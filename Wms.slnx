@@ -1,1 +1,3 @@
-<Solution />
+<Solution>
+  <Project Path="Wms.WebApp/Wms.WebApp.csproj" />
+</Solution>
