@@ -1,4 +1,6 @@
 
+using Serilog;
+
 namespace Wms.WebApi;
 
 public class Program
@@ -7,11 +9,17 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        builder.Host.UseSerilog((context, services, configuration) => configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services));
+
         // Add services to the container.
         builder.Services.AddAuthorization();
 
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
+
+        builder.Services.AddProblemDetails();
 
         var app = builder.Build();
 

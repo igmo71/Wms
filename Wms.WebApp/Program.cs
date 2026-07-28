@@ -2,9 +2,14 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using Serilog;
+using System.Net.Http.Headers;
+using System.Net.Mime;
+using System.Text;
 using Wms.WebApp.Components;
 using Wms.WebApp.Components.Account;
 using Wms.WebApp.Data;
+using Wms.WebApp.Integration.OneS;
 
 namespace Wms.WebApp;
 
@@ -13,6 +18,10 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Host.UseSerilog((context, services, configuration) => configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services));
 
         // Add MudBlazor services
         builder.Services.AddMudServices();
@@ -32,9 +41,12 @@ public class Program
             })
             .AddIdentityCookies();
 
-        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString));
+
         builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
         builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -47,6 +59,20 @@ public class Program
             .AddDefaultTokenProviders();
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+        builder.Services.AddHttpClient<OneCClient>(client =>
+        {
+            var config = builder.Configuration.GetSection(OneCClientConfig.Section).Get<OneCClientConfig>()
+                ?? throw new InvalidOperationException($"Configuration section '{OneCClientConfig.Section}' is missing.");
+
+            client.BaseAddress = new Uri(config.BaseAddress);
+
+            var authToken = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{config.Username}:{config.Password}"));
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
+
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json));
+        });
 
         var app = builder.Build();
 

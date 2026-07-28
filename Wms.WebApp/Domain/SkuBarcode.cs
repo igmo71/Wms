@@ -1,6 +1,8 @@
-﻿namespace Wms.WebApp.Domain;
+﻿using Wms.WebApp.Abstractions;
 
-public class SkuBarcode
+namespace Wms.WebApp.Domain;
+
+public class SkuBarcode : EntityBase
 {
     public required string Value { get; set; }
 
