@@ -7,7 +7,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
     private readonly HttpClient _httpClient = httpClient;
     private readonly ILogger<OneCClient> _logger = logger;
 
-    public async Task<TValue?> GetValueAsync<TValue>(string? uri, CancellationToken ct = default)
+    public async Task<TValue?> GetValueAsync<TValue>(string uri, CancellationToken ct = default)
     {
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug("{Source} - Start {Uri}", nameof(GetValueAsync), uri);

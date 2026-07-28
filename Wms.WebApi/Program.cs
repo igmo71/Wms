@@ -1,4 +1,6 @@
 using Serilog;
+using Wms.WebApp.Integration;
+using Wms.WebApp.Integration.OneS.Endpoints;
 
 namespace Wms.WebApi;
 
@@ -19,6 +21,8 @@ public class Program
         builder.Services.AddOpenApi();
 
         builder.Services.AddProblemDetails();
+
+        builder.Services.AddIntegrationServices(builder.Configuration);
 
         var app = builder.Build();
 
@@ -54,6 +58,8 @@ public class Program
             return forecast;
         })
         .WithName("GetWeatherForecast");
+
+        app.MapOneCEndpints();
 
         app.Run();
     }
