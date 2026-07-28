@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Wms.WebApp.Integration.OneS.Models;
 using Wms.WebApp.Integration.OneS.Services;
 
 namespace Wms.WebApp.Integration.OneS.Endpoints;
@@ -11,11 +12,11 @@ public static class OneCEndpoints
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/", GetListCatalog_УпаковкиЕдиницыИзмерения)
-            .WithTags("Tag: Get List Catalog_УпаковкиЕдиницыИзмерения")
-            .WithName("Name: Get List Catalog_УпаковкиЕдиницыИзмерения")
-            .WithSummary("Summary: Get List Catalog_УпаковкиЕдиницыИзмерения")
-            .WithDescription("Description: Get List Catalog_УпаковкиЕдиницыИзмерения");
+        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения", GetListCatalog_УпаковкиЕдиницыИзмерения)
+            .WithTags("Get List Catalog_УпаковкиЕдиницыИзмерения");
+
+        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", NotifyCatalog_УпаковкиЕдиницыИзмерения)
+           .WithTags("Notify Catalog_УпаковкиЕдиницыИзмерения");
 
         return routeBuilder;
     }
@@ -27,5 +28,17 @@ public static class OneCEndpoints
         var result = await service.GetList(cancellationToken);
 
         return TypedResults.Ok(result);
+    }
+
+    static async Task<IResult> NotifyCatalog_УпаковкиЕдиницыИзмерения(
+        [FromServices] NotifyChannel notifyChannel,
+        [FromBody] NotifyRequest request,
+        CancellationToken cancellationToken)
+    {
+        await notifyChannel.Writer.WriteAsync(
+            new NotifyRecord(request.Ref_Key, nameof(Catalog_УпаковкиЕдиницыИзмерения)),
+            cancellationToken);
+
+        return TypedResults.Ok();
     }
 }

@@ -1,4 +1,6 @@
 using Serilog;
+using Wms.WebApp.Application;
+using Wms.WebApp.Data;
 using Wms.WebApp.Integration;
 using Wms.WebApp.Integration.OneS.Endpoints;
 
@@ -22,7 +24,9 @@ public class Program
 
         builder.Services.AddProblemDetails();
 
+        builder.Services.AddApplicatiobDbContext(builder.Configuration);
         builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddApplicationServices();
 
         var app = builder.Build();
 

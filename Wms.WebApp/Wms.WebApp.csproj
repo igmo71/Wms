@@ -28,7 +28,6 @@
 
 
   <ItemGroup>
-    <Folder Include="Application\" />
     <Folder Include="Components\Pages\UoMPages\" />
   </ItemGroup>
 

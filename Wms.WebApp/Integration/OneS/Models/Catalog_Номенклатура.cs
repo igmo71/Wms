@@ -10,10 +10,12 @@ public class Catalog_Номенклатура
     public string? Description { get; set; }
     public string? Артикул { get; set; }
     public string? ЕдиницаИзмерения_Key { get; set; }
+
     public bool ВесИспользовать { get; set; }
     public string? ВесЕдиницаИзмерения_Key { get; set; }
     public double ВесЧислитель { get; set; }
     public double ВесЗнаменатель { get; set; }
+
     public bool ОбъемИспользовать { get; set; }
     public string? ОбъемЕдиницаИзмерения_Key { get; set; }
     public double ОбъемЗнаменатель { get; set; }

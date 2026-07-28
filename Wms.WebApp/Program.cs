@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Serilog;
 using Wms.WebApp.Components;
@@ -37,14 +36,6 @@ public class Program
             })
             .AddIdentityCookies();
 
-        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-
-        builder.Services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(connectionString));
-
-        builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
         builder.Services.AddIdentityCore<ApplicationUser>(options =>
         {
             options.SignIn.RequireConfirmedAccount = true;
@@ -56,21 +47,7 @@ public class Program
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-        //builder.Services.AddHttpClient<OneCClient>(client =>
-        //{
-        //    var config = builder.Configuration.GetSection(OneCClientConfig.Section).Get<OneCClientConfig>()
-        //        ?? throw new InvalidOperationException($"Configuration section '{OneCClientConfig.Section}' is missing.");
-
-        //    client.BaseAddress = new Uri(config.BaseAddress);
-
-        //    var authToken = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{config.Username}:{config.Password}"));
-
-        //    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
-
-        //    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json));
-        //});
-
-        //builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddApplicatiobDbContext(builder.Configuration);
 
         var app = builder.Build();
 
