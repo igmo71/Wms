@@ -4,6 +4,10 @@ namespace Wms.WebApp.Common;
 
 public class ServiceResult : IServiceResult
 {
+    public bool IsSuccess { get; }
+
+    public ServiceError? Error { get; }
+
     protected ServiceResult()
     {
         IsSuccess = true;
@@ -16,23 +20,31 @@ public class ServiceResult : IServiceResult
         Error = error;
     }
 
-    public bool IsSuccess { get; }
+    protected ServiceResult(ServiceErrorType errorType, string? message)
+    {
+        IsSuccess = false;
+        Error = new ServiceError(errorType, message);
+    }
 
-    public ServiceError? Error { get; }
 
     public static ServiceResult Success() => new();
 
     public static ServiceResult Fail(ServiceError error) => new(error);
+
+    public static ServiceResult Fail(ServiceErrorType errorType, string? message) => new(errorType, message);
+
 
     public static implicit operator ServiceResult(ServiceError error) => Fail(error);
 }
 
 public class ServiceResult<TValue> : ServiceResult, IServiceResult<TValue>
 {
+    public TValue? Value { get; }
+
+    public static ServiceResult<TValue> Success(TValue value) => new(value);
+
     private ServiceResult(TValue value) : base()
     {
-        ArgumentNullException.ThrowIfNull(value);
-
         Value = value;
     }
 
@@ -41,9 +53,16 @@ public class ServiceResult<TValue> : ServiceResult, IServiceResult<TValue>
         Value = default;
     }
 
-    public TValue? Value { get; }
-
-    public static ServiceResult<TValue> Success(TValue value) => new(value);
+    protected ServiceResult(ServiceErrorType errorType, string? message) : base(errorType, message)
+    {
+        Value = default;
+    }
 
     public static new ServiceResult<TValue> Fail(ServiceError error) => new(error);
+    public static new ServiceResult<TValue> Fail(ServiceErrorType errorType, string? message) => new(errorType, message);
+
+
+    public static implicit operator ServiceResult<TValue>(TValue value) => Success(value);
+
+    public static implicit operator ServiceResult<TValue>(ServiceError error) => Fail(error);
 }
