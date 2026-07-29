@@ -5,11 +5,11 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOfMeasureService> logger)
+internal class StockKeepingUnitService(ApplicationDbContext dbContext, ILogger<StockKeepingUnitService> logger)
 {
-    public async Task<UnitOfMeasure> CreateAsync(UnitOfMeasure item)
+    public async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item)
     {
-        var entity = dbContext.Set<UnitOfMeasure>().Add(item).Entity;
+        var entity = dbContext.Set<StockKeepingUnit>().Add(item).Entity;
 
         _ = await dbContext.SaveChangesAsync();
 
@@ -19,18 +19,20 @@ public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOf
         return entity;
     }
 
-    public async Task<UnitOfMeasure?> UpdateAsync(UnitOfMeasure item)
+    public async Task<StockKeepingUnit?> UpdateAsync(StockKeepingUnit item)
     {
-        await dbContext.UnitsOfMeasure
+        await dbContext.StockKeepingUnits
             .Where(x => x.Id == item.Id)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.Abbreviation, item.Abbreviation)
+                .SetProperty(e => e.DeletionMark, item.DeletionMark)
                 .SetProperty(e => e.Code, item.Code)
                 .SetProperty(e => e.DeletionMark, item.DeletionMark)
                 .SetProperty(e => e.Description, item.Description)
                 .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.Numerator, item.Numerator)
-                .SetProperty(e => e.Denominator, item.Denominator));
+                .SetProperty(e => e.IsFolder, item.IsFolder)
+                .SetProperty(e => e.ParentId, item.ParentId)
+                .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
+                .SetProperty(e => e.WeightKg, item.WeightKg));
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
@@ -38,9 +40,9 @@ public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOf
         return item;
     }
 
-    public async Task CreateOrUpdateAsync(UnitOfMeasure item, CancellationToken ct)
+    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct)
     {
-        var exists = await dbContext.UnitsOfMeasure.AnyAsync(e => e.Id == item.Id, ct);
+        var exists = await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == item.Id);
         if (exists)
         {
             await UpdateAsync(item);
@@ -51,7 +53,7 @@ public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOf
         }
     }
 
-    public async Task CreateOrUpdateListAsync(IEnumerable<UnitOfMeasure> items, CancellationToken ct)
+    public async Task CreateOrUpdateListAsync(IEnumerable<StockKeepingUnit> items, CancellationToken ct)
     {
         foreach (var item in items)
         {

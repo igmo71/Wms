@@ -28,25 +28,47 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
 
     public async Task Import(string Ref_Key, CancellationToken ct)
     {
-        var items = await Get(Ref_Key, ct);
+        var fetchedItems = await Get(Ref_Key, ct);
 
-        if (items is null)
+        if (fetchedItems is null)
             return;
 
-        var item = items[0];
+        var fetchedItem = fetchedItems[0];
 
-        var uom = new UnitOfMeasure
+        UnitOfMeasure newItem = CreateNew(fetchedItem);
+
+        await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
+    }
+
+    internal async Task ImportList(CancellationToken cancellationToken)
+    {
+        var fetchedItems = await GetList(cancellationToken);
+
+        if (fetchedItems is null)
+            return;
+
+        foreach (var fetchedItem in fetchedItems)
         {
-            Id = Guid.Parse(item.Ref_Key),
-            Code = item.Code,
-            Abbreviation = item.МеждународноеСокращение,
-            DeletionMark = item.DeletionMark,
-            Description = item.Description,
-            Name = item.НаименованиеПолное,
-            Numerator = item.Числитель,
-            Denominator = item.Знаменатель
-        };
+            var newItem = CreateNew(fetchedItem);
 
-        await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
+            await unitOfMeasureService.CreateOrUpdateAsync(newItem, cancellationToken);
+        }
+
+        return;
+    }
+
+    private static UnitOfMeasure CreateNew(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)
+    {
+        return new UnitOfMeasure
+        {
+            Id = fetchedItem.Ref_Key,
+            Code = fetchedItem.Code,
+            Abbreviation = fetchedItem.МеждународноеСокращение,
+            DeletionMark = fetchedItem.DeletionMark,
+            Description = fetchedItem.Description,
+            Name = fetchedItem.НаименованиеПолное,
+            Numerator = fetchedItem.Числитель,
+            Denominator = fetchedItem.Знаменатель
+        };
     }
 }

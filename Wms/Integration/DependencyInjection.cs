@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddHostedService<NotifyBackgroundService>();
 
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();
+        services.AddScoped<Catalog_Номенклатура_Service>();
 
         return services;
     }

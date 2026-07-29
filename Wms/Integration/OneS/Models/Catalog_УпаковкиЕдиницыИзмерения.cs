@@ -2,7 +2,7 @@
 
 public class Catalog_УпаковкиЕдиницыИзмерения
 {
-    public required string Ref_Key { get; set; }
+    public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
     public string? Code { get; set; }
     public string? Description { get; set; }
