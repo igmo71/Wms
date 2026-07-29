@@ -15,4 +15,6 @@ public class StockKeepingUnit
     public Guid? ParentId { get; set; }
 
     public bool IsFolder { get; set; }
+
+    public List<SkuBarcode>? Barcodes { get; set; }
 }

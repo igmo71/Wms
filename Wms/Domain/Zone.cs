@@ -8,4 +8,6 @@ public class Zone
 
     public Guid? WarehouseId { get; set; }
     public Warehouse? Warehouse { get; set; }
+
+    public List<StorageLocation>? StorageLocations { get; set; }
 }

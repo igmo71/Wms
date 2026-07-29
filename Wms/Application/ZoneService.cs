@@ -6,11 +6,11 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class StockKeepingUnitService(
+internal class ZoneService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<StockKeepingUnitService> logger)
+    ILogger<ZoneService> logger)
 {
-    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
+    public async Task CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
     {
         int updatedRows = await UpdateAsync(item, ct);
 
@@ -20,21 +20,13 @@ internal class StockKeepingUnitService(
         }
     }
 
-    private async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item, CancellationToken ct = default)
+    private async Task<Zone> CreateAsync(Zone item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var entity = dbContext.StockKeepingUnits.Add(item).Entity;
+        var entity = dbContext.Zones.Add(item).Entity;
 
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            logger.LogWarning("Параллельный поток успел вставить ID {Id}. Выполняем обновление.", item.Id);
-            await UpdateAsync(item, ct);
-        }
+        _ = await dbContext.SaveChangesAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(CreateAsync), entity);
@@ -42,20 +34,15 @@ internal class StockKeepingUnitService(
         return entity;
     }
 
-    private async Task<int> UpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
+    private async Task<int> UpdateAsync(Zone item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        int rowsAffected = await dbContext.StockKeepingUnits
+        int rowsAffected = await dbContext.Zones
             .Where(x => x.Id == item.Id)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, item.DeletionMark)
-                .SetProperty(e => e.Code, item.Code)
                 .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.IsFolder, item.IsFolder)
-                .SetProperty(e => e.ParentId, item.ParentId)
-                .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
-                .SetProperty(e => e.WeightKg, item.WeightKg), ct);
+                .SetProperty(e => e.DeletionMark, item.DeletionMark), ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
@@ -63,22 +50,22 @@ internal class StockKeepingUnitService(
         return rowsAffected;
     }
 
-    public async Task<StockKeepingUnit?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<Zone?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.StockKeepingUnits
+        var result = await dbContext.Zones
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         return result;
     }
 
-    public async Task<ListResult<StockKeepingUnit>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Zone>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        IQueryable<StockKeepingUnit> query = dbContext.StockKeepingUnits
+        IQueryable<Zone> query = dbContext.Zones
                 .AsNoTracking();
 
         if (listQuery.ExcludeDeleted)
@@ -95,14 +82,14 @@ internal class StockKeepingUnitService(
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
-        return new ListResult<StockKeepingUnit>
+        return new ListResult<Zone>
         {
             Items = items,
             TotalItems = totalItems
         };
     }
 
-    private static IQueryable<StockKeepingUnit> ApplySearch(IQueryable<StockKeepingUnit> query, string? searchString)
+    private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, string? searchString)
     {
         if (!string.IsNullOrWhiteSpace(searchString))
         {
@@ -112,12 +99,42 @@ internal class StockKeepingUnitService(
         return query;
     }
 
-    private static IQueryable<StockKeepingUnit> ApplySorting(IQueryable<StockKeepingUnit> query, string? sortBy, bool sortDescending)
+    private static IQueryable<Zone> ApplySorting(IQueryable<Zone> query, string? sortBy, bool sortDescending)
     {
         return sortBy switch
         {
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
             _ => query.OrderByDescending(x => x.Name),
         };
+    }
+
+    public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        int rowsAffected = await dbContext.Zones
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.DeletionMark, true), ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@EntityId}", nameof(MarkDeleteAsync), id);
+
+        return rowsAffected;
+    }
+
+    public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        int rowsAffected = await dbContext.Zones
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.DeletionMark, false), ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@EntityId}", nameof(UnMarkDeleteAsync), id);
+
+        return rowsAffected;
     }
 }

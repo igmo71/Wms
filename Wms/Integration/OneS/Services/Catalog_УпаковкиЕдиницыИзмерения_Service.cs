@@ -44,8 +44,6 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
 
             await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
         }
-
-        return;
     }
     private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetListAsync(CancellationToken ct = default)
     {

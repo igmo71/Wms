@@ -44,8 +44,6 @@ internal class Catalog_Склады_Service(
 
             await warehouseService.CreateOrUpdateAsync(newItem, cancellationToken);
         }
-
-        return;
     }
 
     private async Task<List<Catalog_Склады>?> GetListAsync(CancellationToken ct)

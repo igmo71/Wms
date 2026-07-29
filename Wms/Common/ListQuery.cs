@@ -7,4 +7,5 @@ internal class ListQuery
     public bool SortDescending { get; set; }
     public int Skip { get; set; }
     public int Take { get; set; }
+    public bool ExcludeDeleted { get; set; } = true;
 }

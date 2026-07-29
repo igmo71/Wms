@@ -24,7 +24,7 @@ internal class UnitOfMeasureService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var entity = dbContext.Set<UnitOfMeasure>().Add(item).Entity;
+        var entity = dbContext.UnitsOfMeasure.Add(item).Entity;
 
         _ = await dbContext.SaveChangesAsync(ct);
 
@@ -72,6 +72,9 @@ internal class UnitOfMeasureService(
 
         IQueryable<UnitOfMeasure> query = dbContext.UnitsOfMeasure
                 .AsNoTracking();
+
+        if (listQuery.ExcludeDeleted)
+            query = query.Where(x => x.DeletionMark == false);
 
         query = ApplySearch(query, listQuery.SearchString);
 

@@ -6,11 +6,11 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class WarehouseService(
+internal class StorageLocationService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<WarehouseService> logger)
+    ILogger<StorageLocationService> logger)
 {
-    public async Task CreateOrUpdateAsync(Warehouse item, CancellationToken ct = default)
+    public async Task CreateOrUpdateAsync(StorageLocation item, CancellationToken ct = default)
     {
         int updatedRows = await UpdateAsync(item, ct);
 
@@ -20,11 +20,11 @@ internal class WarehouseService(
         }
     }
 
-    private async Task<Warehouse> CreateAsync(Warehouse item, CancellationToken ct = default)
+    private async Task<StorageLocation> CreateAsync(StorageLocation item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var entity = dbContext.Warehouses.Add(item).Entity;
+        var entity = dbContext.StorageLocations.Add(item).Entity;
 
         _ = await dbContext.SaveChangesAsync(ct);
 
@@ -34,11 +34,11 @@ internal class WarehouseService(
         return entity;
     }
 
-    private async Task<int> UpdateAsync(Warehouse item, CancellationToken ct = default)
+    private async Task<int> UpdateAsync(StorageLocation item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        int rowsAffected = await dbContext.Warehouses
+        int rowsAffected = await dbContext.StorageLocations
             .Where(x => x.Id == item.Id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.Name, item.Name)
@@ -50,22 +50,22 @@ internal class WarehouseService(
         return rowsAffected;
     }
 
-    public async Task<Warehouse?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<StorageLocation?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.Warehouses
+        var result = await dbContext.StorageLocations
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         return result;
     }
 
-    public async Task<ListResult<Warehouse>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<StorageLocation>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        IQueryable<Warehouse> query = dbContext.Warehouses
+        IQueryable<StorageLocation> query = dbContext.StorageLocations
                 .AsNoTracking();
 
         if (listQuery.ExcludeDeleted)
@@ -82,14 +82,14 @@ internal class WarehouseService(
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
-        return new ListResult<Warehouse>
+        return new ListResult<StorageLocation>
         {
             Items = items,
             TotalItems = totalItems
         };
     }
 
-    private static IQueryable<Warehouse> ApplySearch(IQueryable<Warehouse> query, string? searchString)
+    private static IQueryable<StorageLocation> ApplySearch(IQueryable<StorageLocation> query, string? searchString)
     {
         if (!string.IsNullOrWhiteSpace(searchString))
         {
@@ -99,7 +99,7 @@ internal class WarehouseService(
         return query;
     }
 
-    private static IQueryable<Warehouse> ApplySorting(IQueryable<Warehouse> query, string? sortBy, bool sortDescending)
+    private static IQueryable<StorageLocation> ApplySorting(IQueryable<StorageLocation> query, string? sortBy, bool sortDescending)
     {
         return sortBy switch
         {
@@ -107,4 +107,35 @@ internal class WarehouseService(
             _ => query.OrderByDescending(x => x.Name),
         };
     }
+
+    public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        int rowsAffected = await dbContext.StorageLocations
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.DeletionMark, true), ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@EntityId}", nameof(MarkDeleteAsync), id);
+
+        return rowsAffected;
+    }
+
+    public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        int rowsAffected = await dbContext.StorageLocations
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.DeletionMark, false), ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@EntityId}", nameof(UnMarkDeleteAsync), id);
+
+        return rowsAffected;
+    }
 }
+
