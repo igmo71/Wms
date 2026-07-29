@@ -15,9 +15,6 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения", GetListCatalog_УпаковкиЕдиницыИзмерения)
-            .WithTags("Get List Catalog_УпаковкиЕдиницыИзмерения");
-
         group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", ImportListCatalog_УпаковкиЕдиницыИзмерения)
             .WithTags("Import Catalog_УпаковкиЕдиницыИзмерения");
 
@@ -25,15 +22,6 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
            .WithTags("Notify Catalog_УпаковкиЕдиницыИзмерения");
 
         return routeBuilder;
-    }
-
-    static async Task<IResult> GetListCatalog_УпаковкиЕдиницыИзмерения(
-        [FromServices] Catalog_УпаковкиЕдиницыИзмерения_Service service,
-        CancellationToken cancellationToken)
-    {
-        var result = await service.GetList(cancellationToken);
-
-        return TypedResults.Ok(result);
     }
 
     static async Task<IResult> ImportListCatalog_УпаковкиЕдиницыИзмерения(

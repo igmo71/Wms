@@ -11,27 +11,6 @@ internal class Catalog_Номенклатура_Service(
     StockKeepingUnitService stockKeepingUnitService,
     ILogger<Catalog_Номенклатура_Service> logger)
 {
-    public async Task<int> GetTotal(CancellationToken ct)
-    {
-        var uri = Catalog_Номенклатура.TotalUri;
-        var result = await oneCClient.GetValueAsync<int>(uri, ct);
-        return result;
-    }
-
-    public async Task<List<Catalog_Номенклатура>?> GetList(int page, CancellationToken ct)
-    {
-        var uri = Catalog_Номенклатура.GetListUri(page);
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-        return rootObject?.Value;
-    }
-
-    public async Task<List<Catalog_Номенклатура>?> Get(string Ref_Key, CancellationToken ct)
-    {
-        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-        return rootObject?.Value;
-    }
-
     public async Task Import(string Ref_Key, CancellationToken ct)
     {
         var fetchedItems = await Get(Ref_Key, ct);
@@ -45,14 +24,24 @@ internal class Catalog_Номенклатура_Service(
         await stockKeepingUnitService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    internal async Task ImportList(CancellationToken ct)
+    private async Task<List<Catalog_Номенклатура>?> Get(string Ref_Key, CancellationToken ct)
+    {
+        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
+        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+        return rootObject?.Value;
+    }
+
+    public async Task ImportList(CancellationToken ct)
     {
         var startedAt = Stopwatch.GetTimestamp();
+
         int totalItems = await GetTotal(ct);
+
         int batchSize = Catalog_Номенклатура.BatchSize;
+
         int totalBatches = (totalItems + batchSize - 1) / batchSize;
 
-        List<Task> tasks = new();
+        List<Task> tasks = [];
 
         using var semaphore = new SemaphoreSlim(10);
 
@@ -81,8 +70,22 @@ internal class Catalog_Номенклатура_Service(
 
         await Task.WhenAll(tasks);
 
-        var elapsed = Stopwatch.GetElapsedTime(startedAt);
-        logger.LogDebug("{Source} {Elapsed}", nameof(ImportList), elapsed);
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {Elapsed}", nameof(ImportList), Stopwatch.GetElapsedTime(startedAt));
+    }
+
+    private async Task<int> GetTotal(CancellationToken ct)
+    {
+        var uri = Catalog_Номенклатура.TotalUri;
+        var result = await oneCClient.GetValueAsync<int>(uri, ct);
+        return result;
+    }
+
+    private async Task<List<Catalog_Номенклатура>?> GetList(int page, CancellationToken ct)
+    {
+        var uri = Catalog_Номенклатура.GetListUri(page);
+        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+        return rootObject?.Value;
     }
 
     private async Task ProcessBatchAsync(List<Catalog_Номенклатура> fetchedItems, CancellationToken ct)

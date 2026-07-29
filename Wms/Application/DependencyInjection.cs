@@ -8,6 +8,7 @@ public static class DependencyInjection
     {
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<UnitOfMeasureService>();
+        services.AddScoped<WarehouseService>();
 
         return services;
     }

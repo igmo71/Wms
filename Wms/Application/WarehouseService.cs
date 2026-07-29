@@ -5,11 +5,11 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class UnitOfMeasureService(
+internal class WarehouseService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<UnitOfMeasureService> logger)
+    ILogger<WarehouseService> logger)
 {
-    public async Task CreateOrUpdateAsync(UnitOfMeasure item, CancellationToken ct)
+    public async Task CreateOrUpdateAsync(Warehouse item, CancellationToken ct)
     {
         int updatedRows = await UpdateAsync(item);
 
@@ -19,11 +19,11 @@ internal class UnitOfMeasureService(
         }
     }
 
-    private async Task<UnitOfMeasure> CreateAsync(UnitOfMeasure item)
+    private async Task<Warehouse> CreateAsync(Warehouse item)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
-        var entity = dbContext.Set<UnitOfMeasure>().Add(item).Entity;
+        var entity = dbContext.Set<Warehouse>().Add(item).Entity;
 
         _ = await dbContext.SaveChangesAsync();
 
@@ -33,20 +33,15 @@ internal class UnitOfMeasureService(
         return entity;
     }
 
-    private async Task<int> UpdateAsync(UnitOfMeasure item)
+    private async Task<int> UpdateAsync(Warehouse item)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
-        int rowsAffected = await dbContext.UnitsOfMeasure
+        int rowsAffected = await dbContext.Warehouses
             .Where(x => x.Id == item.Id)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.Abbreviation, item.Abbreviation)
-                .SetProperty(e => e.Code, item.Code)
-                .SetProperty(e => e.DeletionMark, item.DeletionMark)
-                .SetProperty(e => e.Description, item.Description)
                 .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.Numerator, item.Numerator)
-                .SetProperty(e => e.Denominator, item.Denominator));
+                .SetProperty(e => e.DeletionMark, item.DeletionMark));
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);

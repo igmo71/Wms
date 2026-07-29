@@ -9,7 +9,17 @@ internal class StockKeepingUnitService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     ILogger<StockKeepingUnitService> logger)
 {
-    public async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item)
+    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct)
+    {
+        int updatedRows = await UpdateAsync(item);
+
+        if (updatedRows == 0)
+        {
+            await CreateAsync(item);
+        }
+    }
+
+    private async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
@@ -25,10 +35,13 @@ internal class StockKeepingUnitService(
             await UpdateAsync(item);
         }
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@Entity}", nameof(CreateAsync), entity);
+
         return entity;
     }
 
-    public async Task<int> UpdateAsync(StockKeepingUnit item)
+    private async Task<int> UpdateAsync(StockKeepingUnit item)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
@@ -43,16 +56,9 @@ internal class StockKeepingUnitService(
                 .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
                 .SetProperty(e => e.WeightKg, item.WeightKg));
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
+
         return rowsAffected;
-    }
-
-    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct)
-    {
-        int updatedRows = await UpdateAsync(item);
-
-        if (updatedRows == 0)
-        {
-            await CreateAsync(item);
-        }
     }
 }

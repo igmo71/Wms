@@ -4,28 +4,10 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-public class Catalog_УпаковкиЕдиницыИзмерения_Service(
+internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
     OneCClient oneCClient,
     UnitOfMeasureService unitOfMeasureService)
 {
-    public async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetList(CancellationToken ct)
-    {
-        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
-        var result = rootObject?.Value;
-
-        return result;
-    }
-
-    public async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> Get(string Ref_Key, CancellationToken ct)
-    {
-        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(Ref_Key);
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
-        var result = rootObject?.Value;
-
-        return result;
-    }
-
     public async Task Import(string Ref_Key, CancellationToken ct)
     {
         var fetchedItems = await Get(Ref_Key, ct);
@@ -40,7 +22,16 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
         await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    internal async Task ImportList(CancellationToken cancellationToken)
+    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> Get(string Ref_Key, CancellationToken ct)
+    {
+        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(Ref_Key);
+        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
+        var result = rootObject?.Value;
+
+        return result;
+    }
+
+    public async Task ImportList(CancellationToken cancellationToken)
     {
         var fetchedItems = await GetList(cancellationToken);
 
@@ -55,6 +46,14 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
         }
 
         return;
+    }
+    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetList(CancellationToken ct)
+    {
+        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
+        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
+        var result = rootObject?.Value;
+
+        return result;
     }
 
     private static UnitOfMeasure CreateNew(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)

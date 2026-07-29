@@ -16,9 +16,6 @@ public static class Catalog_Номенклатура_Endpoints
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        //group.MapGet("/Catalog_Номенклатура", GetListCatalog_Номенклатура)
-        //    .WithTags("Get List Catalog_Номенклатура");
-
         group.MapGet("/Catalog_Номенклатура/import", ImportListCatalog_Номенклатура)
             .WithTags("Import Catalog_Номенклатура");
 
@@ -27,15 +24,6 @@ public static class Catalog_Номенклатура_Endpoints
 
         return routeBuilder;
     }
-
-    //static async Task<IResult> GetListCatalog_Номенклатура(
-    //    [FromServices] Catalog_Номенклатура_Service service,
-    //    CancellationToken cancellationToken)
-    //{
-    //    var result = await service.GetList(cancellationToken);
-
-    //    return TypedResults.Ok(result);
-    //}
 
     static async Task<IResult> ImportListCatalog_Номенклатура(
         [FromServices] Catalog_Номенклатура_Service service,
