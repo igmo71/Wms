@@ -24,7 +24,7 @@ public class NotifyBackgroundService(
             catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Error))
-                    logger.LogError(ex, "{Source} - Error dispatching app event from channel", nameof(ExecuteAsync));
+                    logger.LogError(ex, "{Source} {Exception}", nameof(ExecuteAsync), ex.Message);
                 throw;
             }
         }
@@ -58,7 +58,7 @@ public class NotifyBackgroundService(
                     break;
                 }
             default:
-                logger.LogError("{Source} Unsupported NotifyRecord {@}", nameof(DispatchNotification), notifyRecord);
+                logger.LogError("{Source} Unsupported NotifyRecord {@NotifyRecord}", nameof(DispatchNotification), notifyRecord);
                 break;
         }
     }

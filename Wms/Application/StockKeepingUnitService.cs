@@ -30,9 +30,10 @@ internal class StockKeepingUnitService(
         {
             await dbContext.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
-            logger.LogWarning("Параллельный поток успел вставить ID {Id}. Выполняем обновление.", item.Id);
+            logger.LogWarning("{Source} {Id} {DbUpdateException}", nameof(CreateAsync), item.Id, ex.Message);
+
             await UpdateAsync(item, ct);
         }
 

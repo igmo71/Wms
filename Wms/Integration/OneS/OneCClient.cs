@@ -10,8 +10,8 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
     public async Task<TValue?> GetValueAsync<TValue>(string uri, CancellationToken ct = default)
     {
-        //if (_logger.IsEnabled(LogLevel.Debug))
-        //    _logger.LogDebug("{Source} - Start {Uri}", nameof(GetValueAsync), uri);
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("{Source} - Start {Uri}", nameof(GetValueAsync), uri);
 
         using var response = await _httpClient.GetAsync(uri, ct);
 
@@ -27,8 +27,8 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         var result = JsonSerializer.Deserialize<TValue>(content);
 
-        //if (_logger.IsEnabled(LogLevel.Debug))
-        //    _logger.LogDebug("{Source} - Ok {Uri} {@Result}", nameof(GetValueAsync), uri, result);
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("{Source} - Ok {Uri}", nameof(GetValueAsync), uri);
 
         return result;
     }
