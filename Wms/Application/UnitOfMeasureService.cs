@@ -5,10 +5,14 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOfMeasureService> logger)
+public class UnitOfMeasureService(
+    IDbContextFactory<ApplicationDbContext> dbContextFactory,
+    ILogger<UnitOfMeasureService> logger)
 {
     public async Task<UnitOfMeasure> CreateAsync(UnitOfMeasure item)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
         var entity = dbContext.Set<UnitOfMeasure>().Add(item).Entity;
 
         _ = await dbContext.SaveChangesAsync();
@@ -19,9 +23,11 @@ public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOf
         return entity;
     }
 
-    public async Task<UnitOfMeasure?> UpdateAsync(UnitOfMeasure item)
+    public async Task<int> UpdateAsync(UnitOfMeasure item)
     {
-        await dbContext.UnitsOfMeasure
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
+        int rowsAffected = await dbContext.UnitsOfMeasure
             .Where(x => x.Id == item.Id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.Abbreviation, item.Abbreviation)
@@ -35,27 +41,18 @@ public class UnitOfMeasureService(ApplicationDbContext dbContext, ILogger<UnitOf
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
 
-        return item;
+        return rowsAffected;
     }
 
     public async Task CreateOrUpdateAsync(UnitOfMeasure item, CancellationToken ct)
     {
-        var exists = await dbContext.UnitsOfMeasure.AnyAsync(e => e.Id == item.Id, ct);
-        if (exists)
-        {
-            await UpdateAsync(item);
-        }
-        else
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
+        int updatedRows = await UpdateAsync(item);
+
+        if (updatedRows == 0)
         {
             await CreateAsync(item);
-        }
-    }
-
-    public async Task CreateOrUpdateListAsync(IEnumerable<UnitOfMeasure> items, CancellationToken ct)
-    {
-        foreach (var item in items)
-        {
-            await CreateOrUpdateAsync(item, ct);
         }
     }
 }

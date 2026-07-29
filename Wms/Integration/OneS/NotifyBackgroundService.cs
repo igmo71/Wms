@@ -36,11 +36,20 @@ public class NotifyBackgroundService(
 
         switch (notifyRecord.Type)
         {
+            case nameof(Catalog_Номенклатура):
+                {
+                    var service = scope.ServiceProvider.GetService<Catalog_Номенклатура_Service>();
+                    if (service is not null)
+                        await service.Import(notifyRecord.Ref_Key, ct);
+                    break;
+                }
             case nameof(Catalog_УпаковкиЕдиницыИзмерения):
-                var service = scope.ServiceProvider.GetService<Catalog_УпаковкиЕдиницыИзмерения_Service>();
-                if (service is not null)
-                    await service.Import(notifyRecord.Ref_Key, ct);
-                break;
+                {
+                    var service = scope.ServiceProvider.GetService<Catalog_УпаковкиЕдиницыИзмерения_Service>();
+                    if (service is not null)
+                        await service.Import(notifyRecord.Ref_Key, ct);
+                    break;
+                }
             default:
                 logger.LogError("{Source} Unsupported NotifyRecord {@}", nameof(DispatchNotification), notifyRecord);
                 break;

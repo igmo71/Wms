@@ -7,6 +7,7 @@ public static class OneCEndpoints
     public static IEndpointRouteBuilder MapOneCEndpints(this IEndpointRouteBuilder routeBuilder)
     {
         routeBuilder.MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints();
+        routeBuilder.MapCatalog_Номенклатура_Endpoints();
 
         return routeBuilder;
     }

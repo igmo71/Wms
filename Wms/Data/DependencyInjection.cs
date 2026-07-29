@@ -11,8 +11,12 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-        services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(connectionString));
+        services.AddDbContextFactory<ApplicationDbContext>(options =>
+        {
+            options.UseSqlServer(connectionString);
+            options.EnableSensitiveDataLogging();
+            options.EnableDetailedErrors();
+        });
 
         services.AddDatabaseDeveloperPageExceptionFilter();
 
