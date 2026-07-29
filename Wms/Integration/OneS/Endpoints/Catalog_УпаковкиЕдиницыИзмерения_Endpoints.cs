@@ -28,7 +28,7 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
         [FromServices] Catalog_УпаковкиЕдиницыИзмерения_Service service,
         CancellationToken cancellationToken)
     {
-        await service.ImportList(cancellationToken);
+        await service.ImportListAsync(cancellationToken);
 
         return TypedResults.Ok();
     }

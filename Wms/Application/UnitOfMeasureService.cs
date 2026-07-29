@@ -55,7 +55,7 @@ internal class UnitOfMeasureService(
         return rowsAffected;
     }
 
-    public async Task<UnitOfMeasure?> Get(Guid id, CancellationToken ct = default)
+    public async Task<UnitOfMeasure?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -66,7 +66,7 @@ internal class UnitOfMeasureService(
         return result;
     }
 
-    public async Task<ListResult<UnitOfMeasure>> List(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<UnitOfMeasure>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 

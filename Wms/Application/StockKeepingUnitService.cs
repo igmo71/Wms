@@ -63,7 +63,7 @@ internal class StockKeepingUnitService(
         return rowsAffected;
     }
 
-    public async Task<StockKeepingUnit?> Get(Guid id, CancellationToken ct = default)
+    public async Task<StockKeepingUnit?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -74,7 +74,7 @@ internal class StockKeepingUnitService(
         return result;
     }
 
-    public async Task<ListResult<StockKeepingUnit>> List(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<StockKeepingUnit>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 

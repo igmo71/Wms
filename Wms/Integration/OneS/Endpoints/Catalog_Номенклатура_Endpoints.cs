@@ -29,7 +29,7 @@ public static class Catalog_Номенклатура_Endpoints
         [FromServices] Catalog_Номенклатура_Service service,
         CancellationToken cancellationToken)
     {
-        await service.ImportList(cancellationToken);
+        await service.ImportListAsync(cancellationToken);
 
         return TypedResults.Ok();
     }

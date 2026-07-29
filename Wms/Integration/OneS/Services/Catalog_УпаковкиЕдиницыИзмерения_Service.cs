@@ -8,9 +8,9 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
     OneCClient oneCClient,
     UnitOfMeasureService unitOfMeasureService)
 {
-    public async Task Import(string Ref_Key, CancellationToken ct)
+    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var fetchedItems = await Get(Ref_Key, ct);
+        var fetchedItems = await GetAsync(Ref_Key, ct);
 
         if (fetchedItems is null)
             return;
@@ -22,7 +22,7 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> Get(string Ref_Key, CancellationToken ct)
+    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetAsync(string Ref_Key, CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(Ref_Key);
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
@@ -31,9 +31,9 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         return result;
     }
 
-    public async Task ImportList(CancellationToken cancellationToken)
+    public async Task ImportListAsync(CancellationToken ct = default)
     {
-        var fetchedItems = await GetList(cancellationToken);
+        var fetchedItems = await GetListAsync(ct);
 
         if (fetchedItems is null)
             return;
@@ -42,12 +42,12 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         {
             var newItem = CreateNew(fetchedItem);
 
-            await unitOfMeasureService.CreateOrUpdateAsync(newItem, cancellationToken);
+            await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
         }
 
         return;
     }
-    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetList(CancellationToken ct)
+    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);

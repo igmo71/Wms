@@ -50,7 +50,7 @@ internal class WarehouseService(
         return rowsAffected;
     }
 
-    public async Task<Warehouse?> Get(Guid id, CancellationToken ct = default)
+    public async Task<Warehouse?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -61,7 +61,7 @@ internal class WarehouseService(
         return result;
     }
 
-    public async Task<ListResult<Warehouse>> List(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Warehouse>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 

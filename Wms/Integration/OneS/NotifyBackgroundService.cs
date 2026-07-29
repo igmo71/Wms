@@ -40,21 +40,21 @@ public class NotifyBackgroundService(
                 {
                     var service = scope.ServiceProvider.GetService<Catalog_Номенклатура_Service>();
                     if (service is not null)
-                        await service.Import(notifyRecord.Ref_Key, ct);
+                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
                     break;
                 }
             case nameof(Catalog_Склады):
                 {
                     var service = scope.ServiceProvider.GetService<Catalog_Склады_Service>();
                     if (service is not null)
-                        await service.Import(notifyRecord.Ref_Key, ct);
+                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
                     break;
                 }
             case nameof(Catalog_УпаковкиЕдиницыИзмерения):
                 {
                     var service = scope.ServiceProvider.GetService<Catalog_УпаковкиЕдиницыИзмерения_Service>();
                     if (service is not null)
-                        await service.Import(notifyRecord.Ref_Key, ct);
+                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
                     break;
                 }
             default:
