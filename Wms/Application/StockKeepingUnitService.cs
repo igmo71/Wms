@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
@@ -9,30 +10,30 @@ internal class StockKeepingUnitService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     ILogger<StockKeepingUnitService> logger)
 {
-    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct)
+    public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        int updatedRows = await UpdateAsync(item);
+        int updatedRows = await UpdateAsync(item, ct);
 
         if (updatedRows == 0)
         {
-            await CreateAsync(item);
+            await CreateAsync(item, ct);
         }
     }
 
-    private async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item)
+    private async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var entity = dbContext.Set<StockKeepingUnit>().Add(item).Entity;
 
         try
         {
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(ct);
         }
         catch (DbUpdateException)
         {
             logger.LogWarning("Параллельный поток успел вставить ID {Id}. Выполняем обновление.", item.Id);
-            await UpdateAsync(item);
+            await UpdateAsync(item, ct);
         }
 
         if (logger.IsEnabled(LogLevel.Debug))
@@ -41,9 +42,9 @@ internal class StockKeepingUnitService(
         return entity;
     }
 
-    private async Task<int> UpdateAsync(StockKeepingUnit item)
+    private async Task<int> UpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         int rowsAffected = await dbContext.StockKeepingUnits
             .Where(x => x.Id == item.Id)
@@ -54,11 +55,66 @@ internal class StockKeepingUnitService(
                 .SetProperty(e => e.IsFolder, item.IsFolder)
                 .SetProperty(e => e.ParentId, item.ParentId)
                 .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
-                .SetProperty(e => e.WeightKg, item.WeightKg));
+                .SetProperty(e => e.WeightKg, item.WeightKg), ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
 
         return rowsAffected;
+    }
+
+    public async Task<StockKeepingUnit?> Get(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var result = await dbContext.StockKeepingUnits
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+        return result;
+    }
+
+    public async Task<ListResult<StockKeepingUnit>> List(ListQuery listQuery, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        IQueryable<StockKeepingUnit> query = dbContext.StockKeepingUnits
+                .AsNoTracking();
+
+        query = ApplySearch(query, listQuery.SearchString);
+
+        int totalItems = await query.CountAsync(ct);
+
+        query = ApplySorting(query, listQuery.SortBy, listQuery.SortDescending);
+
+        var items = await query
+            .Skip(listQuery.Skip)
+            .Take(listQuery.Take)
+            .ToListAsync(ct);
+
+        return new ListResult<StockKeepingUnit>
+        {
+            Items = items,
+            TotalItems = totalItems
+        };
+    }
+
+    private static IQueryable<StockKeepingUnit> ApplySearch(IQueryable<StockKeepingUnit> query, string? searchString)
+    {
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            query = query.Where(x => x.Name!.Contains(searchString));
+        }
+
+        return query;
+    }
+
+    private static IQueryable<StockKeepingUnit> ApplySorting(IQueryable<StockKeepingUnit> query, string? sortBy, bool sortDescending)
+    {
+        return sortBy switch
+        {
+            "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
+            _ => query.OrderByDescending(x => x.Name),
+        };
     }
 }
