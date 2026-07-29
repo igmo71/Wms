@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
-using Wms.WebApp.Data;
+using Wms.Data;
 
 namespace Wms.WebApp.Components.Account;
 

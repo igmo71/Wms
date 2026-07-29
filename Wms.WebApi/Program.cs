@@ -1,8 +1,8 @@
 using Serilog;
-using Wms.WebApp.Application;
-using Wms.WebApp.Data;
-using Wms.WebApp.Integration;
-using Wms.WebApp.Integration.OneS.Endpoints;
+using Wms.Application;
+using Wms.Data;
+using Wms.Integration;
+using Wms.Integration.OneS.Endpoints;
 
 namespace Wms.WebApi;
 
