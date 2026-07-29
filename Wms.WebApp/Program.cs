@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
 using Serilog;
+using Wms.Data;
 using Wms.WebApp.Components;
 using Wms.WebApp.Components.Account;
 using Wms.WebApp.Data;
