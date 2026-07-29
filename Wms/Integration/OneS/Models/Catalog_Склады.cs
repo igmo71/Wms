@@ -5,6 +5,7 @@ public class Catalog_Склады
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
     public string? Description { get; set; }
+
     private static readonly string select = "Ref_Key,DeletionMark,Description";
 
     public static string GetListUri => $"Catalog_Склады?$format=json&$select={select}";

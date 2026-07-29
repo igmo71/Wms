@@ -31,9 +31,9 @@ internal class Catalog_Склады_Service(
         return result;
     }
 
-    public async Task ImportListAsync(CancellationToken cancellationToken = default)
+    public async Task ImportListAsync(CancellationToken ct = default)
     {
-        var fetchedItems = await GetListAsync(cancellationToken);
+        var fetchedItems = await GetListAsync(ct);
 
         if (fetchedItems is null)
             return;
@@ -42,7 +42,7 @@ internal class Catalog_Склады_Service(
         {
             var newItem = CreateNew(fetchedItem);
 
-            await warehouseService.CreateOrUpdateAsync(newItem, cancellationToken);
+            await warehouseService.CreateOrUpdateAsync(newItem, ct);
         }
     }
 

@@ -10,6 +10,8 @@ internal class SkuBarcodeConfiguration : IEntityTypeConfiguration<SkuBarcode>
     {
         builder.HasKey(x => new { x.SkuId, x.Value });
 
+        builder.Property(x => x.Value).HasMaxLength(DefaultConfiguration.Code);
+
         builder.HasOne(x => x.Sku).WithMany(x => x.Barcodes)
             .HasForeignKey(x => x.SkuId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Cascade);

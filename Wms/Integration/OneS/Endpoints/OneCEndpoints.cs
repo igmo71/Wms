@@ -9,6 +9,7 @@ public static class OneCEndpoints
         routeBuilder.MapCatalog_Номенклатура_Endpoints();
         routeBuilder.MapCatalog_Склады_Endpoints();
         routeBuilder.MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints();
+        routeBuilder.MapInformationRegister_ШтрихкодыНоменклатуры_Endpoints();
 
         return routeBuilder;
     }

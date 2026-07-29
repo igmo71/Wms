@@ -53,19 +53,23 @@ internal class SkuBarcodeService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var affected = await dbContext.SkuBarcodes.ExecuteDeleteAsync(ct);
+        var affected = await dbContext.SkuBarcodes
+            .ExecuteDeleteAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} {@Affected}", nameof(DeleteAllAsync), affected);
 
     }
 
-    public async Task<SkuBarcode?> GetAsync(string value, CancellationToken ct)
+    public async Task DeleteRangeAsync(Guid skuId, CancellationToken ct)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.SkuBarcodes.FirstOrDefaultAsync(x => x.Value == value, ct);
+        var affected = await dbContext.SkuBarcodes
+            .Where(x => x.SkuId == skuId)
+            .ExecuteDeleteAsync(ct);
 
-        return result;
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {@Affected}", nameof(DeleteRangeAsync), affected);
     }
 }

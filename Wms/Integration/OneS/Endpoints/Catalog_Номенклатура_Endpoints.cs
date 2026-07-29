@@ -27,9 +27,9 @@ public static class Catalog_Номенклатура_Endpoints
 
     static async Task<IResult> ImportListCatalog_Номенклатура(
         [FromServices] Catalog_Номенклатура_Service service,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        await service.ImportListAsync(cancellationToken);
+        await service.ImportListAsync(ct);
 
         return TypedResults.Ok();
     }
@@ -37,11 +37,11 @@ public static class Catalog_Номенклатура_Endpoints
     static async Task<IResult> NotifyCatalog_Номенклатура(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         await notifyChannel.Writer.WriteAsync(
             new NotifyRecord(request.Ref_Key, nameof(Catalog_Номенклатура)),
-            cancellationToken);
+            ct);
 
         return TypedResults.Ok();
     }

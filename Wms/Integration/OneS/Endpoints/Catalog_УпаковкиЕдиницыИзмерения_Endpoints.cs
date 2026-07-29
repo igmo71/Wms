@@ -26,9 +26,9 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
 
     static async Task<IResult> ImportListCatalog_УпаковкиЕдиницыИзмерения(
         [FromServices] Catalog_УпаковкиЕдиницыИзмерения_Service service,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        await service.ImportListAsync(cancellationToken);
+        await service.ImportListAsync(ct);
 
         return TypedResults.Ok();
     }
@@ -36,11 +36,11 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
     static async Task<IResult> NotifyCatalog_УпаковкиЕдиницыИзмерения(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         await notifyChannel.Writer.WriteAsync(
             new NotifyRecord(request.Ref_Key, nameof(Catalog_УпаковкиЕдиницыИзмерения)),
-            cancellationToken);
+            ct);
 
         return TypedResults.Ok();
     }
