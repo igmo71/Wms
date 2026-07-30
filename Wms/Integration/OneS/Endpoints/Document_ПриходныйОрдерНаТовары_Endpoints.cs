@@ -7,25 +7,26 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS.Endpoints;
 
-public static class Catalog_УпаковкиЕдиницыИзмерения_Endpoints
+public static class Document_ПриходныйОрдерНаТовары_Endpoints
 {
-    public static IEndpointRouteBuilder MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints(this IEndpointRouteBuilder routeBuilder)
+    public static IEndpointRouteBuilder MapDocument_ПриходныйОрдерНаТовары_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {
+
         var group = routeBuilder.MapGroup("/api/1c")
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import)
-            .WithTags("Import Catalog_УпаковкиЕдиницыИзмерения");
+        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", Import)
+            .WithTags("Import Document_ПриходныйОрдерНаТовары");
 
-        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify)
-           .WithTags("Notify Catalog_УпаковкиЕдиницыИзмерения");
+        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", Notify)
+           .WithTags("Notify Document_ПриходныйОрдерНаТовары");
 
         return routeBuilder;
     }
 
     static async Task<IResult> Import(
-        [FromServices] Catalog_УпаковкиЕдиницыИзмерения_Service service,
+        [FromServices] Document_ПриходныйОрдерНаТовары_Service service,
         CancellationToken ct)
     {
         await service.ImportListAsync(ct);
@@ -39,7 +40,7 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
         CancellationToken ct)
     {
         await notifyChannel.Writer.WriteAsync(
-            new NotifyRecord(request.Ref_Key, nameof(Catalog_УпаковкиЕдиницыИзмерения)),
+            new NotifyRecord(request.Ref_Key, nameof(Document_ПриходныйОрдерНаТовары)),
             ct);
 
         return TypedResults.Ok();

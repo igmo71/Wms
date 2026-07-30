@@ -13,22 +13,25 @@ internal class Catalog_Номенклатура_Service(
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var fetchedItems = await GetAsync(Ref_Key, ct);
+        var fetchedItem = await GetAsync(Ref_Key, ct);
 
-        if (fetchedItems is null || fetchedItems.Count == 0)
+        if (fetchedItem is null)
             return;
 
-        var fetchedItem = fetchedItems[0];
         StockKeepingUnit newItem = CreateNew(fetchedItem);
 
         await stockKeepingUnitService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    private async Task<List<Catalog_Номенклатура>?> GetAsync(string Ref_Key, CancellationToken ct = default)
+    private async Task<Catalog_Номенклатура?> GetAsync(string Ref_Key, CancellationToken ct = default)
     {
         var uri = Catalog_Номенклатура.GetUri(Ref_Key);
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-        return rootObject?.Value;
+
+        var result = rootObject?.Value?[0];
+
+        return result;
     }
 
     public async Task ImportListAsync(CancellationToken ct = default)
@@ -77,14 +80,18 @@ internal class Catalog_Номенклатура_Service(
     private async Task<int> GetTotalAsync(CancellationToken ct = default)
     {
         var uri = Catalog_Номенклатура.TotalUri;
+
         var result = await oneCClient.GetValueAsync<int>(uri, ct);
+
         return result;
     }
 
     private async Task<List<Catalog_Номенклатура>?> GetListAsync(int page, CancellationToken ct = default)
     {
         var uri = Catalog_Номенклатура.GetListUri(page);
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+
         return rootObject?.Value;
     }
 
@@ -93,6 +100,7 @@ internal class Catalog_Номенклатура_Service(
         foreach (var fetchedItem in fetchedItems)
         {
             StockKeepingUnit newItem = CreateNew(fetchedItem);
+
             await stockKeepingUnitService.CreateOrUpdateAsync(newItem, ct);
         }
     }
@@ -101,10 +109,10 @@ internal class Catalog_Номенклатура_Service(
     {
         return new StockKeepingUnit
         {
+            Id = fetchedItem.Ref_Key,
             BaseUnitOfMeasureId = fetchedItem.ЕдиницаИзмерения_Key == Guid.Empty ? null : fetchedItem.ЕдиницаИзмерения_Key,
             Code = fetchedItem.Code,
             DeletionMark = fetchedItem.DeletionMark,
-            Id = fetchedItem.Ref_Key,
             Name = fetchedItem.Description,
             IsFolder = fetchedItem.IsFolder,
             ParentId = fetchedItem.Parent_Key,

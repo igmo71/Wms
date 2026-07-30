@@ -7,6 +7,8 @@ namespace Wms.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
+    public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();
+    public DbSet<ReceivingOrderItem> ReceivingOrderItems => Set<ReceivingOrderItem>();
     public DbSet<SkuBarcode> SkuBarcodes => Set<SkuBarcode>();
     public DbSet<StockKeepingUnit> StockKeepingUnits => Set<StockKeepingUnit>();
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();

@@ -16,16 +16,16 @@ public static class InformationRegister_ШтрихкодыНоменклатур
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", ImportListInformationRegister_ШтрихкодыНоменклатуры)
+        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", Import)
             .WithTags("Import InformationRegister_ШтрихкодыНоменклатуры");
 
-        group.MapPost("/InformationRegister_ШтрихкодыНоменклатуры/notify", NotifyInformationRegister_ШтрихкодыНоменклатуры)
+        group.MapPost("/InformationRegister_ШтрихкодыНоменклатуры/notify", Notify)
            .WithTags("Notify InformationRegister_ШтрихкодыНоменклатуры");
 
         return routeBuilder;
     }
 
-    static async Task<IResult> ImportListInformationRegister_ШтрихкодыНоменклатуры(
+    static async Task<IResult> Import(
         [FromServices] InformationRegister_ШтрихкодыНоменклатуры_Service service,
         CancellationToken ct)
     {
@@ -34,7 +34,7 @@ public static class InformationRegister_ШтрихкодыНоменклатур
         return TypedResults.Ok();
     }
 
-    static async Task<IResult> NotifyInformationRegister_ШтрихкодыНоменклатуры(
+    static async Task<IResult> Notify(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
         CancellationToken ct)

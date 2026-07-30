@@ -27,7 +27,9 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
     private async Task<List<InformationRegister_ШтрихкодыНоменклатуры>?> GetListAsync(string refKey, CancellationToken ct)
     {
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetUri(refKey);
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
+
         var result = rootObject?.Value;
 
         return result;
@@ -52,7 +54,9 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
     private async Task<List<InformationRegister_ШтрихкодыНоменклатуры>?> GetListAsync(CancellationToken ct)
     {
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
+
         var result = rootObject?.Value;
 
         return result;

@@ -19,11 +19,19 @@ public class Catalog_Номенклатура
 
     public const int BatchSize = 1000;
 
-    private static readonly string select = "Ref_Key,DeletionMark,Parent_Key,IsFolder,Code,Description,Артикул,ЕдиницаИзмерения_Key,ВесИспользовать,ВесЕдиницаИзмерения_Key,ВесЧислитель,ВесЗнаменатель";
-
     public static string TotalUri => "Catalog_Номенклатура/$count?$format=json";
 
-    public static string GetListUri(int page) => $"Catalog_Номенклатура?$format=json&$select={select}&$orderby=Ref_Key&$skip={page * BatchSize}&$top={BatchSize}";
+    public static string GetListUri(int page) => $"Catalog_Номенклатура" +
+        $"?$format=json" +
+        $"&$select={select}" +
+        $"&$orderby=Ref_Key" +
+        $"&$skip={page * BatchSize}" +
+        $"&$top={BatchSize}";
 
-    public static string GetUri(string refKey) => $"Catalog_Номенклатура?$format=json&$select={select}&$filter=Ref_Key eq guid'{refKey}'";
+    public static string GetUri(string refKey) => $"Catalog_Номенклатура" +
+        $"?$format=json" +
+        $"&$select={select}" +
+        $"&$filter=Ref_Key eq guid'{refKey}'";
+
+    private static readonly string select = "Ref_Key,DeletionMark,Parent_Key,IsFolder,Code,Description,Артикул,ЕдиницаИзмерения_Key,ВесИспользовать,ВесЕдиницаИзмерения_Key,ВесЧислитель,ВесЗнаменатель";
 }

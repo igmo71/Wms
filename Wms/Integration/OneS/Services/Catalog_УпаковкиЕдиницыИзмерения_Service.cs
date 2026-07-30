@@ -10,23 +10,23 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var fetchedItems = await GetAsync(Ref_Key, ct);
+        var fetchedItem = await GetAsync(Ref_Key, ct);
 
-        if (fetchedItems is null)
+        if (fetchedItem is null)
             return;
-
-        var fetchedItem = fetchedItems[0];
 
         UnitOfMeasure newItem = CreateNew(fetchedItem);
 
         await unitOfMeasureService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetAsync(string Ref_Key, CancellationToken ct = default)
+    private async Task<Catalog_УпаковкиЕдиницыИзмерения?> GetAsync(string Ref_Key, CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(Ref_Key);
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
-        var result = rootObject?.Value;
+
+        var result = rootObject?.Value?[0];
 
         return result;
     }
@@ -48,7 +48,9 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
     private async Task<List<Catalog_УпаковкиЕдиницыИзмерения>?> GetListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
+
         var result = rootObject?.Value;
 
         return result;

@@ -16,16 +16,16 @@ public static class Catalog_Склады_Endpoints
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Склады/import", ImportListCatalog_Склады)
+        group.MapGet("/Catalog_Склады/import", Import)
             .WithTags("Import Catalog_Склады");
 
-        group.MapPost("/Catalog_Склады/notify", NotifyCatalog_Склады)
+        group.MapPost("/Catalog_Склады/notify", Notify)
            .WithTags("Notify Catalog_Склады");
 
         return routeBuilder;
     }
 
-    static async Task<IResult> ImportListCatalog_Склады(
+    static async Task<IResult> Import(
         [FromServices] Catalog_Склады_Service service,
         CancellationToken ct)
     {
@@ -34,7 +34,7 @@ public static class Catalog_Склады_Endpoints
         return TypedResults.Ok();
     }
 
-    static async Task<IResult> NotifyCatalog_Склады(
+    static async Task<IResult> Notify(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
         CancellationToken ct)

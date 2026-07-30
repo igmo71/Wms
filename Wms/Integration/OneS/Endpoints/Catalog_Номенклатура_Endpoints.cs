@@ -16,16 +16,16 @@ public static class Catalog_Номенклатура_Endpoints
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Номенклатура/import", ImportListCatalog_Номенклатура)
+        group.MapGet("/Catalog_Номенклатура/import", Import)
             .WithTags("Import Catalog_Номенклатура");
 
-        group.MapPost("/Catalog_Номенклатура/notify", NotifyCatalog_Номенклатура)
+        group.MapPost("/Catalog_Номенклатура/notify", Notify)
            .WithTags("Notify Catalog_Номенклатура");
 
         return routeBuilder;
     }
 
-    static async Task<IResult> ImportListCatalog_Номенклатура(
+    static async Task<IResult> Import(
         [FromServices] Catalog_Номенклатура_Service service,
         CancellationToken ct)
     {
@@ -34,7 +34,7 @@ public static class Catalog_Номенклатура_Endpoints
         return TypedResults.Ok();
     }
 
-    static async Task<IResult> NotifyCatalog_Номенклатура(
+    static async Task<IResult> Notify(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
         CancellationToken ct)

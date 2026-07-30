@@ -10,23 +10,23 @@ internal class Catalog_Склады_Service(
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var fetchedItems = await GetAsync(Ref_Key, ct);
+        var fetchedItem = await GetAsync(Ref_Key, ct);
 
-        if (fetchedItems is null)
+        if (fetchedItem is null)
             return;
-
-        var fetchedItem = fetchedItems[0];
 
         Warehouse newItem = CreateNew(fetchedItem);
 
         await warehouseService.CreateOrUpdateAsync(newItem, ct);
     }
 
-    private async Task<List<Catalog_Склады>?> GetAsync(string Ref_Key, CancellationToken ct = default)
+    private async Task<Catalog_Склады?> GetAsync(string Ref_Key, CancellationToken ct = default)
     {
         var uri = Catalog_Склады.GetUri(Ref_Key);
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
-        var result = rootObject?.Value;
+
+        var result = rootObject?.Value?[0];
 
         return result;
     }
@@ -49,7 +49,9 @@ internal class Catalog_Склады_Service(
     private async Task<List<Catalog_Склады>?> GetListAsync(CancellationToken ct)
     {
         var uri = Catalog_Склады.GetListUri;
+
         var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
+
         var result = rootObject?.Value;
 
         return result;
