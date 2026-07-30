@@ -26,5 +26,9 @@ public enum BusinessOperation
 
     [EnumMember(Value = "ПеремещениеТоваров")]
     [Display(Name = "Перемещение товаров")]
-    GoodsTransfer = 5
+    Transfer = 5,
+
+    [EnumMember(Value = "РазборкаТоваров")]
+    [Display(Name = "Разборка товаров")]
+    Disassembly = 6
 }

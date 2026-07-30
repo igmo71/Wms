@@ -21,7 +21,7 @@ internal class Document_ПриходныйОрдерНаТовары_Service(
 
         ReceivingOrder newItem = CreateNew(fetchedItem);
 
-        await receivingOrderService.CreateOrUpdateAsync(newItem, ct);
+        await receivingOrderService.Import(newItem, ct);
     }
 
     private async Task<Document_ПриходныйОрдерНаТовары?> GetAsync(string Ref_Key, CancellationToken ct = default)
@@ -43,7 +43,7 @@ internal class Document_ПриходныйОрдерНаТовары_Service(
                 ReceivingOrderId = x.Ref_Key,
                 LineNumber = x.LineNumber,
                 StockKeepingUnitId = x.Номенклатура_Key,
-                PlannQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество
+                PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество
                 FactQuantity = 0
             })
             .ToList();

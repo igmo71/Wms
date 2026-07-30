@@ -30,5 +30,9 @@ public class ReceivingOrder
     public Guid? BaseOrderId { get; set; }
     public string? BaseOrderType { get; set; }
 
-    public List<ReceivingOrderItem>? Items { get; set; }
+    public List<ReceivingOrderItem> Items { get; set; } = [];
+
+    public string? ExternalConflict { get; set; }
+
+    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
 }

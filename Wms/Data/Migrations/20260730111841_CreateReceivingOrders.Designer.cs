@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Wms.Data;
 
@@ -11,9 +12,11 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730111841_CreateReceivingOrders")]
+    partial class CreateReceivingOrders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -275,9 +278,6 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
-                    b.Property<string>("ExternalConflict")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Number")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -327,7 +327,7 @@ namespace Wms.Data.Migrations
                     b.Property<double>("FactQuantity")
                         .HasColumnType("float");
 
-                    b.Property<double>("PlanQuantity")
+                    b.Property<double>("PlannQuantity")
                         .HasColumnType("float");
 
                     b.Property<Guid?>("StockKeepingUnitId")
