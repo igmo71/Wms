@@ -1,6 +1,7 @@
 using Serilog;
 using Wms.Application;
 using Wms.Data;
+using Wms.Endpoints;
 using Wms.Integration;
 using Wms.Integration.OneS.Endpoints;
 
@@ -63,6 +64,7 @@ public class Program
         })
         .WithName("GetWeatherForecast");
 
+        app.MapApplicationEndpints();
         app.MapOneCEndpints();
 
         app.Run();

@@ -24,12 +24,17 @@ internal class Document_ПриходныйОрдерНаТовары
     public Guid? Распоряжение { get; set; }
     public string? Распоряжение_Type { get; set; }
     public string? Доброга_ТипОчереди { get; set; }
-    public List<Document_ПриходныйОрдерНаТовары_Товары>? Товары { get; set; }
+    public List<Document_ПриходныйОрдерНаТовары_Товары> Товары { get; set; } = [];
 
 
     public const int BatchSize = 10;
 
     public static string TotalUri => "Document_ПриходныйОрдерНаТовары/$count?$format=json";
+
+    private static readonly string select =
+        "Ref_Key,DataVersion,DeletionMark,Number,Date,Posted,Склад_Key,Комментарий,Статус,СкладскаяОперация,ВсегоМест," +
+        "Отправитель,Отправитель_Type,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,Доброга_ТипОчереди,Товары";
+
 
     public static string GetListUri(DateTime dateFrom, DateTime dateTo, int page) => $"Document_ПриходныйОрдерНаТовары" +
         $"?$format=json" +
@@ -44,7 +49,10 @@ internal class Document_ПриходныйОрдерНаТовары
         $"&$select={select}" +
         $"&$filter=Ref_Key eq guid'{refKey}'";
 
-    private static readonly string select = "Ref_Key,DataVersion,DeletionMark,Number,Date,Posted,Склад_Key,Комментарий,Статус,СкладскаяОперация,ВсегоМест,Отправитель,Отправитель_Type,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,Доброга_ТипОчереди,Товары";
+
+    public static string PatchUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')?$format=json";
+
+    public static string PostDocumentUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
 }
 
 internal class Document_ПриходныйОрдерНаТовары_Товары

@@ -16,17 +16,17 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
             .WithTags("1С")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", Import)
+        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder)
             .WithTags("Import Document_ПриходныйОрдерНаТовары");
 
-        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", Notify)
+        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder)
            .WithTags("Notify Document_ПриходныйОрдерНаТовары");
 
         return routeBuilder;
     }
 
-    static async Task<IResult> Import(
-        [FromServices] Document_ПриходныйОрдерНаТовары_Service service,
+    static async Task<IResult> ImportOrder(
+        [FromServices] Document_ПриходныйОрдерНаТовары_ImportService service,
         CancellationToken ct)
     {
         await service.ImportListAsync(ct);
@@ -34,7 +34,7 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
         return TypedResults.Ok();
     }
 
-    static async Task<IResult> Notify(
+    static async Task<IResult> NotifyOrder(
         [FromServices] NotifyChannel notifyChannel,
         [FromBody] NotifyRequest request,
         CancellationToken ct)

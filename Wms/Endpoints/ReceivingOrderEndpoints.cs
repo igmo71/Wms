@@ -1,0 +1,45 @@
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
+using Wms.Application;
+
+namespace Wms.Endpoints;
+
+public static class ReceivingOrderEndpoints
+{
+    public static IEndpointRouteBuilder MapReceivingOrderEndpoints(this IEndpointRouteBuilder routeBuilder)
+    {
+
+        var group = routeBuilder.MapGroup("/api")
+            .ProducesValidationProblem();
+
+        group.MapPost("/ReceivingOrder/{id:guid}/start", StartOrder)
+            .WithTags("Start Receiving Order");
+
+        group.MapPost("/ReceivingOrder/{id:guid}/complete", CompleteOrder)
+           .WithTags("Complete Receiving Order");
+
+        return routeBuilder;
+    }
+
+    static async Task<IResult> StartOrder(
+        [FromServices] ReceivingOrderService service,
+        [FromRoute] Guid id,
+        CancellationToken ct)
+    {
+        await service.StartOrder(id, ct);
+
+        return TypedResults.Ok();
+    }
+
+    static async Task<IResult> CompleteOrder(
+        [FromServices] ReceivingOrderService service,
+        [FromRoute] Guid id,
+        CancellationToken ct)
+    {
+        await service.CompleteOrder(id, ct);
+
+        return TypedResults.Ok();
+    }
+}

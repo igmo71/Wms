@@ -32,7 +32,5 @@ public class ReceivingOrder
 
     public List<ReceivingOrderItem> Items { get; set; } = [];
 
-    public string? ExternalConflict { get; set; }
-
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
 }

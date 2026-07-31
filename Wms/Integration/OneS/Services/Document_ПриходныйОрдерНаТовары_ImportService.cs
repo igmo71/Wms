@@ -7,10 +7,12 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Document_ПриходныйОрдерНаТовары_Service(
+
+
+internal class Document_ПриходныйОрдерНаТовары_ImportService(
     OneCClient oneCClient,
     ReceivingOrderService receivingOrderService,
-    ILogger<Document_ПриходныйОрдерНаТовары_Service> logger)
+    ILogger<Document_ПриходныйОрдерНаТовары_ImportService> logger)
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
@@ -19,9 +21,9 @@ internal class Document_ПриходныйОрдерНаТовары_Service(
         if (fetchedItem is null)
             return;
 
-        ReceivingOrder newItem = CreateNew(fetchedItem);
+        ReceivingOrder importedOrder = MapFromODataDocument(fetchedItem);
 
-        await receivingOrderService.Import(newItem, ct);
+        await receivingOrderService.CreateOrUpdateImporttedOrder(importedOrder, ct);
     }
 
     private async Task<Document_ПриходныйОрдерНаТовары?> GetAsync(string Ref_Key, CancellationToken ct = default)
@@ -35,9 +37,9 @@ internal class Document_ПриходныйОрдерНаТовары_Service(
         return result;
     }
 
-    private static ReceivingOrder CreateNew(Document_ПриходныйОрдерНаТовары fetchedItem)
+    private static ReceivingOrder MapFromODataDocument(Document_ПриходныйОрдерНаТовары fetchedItem)
     {
-        var items = fetchedItem.Товары?
+        var items = fetchedItem.Товары
             .Select(x => new ReceivingOrderItem
             {
                 ReceivingOrderId = x.Ref_Key,
