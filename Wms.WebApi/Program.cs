@@ -27,6 +27,7 @@ public class Program
 
         builder.Services.AddApplicatiobDbContext(builder.Configuration);
         builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddNotificationServices();
         builder.Services.AddApplicationServices();
 
         var app = builder.Build();

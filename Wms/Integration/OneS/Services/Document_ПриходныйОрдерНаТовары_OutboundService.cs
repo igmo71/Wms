@@ -5,7 +5,7 @@ using DocumentItem = Wms.Integration.OneS.Models.Document_ПриходныйОр
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Document_ПриходныйОрдерНаТовары_OutboundService(
+public class Document_ПриходныйОрдерНаТовары_OutboundService(
     OneCClient oneCClient,
     ILogger<Document_ПриходныйОрдерНаТовары_OutboundService> logger)
 {

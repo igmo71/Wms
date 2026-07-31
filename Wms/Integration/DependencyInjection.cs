@@ -26,16 +26,22 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json));
         });
 
-        services.AddSingleton<NotifyChannel>();
-
-        services.AddHostedService<NotifyBackgroundService>();
-
         services.AddScoped<Catalog_Номенклатура_Service>();
         services.AddScoped<Catalog_Склады_Service>();
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();
         services.AddScoped<Document_ПриходныйОрдерНаТовары_ImportService>();
         services.AddScoped<Document_ПриходныйОрдерНаТовары_OutboundService>();
         services.AddScoped<InformationRegister_ШтрихкодыНоменклатуры_Service>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddNotificationServices(this IServiceCollection services)
+    {
+
+        services.AddSingleton<NotifyChannel>();
+
+        services.AddHostedService<NotifyBackgroundService>();
 
         return services;
     }

@@ -25,7 +25,7 @@ public class NotifyBackgroundService(
             {
                 if (logger.IsEnabled(LogLevel.Error))
                     logger.LogError(ex, "{Source} {Exception}", nameof(ExecuteAsync), ex.Message);
-                throw;
+                //throw;
             }
         }
     }

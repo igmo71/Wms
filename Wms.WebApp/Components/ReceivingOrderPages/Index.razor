@@ -1,0 +1,47 @@
+@page "/receiving-orders"
+@using Wms.Domain
+
+<PageTitle>Приходные ордера</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Приходные ордера</MudText>
+
+<MudToolBar Class="px-0 mb-4">
+    <MudTextField T="string"
+                  @bind-Value="_searchString"
+                  Placeholder="Поиск по номеру"
+                  Immediate="true"
+                  DebounceInterval="300"
+                  OnDebounceIntervalElapsed="OnSearchChangedAsync"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Clearable="true" />
+    <MudDatePicker Label="Дата с"
+                   Date="_dateFrom"
+                   DateChanged="OnDateFromChangedAsync"
+                   Clearable="true"
+                   Class="ml-4" />
+    <MudDatePicker Label="Дата по"
+                   Date="_dateTo"
+                   DateChanged="OnDateToChangedAsync"
+                   Clearable="true"
+                   Class="ml-4" />
+    <MudSpacer />
+</MudToolBar>
+
+<MudDataGrid T="ReceivingOrder"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true" />
+        <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="ReceivingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+</MudDataGrid>

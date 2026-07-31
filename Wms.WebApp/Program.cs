@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
 using Serilog;
+using Wms.Application;
 using Wms.Data;
+using Wms.Integration;
 using Wms.WebApp.Components;
 using Wms.WebApp.Components.Account;
 
@@ -48,6 +50,8 @@ public class Program
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
         builder.Services.AddApplicatiobDbContext(builder.Configuration);
+        builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddApplicationServices();
 
         var app = builder.Build();
 

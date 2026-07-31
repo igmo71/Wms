@@ -7,7 +7,7 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Application;
 
-internal class ReceivingOrderService(
+public class ReceivingOrderService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderService> logger)
@@ -23,7 +23,7 @@ internal class ReceivingOrderService(
         return result;
     }
 
-    public async Task<ListResult<ReceivingOrder>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<ReceivingOrder>> ListAsync(DocumentListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -33,11 +33,11 @@ internal class ReceivingOrderService(
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
 
-        query = ApplySearch(query, listQuery.SearchString);
+        query = ApplySearch(query, listQuery);
 
         int totalItems = await query.CountAsync(ct);
 
-        query = ApplySorting(query, listQuery.SortBy, listQuery.SortDescending);
+        query = ApplySorting(query, listQuery);
 
         var items = await query
             .Skip(listQuery.Skip)
@@ -51,22 +51,28 @@ internal class ReceivingOrderService(
         };
     }
 
-    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, string? searchString)
+    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
     {
-        if (!string.IsNullOrWhiteSpace(searchString))
+        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
         {
-            query = query.Where(x => x.Number!.Contains(searchString));
+            query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
         }
+
+        if (listQuery.DateFrom is not null)
+            query = query.Where(x => x.DateTime >= listQuery.DateFrom);
+
+        if (listQuery.DateTo is not null)
+            query = query.Where(x => x.DateTime < ((DateTime)listQuery.DateTo).AddDays(1));
 
         return query;
     }
 
-    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, string? sortBy, bool sortDescending)
+    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
     {
-        return sortBy switch
+        return listQuery.SortBy switch
         {
-            "Number" => sortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
-            "DateTime" => sortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
+            "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
+            "DateTime" => listQuery.SortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
             _ => query.OrderByDescending(x => x.DateTime),
         };
     }

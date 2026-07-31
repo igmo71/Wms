@@ -1,6 +1,6 @@
 ﻿namespace Wms.Common;
 
-internal class ListQuery
+public class ListQuery
 {
     public string? SearchString { get; set; }
     public string? SortBy { get; set; }
