@@ -10,6 +10,8 @@ internal class ReceivingOrderItemConfiguration : IEntityTypeConfiguration<Receiv
     {
         builder.HasKey(x => new { x.ReceivingOrderId, x.LineNumber });
 
+        builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
+
         builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.Items)
             .HasForeignKey(x => x.ReceivingOrderId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Cascade);

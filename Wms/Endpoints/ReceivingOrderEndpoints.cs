@@ -28,7 +28,7 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        await service.StartOrder(id, ct);
+        await service.StartOrderAsync(id, ct);
 
         return TypedResults.Ok();
     }
@@ -38,7 +38,7 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        await service.CompleteOrder(id, ct);
+        await service.CompleteOrderAsync(id, ct);
 
         return TypedResults.Ok();
     }

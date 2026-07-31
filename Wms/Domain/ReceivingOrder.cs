@@ -33,4 +33,6 @@ public class ReceivingOrder
     public List<ReceivingOrderItem> Items { get; set; } = [];
 
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
+
+    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 }

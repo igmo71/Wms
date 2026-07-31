@@ -118,7 +118,7 @@ internal class StockKeepingUnitService(
         return sortBy switch
         {
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
-            _ => query.OrderByDescending(x => x.Name),
+            _ => query.OrderBy(x => x.Name),
         };
     }
 }

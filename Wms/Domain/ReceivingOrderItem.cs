@@ -13,6 +13,9 @@ public class ReceivingOrderItem
     public double PlanQuantity { get; set; }
     public double FactQuantity { get; set; }
 
+    public string? Comment { get; set; }
+
     public double RemainingQuantity => PlanQuantity - FactQuantity;
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
+    public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

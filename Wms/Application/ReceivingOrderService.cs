@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
@@ -11,7 +12,66 @@ internal class ReceivingOrderService(
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderService> logger)
 {
-    internal async Task CreateOrUpdateImporttedOrder(ReceivingOrder externalItem, CancellationToken ct)
+    public async Task<ReceivingOrder?> GetAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var result = await dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        return result;
+    }
+
+    public async Task<ListResult<ReceivingOrder>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        IQueryable<ReceivingOrder> query = dbContext.ReceivingOrders
+            .AsNoTracking();
+
+        if (listQuery.ExcludeDeleted)
+            query = query.Where(x => x.DeletionMark == false);
+
+        query = ApplySearch(query, listQuery.SearchString);
+
+        int totalItems = await query.CountAsync(ct);
+
+        query = ApplySorting(query, listQuery.SortBy, listQuery.SortDescending);
+
+        var items = await query
+            .Skip(listQuery.Skip)
+            .Take(listQuery.Take)
+            .ToListAsync(ct);
+
+        return new ListResult<ReceivingOrder>
+        {
+            Items = items,
+            TotalItems = totalItems
+        };
+    }
+
+    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, string? searchString)
+    {
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            query = query.Where(x => x.Number!.Contains(searchString));
+        }
+
+        return query;
+    }
+
+    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, string? sortBy, bool sortDescending)
+    {
+        return sortBy switch
+        {
+            "Number" => sortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
+            "DateTime" => sortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
+            _ => query.OrderByDescending(x => x.DateTime),
+        };
+    }
+
+    internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externalItem, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -27,17 +87,17 @@ internal class ReceivingOrderService(
         {
             if (existsingItem.StartedAtUtc is null && existsingItem.CompletedAtUtc is null)
             {
-                await UpdateOrderByImportAsync(externalItem, ct);
+                await UpdateOrderAsImportAsync(externalItem, ct);
             }
             else
             {
                 logger.LogWarning("{Source} {Number} {Id}, cannot update",
-                    nameof(CreateOrUpdateImporttedOrder), externalItem.Number, externalItem.Id);
+                    nameof(CreateOrUpdateImporttedOrderAsync), externalItem.Number, externalItem.Id);
             }
         }
     }
 
-    private async Task<ReceivingOrder> CreateOrderAsync(ReceivingOrder item, CancellationToken ct)
+    private async Task<ReceivingOrder> CreateOrderAsync(ReceivingOrder item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -51,7 +111,7 @@ internal class ReceivingOrderService(
         {
             logger.LogWarning("{Source} {Id} {DbUpdateException}", nameof(CreateOrderAsync), item.Id, ex.Message);
 
-            await UpdateOrderByImportAsync(item, ct);
+            await UpdateOrderAsImportAsync(item, ct);
         }
 
         if (logger.IsEnabled(LogLevel.Debug))
@@ -60,7 +120,7 @@ internal class ReceivingOrderService(
         return entity;
     }
 
-    private async Task UpdateOrderByImportAsync(ReceivingOrder receivingOrder, CancellationToken ct)
+    private async Task UpdateOrderAsImportAsync(ReceivingOrder receivingOrder, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -70,7 +130,7 @@ internal class ReceivingOrderService(
 
         if (existingOrder is null)
         {
-            logger.LogWarning("{Source} {Id} not found", nameof(UpdateOrderByImportAsync), receivingOrder.Id);
+            logger.LogWarning("{Source} {Id} not found", nameof(UpdateOrderAsImportAsync), receivingOrder.Id);
             return;
         }
 
@@ -126,17 +186,58 @@ internal class ReceivingOrderService(
         }
     }
 
-    public async Task StartOrder(Guid orderId, CancellationToken ct)
+    public async Task StartOrderAsync(Guid orderId, CancellationToken ct = default)
     {
         var outboundResult = await outboundService.StartOrderAsync(orderId, ct);
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        if (outboundResult is null)
+        {
+            logger.LogError("{Source} Start Order failed", nameof(StartOrderAsync));
+            return;
+        }
+
+        //await UpdateOrderAsImportAsync(outboundResult, ct); TODO: Обновление должно прилететь по нотификации
     }
 
-    public async Task CompleteOrder(Guid orderId, CancellationToken ct)
+    public async Task CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
     {
         var outboundResult = await outboundService.CompleteOrderAsync(orderId, ct);
 
+        if (outboundResult is null)
+        {
+            logger.LogError("{Source} Complete Order failed", nameof(CompleteOrderAsync));
+            return;
+        }
+
+        //await UpdateOrderAsImportAsync(outboundResult, ct); TODO: Обновление должно прилететь по нотификации
+    }
+
+    public async Task CompleteOrderAsync(ReceivingOrder order, CancellationToken ct = default)
+    {
+        if (order.HasPlanFactDifference)
+        {
+            var updateOrderItemsResult = await outboundService.UpdateOrderItemsAsync(order.Id, order.Items, ct);
+
+            if (updateOrderItemsResult is null)
+            {
+                logger.LogError("{Source} Update Order Items failed", nameof(CompleteOrderAsync));
+                return;
+            }
+        }
+
+        await CompleteOrderAsync(order.Id, ct);
+    }
+
+    public async Task<int> UpdateOrderItemAsync(ReceivingOrderItem orderItem, CancellationToken ct = default)
+    {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var result = await dbContext.ReceivingOrderItems
+            .Where(x => x.ReceivingOrderId == orderItem.ReceivingOrderId && x.LineNumber == orderItem.LineNumber)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.FactQuantity, orderItem.FactQuantity)
+                .SetProperty(p => p.Comment, orderItem.Comment), ct);
+
+        return result;
     }
 }

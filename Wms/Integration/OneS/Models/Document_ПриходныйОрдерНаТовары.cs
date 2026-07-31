@@ -1,4 +1,7 @@
 ﻿using System.Text.Json.Serialization;
+using Wms.Common;
+using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Integration.OneS.Models;
 
@@ -53,21 +56,45 @@ internal class Document_ПриходныйОрдерНаТовары
     public static string PatchUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')?$format=json";
 
     public static string PostDocumentUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
+
+    public static ReceivingOrder MapToReceivingOrder(Document_ПриходныйОрдерНаТовары fetchedItem)
+    {
+        var items = fetchedItem.Товары
+            .Select(x => new ReceivingOrderItem
+            {
+                ReceivingOrderId = x.Ref_Key,
+                LineNumber = x.LineNumber,
+                StockKeepingUnitId = x.Номенклатура_Key,
+                PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество
+                FactQuantity = 0
+            })
+            .ToList();
+
+        return new ReceivingOrder
+        {
+            Id = fetchedItem.Ref_Key,
+            DataVersion = fetchedItem.DataVersion,
+            Posted = fetchedItem.Posted,
+            DeletionMark = fetchedItem.DeletionMark,
+            DateTime = fetchedItem.Date,
+            Number = fetchedItem.Number,
+            Comment = fetchedItem.Комментарий,
+            WarehouseId = fetchedItem.Склад_Key,
+            ReceivingLocationId = null,
+            Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedItem.Статус),
+            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedItem.СкладскаяОперация),
+            BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedItem.ХозяйственнаяОперация),
+            StartedAtUtc = null,
+            CompletedAtUtc = null,
+            SenderId = fetchedItem.Отправитель,
+            SenderType = fetchedItem.Отправитель_Type.TrimODataPrefix(),
+            BaseOrderId = fetchedItem.Распоряжение,
+            BaseOrderType = fetchedItem.Распоряжение_Type.TrimODataPrefix(),
+            Items = items
+        };
+    }
 }
 
-internal class Document_ПриходныйОрдерНаТовары_Товары
-{
-    public Guid Ref_Key { get; set; }
-
-    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
-    public int LineNumber { get; set; }
-
-    public Guid? Номенклатура_Key { get; set; }
-    public double КоличествоУпаковок { get; set; }
-    public double Количество { get; set; }
-    public string? Штрихкод { get; set; }
-    public string? Комментарий { get; set; }
-}
 
 
 
