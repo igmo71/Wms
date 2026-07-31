@@ -9,7 +9,7 @@ public static class DependencyInjection
         services.AddScoped<ReceivingOrderService>();
         services.AddScoped<SkuBarcodeService>();
         services.AddScoped<StockKeepingUnitService>();
-        services.AddScoped<StockKeepingUnitService>();
+        services.AddScoped<StorageLocationService>();
         services.AddScoped<UnitOfMeasureService>();
         services.AddScoped<WarehouseService>();
         services.AddScoped<ZoneService>();
