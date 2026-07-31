@@ -91,6 +91,7 @@ public class ReceivingOrderService(
         }
         else if (existsingItem.DataVersion != externalItem.DataVersion)
         {
+            // TODO: Нужно проверить Нотфткацию после StartOrderAsync и CompleteOrderAsync
             if (existsingItem.StartedAtUtc is null && existsingItem.CompletedAtUtc is null)
             {
                 await UpdateOrderAsImportAsync(externalItem, ct);
@@ -121,7 +122,8 @@ public class ReceivingOrderService(
         }
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(CreateOrderAsync), entity);
+            logger.LogDebug("{Source} {Number} {DateTime} {Id}",
+                nameof(CreateOrderAsync), entity.Number, entity.DateTime, entity.Id);
 
         return entity;
     }
@@ -202,7 +204,8 @@ public class ReceivingOrderService(
             return;
         }
 
-        //await UpdateOrderAsImportAsync(outboundResult, ct); TODO: Обновление должно прилететь по нотификации
+        // TODO: Обновление должно прилететь по нотификации, надо проверять
+        //await UpdateOrderAsImportAsync(outboundResult, ct); 
     }
 
     public async Task CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
@@ -215,7 +218,9 @@ public class ReceivingOrderService(
             return;
         }
 
-        //await UpdateOrderAsImportAsync(outboundResult, ct); TODO: Обновление должно прилететь по нотификации
+        // TODO: Обновление должно прилететь по нотификации,
+        // но уже установлено StartedAt и UpdateOrderAsImportAsync не пропустит, надо проверять
+        //await UpdateOrderAsImportAsync(outboundResult, ct); 
     }
 
     public async Task CompleteOrderAsync(ReceivingOrder order, CancellationToken ct = default)

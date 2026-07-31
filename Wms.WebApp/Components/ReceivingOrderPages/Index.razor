@@ -35,10 +35,14 @@
              Filterable="false"
              Hover="true"
              Striped="true"
+             Dense="true"
              RowsPerPage="25">
     <Columns>
         <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true" />
         <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.Status" Title="Статус" />
+        <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
 
     </Columns>
     <PagerContent>
