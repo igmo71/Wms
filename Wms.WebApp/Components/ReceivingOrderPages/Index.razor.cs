@@ -3,6 +3,7 @@ using MudBlazor;
 using Wms.Application;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.ReceivingOrderPages;
 
@@ -15,6 +16,7 @@ public partial class Index
     private string? _searchString;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
+    private ReceivingOrderStatus? _status;
 
     private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(
         GridState<ReceivingOrder> state,
@@ -26,6 +28,7 @@ public partial class Index
             SearchString = _searchString,
             DateFrom = _dateFrom,
             DateTo = _dateTo,
+            Status = _status,
             SortBy = sortDefinition?.SortBy,
             SortDescending = sortDefinition?.Descending ?? true,
             Skip = state.Page * state.PageSize,
@@ -56,6 +59,12 @@ public partial class Index
     private Task OnDateToChangedAsync(DateTime? dateTo)
     {
         _dateTo = dateTo;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private Task OnStatusChangedAsync(ReceivingOrderStatus? status)
+    {
+        _status = status;
         return _dataGrid.ReloadServerData();
     }
 }

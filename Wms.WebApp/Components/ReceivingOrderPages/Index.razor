@@ -1,5 +1,7 @@
 @page "/receiving-orders"
 @using Wms.Domain
+@using Wms.Common
+@using Wms.Domain.Enums
 
 <PageTitle>Приходные ордера</PageTitle>
 
@@ -25,6 +27,19 @@
                    DateChanged="OnDateToChangedAsync"
                    Clearable="true"
                    Class="ml-4" />
+    <MudSelect T="ReceivingOrderStatus?"
+               Label="Статус"
+               Value="_status"
+               ValueChanged="OnStatusChangedAsync"
+               Clearable="true"
+               Class="ml-4">
+        @foreach (var status in Enum.GetValues<ReceivingOrderStatus>())
+        {
+            <MudSelectItem T="ReceivingOrderStatus?" Value="@((ReceivingOrderStatus?)status)">
+                @status.GetDisplayName()
+            </MudSelectItem>
+        }
+    </MudSelect>
     <MudSpacer />
 </MudToolBar>
 
@@ -40,10 +55,9 @@
     <Columns>
         <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true" />
         <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.Status" Title="Статус" />
+        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
         <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-
     </Columns>
     <PagerContent>
         <MudDataGridPager T="ReceivingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />

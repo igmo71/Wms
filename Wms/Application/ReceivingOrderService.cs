@@ -64,6 +64,9 @@ public class ReceivingOrderService(
         if (listQuery.DateTo is not null)
             query = query.Where(x => x.DateTime < ((DateTime)listQuery.DateTo).AddDays(1));
 
+        if (listQuery.Status is not null)
+            query = query.Where(x => x.Status == listQuery.Status);
+
         return query;
     }
 
@@ -73,6 +76,8 @@ public class ReceivingOrderService(
         {
             "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
             "DateTime" => listQuery.SortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
+            "StartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.StartedAtUtc) : query.OrderBy(x => x.StartedAtUtc),
+            "CompletedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.CompletedAtUtc) : query.OrderBy(x => x.CompletedAtUtc),
             _ => query.OrderByDescending(x => x.DateTime),
         };
     }
