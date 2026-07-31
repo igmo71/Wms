@@ -1,0 +1,71 @@
+@page "/receiving-orders"
+@using Wms.Domain
+@using Wms.Common
+@using Wms.Domain.Enums
+
+<PageTitle>Приходные ордера</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Приходные ордера</MudText>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudStack Row>
+        <MudTextField T="string"
+                      @bind-Value="_searchString"
+                      Label="Поиск по номеру"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="OnSearchChangedAsync"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Clearable="true" />
+        <MudDatePicker Label="Дата с"
+                       Date="_dateFrom"
+                       DateChanged="OnDateFromChangedAsync"
+                       Clearable="true"
+                       Class="ml-4" />
+        <MudDatePicker Label="Дата по"
+                       Date="_dateTo"
+                       DateChanged="OnDateToChangedAsync"
+                       Clearable="true"
+                       Class="ml-4" />
+        <MudSelect T="ReceivingOrderStatus?"
+                   Label="Статус"
+                   Value="_status"
+                   ValueChanged="OnStatusChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
+            @foreach (var status in Enum.GetValues<ReceivingOrderStatus>())
+            {
+                <MudSelectItem T="ReceivingOrderStatus?" Value="@((ReceivingOrderStatus?)status)">
+                    @status.GetDisplayName()
+                </MudSelectItem>
+            }
+        </MudSelect>
+        <MudSpacer />
+    </MudStack>
+</MudPaper>
+
+<MudDataGrid T="ReceivingOrder"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <TemplateColumn Title="Номер" SortBy="x => x.Number">
+            <CellTemplate>
+                <MudLink Href="@($"receiving-orders/{context.Item.Id}")">@context.Item.Number</MudLink>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
+        <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="ReceivingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+</MudDataGrid>

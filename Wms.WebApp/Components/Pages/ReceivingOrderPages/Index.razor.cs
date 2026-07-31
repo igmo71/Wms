@@ -5,7 +5,7 @@ using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.WebApp.Components.ReceivingOrderPages;
+namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
 public partial class Index
 {
@@ -35,7 +35,7 @@ public partial class Index
             Take = state.PageSize
         };
 
-        var result = await ReceivingOrderService.ListAsync(query, cancellationToken);
+        var result = await ReceivingOrderService.ListOrdersAsync(query, cancellationToken);
 
         return new GridData<ReceivingOrder>
         {

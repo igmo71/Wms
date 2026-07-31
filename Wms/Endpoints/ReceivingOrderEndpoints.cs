@@ -20,6 +20,9 @@ public static class ReceivingOrderEndpoints
         group.MapPost("/ReceivingOrder/{id:guid}/complete", CompleteOrder)
            .WithTags("Complete Receiving Order");
 
+        group.MapGet("/ReceivingOrder/{id:guid}", GetOrder)
+           .WithTags("Get Receiving Order"); ;
+
         return routeBuilder;
     }
 
@@ -41,5 +44,18 @@ public static class ReceivingOrderEndpoints
         await service.CompleteOrderAsync(id, ct);
 
         return TypedResults.Ok();
+    }
+
+    static async Task<IResult> GetOrder(
+        [FromServices] ReceivingOrderService service,
+        [FromRoute] Guid id,
+        CancellationToken ct)
+    {
+        var orderDetails = await service.GetOrderAsync(id, ct);
+        if (orderDetails == null)
+        {
+            return Results.NotFound();
+        }
+        return Results.Ok(orderDetails);
     }
 }

@@ -12,26 +12,24 @@ public class ReceivingOrderService(
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderService> logger)
 {
-    public async Task<ReceivingOrder?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<ReceivingOrderDetails?> GetOrderAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var result = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
             .AsNoTracking()
+            .Select(ReceivingOrderDetails.Projection)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
+
         return result;
     }
 
-    public async Task<ListResult<ReceivingOrder>> ListAsync(DocumentListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<ReceivingOrder>> ListOrdersAsync(DocumentListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<ReceivingOrder> query = dbContext.ReceivingOrders
             .AsNoTracking();
-
-        if (listQuery.ExcludeDeleted)
-            query = query.Where(x => x.DeletionMark == false);
 
         query = ApplySearch(query, listQuery);
 
@@ -53,10 +51,14 @@ public class ReceivingOrderService(
 
     private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
     {
+        if (listQuery.ExcludeDeleted)
+            query = query.Where(x => x.DeletionMark == false);
+
+        if (listQuery.IncludePostedOnly)
+            query = query.Where(x => x.Posted == true);
+
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
-        {
             query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
-        }
 
         if (listQuery.DateFrom is not null)
             query = query.Where(x => x.DateTime >= listQuery.DateFrom);
