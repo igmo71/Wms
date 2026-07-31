@@ -201,18 +201,20 @@ public class ReceivingOrderService(
         }
     }
 
-    public async Task StartOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<bool> StartOrderAsync(Guid orderId, CancellationToken ct = default)
     {
         var outboundResult = await outboundService.StartOrderAsync(orderId, ct);
 
         if (outboundResult is null)
         {
             logger.LogError("{Source} Start Order failed", nameof(StartOrderAsync));
-            return;
+            return false;
         }
 
         // TODO: Обновление должно прилететь по нотификации, надо проверять
         //await UpdateOrderAsImportAsync(outboundResult, ct); 
+
+        return true;
     }
 
     public async Task CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
@@ -246,7 +248,7 @@ public class ReceivingOrderService(
         await CompleteOrderAsync(order.Id, ct);
     }
 
-    public async Task<int> UpdateOrderItemAsync(ReceivingOrderItem orderItem, CancellationToken ct = default)
+    public async Task<int> UpdateOrderItemAsync(ReceivingOrderItemDetails orderItem, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 

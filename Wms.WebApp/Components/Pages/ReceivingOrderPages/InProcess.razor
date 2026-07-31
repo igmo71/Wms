@@ -1,9 +1,8 @@
-@page "/receiving-orders/{Id:guid}"
+@page "/receiving-orders/{Id:guid}/in-process"
 @using Wms.Application
 @using Wms.Common
-@using Wms.Domain.Enums
 
-<PageTitle>Детали приходного ордера</PageTitle>
+<PageTitle>Приёмка приходного ордера</PageTitle>
 
 @if (_isLoading)
 {
@@ -17,27 +16,12 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Приходный ордер @_order.Number</MudText>
+            <MudText Typo="Typo.h4">Приёмка приходного ордера @_order.Number</MudText>
             <MudSpacer />
-            @if (_order.Status == ReceivingOrderStatus.Pending)
-            {
-                <MudButton Color="Color.Primary"
-                           Variant="Variant.Filled"
-                           Disabled="_isStarting"
-                           StartIcon="@Icons.Material.Filled.PlayArrow"
-                           OnClick="StartOrderAsync">
-                    Взять в работу
-                </MudButton>
-            }
-            <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
-                К списку
+            <MudButton Href="@($"receiving-orders/{Id}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
+                К деталям
             </MudButton>
         </MudStack>
-
-        @if (_startOrderFailed)
-        {
-            <MudAlert Severity="Severity.Error">Не удалось взять ордер в работу.</MudAlert>
-        }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
@@ -65,16 +49,13 @@ else
                     <MudText Typo="Typo.caption">В работе с</MudText>
                     <MudText>@FormatDateTimeOffset(_order.StartedAtUtc)</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Принят</MudText>
-                    <MudText>@FormatDateTimeOffset(_order.CompletedAtUtc)</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Комментарий</MudText>
-                    <MudText>@_order.Comment</MudText>
-                </MudItem>
             </MudGrid>
         </MudPaper>
+
+        @if (_updateFailed)
+        {
+            <MudAlert Severity="Severity.Error">Не удалось сохранить изменения строки.</MudAlert>
+        }
 
         <MudDataGrid T="ReceivingOrderItemDetails"
                      Items="_order.Items"
@@ -85,9 +66,24 @@ else
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnitName" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
-                <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <TemplateColumn Title="Факт">
+                    <CellTemplate>
+                        <MudNumericField T="double"
+                                         Value="context.Item.FactQuantity"
+                                         ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
+                                         Variant="Variant.Text"
+                                         HideSpinButtons="true" />
+                    </CellTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
-                <PropertyColumn Property="x => x.Comment" Title="Комментарий" />
+                <TemplateColumn Title="Комментарий">
+                    <CellTemplate>
+                        <MudTextField T="string"
+                                      Value="context.Item.Comment"
+                                      ValueChanged="value => UpdateCommentAsync(context.Item, value)"
+                                      Variant="Variant.Text" />
+                    </CellTemplate>
+                </TemplateColumn>
             </Columns>
         </MudDataGrid>
     </MudStack>
