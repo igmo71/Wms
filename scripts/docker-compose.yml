@@ -1,0 +1,37 @@
+name: wms
+
+services:
+  wms-webapi:
+    image: 192.168.1.55:5000/wms-webapi:${WMS_TAG}
+    container_name: wms-webapi
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
+      OPENSSL_CONF: "/app/openssl-legacy.cnf"
+      OneC__Username: "${ONEC_USERNAME}"
+      OneC__Password: "${ONEC_PASSWORD}"
+    volumes:
+      - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
+    ports:
+      - "8206:8080"
+    networks:
+      - xms-network
+
+  wms-webapp:
+    image: 192.168.1.55:5000/wms-webapp:${WMS_TAG}
+    container_name: wms-webapp
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
+      OPENSSL_CONF: "/app/openssl-legacy.cnf"
+    volumes:
+      - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
+    ports:
+      - "8207:8080"
+    networks:
+      - xms-network
+
+networks:
+  xms-network:
+    external: true
+    name: xms-network
