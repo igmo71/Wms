@@ -64,6 +64,23 @@
         <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
         <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudTooltip Text="Детали">
+                    <MudIconButton Href="@($"receiving-orders/{context.Item.Id}")"
+                                   Icon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Primary" />
+                </MudTooltip>
+                @if (context.Item.Status == ReceivingOrderStatus.InProcess)
+                {
+                    <MudTooltip Text="Приёмка">
+                        <MudIconButton Href="@($"receiving-orders/{context.Item.Id}/in-process")"
+                                       Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary" />
+                    </MudTooltip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
     </Columns>
     <PagerContent>
         <MudDataGridPager T="ReceivingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />

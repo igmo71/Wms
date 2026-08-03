@@ -15,9 +15,14 @@ public partial class InProcess
     [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
 
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
+
     private ReceivingOrder? _order;
     private bool _isLoading = true;
     private bool _updateFailed;
+    private bool _isCompleting;
+    private bool _completeFailed;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -60,6 +65,28 @@ public partial class InProcess
         catch
         {
             _updateFailed = true;
+        }
+    }
+
+    private async Task CompleteOrderAsync()
+    {
+        _isCompleting = true;
+        _completeFailed = false;
+
+        try
+        {
+            if (await OrderCommandService.CompleteOrderAsync(Id))
+                NavigationManager.NavigateTo($"receiving-orders/{Id}");
+            else
+                _completeFailed = true;
+        }
+        catch
+        {
+            _completeFailed = true;
+        }
+        finally
+        {
+            _isCompleting = false;
         }
     }
 

@@ -18,6 +18,13 @@ else
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h4">Приёмка приходного ордера @_order.Number</MudText>
             <MudSpacer />
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Disabled="_isCompleting"
+                       StartIcon="@Icons.Material.Filled.Check"
+                       OnClick="CompleteOrderAsync">
+                Завершить
+            </MudButton>
             <MudButton Href="@($"receiving-orders/{Id}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
                 К деталям
             </MudButton>
@@ -55,6 +62,11 @@ else
         @if (_updateFailed)
         {
             <MudAlert Severity="Severity.Error">Не удалось сохранить изменения строки.</MudAlert>
+        }
+
+        @if (_completeFailed)
+        {
+            <MudAlert Severity="Severity.Error">Не удалось завершить приходный ордер.</MudAlert>
         }
 
         <MudDataGrid T="ReceivingOrderItem"
