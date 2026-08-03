@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application;
+using Wms.Application.ReceivingOrders;
+using Wms.Domain;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -9,12 +10,14 @@ public partial class Details
     public Guid Id { get; set; }
 
     [Inject]
-    private ReceivingOrderService ReceivingOrderService { get; set; } = null!;
+    private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject]
+    private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
 
     [Inject]
     private NavigationManager NavigationManager { get; set; } = null!;
 
-    private ReceivingOrderDetails? _order;
+    private ReceivingOrder? _order;
     private bool _isLoading = true;
     private bool _isStarting;
     private bool _startOrderFailed;
@@ -22,7 +25,7 @@ public partial class Details
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
-        _order = await ReceivingOrderService.GetOrderAsync(Id);
+        _order = await OrderQueryService.GetOrderAsync(Id);
         _isLoading = false;
     }
 
@@ -36,7 +39,7 @@ public partial class Details
 
         try
         {
-            if (await ReceivingOrderService.StartOrderAsync(Id))
+            if (await OrderCommandService.StartOrderAsync(Id))
                 NavigationManager.NavigateTo($"receiving-orders/{Id}/in-process");
             else
                 _startOrderFailed = true;

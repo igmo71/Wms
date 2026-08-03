@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Wms.Application;
+using Wms.Application.ReceivingOrders;
 
 namespace Wms.Endpoints;
 
@@ -27,31 +27,32 @@ public static class ReceivingOrderEndpoints
     }
 
     static async Task<IResult> StartOrder(
-        [FromServices] ReceivingOrderService service,
+        [FromServices] ReceivingOrderCommandService service,
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        await service.StartOrderAsync(id, ct);
+        var success = await service.StartOrderAsync(id, ct);
 
-        return TypedResults.Ok();
+        return success ? TypedResults.Ok() : Results.BadRequest();
     }
 
     static async Task<IResult> CompleteOrder(
-        [FromServices] ReceivingOrderService service,
+        [FromServices] ReceivingOrderCommandService service,
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        await service.CompleteOrderAsync(id, ct);
+        var success = await service.CompleteOrderAsync(id, ct);
 
-        return TypedResults.Ok();
+        return success ? TypedResults.Ok() : Results.BadRequest();
     }
 
     static async Task<IResult> GetOrder(
-        [FromServices] ReceivingOrderService service,
+        [FromServices] ReceivingOrderQueryService service,
         [FromRoute] Guid id,
         CancellationToken ct)
     {
         var orderDetails = await service.GetOrderAsync(id, ct);
+
         if (orderDetails == null)
         {
             return Results.NotFound();

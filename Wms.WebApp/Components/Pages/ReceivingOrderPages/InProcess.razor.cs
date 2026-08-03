@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application;
+using Wms.Application.ReceivingOrders;
+using Wms.Domain;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -9,42 +10,43 @@ public partial class InProcess
     public Guid Id { get; set; }
 
     [Inject]
-    private ReceivingOrderService ReceivingOrderService { get; set; } = null!;
+    private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
 
-    private ReceivingOrderDetails? _order;
+    [Inject]
+    private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
+
+    private ReceivingOrder? _order;
     private bool _isLoading = true;
     private bool _updateFailed;
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
-        _order = await ReceivingOrderService.GetOrderAsync(Id);
+        _order = await OrderQueryService.GetOrderAsync(Id);
         _isLoading = false;
     }
 
-    private async Task UpdateFactQuantityAsync(ReceivingOrderItemDetails item, double factQuantity)
+    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double factQuantity)
     {
         await UpdateOrderItemAsync(item, factQuantity, item.Comment);
     }
 
-    private async Task UpdateCommentAsync(ReceivingOrderItemDetails item, string? comment)
+    private async Task UpdateCommentAsync(ReceivingOrderItem item, string? comment)
     {
         await UpdateOrderItemAsync(item, item.FactQuantity, comment);
     }
 
-    private async Task UpdateOrderItemAsync(ReceivingOrderItemDetails item, double factQuantity, string? comment)
+    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, double factQuantity, string? comment)
     {
         _updateFailed = false;
 
         try
         {
-            var updatedItems = await ReceivingOrderService.UpdateOrderItemAsync(new ReceivingOrderItemDetails
-            {
-                ReceivingOrderId = item.ReceivingOrderId,
-                LineNumber = item.LineNumber,
-                FactQuantity = factQuantity,
-                Comment = comment
-            });
+            var updatedItems = await OrderCommandService.UpdateOrderItemFactQuantityAsync(
+                item.ReceivingOrderId,
+                item.LineNumber,
+                factQuantity,
+                comment);
 
             if (updatedItems == 0)
             {

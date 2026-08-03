@@ -34,7 +34,7 @@ internal class StockKeepingUnitService(
         {
             logger.LogWarning("{Source} {Id} {DbUpdateException}", nameof(CreateAsync), item.Id, ex.Message);
 
-            await UpdateAsync(item, ct);
+            await UpdateAsync(item, ct); // TODO: Наверное нужно убрать
         }
 
         if (logger.IsEnabled(LogLevel.Debug))

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application;
+using Wms.Application.ReceivingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -10,7 +10,10 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 public partial class Index
 {
     [Inject]
-    private ReceivingOrderService ReceivingOrderService { get; set; } = null!;
+    private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+
+    [Inject]
+    private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
 
     private MudDataGrid<ReceivingOrder> _dataGrid = null!;
     private string? _searchString;
@@ -35,7 +38,7 @@ public partial class Index
             Take = state.PageSize
         };
 
-        var result = await ReceivingOrderService.ListOrdersAsync(query, cancellationToken);
+        var result = await OrderQueryService.ListOrdersAsync(query, cancellationToken);
 
         return new GridData<ReceivingOrder>
         {

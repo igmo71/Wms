@@ -1,95 +1,17 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
 
-namespace Wms.Application;
+namespace Wms.Application.ReceivingOrders;
 
-public class ReceivingOrderService(
+public class ReceivingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
-    ILogger<ReceivingOrderService> logger)
+    ILogger<ReceivingOrderCommandService> logger)
 {
-    public async Task<ReceivingOrder?> GetOrderAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var order = await dbContext.ReceivingOrders
-            .AsNoTracking()
-            .Include(x => x.Warehouse)
-            .Include(x => x.ReceivingLocation)
-            .FirstOrDefaultAsync(x => x.Id == id, ct);
-
-        var orderItems = await dbContext.ReceivingOrderItems
-            .AsNoTracking()
-            .Include(x => x.StockKeepingUnit)
-            .Where(x => x.ReceivingOrderId == id)
-            .ToListAsync(ct);
-
-        return order;
-    }
-
-    public async Task<ListResult<ReceivingOrder>> ListOrdersAsync(DocumentListQuery listQuery, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        IQueryable<ReceivingOrder> query = dbContext.ReceivingOrders
-            .AsNoTracking();
-
-        query = ApplySearch(query, listQuery);
-
-        int totalItems = await query.CountAsync(ct);
-
-        query = ApplySorting(query, listQuery);
-
-        var items = await query
-            .Skip(listQuery.Skip)
-            .Take(listQuery.Take)
-            .ToListAsync(ct);
-
-        return new ListResult<ReceivingOrder>
-        {
-            Items = items,
-            TotalItems = totalItems
-        };
-    }
-
-    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
-    {
-        if (listQuery.ExcludeDeleted)
-            query = query.Where(x => x.DeletionMark == false);
-
-        if (listQuery.IncludePostedOnly)
-            query = query.Where(x => x.Posted == true);
-
-        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
-            query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
-
-        if (listQuery.DateFrom is not null)
-            query = query.Where(x => x.DateTime >= listQuery.DateFrom);
-
-        if (listQuery.DateTo is not null)
-            query = query.Where(x => x.DateTime < ((DateTime)listQuery.DateTo).AddDays(1));
-
-        if (listQuery.Status is not null)
-            query = query.Where(x => x.Status == listQuery.Status);
-
-        return query;
-    }
-
-    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
-    {
-        return listQuery.SortBy switch
-        {
-            "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
-            "DateTime" => listQuery.SortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
-            "StartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.StartedAtUtc) : query.OrderBy(x => x.StartedAtUtc),
-            "CompletedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.CompletedAtUtc) : query.OrderBy(x => x.CompletedAtUtc),
-            _ => query.OrderByDescending(x => x.DateTime),
-        };
-    }
 
     internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externalItem, CancellationToken ct = default)
     {
@@ -105,7 +27,7 @@ public class ReceivingOrderService(
         }
         else if (existsingItem.DataVersion != externalItem.DataVersion)
         {
-            // TODO: Нужно проверить Нотфткацию после StartOrderAsync и CompleteOrderAsync
+            // TODO: Нужно проверить Нотфткацию после StartOrderAsync и CompleteOrderAsync? 
             if (existsingItem.StartedAtUtc is null && existsingItem.CompletedAtUtc is null)
             {
                 await UpdateOrderAsImportAsync(externalItem, ct);
@@ -130,7 +52,8 @@ public class ReceivingOrderService(
         }
         catch (DbUpdateException ex)
         {
-            logger.LogWarning("{Source} {Id} {DbUpdateException}", nameof(CreateOrderAsync), item.Id, ex.Message);
+            logger.LogWarning("{Source} {Id} {DbUpdateException}",
+                nameof(CreateOrderAsync), item.Id, ex.Message);
 
             await UpdateOrderAsImportAsync(item, ct);
         }
@@ -224,19 +147,21 @@ public class ReceivingOrderService(
         return true;
     }
 
-    public async Task CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<bool> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
     {
         var outboundResult = await outboundService.CompleteOrderAsync(orderId, ct);
 
         if (outboundResult is null)
         {
             logger.LogError("{Source} Complete Order failed", nameof(CompleteOrderAsync));
-            return;
+            return false;
         }
 
         // TODO: Обновление должно прилететь по нотификации,
         // но уже установлено StartedAt и UpdateOrderAsImportAsync не пропустит, надо проверять
         //await UpdateOrderAsImportAsync(outboundResult, ct); 
+
+        return true;
     }
 
     public async Task CompleteOrderAsync(ReceivingOrder order, CancellationToken ct = default)
@@ -255,15 +180,16 @@ public class ReceivingOrderService(
         await CompleteOrderAsync(order.Id, ct);
     }
 
-    public async Task<int> UpdateOrderItemAsync(ReceivingOrderItemDetails orderItem, CancellationToken ct = default)
+    public async Task<int> UpdateOrderItemFactQuantityAsync(
+        Guid receivingOrderId, int lineNumber, double factQuantity, string? comment, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var result = await dbContext.ReceivingOrderItems
-            .Where(x => x.ReceivingOrderId == orderItem.ReceivingOrderId && x.LineNumber == orderItem.LineNumber)
+            .Where(x => x.ReceivingOrderId == receivingOrderId && x.LineNumber == lineNumber)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.FactQuantity, orderItem.FactQuantity)
-                .SetProperty(p => p.Comment, orderItem.Comment), ct);
+                .SetProperty(p => p.FactQuantity, factQuantity)
+                .SetProperty(p => p.Comment, comment), ct);
 
         return result;
     }

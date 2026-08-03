@@ -1,6 +1,6 @@
 @page "/receiving-orders/{Id:guid}"
-@using Wms.Application
 @using Wms.Common
+@using Wms.Domain
 @using Wms.Domain.Enums
 
 <PageTitle>Детали приходного ордера</PageTitle>
@@ -55,11 +55,11 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Склад</MudText>
-                    <MudText>@_order.WarehouseName</MudText>
+                    <MudText>@_order.Warehouse?.Name</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    <MudText>@_order.ReceivingLocationName</MudText>
+                    <MudText>@_order.ReceivingLocation?.Name</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">В работе с</MudText>
@@ -76,14 +76,14 @@ else
             </MudGrid>
         </MudPaper>
 
-        <MudDataGrid T="ReceivingOrderItemDetails"
+        <MudDataGrid T="ReceivingOrderItem"
                      Items="_order.Items"
                      Hover="true"
                      Striped="true"
                      Dense="true">
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
-                <PropertyColumn Property="x => x.StockKeepingUnitName" Title="Номенклатура" />
+                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
                 <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />

@@ -1,4 +1,4 @@
-﻿using Wms.Application;
+﻿using Wms.Application.ReceivingOrders;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
@@ -9,7 +9,7 @@ namespace Wms.Integration.OneS.Services;
 
 internal class Document_ПриходныйОрдерНаТовары_ImportService(
     OneCClient oneCClient,
-    ReceivingOrderService receivingOrderService)
+    ReceivingOrderCommandService receivingOrderService)
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
