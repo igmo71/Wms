@@ -5,23 +5,30 @@ using Wms.Data;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
 
-namespace Wms.Application.RecreivingOrders;
+namespace Wms.Application;
 
 public class ReceivingOrderService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderService> logger)
 {
-    public async Task<ReceivingOrderDetails?> GetOrderAsync(Guid id, CancellationToken ct = default)
+    public async Task<ReceivingOrder?> GetOrderAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.ReceivingOrders
+        var order = await dbContext.ReceivingOrders
             .AsNoTracking()
-            .Select(ReceivingOrderDetails.Projection)
+            .Include(x => x.Warehouse)
+            .Include(x => x.ReceivingLocation)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
-        return result;
+        var orderItems = await dbContext.ReceivingOrderItems
+            .AsNoTracking()
+            .Include(x => x.StockKeepingUnit)
+            .Where(x => x.ReceivingOrderId == id)
+            .ToListAsync(ct);
+
+        return order;
     }
 
     public async Task<ListResult<ReceivingOrder>> ListOrdersAsync(DocumentListQuery listQuery, CancellationToken ct = default)
