@@ -1,6 +1,6 @@
 ﻿using Wms.Domain;
 
-namespace Wms.Application;
+namespace Wms.Application.RecreivingOrders;
 
 public class ReceivingOrderItemDetails
 {

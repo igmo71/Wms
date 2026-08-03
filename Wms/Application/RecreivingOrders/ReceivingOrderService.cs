@@ -5,7 +5,7 @@ using Wms.Data;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
 
-namespace Wms.Application;
+namespace Wms.Application.RecreivingOrders;
 
 public class ReceivingOrderService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,

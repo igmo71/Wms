@@ -1,4 +1,4 @@
-﻿using Wms.Application;
+﻿using Wms.Application.RecreivingOrders;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;

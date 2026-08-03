@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application;
+using Wms.Application.RecreivingOrders;
 using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;

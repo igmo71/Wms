@@ -2,7 +2,7 @@
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.Application;
+namespace Wms.Application.RecreivingOrders;
 
 public class ReceivingOrderDetails
 {
