@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.RecreivingOrders;
+using Wms.Application;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

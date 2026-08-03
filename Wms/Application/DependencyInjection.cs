@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Wms.Application.RecreivingOrders;
 
 namespace Wms.Application;
 

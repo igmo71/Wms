@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application.RecreivingOrders;
+using Wms.Application;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
