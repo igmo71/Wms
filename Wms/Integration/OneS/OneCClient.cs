@@ -17,11 +17,12 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         using var response = await _httpClient.GetAsync(uri, ct);
 
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
+
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadFromJsonAsync<OneCError>(ct);
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {@Error}", nameof(GetValueAsync), uri, error);
+            TryReadError(uri, response, responseContent);
+
             return default;
         }
 
@@ -44,11 +45,12 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         using var response = await _httpClient.PatchAsync(uri, content, ct);
 
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
+
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadFromJsonAsync<OneCError>(ct);
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {@Error}", nameof(GetValueAsync), uri, error);
+            TryReadError(uri, response, responseContent);
+
             return default;
         }
 
@@ -67,11 +69,12 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         using var response = await _httpClient.PostAsync(uri, null, ct);
 
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
+
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadFromJsonAsync<OneCError>(ct);
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {@Error}", nameof(GetValueAsync), uri, error);
+            TryReadError(uri, response, responseContent);
+
             return false;
         }
 
@@ -79,5 +82,21 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             _logger.LogDebug("{Source} - Ok {Uri}", nameof(PostValueAsync), uri);
 
         return true;
+    }
+
+    private void TryReadError(string uri, HttpResponseMessage response, string content)
+    {
+        try
+        {
+            var error = JsonSerializer.Deserialize<OneCError>(content);
+
+            if (_logger.IsEnabled(LogLevel.Error))
+                _logger.LogError("{Source} {Uri} StatusCode{} {@Error}", nameof(GetValueAsync), uri, response.StatusCode, error);
+        }
+        catch (Exception)
+        {
+            if (_logger.IsEnabled(LogLevel.Error))
+                _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", nameof(GetValueAsync), uri, response.StatusCode, content);
+        }
     }
 }

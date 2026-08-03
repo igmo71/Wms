@@ -62,6 +62,7 @@
         </TemplateColumn>
         <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
+        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />
         <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">

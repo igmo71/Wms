@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
@@ -13,100 +14,85 @@ public class ReceivingOrderCommandService(
 {
 
 
-    internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externalItem, CancellationToken ct = default)
+    internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externaOrder, CancellationToken ct = default)
     {
+        var source = nameof(CreateOrUpdateImporttedOrderAsync);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Start {externaOrderId} {@externaOrder}", source, externaOrder.Id, externaOrder);
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existsingItem = await dbContext.ReceivingOrders
+        var existsingOrder = await dbContext.ReceivingOrders
             .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == externalItem.Id, ct);
+            .FirstOrDefaultAsync(x => x.Id == externaOrder.Id, ct);
 
-        if (existsingItem is null)
+        if (existsingOrder is null)
         {
-            await CreateOrderAsync(externalItem, ct);
+            var entity = dbContext.ReceivingOrders.Add(externaOrder).Entity;
         }
-        else if (existsingItem.DataVersion != externalItem.DataVersion)
+        else if (existsingOrder.DataVersion != externaOrder.DataVersion)
         {
-            // TODO: Нужно проверить Нотфткацию после StartOrderAsync и CompleteOrderAsync? 
-            if (existsingItem.StartedAtUtc is null && existsingItem.CompletedAtUtc is null)
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("{Source} DataVersion differ {OrderId}", source, existsingOrder.Id);
+
+            if (existsingOrder.StartedAtUtc is null && existsingOrder.CompletedAtUtc is null)
             {
-                await UpdateOrderAsImportAsync(externalItem, ct);
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug("{Source} StartedAtUtc and CompletedAtUtc is null {OrderId}", source, existsingOrder.Id);
+
+                UpdateOrder(externaOrder, existsingOrder);
             }
             else
             {
-                logger.LogWarning("{Source} {Number} {Id}, cannot update",
-                    nameof(CreateOrUpdateImporttedOrderAsync), externalItem.Number, externalItem.Id);
+                logger.LogWarning("{Source} {Number} {OrderId}, cannot update", source, externaOrder.Number, existsingOrder.Id);
             }
         }
-    }
-
-    private async Task<ReceivingOrder> CreateOrderAsync(ReceivingOrder item, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var entity = dbContext.ReceivingOrders.Add(item).Entity;
-
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogWarning("{Source} {Id} {DbUpdateException}",
-                nameof(CreateOrderAsync), item.Id, ex.Message);
-
-            await UpdateOrderAsImportAsync(item, ct);
-        }
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {Number} {DateTime} {Id}",
-                nameof(CreateOrderAsync), entity.Number, entity.DateTime, entity.Id);
-
-        return entity;
-    }
-
-    private async Task UpdateOrderAsImportAsync(ReceivingOrder receivingOrder, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingOrder = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == receivingOrder.Id, ct);
-
-        if (existingOrder is null)
-        {
-            logger.LogWarning("{Source} {Id} not found", nameof(UpdateOrderAsImportAsync), receivingOrder.Id);
-            return;
-        }
-
-        existingOrder.BaseOrderId = receivingOrder.BaseOrderId;
-        existingOrder.BaseOrderType = receivingOrder.BaseOrderType;
-        existingOrder.Status = receivingOrder.Status;
-        existingOrder.BusinessOperation = receivingOrder.BusinessOperation;
-        existingOrder.WarehouseOperation = receivingOrder.WarehouseOperation;
-        existingOrder.Comment = receivingOrder.Comment;
-        existingOrder.Posted = receivingOrder.Posted;
-        existingOrder.DeletionMark = receivingOrder.DeletionMark;
-        existingOrder.DataVersion = receivingOrder.DataVersion;
-
-        SynchronizeOrderItems(existingOrder.Items, receivingOrder.Items);
 
         await dbContext.SaveChangesAsync(ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Ok {externaOrderId}", source, externaOrder.Id);
     }
 
-    private static void SynchronizeOrderItems(
+    private void UpdateOrder(ReceivingOrder externaOrder, ReceivingOrder existsingOrder)
+    {
+        var source = nameof(UpdateOrder);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Start {OrderId} {existsingOrderStatus} {externaOrderStatus}",
+                source, existsingOrder.Id, existsingOrder.Status.GetDisplayName(), externaOrder.Status.GetDisplayName());
+
+        existsingOrder.BaseOrderId = externaOrder.BaseOrderId;
+        existsingOrder.BaseOrderType = externaOrder.BaseOrderType;
+        existsingOrder.Status = externaOrder.Status;
+        existsingOrder.Queue = externaOrder.Queue;
+        existsingOrder.BusinessOperation = externaOrder.BusinessOperation;
+        existsingOrder.WarehouseOperation = externaOrder.WarehouseOperation;
+        existsingOrder.Comment = externaOrder.Comment;
+        existsingOrder.Posted = externaOrder.Posted;
+        existsingOrder.DeletionMark = externaOrder.DeletionMark;
+        existsingOrder.DataVersion = externaOrder.DataVersion;
+
+        UpdateOrderItems(existsingOrder.Items, externaOrder.Items);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Ok {OrderId} {existsingOrderStatus} {externaOrderStatus}",
+                source, existsingOrder.Id, existsingOrder.Status.GetDisplayName(), externaOrder.Status.GetDisplayName());
+    }
+
+    private static void UpdateOrderItems(
     List<ReceivingOrderItem> existingOrderItems,
     IReadOnlyCollection<ReceivingOrderItem> externalOrderItems)
     {
-        var externalByKey = externalOrderItems.ToDictionary(
-            item => (item.ReceivingOrderId, item.LineNumber));
+        var externalByKey = externalOrderItems
+            .ToDictionary(item => (item.ReceivingOrderId, item.LineNumber));
 
-        existingOrderItems.RemoveAll(existing =>
-            !externalByKey.ContainsKey(
-                (existing.ReceivingOrderId, existing.LineNumber)));
+        existingOrderItems
+            .RemoveAll(existing => !externalByKey.ContainsKey((existing.ReceivingOrderId, existing.LineNumber)));
 
-        var existingByKey = existingOrderItems.ToDictionary(
-            item => (item.ReceivingOrderId, item.LineNumber));
+        var existingByKey = existingOrderItems
+            .ToDictionary(item => (item.ReceivingOrderId, item.LineNumber));
 
         foreach (var external in externalOrderItems)
         {
@@ -133,27 +119,63 @@ public class ReceivingOrderCommandService(
 
     public async Task<bool> StartOrderAsync(Guid orderId, CancellationToken ct = default)
     {
+        var source = nameof(StartOrderAsync);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Start {orderId}", source, orderId);
+
         var outboundResult = await outboundService.StartOrderAsync(orderId, ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} {orderId} {@outboundResult}", source, orderId, outboundResult);
 
         if (outboundResult is null)
         {
-            logger.LogError("{Source} Start Order failed", nameof(StartOrderAsync));
+            logger.LogError("{Source} Start Order failed", source);
             return false;
         }
 
         // TODO: Обновление должно прилететь по нотификации, надо проверять
         //await UpdateOrderAsImportAsync(outboundResult, ct); 
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Ok {orderId}", source, orderId);
+
         return true;
     }
 
     public async Task<bool> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
     {
+        var source = nameof(CompleteOrderAsync);
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existingOrder = await dbContext.ReceivingOrders
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+
+
+        if (existingOrder is null)
+        {
+            logger.LogError("{Source} Order Not Found {orderId}", source, orderId);
+            return false;
+        }
+
+        if (existingOrder.HasPlanFactDifference)
+        {
+            var updateOrderItemsResult = await outboundService.UpdateOrderItemsAsync(existingOrder.Id, existingOrder.Items, ct);
+
+            if (updateOrderItemsResult is null)
+            {
+                logger.LogError("{Source} Update Order Items failed", source);
+                return false;
+            }
+        }
+
         var outboundResult = await outboundService.CompleteOrderAsync(orderId, ct);
 
         if (outboundResult is null)
         {
-            logger.LogError("{Source} Complete Order failed", nameof(CompleteOrderAsync));
+            logger.LogError("{Source} Complete Order failed", source);
             return false;
         }
 
@@ -164,24 +186,12 @@ public class ReceivingOrderCommandService(
         return true;
     }
 
-    public async Task CompleteOrderAsync(ReceivingOrder order, CancellationToken ct = default)
-    {
-        if (order.HasPlanFactDifference)
-        {
-            var updateOrderItemsResult = await outboundService.UpdateOrderItemsAsync(order.Id, order.Items, ct);
-
-            if (updateOrderItemsResult is null)
-            {
-                logger.LogError("{Source} Update Order Items failed", nameof(CompleteOrderAsync));
-                return;
-            }
-        }
-
-        await CompleteOrderAsync(order.Id, ct);
-    }
-
     public async Task<int> UpdateOrderItemFactQuantityAsync(
-        Guid receivingOrderId, int lineNumber, double factQuantity, string? comment, CancellationToken ct = default)
+        Guid receivingOrderId,
+        int lineNumber,
+        double factQuantity,
+        string? comment,
+        CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 

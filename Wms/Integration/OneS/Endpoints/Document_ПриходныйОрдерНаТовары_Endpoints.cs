@@ -26,7 +26,7 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
     }
 
     static async Task<IResult> ImportOrder(
-        [FromServices] Document_ПриходныйОрдерНаТовары_ImportService service,
+        [FromServices] Document_ПриходныйОрдерНаТовары_InboundService service,
         CancellationToken ct)
     {
         await service.ImportListAsync(ct);

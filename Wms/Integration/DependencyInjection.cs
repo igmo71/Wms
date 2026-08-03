@@ -29,7 +29,7 @@ public static class DependencyInjection
         services.AddScoped<Catalog_Номенклатура_Service>();
         services.AddScoped<Catalog_Склады_Service>();
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();
-        services.AddScoped<Document_ПриходныйОрдерНаТовары_ImportService>();
+        services.AddScoped<Document_ПриходныйОрдерНаТовары_InboundService>();
         services.AddScoped<Document_ПриходныйОрдерНаТовары_OutboundService>();
         services.AddScoped<InformationRegister_ШтрихкодыНоменклатуры_Service>();
 

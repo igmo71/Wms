@@ -1,26 +1,42 @@
-﻿using Wms.Application.ReceivingOrders;
+﻿using Microsoft.Extensions.Logging;
+using Wms.Application.ReceivingOrders;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
 
-
-
-internal class Document_ПриходныйОрдерНаТовары_ImportService(
+internal class Document_ПриходныйОрдерНаТовары_InboundService(
     OneCClient oneCClient,
-    ReceivingOrderCommandService receivingOrderService)
+    ReceivingOrderCommandService receivingOrderService,
+    ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger)
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
+        var source = nameof(ImportAsync);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Start {Ref_Key}", source, Ref_Key);
+
+        await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
         var fetchedItem = await GetAsync(Ref_Key, ct);
 
         if (fetchedItem is null)
+        {
+            logger.LogError("{Source} Not Found {Ref_Key}", source, Ref_Key);
             return;
+        }
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Fetched {@fetchedItem}", source, fetchedItem);
 
         ReceivingOrder importedOrder = Document.MapToReceivingOrder(fetchedItem);
 
         await receivingOrderService.CreateOrUpdateImporttedOrderAsync(importedOrder, ct);
+
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("{Source} Ok {Ref_Key}", source, Ref_Key);
     }
 
     private async Task<Document?> GetAsync(string Ref_Key, CancellationToken ct = default)

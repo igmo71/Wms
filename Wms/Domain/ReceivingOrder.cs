@@ -17,6 +17,7 @@ public class ReceivingOrder
     public Guid? ReceivingLocationId { get; set; }
     public StorageLocation? ReceivingLocation { get; set; }
     public ReceivingOrderStatus Status { get; set; }
+    public ReceivingOrderQueue Queue { get; set; }
     public WarehouseOperation WarehouseOperation { get; set; }
     public BusinessOperation BusinessOperation { get; set; }
 

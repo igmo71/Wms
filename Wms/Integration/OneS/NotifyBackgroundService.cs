@@ -59,7 +59,7 @@ public class NotifyBackgroundService(
                 }
             case nameof(Document_ПриходныйОрдерНаТовары):
                 {
-                    var service = scope.ServiceProvider.GetService<Document_ПриходныйОрдерНаТовары_ImportService>();
+                    var service = scope.ServiceProvider.GetService<Document_ПриходныйОрдерНаТовары_InboundService>();
                     if (service is not null)
                         await service.ImportAsync(notifyRecord.Ref_Key, ct);
                     break;
