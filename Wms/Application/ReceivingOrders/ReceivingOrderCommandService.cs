@@ -10,13 +10,15 @@ namespace Wms.Application.ReceivingOrders;
 
 public class ReceivingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     IOptions<WmsSettings> options,
+    InventoryBalanceService inventoryBalanceService,
+    InventoryTurnoverService inventoryTurnoverService,
+    Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderCommandService> logger)
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    internal async Task CreateOrUpdateImportedOrderAsync(
+    public async Task CreateOrUpdateImportedOrderAsync(
     ReceivingOrder externalOrder,
     CancellationToken ct = default)
     {
@@ -148,8 +150,12 @@ public class ReceivingOrderCommandService(
             return false;
         }
 
+        existingOrder.UpdateFromImport(externalOrder);
         existingOrder.Status = externalOrder.Status;
         existingOrder.CompletedAtUtc = DateTimeOffset.UtcNow;
+
+        await inventoryTurnoverService.CreateAsync(existingOrder, dbContext, ct);
+        await inventoryBalanceService.CreateOrUpdateAsync(existingOrder, dbContext, ct);
 
         await dbContext.SaveChangesAsync(ct);
 

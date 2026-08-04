@@ -10,7 +10,7 @@ internal class Document_ПриходныйОрдерНаТовары_Товар�
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public int LineNumber { get; set; }
 
-    public Guid? Номенклатура_Key { get; set; }
+    public Guid Номенклатура_Key { get; set; }
     public double КоличествоУпаковок { get; set; }
     public double Количество { get; set; }
     public string? Штрихкод { get; set; }

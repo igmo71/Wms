@@ -53,8 +53,6 @@ internal class StockKeepingUnitService(
                 .SetProperty(e => e.DeletionMark, item.DeletionMark)
                 .SetProperty(e => e.Code, item.Code)
                 .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.IsFolder, item.IsFolder)
-                .SetProperty(e => e.ParentId, item.ParentId)
                 .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
                 .SetProperty(e => e.WeightKg, item.WeightKg), ct);
 

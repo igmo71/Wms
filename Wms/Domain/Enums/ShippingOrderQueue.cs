@@ -5,6 +5,10 @@ namespace Wms.Domain.Enums;
 
 public enum ShippingOrderQueue
 {
+    [EnumMember(Value = "")]
+    [Display(Name = "Очередность не указана")]
+    Unknown = 0,
+
     [EnumMember(Value = "ЖиваяОчередь")]
     [Display(Name = "Живая Очередь")]
     LiveQueue = 1,

@@ -5,6 +5,10 @@ namespace Wms.Domain.Enums;
 
 public enum ReceivingOrderQueue
 {
+    [EnumMember(Value = "")]
+    [Display(Name = "Очередность не указана")]
+    Unknown = 0,
+
     [EnumMember(Value = "ПодКлиента")]
     [Display(Name = "Под Клиента")]
     ForClient = 1,

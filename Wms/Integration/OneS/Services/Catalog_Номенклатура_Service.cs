@@ -110,15 +110,11 @@ internal class Catalog_Номенклатура_Service(
         return new StockKeepingUnit
         {
             Id = fetchedItem.Ref_Key,
-            BaseUnitOfMeasureId = fetchedItem.ЕдиницаИзмерения_Key == Guid.Empty ? null : fetchedItem.ЕдиницаИзмерения_Key,
+            BaseUnitOfMeasureId = fetchedItem.ЕдиницаИзмерения_Key,
             Code = fetchedItem.Code,
             DeletionMark = fetchedItem.DeletionMark,
             Name = fetchedItem.Description,
-            IsFolder = fetchedItem.IsFolder,
-            ParentId = fetchedItem.Parent_Key,
-            WeightKg = fetchedItem.ВесИспользовать.HasValue && fetchedItem.ВесИспользовать.Value
-                ? fetchedItem.ВесЧислитель / fetchedItem.ВесЗнаменатель
-                : null
+            WeightKg = fetchedItem.ВесИспользовать ? fetchedItem.ВесЧислитель / fetchedItem.ВесЗнаменатель : null
         };
     }
 }

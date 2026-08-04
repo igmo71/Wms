@@ -12,7 +12,7 @@ internal class Document_ПриходныйОрдерНаТовары
     public string? Number { get; set; }
     public DateTime Date { get; set; }
     public bool Posted { get; set; }
-    public Guid? Склад_Key { get; set; }
+    public Guid Склад_Key { get; set; }
     public string? Комментарий { get; set; }
     public string? Статус { get; set; }
     public string? СкладскаяОперация { get; set; }
@@ -21,9 +21,9 @@ internal class Document_ПриходныйОрдерНаТовары
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public int ВсегоМест { get; set; }
 
-    public Guid? Отправитель { get; set; }
+    public Guid Отправитель { get; set; }
     public string? Отправитель_Type { get; set; }
-    public Guid? Распоряжение { get; set; }
+    public Guid Распоряжение { get; set; }
     public string? Распоряжение_Type { get; set; }
     public string? Доброга_ТипОчереди { get; set; }
     public List<Document_ПриходныйОрдерНаТовары_Товары> Товары { get; set; } = [];
@@ -78,7 +78,7 @@ internal class Document_ПриходныйОрдерНаТовары
             Number = fetchedItem.Number,
             Comment = fetchedItem.Комментарий,
             WarehouseId = fetchedItem.Склад_Key,
-            ReceivingLocationId = null,
+            ReceivingLocationId = Guid.Empty,
             Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedItem.Статус),
             Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedItem.Доброга_ТипОчереди),
             WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedItem.СкладскаяОперация),

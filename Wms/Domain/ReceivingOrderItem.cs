@@ -7,7 +7,7 @@ public class ReceivingOrderItem
 
     public int LineNumber { get; set; }
 
-    public Guid? StockKeepingUnitId { get; set; }
+    public Guid StockKeepingUnitId { get; set; }
     public StockKeepingUnit? StockKeepingUnit { get; set; }
 
     public double PlanQuantity { get; set; }

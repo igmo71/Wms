@@ -4,17 +4,17 @@ public class Catalog_Номенклатура
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
-    public Guid? Parent_Key { get; set; }
+    public Guid Parent_Key { get; set; }
     public bool IsFolder { get; set; }
     public string? Code { get; set; }
     public string? Description { get; set; }
     public string? Артикул { get; set; }
-    public Guid? ЕдиницаИзмерения_Key { get; set; }
+    public Guid ЕдиницаИзмерения_Key { get; set; }
 
-    public bool? ВесИспользовать { get; set; }
-    public Guid? ВесЕдиницаИзмерения_Key { get; set; }
-    public double? ВесЧислитель { get; set; }
-    public double? ВесЗнаменатель { get; set; }
+    public bool ВесИспользовать { get; set; }
+    public Guid ВесЕдиницаИзмерения_Key { get; set; }
+    public double ВесЧислитель { get; set; }
+    public double ВесЗнаменатель { get; set; }
 
 
     public const int BatchSize = 1000;
@@ -24,6 +24,7 @@ public class Catalog_Номенклатура
     public static string GetListUri(int page) => $"Catalog_Номенклатура" +
         $"?$format=json" +
         $"&$select={select}" +
+        $"&$filter=IsFolder eq false" +
         $"&$orderby=Ref_Key" +
         $"&$skip={page * BatchSize}" +
         $"&$top={BatchSize}";

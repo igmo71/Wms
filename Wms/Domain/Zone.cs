@@ -6,7 +6,7 @@ public class Zone
     public string? Name { get; set; }
     public bool DeletionMark { get; set; }
 
-    public Guid? WarehouseId { get; set; }
+    public Guid WarehouseId { get; set; }
     public Warehouse? Warehouse { get; set; }
 
     public List<StorageLocation>? StorageLocations { get; set; }
