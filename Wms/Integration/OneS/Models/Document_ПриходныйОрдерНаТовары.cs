@@ -74,7 +74,7 @@ internal class Document_ПриходныйОрдерНаТовары
             Id = fetchedItem.Ref_Key,
             Posted = fetchedItem.Posted,
             DeletionMark = fetchedItem.DeletionMark,
-            DateTime = fetchedItem.Date,
+            Date = fetchedItem.Date,
             Number = fetchedItem.Number,
             Comment = fetchedItem.Комментарий,
             WarehouseId = fetchedItem.Склад_Key,

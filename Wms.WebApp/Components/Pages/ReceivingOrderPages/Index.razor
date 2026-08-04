@@ -60,7 +60,7 @@
                 <MudLink Href="@($"receiving-orders/{context.Item.Id}")">@context.Item.Number</MudLink>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.DateTime" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
         <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />
         <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />

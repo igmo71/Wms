@@ -8,7 +8,7 @@ public class ReceivingOrder
     public Guid Id { get; set; }
     public bool Posted { get; set; }
     public bool DeletionMark { get; set; }
-    public DateTime DateTime { get; set; }
+    public DateTime Date { get; set; }
     public string? Number { get; set; }
     public string? Comment { get; set; }
     public Guid? WarehouseId { get; set; }
@@ -25,7 +25,7 @@ public class ReceivingOrder
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
     public DateTimeOffset? CompletedAtUtc { get; set; }
-    public DateTimeOffset? ExternalChangeDetectedAtUtc { get; set; } // Прилетал запрос из 1С
+    public DateTimeOffset? ExternalChangeDetectedAtUtc { get; set; }
 
     public Guid? StartedBy { get; set; }
     public Guid? CompletedBy { get; set; }
@@ -44,10 +44,15 @@ public class ReceivingOrder
 
     public bool ExternalChangeDetected => ExternalChangeDetectedAtUtc is not null;
 
-    public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
-        (Status == ReceivingOrderStatus.Pending && wmsSettings.AllowExternalUpdatePending) ||
-        (Status == ReceivingOrderStatus.InProcess && wmsSettings.AllowExternalUpdateInProcess) ||
-        (Status == ReceivingOrderStatus.Completed && wmsSettings.AllowExternalUpdateCompleted);
+    public bool AllowExternalUpdate(WmsSettings settings) =>
+    Status switch
+    {
+        ReceivingOrderStatus.Pending => settings.AllowExternalUpdatePending,
+        ReceivingOrderStatus.InProcess => settings.AllowExternalUpdateInProcess,
+        ReceivingOrderStatus.ProcessingRequired => settings.AllowExternalUpdateInProcess,
+        ReceivingOrderStatus.Completed => settings.AllowExternalUpdateCompleted,
+        _ => false
+    };
 
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
@@ -62,15 +67,45 @@ public class ReceivingOrder
             || WarehouseOperation != externalOrder.WarehouseOperation
             || Comment != externalOrder.Comment
             || Posted != externalOrder.Posted
-            || DeletionMark != externalOrder.DeletionMark)
+            || DeletionMark != externalOrder.DeletionMark
+            || Date != externalOrder.Date
+            || Number != externalOrder.Number
+            || WarehouseId != externalOrder.WarehouseId
+            || SenderId != externalOrder.SenderId
+            || SenderType != externalOrder.SenderType)
         {
             return true;
         }
 
-        return HaveImportItemChanges(Items, externalOrder.Items);
+        return HaveImportItemChanges(externalOrder.Items);
     }
 
-    public void Update(ReceivingOrder externaOrder)
+    private bool HaveImportItemChanges(List<ReceivingOrderItem> externalItems)
+    {
+        if (Items.Count != externalItems.Count)
+            return true;
+
+        var externalByLineNumber = externalItems
+            .ToDictionary(x => x.LineNumber);
+
+        foreach (var existing in Items)
+        {
+            if (!externalByLineNumber.TryGetValue(existing.LineNumber, out var external))
+            {
+                return true;
+            }
+
+            if (existing.StockKeepingUnitId != external.StockKeepingUnitId
+                || existing.PlanQuantity != external.PlanQuantity)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void UpdateFromImport(ReceivingOrder externaOrder)
     {
         BaseOrderId = externaOrder.BaseOrderId;
         BaseOrderType = externaOrder.BaseOrderType;
@@ -81,37 +116,35 @@ public class ReceivingOrder
         Comment = externaOrder.Comment;
         Posted = externaOrder.Posted;
         DeletionMark = externaOrder.DeletionMark;
+        Date = externaOrder.Date;
+        Number = externaOrder.Number;
+        WarehouseId = externaOrder.WarehouseId;
+        SenderId = externaOrder.SenderId;
+        SenderType = externaOrder.SenderType;
 
-        UpdateOrderItems(Items, externaOrder.Items);
+        UpdateOrderItems(externaOrder.Items);
     }
 
-    private static void UpdateOrderItems(
-    List<ReceivingOrderItem> existingOrderItems,
-    IReadOnlyCollection<ReceivingOrderItem> externalOrderItems)
+    private void UpdateOrderItems(List<ReceivingOrderItem> externalOrderItems)
     {
-        var externalByKey = externalOrderItems
-            .ToDictionary(item => (item.ReceivingOrderId, item.LineNumber));
+        var externalByLineNumber = externalOrderItems.ToDictionary(item => item.LineNumber);
 
-        existingOrderItems
-            .RemoveAll(existing => !externalByKey.ContainsKey((existing.ReceivingOrderId, existing.LineNumber)));
+        Items.RemoveAll(existing => !externalByLineNumber.ContainsKey(existing.LineNumber));
 
-        var existingByKey = existingOrderItems
-            .ToDictionary(item => (item.ReceivingOrderId, item.LineNumber));
+        var existingByLineNumber = Items.ToDictionary(item => item.LineNumber);
 
         foreach (var external in externalOrderItems)
         {
-            var key = (external.ReceivingOrderId, external.LineNumber);
-
-            if (existingByKey.TryGetValue(key, out var existing))
+            if (existingByLineNumber.TryGetValue(external.LineNumber, out var existing))
             {
                 existing.StockKeepingUnitId = external.StockKeepingUnitId;
                 existing.PlanQuantity = external.PlanQuantity;
             }
             else
             {
-                existingOrderItems.Add(new ReceivingOrderItem
+                Items.Add(new ReceivingOrderItem
                 {
-                    ReceivingOrderId = external.ReceivingOrderId,
+                    ReceivingOrderId = Id,
                     LineNumber = external.LineNumber,
                     StockKeepingUnitId = external.StockKeepingUnitId,
                     PlanQuantity = external.PlanQuantity,
@@ -119,5 +152,15 @@ public class ReceivingOrder
                 });
             }
         }
+    }
+
+    public void MarkExternalChangeDetected(DateTimeOffset detectedAtUtc)
+    {
+        ExternalChangeDetectedAtUtc = detectedAtUtc;
+    }
+
+    public void ClearExternalChangeDetected()
+    {
+        ExternalChangeDetectedAtUtc = null;
     }
 }

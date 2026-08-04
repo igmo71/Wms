@@ -51,7 +51,7 @@ public class Program
 
         builder.Services.AddApplicatiobDbContext(builder.Configuration);
         builder.Services.AddIntegrationServices(builder.Configuration);
-        builder.Services.AddApplicationServices();
+        builder.Services.AddApplicationServices(builder.Configuration);
 
         var app = builder.Build();
 

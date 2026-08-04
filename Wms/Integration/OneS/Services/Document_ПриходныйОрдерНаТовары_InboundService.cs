@@ -10,7 +10,7 @@ namespace Wms.Integration.OneS.Services;
 
 internal class Document_ПриходныйОрдерНаТовары_InboundService(
     OneCClient oneCClient,
-    ReceivingOrderCommandService receivingOrderService,
+    ReceivingOrderCommandService receivingOrderCommandService,
     IOptions<WmsSettings> options,
     ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger)
 {
@@ -41,7 +41,7 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 
         ReceivingOrder importedOrder = Document.MapToReceivingOrder(fetchedItem);
 
-        await receivingOrderService.CreateOrUpdateImporttedOrderAsync(importedOrder, ct);
+        await receivingOrderCommandService.CreateOrUpdateImportedOrderAsync(importedOrder, ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} Ok {Ref_Key}", source, Ref_Key);

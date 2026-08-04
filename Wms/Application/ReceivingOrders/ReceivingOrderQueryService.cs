@@ -69,10 +69,10 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
             query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
 
         if (listQuery.DateFrom is not null)
-            query = query.Where(x => x.DateTime >= listQuery.DateFrom);
+            query = query.Where(x => x.Date >= listQuery.DateFrom);
 
         if (listQuery.DateTo is not null)
-            query = query.Where(x => x.DateTime < ((DateTime)listQuery.DateTo).AddDays(1));
+            query = query.Where(x => x.Date < ((DateTime)listQuery.DateTo).AddDays(1));
 
         if (listQuery.Status is not null)
             query = query.Where(x => x.Status == listQuery.Status);
@@ -85,10 +85,10 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         return listQuery.SortBy switch
         {
             "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
-            "DateTime" => listQuery.SortDescending ? query.OrderByDescending(x => x.DateTime) : query.OrderBy(x => x.DateTime),
+            "Date" => listQuery.SortDescending ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date),
             "StartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.StartedAtUtc) : query.OrderBy(x => x.StartedAtUtc),
             "CompletedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.CompletedAtUtc) : query.OrderBy(x => x.CompletedAtUtc),
-            _ => query.OrderByDescending(x => x.DateTime),
+            _ => query.OrderByDescending(x => x.Date),
         };
     }
 }
