@@ -8,7 +8,6 @@ namespace Wms.Integration.OneS.Models;
 internal class Document_ПриходныйОрдерНаТовары
 {
     public Guid Ref_Key { get; set; }
-    public string? DataVersion { get; set; }
     public bool DeletionMark { get; set; }
     public string? Number { get; set; }
     public DateTime Date { get; set; }
@@ -35,7 +34,7 @@ internal class Document_ПриходныйОрдерНаТовары
     public static string TotalUri => "Document_ПриходныйОрдерНаТовары/$count?$format=json";
 
     private static readonly string select =
-        "Ref_Key,DataVersion,DeletionMark,Number,Date,Posted,Склад_Key,Комментарий,Статус,СкладскаяОперация,ВсегоМест," +
+        "Ref_Key,DeletionMark,Number,Date,Posted,Склад_Key,Комментарий,Статус,СкладскаяОперация,ВсегоМест," +
         "Отправитель,Отправитель_Type,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,Доброга_ТипОчереди,Товары";
 
 
@@ -73,7 +72,6 @@ internal class Document_ПриходныйОрдерНаТовары
         return new ReceivingOrder
         {
             Id = fetchedItem.Ref_Key,
-            DataVersion = fetchedItem.DataVersion,
             Posted = fetchedItem.Posted,
             DeletionMark = fetchedItem.DeletionMark,
             DateTime = fetchedItem.Date,

@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
-using Wms.Domain.Enums;
 using Wms.Integration.OneS.Services;
 
 namespace Wms.Application.ReceivingOrders;
@@ -17,45 +16,48 @@ public class ReceivingOrderCommandService(
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externaOrder, CancellationToken ct = default)
+    internal async Task CreateOrUpdateImporttedOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
     {
         var source = nameof(CreateOrUpdateImporttedOrderAsync);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Start {externaOrderId} {@externaOrder}", source, externaOrder.Id, externaOrder);
+            logger.LogDebug("{Source} Start {externaOrderId} {@externaOrder}", source, externalOrder.Id, externalOrder);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existsingOrder = await dbContext.ReceivingOrders
+        var existingOrder = await dbContext.ReceivingOrders
             .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == externaOrder.Id, ct);
+            .FirstOrDefaultAsync(x => x.Id == externalOrder.Id, ct);
 
-        if (existsingOrder is null)
+        if (existingOrder is null)
         {
-            var entity = dbContext.ReceivingOrders.Add(externaOrder).Entity;
+            var createdOrder = dbContext.ReceivingOrders.Add(externalOrder).Entity;
+            createdOrder.CreatedAtUtc = DateTime.UtcNow;
+
         }
-        else if (existsingOrder.IsDataVersionDiffer(externaOrder.DataVersion))
+        else
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug("{Source} DataVersion differ {OrderId} {existsingDataVersion} {externaDataVersion}",
-                    source, existsingOrder.Id, existsingOrder.DataVersion, externaOrder.DataVersion);
-
-            if ((existsingOrder.Status == ReceivingOrderStatus.Pending && !_wmsSettings.AllowExternalUpdatePending) ||
-                (existsingOrder.Status == ReceivingOrderStatus.InProcess && !_wmsSettings.AllowExternalUpdateInProcess) ||
-                (existsingOrder.Status == ReceivingOrderStatus.Completed && !_wmsSettings.AllowExternalUpdateCompleted))
+            if (!existingOrder.AllowExternalUpdate(_wmsSettings))
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug("{Source} External Update Not Allow {OrderId}", source, existsingOrder.Id);
-                return;
+                    logger.LogDebug("{Source} External Update Not Allow {OrderId}", source, existingOrder.Id);
+                {
+                    existingOrder.ExternalChangeDetectedAtUtc = DateTime.UtcNow;
+                }
             }
+            else
+            {
+                var changed = existingOrder.UpdateFromImport(externalOrder);
 
-            existsingOrder.Update(externaOrder);
+                if (changed)
+                    existingOrder.UpdatedAtUtc = DateTime.UtcNow;
+            }
         }
 
         await dbContext.SaveChangesAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Ok {externaOrderId}", source, externaOrder.Id);
+            logger.LogDebug("{Source} Ok {externaOrderId}", source, externalOrder.Id);
     }
 
     public async Task<bool> StartOrderAsync(Guid orderId, CancellationToken ct = default)
@@ -67,26 +69,26 @@ public class ReceivingOrderCommandService(
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("{Source} Start {orderId}", source, orderId);
 
-        var outboundResult = await outboundService.StartOrderAsync(orderId, ct);
+        var externalOrder = await outboundService.StartOrderAsync(orderId, ct);
 
-        if (outboundResult is null)
+        if (externalOrder is null)
         {
             logger.LogError("{Source} Failed {orderId}", source, orderId);
             return false;
         }
 
-        var existsingOrder = await dbContext.ReceivingOrders
+        var existingOrder = await dbContext.ReceivingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
-        if (existsingOrder is null)
+        if (existingOrder is null)
         {
             logger.LogError("{Source} Not Found {orderId}", source, orderId);
             return false;
         }
 
-        existsingOrder.Status = outboundResult.Status;
-        existsingOrder.StartedAtUtc = DateTime.UtcNow;
+        existingOrder.Status = externalOrder.Status;
+        existingOrder.StartedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -133,7 +135,7 @@ public class ReceivingOrderCommandService(
 
         // TODO: Обновление должно прилететь по нотификации,
         // но уже установлено StartedAt и UpdateOrderAsImportAsync не пропустит, надо проверять
-        //await UpdateOrderAsImportAsync(outboundResult, ct); 
+        //await UpdateOrderAsImportAsync(externalOrder, ct); 
 
         return true;
     }

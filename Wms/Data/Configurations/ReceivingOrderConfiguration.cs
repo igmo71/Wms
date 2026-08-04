@@ -10,7 +10,6 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
     {
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.DataVersion).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
         builder.Property(x => x.SenderType).HasMaxLength(DefaultConfiguration.Name);
