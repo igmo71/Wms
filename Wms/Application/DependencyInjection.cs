@@ -1,11 +1,13 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.ReceivingOrders;
+using Wms.Common;
 
 namespace Wms.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ReceivingOrderCommandService>();
         services.AddScoped<ReceivingOrderQueryService>();
@@ -15,6 +17,8 @@ public static class DependencyInjection
         services.AddScoped<UnitOfMeasureService>();
         services.AddScoped<WarehouseService>();
         services.AddScoped<ZoneService>();
+
+        services.Configure<WmsSettings>(configuration.GetSection(nameof(WmsSettings)));
 
         return services;
     }

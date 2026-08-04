@@ -12,8 +12,10 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
     public async Task<TValue?> GetValueAsync<TValue>(string uri, CancellationToken ct = default)
     {
+        var source = nameof(GetValueAsync);
+
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Start {Uri}", nameof(GetValueAsync), uri);
+            _logger.LogDebug("{Source} - Start {Uri}", source, uri);
 
         using var response = await _httpClient.GetAsync(uri, ct);
 
@@ -21,7 +23,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         if (!response.IsSuccessStatusCode)
         {
-            TryReadError(uri, response, responseContent);
+            TryReadError(uri, response, responseContent, source);
 
             return default;
         }
@@ -29,15 +31,17 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         var result = await response.Content.ReadFromJsonAsync<TValue>(ct);
 
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Ok {Uri}", nameof(GetValueAsync), uri);
+            _logger.LogDebug("{Source} - Ok {Uri}", source, uri);
 
         return result;
     }
 
     public async Task<TResponse?> PatchValueAsync<TRequest, TResponse>(string uri, TRequest request, CancellationToken ct = default)
     {
+        var source = nameof(PatchValueAsync);
+
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Start {Uri}", nameof(PatchValueAsync), uri);
+            _logger.LogDebug("{Source} - Start {Uri}", source, uri);
 
         var json = JsonSerializer.Serialize(request);
 
@@ -49,7 +53,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         if (!response.IsSuccessStatusCode)
         {
-            TryReadError(uri, response, responseContent);
+            TryReadError(uri, response, responseContent, source);
 
             return default;
         }
@@ -57,15 +61,17 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         var result = await response.Content.ReadFromJsonAsync<TResponse>(ct);
 
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Ok {Uri}", nameof(PatchValueAsync), uri);
+            _logger.LogDebug("{Source} - Ok {Uri} {@result}", source, uri, result);
 
         return result;
     }
 
     public async Task<bool> PostValueAsync(string uri, CancellationToken ct = default)
     {
+        var source = nameof(PostValueAsync);
+
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Start {Uri}", nameof(PostValueAsync), uri);
+            _logger.LogDebug("{Source} - Start {Uri}", source, uri);
 
         using var response = await _httpClient.PostAsync(uri, null, ct);
 
@@ -73,30 +79,30 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
         if (!response.IsSuccessStatusCode)
         {
-            TryReadError(uri, response, responseContent);
+            TryReadError(uri, response, responseContent, source);
 
             return false;
         }
 
         if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Ok {Uri}", nameof(PostValueAsync), uri);
+            _logger.LogDebug("{Source} - Ok {Uri}", source, uri);
 
         return true;
     }
 
-    private void TryReadError(string uri, HttpResponseMessage response, string content)
+    private void TryReadError(string uri, HttpResponseMessage response, string content, string source)
     {
         try
         {
             var error = JsonSerializer.Deserialize<OneCError>(content);
 
             if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} StatusCode{} {@Error}", nameof(GetValueAsync), uri, response.StatusCode, error);
+                _logger.LogError("{Source} {Uri} StatusCode{} {@Error}", source, uri, response.StatusCode, error);
         }
         catch (Exception)
         {
             if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", nameof(GetValueAsync), uri, response.StatusCode, content);
+                _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", source, uri, response.StatusCode, content);
         }
     }
 }

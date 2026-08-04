@@ -65,7 +65,7 @@ internal class Document_ПриходныйОрдерНаТовары
                 ReceivingOrderId = x.Ref_Key,
                 LineNumber = x.LineNumber,
                 StockKeepingUnitId = x.Номенклатура_Key,
-                PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество
+                PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество?
                 FactQuantity = 0
             })
             .ToList();
@@ -85,7 +85,6 @@ internal class Document_ПриходныйОрдерНаТовары
             Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedItem.Доброга_ТипОчереди),
             WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedItem.СкладскаяОперация),
             BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedItem.ХозяйственнаяОперация),
-
             StartedAtUtc = null,
             CompletedAtUtc = null,
             SenderId = fetchedItem.Отправитель,
