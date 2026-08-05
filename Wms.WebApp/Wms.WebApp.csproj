@@ -20,11 +20,6 @@
 
 
   <ItemGroup>
-    <Folder Include="Components\Pages\UoMPages\" />
-  </ItemGroup>
-
-
-  <ItemGroup>
     <ProjectReference Include="..\Wms\Wms.csproj" />
   </ItemGroup>
 
