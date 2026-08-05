@@ -12,26 +12,18 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
     public async Task<TValue?> GetValueAsync<TValue>(string uri, CancellationToken ct = default)
     {
-        var source = nameof(GetValueAsync);
-
-        if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Start {Uri}", source, uri);
-
         using var response = await _httpClient.GetAsync(uri, ct);
 
         var responseContent = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
         {
-            TryReadError(uri, response, responseContent, source);
+            TryReadError(uri, response, responseContent, nameof(GetValueAsync));
 
             return default;
         }
 
         var result = await response.Content.ReadFromJsonAsync<TValue>(ct);
-
-        if (_logger.IsEnabled(LogLevel.Debug))
-            _logger.LogDebug("{Source} - Ok {Uri}", source, uri);
 
         return result;
     }
@@ -97,7 +89,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             var error = JsonSerializer.Deserialize<OneCError>(content);
 
             if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} StatusCode{} {@Error}", source, uri, response.StatusCode, error);
+                _logger.LogError("{Source} {Uri} {StatusCode} {@Error}", source, uri, response.StatusCode, error);
         }
         catch (Exception)
         {

@@ -1,4 +1,5 @@
 using Serilog;
+using SerilogTracing;
 using Wms.Application;
 using Wms.Data;
 using Wms.Endpoints;
@@ -16,6 +17,11 @@ public class Program
         builder.Host.UseSerilog((context, services, configuration) => configuration
             .ReadFrom.Configuration(context.Configuration)
             .ReadFrom.Services(services));
+
+        using var tracing = new ActivityListenerConfiguration()
+            .Instrument.AspNetCoreRequests()
+            .Instrument.SqlClientCommands()
+            .TraceToSharedLogger();
 
         // Add services to the container.
         builder.Services.AddAuthorization();
@@ -45,6 +51,8 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
+
+        app.UseSerilogRequestLogging();
 
         app.MapApplicationEndpints();
         app.MapOneCEndpints();

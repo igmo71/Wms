@@ -12,28 +12,17 @@ internal class StockKeepingUnitService(
 {
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Source"] = nameof(CreateOrUpdateAsync),
-            ["@StockKeepingUnit"] = item
-        });
+        using var scope = logger.BeginScope("StockKeepingUnit CreateOrUpdate {@StockKeepingUnit}", item);
+        using var activity = AppTracing.StartActivity("StockKeepingUnit CreateOrUpdate", nameof(StockKeepingUnitService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var exists = await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == item.Id, ct);
 
         if (exists)
-        {
             dbContext.StockKeepingUnits.Update(item);
-
-            logger.LogDebug("StockKeepingUnit Updated");
-        }
         else
-        {
             dbContext.StockKeepingUnits.Add(item);
-
-            logger.LogDebug("StockKeepingUnit Created");
-        }
 
         await dbContext.SaveChangesAsync(ct);
     }

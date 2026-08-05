@@ -27,6 +27,10 @@
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.Seq" Version="9.1.0" />
+    <PackageReference Include="SerilogTracing" Version="2.4.0" />
+    <PackageReference Include="SerilogTracing.Expressions" Version="2.4.0" />
+    <PackageReference Include="SerilogTracing.Instrumentation.AspNetCore" Version="2.4.0" />
+    <PackageReference Include="SerilogTracing.Instrumentation.SqlClient" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>
