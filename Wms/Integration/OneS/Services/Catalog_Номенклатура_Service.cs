@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using Wms.Application;
 using Wms.Common;
 using Wms.Domain;
@@ -14,7 +13,7 @@ internal class Catalog_Номенклатура_Service(
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("Catalog_Номенклатура Import {Ref_Key}", Ref_Key);
+        //using var scope = logger.BeginScope("Catalog_Номенклатура Import {Ref_Key}", Ref_Key);
         using var activity = AppTracing.StartActivity("Catalog_Номенклатура Import", nameof(Catalog_Номенклатура_Service));
 
         var fetchedItem = await GetAsync(Ref_Key, ct);
@@ -29,7 +28,7 @@ internal class Catalog_Номенклатура_Service(
 
     public async Task ImportListAsync(CancellationToken ct = default)
     {
-        var startedAt = Stopwatch.GetTimestamp();
+        using var activity = AppTracing.StartActivity("Catalog_Номенклатура Import List", nameof(Catalog_Номенклатура_Service));
 
         int totalItems = await GetTotalAsync(ct);
 
@@ -69,9 +68,6 @@ internal class Catalog_Номенклатура_Service(
         }
 
         await Task.WhenAll(tasks);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {Elapsed}", nameof(ImportListAsync), Stopwatch.GetElapsedTime(startedAt));
     }
 
     private async Task<int> GetTotalAsync(CancellationToken ct = default)

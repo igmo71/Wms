@@ -12,7 +12,7 @@ internal class StockKeepingUnitService(
 {
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("StockKeepingUnit CreateOrUpdate {@StockKeepingUnit}", item);
+        //using var scope = logger.BeginScope("StockKeepingUnit CreateOrUpdate {@StockKeepingUnit}", item);
         using var activity = AppTracing.StartActivity("StockKeepingUnit CreateOrUpdate", nameof(StockKeepingUnitService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
