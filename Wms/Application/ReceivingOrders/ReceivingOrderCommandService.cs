@@ -18,14 +18,16 @@ public class ReceivingOrderCommandService(
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task CreateOrUpdateImportedOrderAsync(
-    ReceivingOrder externalOrder,
-    CancellationToken ct = default)
+    public async Task CreateOrUpdateImportedOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
     {
-        const string source = nameof(CreateOrUpdateImportedOrderAsync);
+        using var scope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Source"] = nameof(CreateOrUpdateImportedOrderAsync),
+            ["externalOrderId"] = externalOrder.Id,
+            ["@externalOrder"] = externalOrder
+        });
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Start {ExternalOrderId} {@ExternalOrder}", source, externalOrder.Id, externalOrder);
+        logger.LogDebug("Start");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -42,52 +44,47 @@ public class ReceivingOrderCommandService(
         }
         else
         {
-            var hasExternalChanges = existingOrder.HasImportChanges(externalOrder);
+            var hasExternalChanges = existingOrder.HasExternalChanges(externalOrder);
 
             if (!hasExternalChanges)
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug("{Source} No external changes {OrderId}", source, existingOrder.Id);
+                logger.LogDebug("No external changes");
 
                 return;
             }
 
             if (!existingOrder.AllowExternalUpdate(_wmsSettings))
             {
-                existingOrder.MarkExternalChangeDetected(now);
+                existingOrder.ExternalChangeDetected = true;
 
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug("{Source} External changes detected, update blocked {OrderId}", source, existingOrder.Id);
+                logger.LogDebug("External changes detected, update blocked");
             }
             else
             {
-                existingOrder.UpdateFromImport(externalOrder);
+                existingOrder.UpdateFrom(externalOrder);
+
                 existingOrder.UpdatedAtUtc = now;
-                existingOrder.ClearExternalChangeDetected();
+
+                existingOrder.ExternalChangeDetected = false;
             }
         }
 
         await dbContext.SaveChangesAsync(ct);
 
-        logger.LogDebug("{Source} Ok {ExternalOrderId}", source, externalOrder.Id);
+        logger.LogDebug("Ok");
     }
 
     public async Task<bool> StartOrderAsync(Guid orderId, CancellationToken ct = default)
     {
-        var source = nameof(StartOrderAsync);
+        using var scope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Source"] = nameof(StartOrderAsync),
+            ["orderId"] = orderId
+        });
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Start {orderId}", source, orderId);
+        logger.LogDebug("Start");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var externalOrder = await outboundService.StartOrderAsync(orderId, ct);
-
-        if (externalOrder is null)
-        {
-            logger.LogError("{Source} Failed {orderId}", source, orderId);
-            return false;
-        }
 
         var existingOrder = await dbContext.ReceivingOrders
             .Include(x => x.Items)
@@ -95,7 +92,15 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("{Source} Not Found {orderId}", source, orderId);
+            logger.LogError("Not Found");
+            return false;
+        }
+
+        var externalOrder = await outboundService.StartOrderAsync(orderId, ct);
+
+        if (externalOrder is null)
+        {
+            logger.LogError("Failed to start external order");
             return false;
         }
 
@@ -104,18 +109,20 @@ public class ReceivingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Ok {orderId}", source, orderId);
+        logger.LogDebug("Ok");
 
         return true;
     }
 
     public async Task<bool> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
     {
-        var source = nameof(CompleteOrderAsync);
+        using var scope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["Source"] = nameof(CompleteOrderAsync),
+            ["orderId"] = orderId
+        });
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Start {orderId}", source, orderId);
+        logger.LogDebug("Start");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -123,10 +130,9 @@ public class ReceivingOrderCommandService(
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
-
         if (existingOrder is null)
         {
-            logger.LogError("{Source} Not Found {orderId}", source, orderId);
+            logger.LogError("Not Found");
             return false;
         }
 
@@ -136,7 +142,7 @@ public class ReceivingOrderCommandService(
 
             if (updateOrderItemsResult is null)
             {
-                logger.LogError("{Source} Update Order Items failed", source);
+                logger.LogError("Failed to update external order items");
                 return false;
             }
         }
@@ -146,11 +152,11 @@ public class ReceivingOrderCommandService(
 
         if (externalOrder is null)
         {
-            logger.LogError("{Source} Failed", source);
+            logger.LogError("Failed to сщьздуеу external order");
             return false;
         }
 
-        existingOrder.UpdateFromImport(externalOrder);
+        existingOrder.UpdateFrom(externalOrder);
         existingOrder.Status = externalOrder.Status;
         existingOrder.CompletedAtUtc = DateTimeOffset.UtcNow;
 
@@ -159,8 +165,7 @@ public class ReceivingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Ok {orderId}", source, orderId);
+        logger.LogDebug("Ok");
 
         return true;
     }

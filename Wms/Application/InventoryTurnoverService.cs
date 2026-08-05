@@ -41,7 +41,12 @@ public class InventoryTurnoverService(ILogger<InventoryTurnoverService> logger)
                 RecorderType = RecorderType.ReceivingOrder,
                 RecorderLineNumber = item.LineNumber,
             };
+
             await dbContext.InventoryTurnovers.AddAsync(newInventoryTurnover, ct);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("Created new InventoryTurnover for SKU {StockKeepingUnitId} {@InventoryBalance}",
+                    item.StockKeepingUnitId, newInventoryTurnover);
         }
     }
 }

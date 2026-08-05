@@ -25,7 +25,7 @@ public class ReceivingOrder
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
     public DateTimeOffset? CompletedAtUtc { get; set; }
-    public DateTimeOffset? ExternalChangeDetectedAtUtc { get; set; }
+    public bool ExternalChangeDetected { get; set; }
 
     public Guid? StartedBy { get; set; }
     public Guid? CompletedBy { get; set; }
@@ -42,8 +42,6 @@ public class ReceivingOrder
     public bool CanStart => StartedAtUtc is null && CompletedAtUtc is null;
     public bool CanComplete => StartedAtUtc is not null && CompletedAtUtc is null;
 
-    public bool ExternalChangeDetected => ExternalChangeDetectedAtUtc is not null;
-
     public bool AllowExternalUpdate(WmsSettings settings) =>
     Status switch
     {
@@ -57,7 +55,7 @@ public class ReceivingOrder
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
-    public bool HasImportChanges(ReceivingOrder externalOrder)
+    public bool HasExternalChanges(ReceivingOrder externalOrder)
     {
         if (BaseOrderId != externalOrder.BaseOrderId
             || BaseOrderType != externalOrder.BaseOrderType
@@ -105,7 +103,7 @@ public class ReceivingOrder
         return false;
     }
 
-    public void UpdateFromImport(ReceivingOrder externaOrder)
+    public void UpdateFrom(ReceivingOrder externaOrder)
     {
         BaseOrderId = externaOrder.BaseOrderId;
         BaseOrderType = externaOrder.BaseOrderType;
@@ -152,15 +150,5 @@ public class ReceivingOrder
                 });
             }
         }
-    }
-
-    public void MarkExternalChangeDetected(DateTimeOffset detectedAtUtc)
-    {
-        ExternalChangeDetectedAtUtc = detectedAtUtc;
-    }
-
-    public void ClearExternalChangeDetected()
-    {
-        ExternalChangeDetectedAtUtc = null;
     }
 }
