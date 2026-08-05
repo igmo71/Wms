@@ -12,54 +12,57 @@ internal class StockKeepingUnitService(
 {
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        int updatedRows = await UpdateAsync(item, ct);
-
-        if (updatedRows == 0)
+        using var scope = logger.BeginScope(new Dictionary<string, object>
         {
-            await CreateAsync(item, ct);
-        }
-    }
+            ["Source"] = nameof(CreateOrUpdateAsync),
+            ["@StockKeepingUnit"] = item
+        });
 
-    private async Task<StockKeepingUnit> CreateAsync(StockKeepingUnit item, CancellationToken ct = default)
-    {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var entity = dbContext.StockKeepingUnits.Add(item).Entity;
+        var exists = await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == item.Id, ct);
 
-        try
+        if (exists)
         {
-            await dbContext.SaveChangesAsync(ct);
+            dbContext.StockKeepingUnits.Update(item);
+
+            logger.LogDebug("StockKeepingUnit Updated");
         }
-        catch (DbUpdateException ex)
+        else
         {
-            logger.LogWarning("{Source} {Id} {DbUpdateException}", nameof(CreateAsync), item.Id, ex.Message);
+            dbContext.StockKeepingUnits.Add(item);
 
-            await UpdateAsync(item, ct); // TODO: Наверное нужно убрать
+            logger.LogDebug("StockKeepingUnit Created");
         }
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(CreateAsync), entity);
-
-        return entity;
+        await dbContext.SaveChangesAsync(ct);
     }
 
-    private async Task<int> UpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
+    public async Task CreateOrUpdateBatchAsync(List<StockKeepingUnit> items, CancellationToken ct = default)
     {
+        if (items == null || items.Count == 0) return;
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        int rowsAffected = await dbContext.StockKeepingUnits
-            .Where(x => x.Id == item.Id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, item.DeletionMark)
-                .SetProperty(e => e.Code, item.Code)
-                .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.BaseUnitOfMeasureId, item.BaseUnitOfMeasureId)
-                .SetProperty(e => e.WeightKg, item.WeightKg), ct);
+        var incomingIds = items.Select(x => x.Id).ToList();
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
+        var existingIds = await dbContext.StockKeepingUnits
+            .Where(x => incomingIds.Contains(x.Id))
+            .Select(x => x.Id)
+            .ToHashSetAsync(ct);
 
-        return rowsAffected;
+        foreach (var item in items)
+        {
+            if (existingIds.Contains(item.Id))
+            {
+                dbContext.StockKeepingUnits.Update(item);
+            }
+            else
+            {
+                dbContext.StockKeepingUnits.Add(item);
+            }
+        }
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<StockKeepingUnit?> GetAsync(Guid id, CancellationToken ct = default)

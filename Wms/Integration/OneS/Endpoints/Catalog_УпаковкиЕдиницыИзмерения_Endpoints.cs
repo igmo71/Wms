@@ -12,14 +12,11 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
     public static IEndpointRouteBuilder MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("1С")
+            .WithTags("Catalog_УпаковкиЕдиницыИзмерения")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import)
-            .WithTags("Import Catalog_УпаковкиЕдиницыИзмерения");
-
-        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify)
-           .WithTags("Notify Catalog_УпаковкиЕдиницыИзмерения");
+        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import);
+        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify);
 
         return routeBuilder;
     }

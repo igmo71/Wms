@@ -7,7 +7,7 @@ public class StockKeepingUnit
     public string? Code { get; set; }
     public bool DeletionMark { get; set; }
 
-    public Guid BaseUnitOfMeasureId { get; set; }
+    public Guid? BaseUnitOfMeasureId { get; set; }
     public UnitOfMeasure? BaseUnitOfMeasure { get; set; }
 
     public double? WeightKg { get; set; }

@@ -18,20 +18,9 @@ internal class Catalog_Номенклатура_Service(
         if (fetchedItem is null)
             return;
 
-        StockKeepingUnit newItem = CreateNew(fetchedItem);
+        var stockKeepingUnit = MapToStockKeepingUnit(fetchedItem);
 
-        await stockKeepingUnitService.CreateOrUpdateAsync(newItem, ct);
-    }
-
-    private async Task<Catalog_Номенклатура?> GetAsync(string Ref_Key, CancellationToken ct = default)
-    {
-        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-
-        var result = rootObject?.Value?[0];
-
-        return result;
+        await stockKeepingUnitService.CreateOrUpdateAsync(stockKeepingUnit, ct);
     }
 
     public async Task ImportListAsync(CancellationToken ct = default)
@@ -62,7 +51,11 @@ internal class Catalog_Номенклатура_Service(
                     if (fetchedItems is null || fetchedItems.Count == 0)
                         return;
 
-                    await ProcessBatchAsync(fetchedItems, ct);
+                    List<StockKeepingUnit> stockKeepingUnits = fetchedItems
+                        .Select(MapToStockKeepingUnit)
+                        .ToList();
+
+                    await stockKeepingUnitService.CreateOrUpdateBatchAsync(stockKeepingUnits, ct);
                 }
                 finally
                 {
@@ -86,6 +79,17 @@ internal class Catalog_Номенклатура_Service(
         return result;
     }
 
+    private async Task<Catalog_Номенклатура?> GetAsync(string Ref_Key, CancellationToken ct = default)
+    {
+        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
+
+        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+
+        var result = rootObject?.Value?[0];
+
+        return result;
+    }
+
     private async Task<List<Catalog_Номенклатура>?> GetListAsync(int page, CancellationToken ct = default)
     {
         var uri = Catalog_Номенклатура.GetListUri(page);
@@ -95,22 +99,12 @@ internal class Catalog_Номенклатура_Service(
         return rootObject?.Value;
     }
 
-    private async Task ProcessBatchAsync(List<Catalog_Номенклатура> fetchedItems, CancellationToken ct = default)
-    {
-        foreach (var fetchedItem in fetchedItems)
-        {
-            StockKeepingUnit newItem = CreateNew(fetchedItem);
-
-            await stockKeepingUnitService.CreateOrUpdateAsync(newItem, ct);
-        }
-    }
-
-    private static StockKeepingUnit CreateNew(Catalog_Номенклатура fetchedItem)
+    private static StockKeepingUnit MapToStockKeepingUnit(Catalog_Номенклатура fetchedItem)
     {
         return new StockKeepingUnit
         {
             Id = fetchedItem.Ref_Key,
-            BaseUnitOfMeasureId = fetchedItem.ЕдиницаИзмерения_Key,
+            BaseUnitOfMeasureId = fetchedItem.ЕдиницаИзмерения_Key == Guid.Empty ? null : fetchedItem.ЕдиницаИзмерения_Key,
             Code = fetchedItem.Code,
             DeletionMark = fetchedItem.DeletionMark,
             Name = fetchedItem.Description,

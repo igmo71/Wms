@@ -13,14 +13,11 @@ public static class Catalog_Номенклатура_Endpoints
     {
 
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("1С")
+            .WithTags("Catalog_Номенклатура")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Номенклатура/import", Import)
-            .WithTags("Import Catalog_Номенклатура");
-
-        group.MapPost("/Catalog_Номенклатура/notify", Notify)
-           .WithTags("Notify Catalog_Номенклатура");
+        group.MapGet("/Catalog_Номенклатура/import", Import);
+        group.MapPost("/Catalog_Номенклатура/notify", Notify);
 
         return routeBuilder;
     }

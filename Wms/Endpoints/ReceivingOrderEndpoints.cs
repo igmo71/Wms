@@ -12,16 +12,12 @@ public static class ReceivingOrderEndpoints
     {
 
         var group = routeBuilder.MapGroup("/api")
+            .WithTags("ReceivingOrder")
             .ProducesValidationProblem();
 
-        group.MapPost("/ReceivingOrder/{id:guid}/start", StartOrder)
-            .WithTags("Start Receiving Order");
-
-        group.MapPost("/ReceivingOrder/{id:guid}/complete", CompleteOrder)
-           .WithTags("Complete Receiving Order");
-
-        group.MapGet("/ReceivingOrder/{id:guid}", GetOrder)
-           .WithTags("Get Receiving Order"); ;
+        group.MapGet("/ReceivingOrder/{id:guid}", GetOrder);
+        group.MapPost("/ReceivingOrder/{id:guid}/start", StartOrder);
+        group.MapPost("/ReceivingOrder/{id:guid}/complete", CompleteOrder);
 
         return routeBuilder;
     }

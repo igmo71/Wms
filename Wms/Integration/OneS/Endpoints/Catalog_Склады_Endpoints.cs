@@ -13,14 +13,11 @@ public static class Catalog_Склады_Endpoints
     {
 
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("1С")
+            .WithTags("Catalog_Склады")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Склады/import", Import)
-            .WithTags("Import Catalog_Склады");
-
-        group.MapPost("/Catalog_Склады/notify", Notify)
-           .WithTags("Notify Catalog_Склады");
+        group.MapGet("/Catalog_Склады/import", Import);
+        group.MapPost("/Catalog_Склады/notify", Notify);
 
         return routeBuilder;
     }

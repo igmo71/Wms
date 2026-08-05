@@ -13,14 +13,11 @@ public static class InformationRegister_ШтрихкодыНоменклатур
     {
 
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("1С")
+            .WithTags("InformationRegister_ШтрихкодыНоменклатуры")
             .ProducesValidationProblem();
 
-        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", Import)
-            .WithTags("Import InformationRegister_ШтрихкодыНоменклатуры");
-
-        group.MapPost("/InformationRegister_ШтрихкодыНоменклатуры/notify", Notify)
-           .WithTags("Notify InformationRegister_ШтрихкодыНоменклатуры");
+        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", Import);
+        group.MapPost("/InformationRegister_ШтрихкодыНоменклатуры/notify", Notify);
 
         return routeBuilder;
     }

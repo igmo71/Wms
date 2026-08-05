@@ -13,14 +13,11 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
     {
 
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("1С")
+            .WithTags("Document_ПриходныйОрдерНаТовары")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder)
-            .WithTags("Import Document_ПриходныйОрдерНаТовары");
-
-        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder)
-           .WithTags("Notify Document_ПриходныйОрдерНаТовары");
+        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder);
+        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder);
 
         return routeBuilder;
     }
