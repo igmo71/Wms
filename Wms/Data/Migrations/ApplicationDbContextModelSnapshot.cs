@@ -242,196 +242,6 @@ namespace Wms.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("Wms.Domain.InventoryBalance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<double>("Quantity")
-                        .HasColumnType("float");
-
-                    b.Property<Guid>("StockKeepingUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("StorageLocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StorageLocationId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.HasIndex("StockKeepingUnitId", "StorageLocationId", "WarehouseId")
-                        .IsUnique();
-
-                    b.ToTable("InventoryBalances");
-                });
-
-            modelBuilder.Entity("Wms.Domain.InventoryTurnover", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<double>("BalanceAfter")
-                        .HasColumnType("float");
-
-                    b.Property<double>("BalanceBefore")
-                        .HasColumnType("float");
-
-                    b.Property<DateTimeOffset>("DateTimeUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<double>("QuantityDelta")
-                        .HasColumnType("float");
-
-                    b.Property<Guid?>("RecorderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("RecorderLineNumber")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RecorderType")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StockKeepingUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("StorageLocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StockKeepingUnitId");
-
-                    b.HasIndex("StorageLocationId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.ToTable("InventoryTurnovers");
-                });
-
-            modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("BaseOrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("BaseOrderType")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("BusinessOperation")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTimeOffset?>("CompletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("CompletedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("DeletionMark")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("ExternalChangeDetected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Number")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<bool>("Posted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("Queue")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("ReceivingLocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("SenderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("SenderType")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTimeOffset?>("StartedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("StartedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("WarehouseOperation")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReceivingLocationId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.ToTable("ReceivingOrders");
-                });
-
-            modelBuilder.Entity("Wms.Domain.ReceivingOrderItem", b =>
-                {
-                    b.Property<Guid>("ReceivingOrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("LineNumber")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<double>("FactQuantity")
-                        .HasColumnType("float");
-
-                    b.Property<double>("PlanQuantity")
-                        .HasColumnType("float");
-
-                    b.Property<Guid>("StockKeepingUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("ReceivingOrderId", "LineNumber");
-
-                    b.HasIndex("StockKeepingUnitId");
-
-                    b.ToTable("ReceivingOrderItems");
-                });
-
             modelBuilder.Entity("Wms.Domain.SkuBarcode", b =>
                 {
                     b.Property<Guid>("SkuId")
@@ -443,7 +253,7 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("SkuId", "Value");
 
-                    b.ToTable("SkuBarcodes");
+                    b.ToTable("SkuBarcodes", (string)null);
                 });
 
             modelBuilder.Entity("Wms.Domain.StockKeepingUnit", b =>
@@ -462,9 +272,15 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsFolder")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<double?>("WeightKg")
                         .HasColumnType("float");
@@ -473,7 +289,7 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("BaseUnitOfMeasureId");
 
-                    b.ToTable("StockKeepingUnits");
+                    b.ToTable("StockKeepingUnits", (string)null);
                 });
 
             modelBuilder.Entity("Wms.Domain.StorageLocation", b =>
@@ -489,7 +305,7 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid>("WarehouseId")
+                    b.Property<Guid?>("WarehouseId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ZoneId")
@@ -501,7 +317,7 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("ZoneId");
 
-                    b.ToTable("StorageLocations");
+                    b.ToTable("StorageLocations", (string)null);
                 });
 
             modelBuilder.Entity("Wms.Domain.UnitOfMeasure", b =>
@@ -537,7 +353,7 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("UnitsOfMeasure");
+                    b.ToTable("UnitsOfMeasure", (string)null);
                 });
 
             modelBuilder.Entity("Wms.Domain.Warehouse", b =>
@@ -555,7 +371,7 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Warehouses");
+                    b.ToTable("Warehouses", (string)null);
                 });
 
             modelBuilder.Entity("Wms.Domain.Zone", b =>
@@ -571,14 +387,14 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid>("WarehouseId")
+                    b.Property<Guid?>("WarehouseId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("Zones");
+                    b.ToTable("Zones", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -645,7 +461,7 @@ namespace Wms.Data.Migrations
 
                             b1.HasKey("IdentityUserPasskeyCredentialId");
 
-                            b1.ToTable("AspNetUserPasskeys");
+                            b1.ToTable("AspNetUserPasskeys", (string)null);
 
                             b1
                                 .ToJson("Data")
@@ -683,98 +499,6 @@ namespace Wms.Data.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Wms.Domain.InventoryBalance", b =>
-                {
-                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
-                        .WithMany()
-                        .HasForeignKey("StockKeepingUnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.StorageLocation", "StorageLocation")
-                        .WithMany()
-                        .HasForeignKey("StorageLocationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StockKeepingUnit");
-
-                    b.Navigation("StorageLocation");
-
-                    b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("Wms.Domain.InventoryTurnover", b =>
-                {
-                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
-                        .WithMany()
-                        .HasForeignKey("StockKeepingUnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.StorageLocation", "StorageLocation")
-                        .WithMany()
-                        .HasForeignKey("StorageLocationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StockKeepingUnit");
-
-                    b.Navigation("StorageLocation");
-
-                    b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
-                {
-                    b.HasOne("Wms.Domain.StorageLocation", "ReceivingLocation")
-                        .WithMany()
-                        .HasForeignKey("ReceivingLocationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReceivingLocation");
-
-                    b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("Wms.Domain.ReceivingOrderItem", b =>
-                {
-                    b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
-                        .WithMany("Items")
-                        .HasForeignKey("ReceivingOrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
-                        .WithMany()
-                        .HasForeignKey("StockKeepingUnitId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ReceivingOrder");
-
-                    b.Navigation("StockKeepingUnit");
-                });
-
             modelBuilder.Entity("Wms.Domain.SkuBarcode", b =>
                 {
                     b.HasOne("Wms.Domain.StockKeepingUnit", "Sku")
@@ -801,8 +525,7 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
                         .WithMany("StorageLocations")
                         .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Wms.Domain.Zone", "Zone")
                         .WithMany("StorageLocations")
@@ -819,15 +542,9 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
                         .WithMany("Zones")
                         .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
-                {
-                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Wms.Domain.StockKeepingUnit", b =>

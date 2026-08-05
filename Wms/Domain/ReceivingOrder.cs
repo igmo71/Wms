@@ -11,11 +11,13 @@ public class ReceivingOrder
     public DateTime Date { get; set; }
     public string? Number { get; set; }
     public string? Comment { get; set; }
+
     public Guid WarehouseId { get; set; }
     public Warehouse? Warehouse { get; set; }
 
-    public Guid ReceivingLocationId { get; set; }
+    public Guid? ReceivingLocationId { get; set; }
     public StorageLocation? ReceivingLocation { get; set; }
+
     public ReceivingOrderStatus Status { get; set; }
     public ReceivingOrderQueue Queue { get; set; }
     public WarehouseOperation WarehouseOperation { get; set; }
@@ -150,5 +152,43 @@ public class ReceivingOrder
                 });
             }
         }
+    }
+
+    public Guid Start()
+    {
+        if (Status != ReceivingOrderStatus.Pending)
+        {
+            throw new InvalidOperationException("Only a pending receiving order can be started.");
+        }
+
+        if (ReceivingLocationId is not Guid receivingLocationId)
+        {
+            throw new InvalidOperationException("Receiving location must be specified before starting the order.");
+        }
+
+        Status = ReceivingOrderStatus.InProcess;
+
+        StartedAtUtc = DateTimeOffset.UtcNow;
+
+        return receivingLocationId;
+    }
+
+    public Guid Complete()
+    {
+        if (Status != ReceivingOrderStatus.InProcess)
+        {
+            throw new InvalidOperationException("Only an in-progress receiving order can be completed.");
+        }
+
+        if (ReceivingLocationId is not Guid receivingLocationId)
+        {
+            throw new InvalidOperationException("Receiving location must be specified before completing the order.");
+        }
+
+        Status = ReceivingOrderStatus.Completed;
+
+        CompletedAtUtc = DateTimeOffset.UtcNow;
+
+        return receivingLocationId;
     }
 }

@@ -46,7 +46,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         return result;
     }
 
-    internal async Task<ReceivingOrder?> UpdateOrderItemsAsync(Guid refKey, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
+    internal async Task<ReceivingOrder?> UpdateDocumentItemsAsync(Guid refKey, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
     {
         var documentItems = receivingOrderItems
             .Select(x => DocumentItem.MapFromReceivingOrderItem(x))
@@ -58,7 +58,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            logger.LogError("{Source} Failed to patch items {refKey}", nameof(UpdateOrderItemsAsync), refKey);
+            logger.LogError("{Source} Failed to patch items {refKey}", nameof(UpdateDocumentItemsAsync), refKey);
             return null;
         }
 

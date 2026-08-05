@@ -73,13 +73,11 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         {
             var error = JsonSerializer.Deserialize<OneCError>(content);
 
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {StatusCode} {@Error}", source, uri, httpStatusCode, error);
+            _logger.LogError("{Source} {Uri} {StatusCode} {@Error}", source, uri, httpStatusCode, error);
         }
         catch (Exception)
         {
-            if (_logger.IsEnabled(LogLevel.Error))
-                _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", source, uri, httpStatusCode, content);
+            _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", source, uri, httpStatusCode, content);
         }
     }
 }

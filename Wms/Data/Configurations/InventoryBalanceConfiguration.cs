@@ -4,30 +4,41 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<InventoryBalance>
+internal class InventoryBalanceConfiguration
+    : IEntityTypeConfiguration<InventoryBalance>
 {
     public void Configure(EntityTypeBuilder<InventoryBalance> builder)
     {
         builder.HasKey(x => x.Id);
 
-        builder.HasOne(X => X.StockKeepingUnit).WithMany()
-            .HasForeignKey(X => X.StockKeepingUnitId).HasPrincipalKey(X => X.Id)
+        builder.HasOne(x => x.StockKeepingUnit)
+            .WithMany()
+            .HasForeignKey(x => x.StockKeepingUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(X => X.Warehouse).WithMany()
-            .HasForeignKey(X => X.WarehouseId).HasPrincipalKey(X => X.Id)
+        builder.HasOne(x => x.Warehouse)
+            .WithMany()
+            .HasForeignKey(x => x.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(X => X.StorageLocation).WithMany()
-            .HasForeignKey(X => X.StorageLocationId).HasPrincipalKey(X => X.Id)
+        builder.HasOne(x => x.StorageLocation)
+            .WithMany()
+            .HasForeignKey(x => x.StorageLocationId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new
         {
-            x.StockKeepingUnitId,
+            x.WarehouseId,
             x.StorageLocationId,
-            x.WarehouseId
+            x.StockKeepingUnitId
         })
-            .IsUnique();
+        .IsUnique();
+
+        builder.Property(x => x.Quantity)
+            .HasPrecision(18, 3);
+
+        builder.Property(x => x.RowVersion)
+            .IsRowVersion();
     }
+}
 }
