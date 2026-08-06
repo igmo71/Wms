@@ -11,7 +11,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
     private readonly HttpClient _httpClient = httpClient;
     private readonly ILogger<OneCClient> _logger = logger;
 
-    public async Task<TValue?> GetValueAsync<TValue>(string uri, CancellationToken ct = default)
+    public async Task<TResponse?> GetValueAsync<TResponse>(string uri, CancellationToken ct = default)
     {
         using var response = await _httpClient.GetAsync(uri, ct);
 
@@ -24,7 +24,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             return default;
         }
 
-        var result = await response.Content.ReadFromJsonAsync<TValue>(ct);
+        var result = await response.Content.ReadFromJsonAsync<TResponse>(ct);
 
         return result;
     }
@@ -69,15 +69,17 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
     private void TryReadError(string uri, HttpStatusCode httpStatusCode, string content, string source)
     {
+        using var scope = _logger.BeginScope("{Source} {Uri} {StatusCode}", source, uri, httpStatusCode);
+
         try
         {
             var error = JsonSerializer.Deserialize<OneCError>(content);
 
-            _logger.LogError("{Source} {Uri} {StatusCode} {@Error}", source, uri, httpStatusCode, error);
+            _logger.LogError("{@Error}", error);
         }
         catch (Exception)
         {
-            _logger.LogError("{Source} {Uri} {StatusCode} {ErrorContent}", source, uri, httpStatusCode, content);
+            _logger.LogError("{ErrorContent}", content);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
 using DocumentItem = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары_Товары;
@@ -11,17 +12,17 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal async Task<ReceivingOrder?> StartOrderAsync(Guid refKey, CancellationToken ct) =>
-        await SwitchStatusAsync("ВРаботе", refKey, ct);
+    internal async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct) =>
+        await SwitchStatusAsync("ВРаботе", orderId, ct);
 
-    internal async Task<ReceivingOrder?> CompleteOrderAsync(Guid refKey, CancellationToken ct) =>
-        await SwitchStatusAsync("Принят", refKey, ct);
+    internal async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct) =>
+        await SwitchStatusAsync("Принят", orderId, ct);
 
-    private async Task<ReceivingOrder?> SwitchStatusAsync(string status, Guid refKey, CancellationToken ct)
+    private async Task<ServiceResult> SwitchStatusAsync(string status, Guid orderId, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("SwitchStatus {refKey} {Status}", refKey, status);
+        using var scope = logger.BeginScope("SwitchStatus {OrderId} {Status}", orderId, status);
 
-        var patchUri = Document.PatchUri(refKey.ToString());
+        var patchUri = Document.PatchUri(orderId.ToString());
 
         var patchCommand = new StatusOrderCommand(status);
 
@@ -29,45 +30,38 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            logger.LogError("Failed to patch document status");
-            return null;
+            return ServiceError.Failure<ReceivingOrder>("Failed to patch document status");
         }
 
-        var postUri = Document.PostDocumentUri(refKey.ToString());
+        var postUri = Document.PostDocumentUri(orderId.ToString());
 
-        var postSuccessResult = await oneCClient.PostValueAsync(postUri, ct);
+        var postSuccess = await oneCClient.PostValueAsync(postUri, ct);
 
-        if (!postSuccessResult)
+        if (!postSuccess)
         {
-            logger.LogError("Failed to post document");
-            return null;
+            return ServiceError.Failure<ReceivingOrder>("Failed to post document");
         }
 
-        var result = Document.MapToReceivingOrder(patchResult);
-
-        return result;
+        return ServiceResult.Success();
     }
 
-    internal async Task<ReceivingOrder?> UpdateDocumentItemsAsync(Guid refKey, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
+    internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("UpdateDocumentItems {refKey}", refKey);
+        using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
 
         var documentItems = receivingOrderItems
             .Select(x => DocumentItem.MapFromReceivingOrderItem(x))
             .ToList();
 
-        var patchUri = Document.PatchUri(refKey.ToString());
+        var patchUri = Document.PatchUri(orderId.ToString());
 
         var patchResult = await oneCClient.PatchValueAsync<List<DocumentItem>, Document>(patchUri, documentItems, ct);
 
         if (patchResult is null)
         {
-            logger.LogError("Failed to patch document items");
-            return null;
+            return ServiceError.Failure<ReceivingOrder>("Failed to patch document items");
         }
 
-        var result = Document.MapToReceivingOrder(patchResult);
-
-        return result;
+        return ServiceResult.Success();
     }
 }

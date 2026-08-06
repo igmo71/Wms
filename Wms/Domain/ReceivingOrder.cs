@@ -40,9 +40,8 @@ public class ReceivingOrder
 
     public List<ReceivingOrderItem> Items { get; set; } = [];
 
-
-    public bool CanStart => StartedAtUtc is null && CompletedAtUtc is null;
-    public bool CanComplete => StartedAtUtc is not null && CompletedAtUtc is null;
+    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
+    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
     public bool AllowExternalUpdate(WmsSettings settings) =>
     Status switch
@@ -53,9 +52,6 @@ public class ReceivingOrder
         ReceivingOrderStatus.Completed => settings.AllowExternalUpdateCompleted,
         _ => false
     };
-
-    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
-    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
     public bool HasExternalChanges(ReceivingOrder externalOrder)
     {
@@ -77,26 +73,21 @@ public class ReceivingOrder
             return true;
         }
 
-        return HaveImportItemChanges(externalOrder.Items);
-    }
 
-    private bool HaveImportItemChanges(List<ReceivingOrderItem> externalItems)
-    {
-        if (Items.Count != externalItems.Count)
+        if (Items.Count != externalOrder.Items.Count)
             return true;
 
-        var externalByLineNumber = externalItems
-            .ToDictionary(x => x.LineNumber);
+        var externalItemsByLineNumber = externalOrder.Items.ToDictionary(x => x.LineNumber);
 
-        foreach (var existing in Items)
+        foreach (var existingItem in Items)
         {
-            if (!externalByLineNumber.TryGetValue(existing.LineNumber, out var external))
+            if (!externalItemsByLineNumber.TryGetValue(existingItem.LineNumber, out var external))
             {
                 return true;
             }
 
-            if (existing.StockKeepingUnitId != external.StockKeepingUnitId
-                || existing.PlanQuantity != external.PlanQuantity)
+            if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
+                || existingItem.PlanQuantity != external.PlanQuantity)
             {
                 return true;
             }
@@ -105,7 +96,7 @@ public class ReceivingOrder
         return false;
     }
 
-    public void UpdateFrom(ReceivingOrder externaOrder)
+    public void UpdateOrder(ReceivingOrder externaOrder)
     {
         BaseOrderId = externaOrder.BaseOrderId;
         BaseOrderType = externaOrder.BaseOrderType;
@@ -154,41 +145,47 @@ public class ReceivingOrder
         }
     }
 
-    public Guid Start()
+    public ServiceResult ValidateToStart()
     {
         if (Status != ReceivingOrderStatus.Pending)
         {
-            throw new InvalidOperationException("Only a pending receiving order can be started.");
+            return ServiceError.Invalid<ReceivingOrder>("Only a pending receiving order can be started.");
         }
 
         if (ReceivingLocationId is not Guid receivingLocationId)
         {
-            throw new InvalidOperationException("Receiving location must be specified before starting the order.");
+            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting the order.");
         }
 
+        return ServiceResult.Success();
+    }
+
+    public void Start()
+    {
         Status = ReceivingOrderStatus.InProcess;
 
         StartedAtUtc = DateTimeOffset.UtcNow;
-
-        return receivingLocationId;
     }
 
-    public bool IsCorrectToComplete()
+    public ServiceResult ValidateToComplete()
     {
-        if (Status != ReceivingOrderStatus.InProcess)
+        if (Status is not (ReceivingOrderStatus.InProcess or ReceivingOrderStatus.ProcessingRequired))
         {
-            throw new InvalidOperationException("Only an in-progress receiving order can be completed.");
+            return ServiceError.Invalid<ReceivingOrder>("Only an InProcess or ProcessingRequired receiving order can be completed.");
         }
 
-        if (ReceivingLocationId is not Guid receivingLocationId)
+        if (ReceivingLocationId is null)
         {
-            throw new InvalidOperationException("Receiving location must be specified before completing the order.");
+            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before completing the order.");
         }
 
+        return ServiceResult.Success();
+    }
+
+    public void Complete()
+    {
         Status = ReceivingOrderStatus.Completed;
 
         CompletedAtUtc = DateTimeOffset.UtcNow;
-
-        return receivingLocationId;
     }
 }

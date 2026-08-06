@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
-using Wms.Domain.Enums;
 using Wms.Integration.OneS.Services;
 
 namespace Wms.Application.ReceivingOrders;
@@ -20,8 +19,9 @@ public class ReceivingOrderCommandService(
 
     public async Task ImportOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder CreateOrUpdateImported  {externalOrderId}", externalOrder.Id);
-        using var activity = AppTracing.StartActivity("ReceivingOrder.Import ", nameof(ReceivingOrderCommandService));
+        using var scope = logger.BeginScope("ReceivingOrder Import {OrderId}", externalOrder.Id);
+
+        using var activity = AppTracing.StartActivity("ReceivingOrder.Import", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -52,11 +52,11 @@ public class ReceivingOrderCommandService(
             {
                 existingOrder.ExternalChangeDetected = true;
 
-                logger.LogDebug("External changes detected, update blocked");
+                logger.LogWarning("External changes detected, update not allowed");
             }
             else
             {
-                existingOrder.UpdateFrom(externalOrder);
+                existingOrder.UpdateOrder(externalOrder);
 
                 existingOrder.UpdatedAtUtc = now;
 
@@ -67,9 +67,10 @@ public class ReceivingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<bool> StartOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Start {orderId}", orderId);
+        using var scope = logger.BeginScope("ReceivingOrder Start {OrderId}", orderId);
+
         using var activity = AppTracing.StartActivity("ReceivingOrder.Start", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -81,41 +82,36 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return false;
+            return ServiceError.NotFound<ReceivingOrder>();
         }
 
-        if (existingOrder.Status != ReceivingOrderStatus.Pending)
+        var validationResult = existingOrder.ValidateToStart();
+
+        if (!validationResult.IsSuccess)
         {
-            logger.LogError("Only a pending receiving order can be started.");
-            return false;
+            logger.LogError("Validation to start failed {ErrorMessage}", validationResult.Error?.Message);
+            return validationResult;
         }
 
-        if (existingOrder.ReceivingLocationId is null)
+        var externalStartResult = await outboundService.StartOrderAsync(orderId, ct);
+
+        if (!externalStartResult.IsSuccess)
         {
-            logger.LogError("Receiving location must be specified before starting the order.");
-            return false;
+            logger.LogError("Failed to start external order {ErrorMessage}", externalStartResult.Error?.Message);
+            return ServiceError.Failure<ReceivingOrder>("Failed to start external order");
         }
 
-        var externalOrder = await outboundService.StartOrderAsync(orderId, ct);
-
-        if (externalOrder is null)
-        {
-            logger.LogError("Failed to start external order");
-            return false;
-        }
-
-        existingOrder.Status = externalOrder.Status; // TODO: ReceivingOrderStatus.InProcess ?
-
-        existingOrder.StartedAtUtc = DateTimeOffset.UtcNow;
+        existingOrder.Start();
 
         await dbContext.SaveChangesAsync(ct);
 
-        return true;
+        return ServiceResult.Success();
     }
 
-    public async Task<bool> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Complete {orderId}", orderId);
+        using var scope = logger.BeginScope("ReceivingOrder Complete {OrderId}", orderId);
+
         using var activity = AppTracing.StartActivity("ReceivingOrder.Complete", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -127,69 +123,71 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return false;
+            return ServiceError.NotFound<ReceivingOrder>();
         }
 
-        if (existingOrder.Status != ReceivingOrderStatus.InProcess)
-        {
-            logger.LogError("Only an in-progress receiving order can be completed.");
-            return false;
-        }
+        var validationResult = existingOrder.ValidateToComplete();
 
-        if (existingOrder.ReceivingLocationId is null)
+        if (!validationResult.IsSuccess)
         {
-            logger.LogError("Receiving location must be specified before completing the order.");
-            return false;
+            logger.LogError("Validation to complete failed {ErrorMessage}", validationResult.Error?.Message);
+            return validationResult;
         }
 
         if (existingOrder.HasPlanFactDifference)
         {
-            var updateExternalItemsResult = await outboundService
+            var externalItemsUpdateResult = await outboundService
                 .UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
 
-            if (updateExternalItemsResult is null)
+            if (!externalItemsUpdateResult.IsSuccess)
             {
                 logger.LogError("Failed to update external order items");
-                return false;
+                return ServiceError.Failure<ReceivingOrder>("Failed to update external order items");
             }
         }
 
-        var externalOrder = await outboundService.CompleteOrderAsync(orderId, ct);
+        var externalCompletionResult = await outboundService.CompleteOrderAsync(orderId, ct);
 
-        if (externalOrder is null)
+        if (!externalCompletionResult.IsSuccess)
         {
             logger.LogError("Failed to complete external order");
-            return false;
+            return ServiceError.Failure<ReceivingOrder>("Failed to complete external order");
         }
 
-        existingOrder.UpdateFrom(externalOrder);
-
-        existingOrder.Status = externalOrder.Status; // TODO: ReceivingOrderStatus.Completed ?
-
-        existingOrder.CompletedAtUtc = DateTimeOffset.UtcNow;
+        existingOrder.Complete();
 
         await balanceAndTurnoverService.CompleteReceivingOrder(existingOrder, dbContext, ct);
 
         await dbContext.SaveChangesAsync(ct);
 
-        return true;
+        return ServiceResult.Success();
     }
 
-    public async Task<int> UpdateOrderItemFactQuantityAsync(
+    public async Task<ServiceResult> UpdateOrderItemFactQuantityAsync(
         Guid receivingOrderId,
         int lineNumber,
         decimal factQuantity,
         string? comment,
         CancellationToken ct = default)
     {
+        if (factQuantity < 0m)
+        {
+            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
+        }
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.ReceivingOrderItems
+        var affected = await dbContext.ReceivingOrderItems
             .Where(x => x.ReceivingOrderId == receivingOrderId && x.LineNumber == lineNumber)
             .ExecuteUpdateAsync(x => x
                 .SetProperty(p => p.FactQuantity, factQuantity)
                 .SetProperty(p => p.Comment, comment), ct);
 
-        return result;
+        if (affected == 0)
+        {
+            return ServiceError.NotFound<ReceivingOrderItem>();
+        }
+
+        return ServiceResult.Success();
     }
 }

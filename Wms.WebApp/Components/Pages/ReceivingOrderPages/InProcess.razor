@@ -66,7 +66,7 @@ else
 
         @if (_completeFailed)
         {
-            <MudAlert Severity="Severity.Error">Не удалось завершить приходный ордер.</MudAlert>
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
         <MudDataGrid T="ReceivingOrderItem"
@@ -80,7 +80,7 @@ else
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
-                        <MudNumericField T="double"
+                        <MudNumericField T="decimal"
                                          Value="context.Item.FactQuantity"
                                          ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
                                          Variant="Variant.Text"

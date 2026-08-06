@@ -23,6 +23,7 @@ public partial class InProcess
     private bool _updateFailed;
     private bool _isCompleting;
     private bool _completeFailed;
+    private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -31,7 +32,7 @@ public partial class InProcess
         _isLoading = false;
     }
 
-    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double factQuantity)
+    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, decimal factQuantity)
     {
         await UpdateOrderItemAsync(item, factQuantity, item.Comment);
     }
@@ -41,7 +42,7 @@ public partial class InProcess
         await UpdateOrderItemAsync(item, item.FactQuantity, comment);
     }
 
-    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, double factQuantity, string? comment)
+    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, decimal factQuantity, string? comment)
     {
         _updateFailed = false;
 
@@ -75,10 +76,14 @@ public partial class InProcess
 
         try
         {
-            if (await OrderCommandService.CompleteOrderAsync(Id))
+            var result = await OrderCommandService.CompleteOrderAsync(Id);
+            if (result.IsSuccess)
                 NavigationManager.NavigateTo($"receiving-orders/{Id}");
             else
+            {
                 _completeFailed = true;
+                _errorMessage = result.Error?.Message ?? "Не удалось завершить приходный ордер.";
+            }
         }
         catch
         {

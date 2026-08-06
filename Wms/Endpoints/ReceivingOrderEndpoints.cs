@@ -10,7 +10,6 @@ public static class ReceivingOrderEndpoints
 {
     public static IEndpointRouteBuilder MapReceivingOrderEndpoints(this IEndpointRouteBuilder routeBuilder)
     {
-
         var group = routeBuilder.MapGroup("/api")
             .WithTags("ReceivingOrder")
             .ProducesValidationProblem();
@@ -27,9 +26,9 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var success = await service.StartOrderAsync(id, ct);
+        var result = await service.StartOrderAsync(id, ct);
 
-        return success ? TypedResults.Ok() : Results.BadRequest();
+        return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }
 
     static async Task<IResult> CompleteOrder(
@@ -37,9 +36,9 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var success = await service.CompleteOrderAsync(id, ct);
+        var result = await service.CompleteOrderAsync(id, ct);
 
-        return success ? TypedResults.Ok() : Results.BadRequest();
+        return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }
 
     static async Task<IResult> GetOrder(

@@ -16,13 +16,13 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task ImportDocumentAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task ImportDocumentAsync(string refKey, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ImportDocument {Ref_Key}", Ref_Key);
+        using var scope = logger.BeginScope("ImportDocument {RefKey}", refKey);
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
-        var uri = Document.GetUri(Ref_Key);
+        var uri = Document.GetUri(refKey);
 
         var rootObject = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
@@ -41,7 +41,7 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
         await receivingOrderCommandService.ImportOrderAsync(order, ct);
     }
 
-    internal async Task ImportListAsync(CancellationToken ct)
+    internal async Task ImportDocumentListAsync(CancellationToken ct)
     {
         throw new NotImplementedException();
     }

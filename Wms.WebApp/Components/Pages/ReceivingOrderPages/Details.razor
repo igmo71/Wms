@@ -36,7 +36,7 @@ else
 
         @if (_startOrderFailed)
         {
-            <MudAlert Severity="Severity.Error">Не удалось взять ордер в работу.</MudAlert>
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">

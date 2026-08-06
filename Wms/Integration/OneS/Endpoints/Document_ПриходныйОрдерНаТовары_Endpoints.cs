@@ -26,7 +26,7 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
         [FromServices] Document_ПриходныйОрдерНаТовары_InboundService service,
         CancellationToken ct)
     {
-        await service.ImportListAsync(ct);
+        await service.ImportDocumentListAsync(ct);
 
         return TypedResults.Ok();
     }

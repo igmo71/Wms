@@ -41,4 +41,4 @@ internal class InventoryBalanceConfiguration
             .IsRowVersion();
     }
 }
-}
+

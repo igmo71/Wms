@@ -21,6 +21,7 @@ public partial class Details
     private bool _isLoading = true;
     private bool _isStarting;
     private bool _startOrderFailed;
+    private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -39,10 +40,14 @@ public partial class Details
 
         try
         {
-            if (await OrderCommandService.StartOrderAsync(Id))
+            var result = await OrderCommandService.StartOrderAsync(Id);
+            if (result.IsSuccess)
                 NavigationManager.NavigateTo($"receiving-orders/{Id}/in-process");
             else
+            {
                 _startOrderFailed = true;
+                _errorMessage = result.Error?.Message ?? "Не удалось взять ордер в работу";
+            }
         }
         catch
         {
