@@ -18,6 +18,7 @@ internal class StorageLocationConfiguration : IEntityTypeConfiguration<StorageLo
 
         builder.HasOne(x => x.Zone).WithMany(x => x.StorageLocations)
             .HasForeignKey(x => x.ZoneId).HasPrincipalKey(x => x.Id)
+            .IsRequired()
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

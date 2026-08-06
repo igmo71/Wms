@@ -56,17 +56,30 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         return result;
     }
 
-    public async Task<ListResult<StorageLocation>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public Task<ListResult<StorageLocation>> ListAsync(ListQuery listQuery, CancellationToken ct = default) =>
+        ListAsync(new StorageLocationListQuery
+        {
+            SearchString = listQuery.SearchString,
+            SortBy = listQuery.SortBy,
+            SortDescending = listQuery.SortDescending,
+            Skip = listQuery.Skip,
+            Take = listQuery.Take,
+            ExcludeDeleted = listQuery.ExcludeDeleted
+        }, ct);
+
+    public async Task<ListResult<StorageLocation>> ListAsync(StorageLocationListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<StorageLocation> query = dbContext.StorageLocations
-                .AsNoTracking();
+            .AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.Zone);
 
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
 
-        query = ApplySearch(query, listQuery.SearchString);
+        query = ApplySearch(query, listQuery);
 
         int totalItems = await query.CountAsync(ct);
 
@@ -84,11 +97,19 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         };
     }
 
-    private static IQueryable<StorageLocation> ApplySearch(IQueryable<StorageLocation> query, string? searchString)
+    private static IQueryable<StorageLocation> ApplySearch(
+        IQueryable<StorageLocation> query,
+        StorageLocationListQuery listQuery)
     {
-        if (!string.IsNullOrWhiteSpace(searchString))
+        if (listQuery.WarehouseId is Guid warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
+
+        if (listQuery.ZoneId is Guid zoneId)
+            query = query.Where(x => x.ZoneId == zoneId);
+
+        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
         {
-            query = query.Where(x => x.Name!.Contains(searchString));
+            query = query.Where(x => x.Name!.Contains(listQuery.SearchString));
         }
 
         return query;

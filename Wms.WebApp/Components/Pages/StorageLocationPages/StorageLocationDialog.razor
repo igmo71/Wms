@@ -1,0 +1,38 @@
+@using Wms.Domain
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAutocomplete T="Warehouse"
+                             Value="_warehouse"
+                             ValueChanged="OnWarehouseChanged"
+                             SearchFunc="SearchWarehousesAsync"
+                             ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                             Label="Склад"
+                             Required="true"
+                             Clearable="true" />
+            <MudAutocomplete T="Zone"
+                             Value="_zone"
+                             ValueChanged="OnZoneChanged"
+                             SearchFunc="SearchZonesAsync"
+                             ToStringFunc="zone => zone?.Name ?? string.Empty"
+                             Label="Зона"
+                             Required="true"
+                             Clearable="true" />
+            <MudTextField T="string"
+                          @bind-Value="_storageLocation.Name"
+                          Label="Наименование"
+                          Required="true"
+                          Immediate="true" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(_warehouse is null || _zone is null || string.IsNullOrWhiteSpace(_storageLocation.Name))"
+                   OnClick="SaveAsync">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>

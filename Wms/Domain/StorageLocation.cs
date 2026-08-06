@@ -9,6 +9,6 @@ public class StorageLocation
     public Guid WarehouseId { get; set; }
     public Warehouse? Warehouse { get; set; }
 
-    public Guid? ZoneId { get; set; }
+    public Guid ZoneId { get; set; }
     public Zone? Zone { get; set; }
 }
