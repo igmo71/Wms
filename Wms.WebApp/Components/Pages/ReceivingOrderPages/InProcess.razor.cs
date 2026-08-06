@@ -33,7 +33,7 @@ public partial class InProcess
         _isLoading = false;
     }
 
-    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, decimal factQuantity)
+    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double factQuantity)
     {
         await UpdateOrderItemAsync(item, factQuantity, item.Comment);
     }
@@ -43,7 +43,7 @@ public partial class InProcess
         await UpdateOrderItemAsync(item, item.FactQuantity, comment);
     }
 
-    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, decimal factQuantity, string? comment)
+    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, double factQuantity, string? comment)
     {
         _updateFailed = false;
 

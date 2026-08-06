@@ -80,7 +80,7 @@ else
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
-                        <MudNumericField T="decimal"
+                        <MudNumericField T="double"
                                          Value="context.Item.FactQuantity"
                                          ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
                                          Variant="Variant.Text"

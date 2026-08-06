@@ -10,12 +10,12 @@ public class ReceivingOrderItem
     public Guid StockKeepingUnitId { get; set; }
     public StockKeepingUnit? StockKeepingUnit { get; set; }
 
-    public decimal PlanQuantity { get; set; }
-    public decimal FactQuantity { get; set; }
+    public double PlanQuantity { get; set; }
+    public double FactQuantity { get; set; }
 
     public string? Comment { get; set; }
 
-    public decimal RemainingQuantity => PlanQuantity - FactQuantity;
+    public double RemainingQuantity => PlanQuantity - FactQuantity;
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
     public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

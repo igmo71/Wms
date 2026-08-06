@@ -15,9 +15,9 @@ public class InventoryTurnover
     public Guid StockKeepingUnitId { get; set; }
     public StockKeepingUnit? StockKeepingUnit { get; set; }
 
-    public decimal QuantityDelta { get; set; }
-    public decimal BalanceBefore { get; set; }
-    public decimal BalanceAfter { get; set; }
+    public double QuantityDelta { get; set; }
+    public double BalanceBefore { get; set; }
+    public double BalanceAfter { get; set; }
 
     public DateTimeOffset DateTimeUtc { get; set; }
 

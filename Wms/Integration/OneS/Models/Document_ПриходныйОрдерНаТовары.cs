@@ -78,7 +78,7 @@ internal class Document_ПриходныйОрдерНаТовары
             Number = fetchedItem.Number,
             Comment = fetchedItem.Комментарий,
             WarehouseId = fetchedItem.Склад_Key,
-            ReceivingLocationId = Guid.Empty,
+            ReceivingLocationId = null,
             Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedItem.Статус),
             Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedItem.Доброга_ТипОчереди),
             WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedItem.СкладскаяОперация),

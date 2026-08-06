@@ -108,7 +108,9 @@ internal class Catalog_Номенклатура_Service(
             Code = fetchedItem.Code,
             DeletionMark = fetchedItem.DeletionMark,
             Name = fetchedItem.Description,
-            WeightKg = fetchedItem.ВесИспользовать ? fetchedItem.ВесЧислитель / fetchedItem.ВесЗнаменатель : null
+            WeightKg = fetchedItem.ВесИспользовать && fetchedItem.ВесЗнаменатель != 0
+                ? fetchedItem.ВесЧислитель / fetchedItem.ВесЗнаменатель
+                : null
         };
     }
 }

@@ -10,7 +10,7 @@ public class StockKeepingUnit
     public Guid? BaseUnitOfMeasureId { get; set; }
     public UnitOfMeasure? BaseUnitOfMeasure { get; set; }
 
-    public decimal? WeightKg { get; set; }
+    public double? WeightKg { get; set; }
 
     public List<SkuBarcode>? Barcodes { get; set; }
 }

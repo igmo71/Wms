@@ -32,17 +32,17 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
 
         foreach (var item in receivingOrder.Items)
         {
-            if (item.FactQuantity < 0m)
+            if (item.FactQuantity < 0)
                 throw new InvalidOperationException($"Fact quantity cannot be negative for line {item.LineNumber}.");
 
-            if (item.FactQuantity == 0m)
+            if (item.FactQuantity == 0)
                 continue;
 
-            decimal balanceBefore;
+            double balanceBefore;
 
             if (!balances.TryGetValue(item.StockKeepingUnitId, out var balance))
             {
-                balanceBefore = 0m;
+                balanceBefore = 0;
 
                 balance = new InventoryBalance
                 {

@@ -166,11 +166,11 @@ public class ReceivingOrderCommandService(
     public async Task<ServiceResult> UpdateOrderItemFactQuantityAsync(
         Guid receivingOrderId,
         int lineNumber,
-        decimal factQuantity,
+        double factQuantity,
         string? comment,
         CancellationToken ct = default)
     {
-        if (factQuantity < 0m)
+        if (factQuantity < 0)
         {
             return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
         }

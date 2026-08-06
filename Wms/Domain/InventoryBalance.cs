@@ -13,7 +13,7 @@ public class InventoryBalance
     public Guid StockKeepingUnitId { get; set; }
     public StockKeepingUnit? StockKeepingUnit { get; set; }
 
-    public decimal Quantity { get; set; }
+    public double Quantity { get; set; }
 
     public byte[] RowVersion { get; set; } = [];
 }
