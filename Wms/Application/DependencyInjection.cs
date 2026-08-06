@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<StorageLocationService>();
         services.AddScoped<UnitOfMeasureService>();
+        services.AddScoped<WarehouseImportService>();
         services.AddScoped<WarehouseService>();
         services.AddScoped<ZoneService>();
 

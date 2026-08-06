@@ -4,7 +4,7 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_Склады_Service(
+public class Catalog_Склады_Service(
     OneCClient oneCClient,
     WarehouseService warehouseService)
 {

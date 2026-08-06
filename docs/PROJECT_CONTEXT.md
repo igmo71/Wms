@@ -43,7 +43,10 @@ Core domain concepts:
 
 ## Configuration UI
 
-The operator UI exposes configuration screens under the `Конфигурация` navigation group. The first such screen is `Зоны`: it supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
+The operator UI exposes configuration screens under the `Конфигурация` navigation group.
+
+- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C. The UI calls `WarehouseImportService`, which delegates to the 1C warehouse catalog importer.
+- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
 
 ## Receiving
 
