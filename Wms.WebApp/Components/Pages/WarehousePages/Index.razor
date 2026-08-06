@@ -53,7 +53,12 @@
         <PropertyColumn Property="x => x.Name" Title="Наименование" Sortable="true" />
         <TemplateColumn Title="Статус" Sortable="false">
             <CellTemplate>
-                @(context.Item.DeletionMark ? "Деактивирован" : "Активен")
+                <MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирован" : "Активен")">
+                    <MudIcon Icon="@(context.Item.DeletionMark
+                                                                                     ? Icons.Material.Filled.Block
+                                                                             : Icons.Material.Filled.CheckCircle)"
+                             Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" />
+                </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
     </Columns>

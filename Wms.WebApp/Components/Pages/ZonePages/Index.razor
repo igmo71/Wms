@@ -56,7 +56,12 @@
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" Sortable="false" />
         <TemplateColumn Title="Статус" Sortable="false">
             <CellTemplate>
-                @(context.Item.DeletionMark ? "Деактивирована" : "Активна")
+                <MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирована" : "Активна")">
+                    <MudIcon Icon="@(context.Item.DeletionMark
+                                         ? Icons.Material.Filled.Block
+                                         : Icons.Material.Filled.CheckCircle)"
+                             Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" />
+                </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
