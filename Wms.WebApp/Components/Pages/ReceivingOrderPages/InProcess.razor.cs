@@ -21,9 +21,10 @@ public partial class InProcess
     private ReceivingOrder? _order;
     private bool _isLoading = true;
     private bool _updateFailed;
+    private string? _updateErrorMessage;
     private bool _isCompleting;
     private bool _completeFailed;
-    private string? _errorMessage;
+    private string? _completeErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -48,15 +49,16 @@ public partial class InProcess
 
         try
         {
-            var updatedItems = await OrderCommandService.UpdateOrderItemFactQuantityAsync(
+            var updateResult = await OrderCommandService.UpdateOrderItemFactQuantityAsync(
                 item.ReceivingOrderId,
                 item.LineNumber,
                 factQuantity,
                 comment);
 
-            if (updatedItems == 0)
+            if (!updateResult.IsSuccess)
             {
                 _updateFailed = true;
+                _updateErrorMessage = updateResult.Error?.Message ?? "Не удалось обновить количество по факту.";
                 return;
             }
 
@@ -82,7 +84,7 @@ public partial class InProcess
             else
             {
                 _completeFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось завершить приходный ордер.";
+                _completeErrorMessage = result.Error?.Message ?? "Не удалось завершить приходный ордер.";
             }
         }
         catch

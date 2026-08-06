@@ -1,18 +1,14 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class StockKeepingUnitService(
-    IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<StockKeepingUnitService> logger)
+internal class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
-        //using var scope = logger.BeginScope("StockKeepingUnit CreateOrUpdate {@StockKeepingUnit}", item);
         using var activity = AppTracing.StartActivity("StockKeepingUnit CreateOrUpdate", nameof(StockKeepingUnitService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -29,6 +25,8 @@ internal class StockKeepingUnitService(
 
     public async Task CreateOrUpdateBatchAsync(List<StockKeepingUnit> items, CancellationToken ct = default)
     {
+        using var activity = AppTracing.StartActivity("StockKeepingUnit CreateOrUpdateBatch", nameof(StockKeepingUnitService));
+
         if (items == null || items.Count == 0) return;
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

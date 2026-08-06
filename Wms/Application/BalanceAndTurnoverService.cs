@@ -10,7 +10,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
 {
     public async Task CompleteReceivingOrder(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("InventoryBalance CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
+        using var scope = logger.BeginScope("BalanceAndTurnover CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
             receivingOrder.Id, receivingOrder.WarehouseId, receivingOrder.ReceivingLocationId);
 
         var receivingLocationId = receivingOrder.ReceivingLocationId

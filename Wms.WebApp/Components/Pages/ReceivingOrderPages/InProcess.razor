@@ -61,12 +61,12 @@ else
 
         @if (_updateFailed)
         {
-            <MudAlert Severity="Severity.Error">Не удалось сохранить изменения строки.</MudAlert>
+            <MudAlert Severity="Severity.Error">@_updateErrorMessage</MudAlert>
         }
 
         @if (_completeFailed)
         {
-            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            <MudAlert Severity="Severity.Error">@_completeErrorMessage</MudAlert>
         }
 
         <MudDataGrid T="ReceivingOrderItem"
@@ -76,7 +76,7 @@ else
                      Dense="true">
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
-                <PropertyColumn Property="x => x.StockKeepingUnit == null? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <TemplateColumn Title="Факт">
                     <CellTemplate>

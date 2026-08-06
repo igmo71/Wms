@@ -44,7 +44,7 @@ internal class SkuBarcodeService(
         var affected = await dbContext.SaveChangesAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Affected}", nameof(CreateListAsync), affected);
+            logger.LogDebug("{Source} {Created}", nameof(CreateListAsync), affected);
 
         return affected;
     }
@@ -57,7 +57,7 @@ internal class SkuBarcodeService(
             .ExecuteDeleteAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Affected}", nameof(DeleteAllAsync), affected);
+            logger.LogDebug("{Source} {Deleted}", nameof(DeleteAllAsync), affected);
 
     }
 
@@ -70,6 +70,6 @@ internal class SkuBarcodeService(
             .ExecuteDeleteAsync(ct);
 
         if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Affected}", nameof(DeleteRangeAsync), affected);
+            logger.LogDebug("{Source} {Deleted} {SkuId}", nameof(DeleteRangeAsync), affected, skuId);
     }
 }

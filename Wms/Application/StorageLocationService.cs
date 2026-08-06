@@ -1,46 +1,28 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class StorageLocationService(
-    IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<StorageLocationService> logger)
+internal class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(StorageLocation item, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("{Source} {StorageLocationid} {@StorageLocation}", nameof(CreateOrUpdateAsync), item.Id, item);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var exists = await dbContext.StorageLocations.AnyAsync(x => x.Id == item.Id, ct);
+
         if (exists)
-        {
             dbContext.StorageLocations.Update(item);
-
-            logger.LogDebug("Updated");
-        }
         else
-        {
             dbContext.StorageLocations.Add(item);
-
-            logger.LogDebug("Created");
-        }
 
         await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Source"] = nameof(MarkDeleteAsync),
-            ["StorageLocationId"] = id
-        });
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         int rowsAffected = await dbContext.StorageLocations
@@ -48,27 +30,17 @@ internal class StorageLocationService(
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.DeletionMark, true), ct);
 
-        logger.LogDebug("StorageLocations Marked Delete");
-
         return rowsAffected;
     }
 
     public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["Source"] = nameof(UnMarkDeleteAsync),
-            ["StorageLocationId"] = id
-        });
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         int rowsAffected = await dbContext.StorageLocations
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.DeletionMark, false), ct);
-
-        logger.LogDebug("StorageLocations UnMarked Delete");
 
         return rowsAffected;
     }

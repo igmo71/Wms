@@ -1,51 +1,46 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class ZoneService(
-    IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    ILogger<ZoneService> logger)
+internal class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
     {
-        int updatedRows = await UpdateAsync(item, ct);
-
-        if (updatedRows == 0)
-        {
-            await CreateAsync(item, ct);
-        }
-    }
-
-    private async Task<Zone> CreateAsync(Zone item, CancellationToken ct = default)
-    {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var entity = dbContext.Zones.Add(item).Entity;
+        var exists = await dbContext.Zones.AnyAsync(x => x.Id == item.Id, ct);
 
-        _ = await dbContext.SaveChangesAsync(ct);
+        if (exists)
+            dbContext.Zones.Update(item);
+        else
+            dbContext.Zones.Add(item);
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(CreateAsync), entity);
-
-        return entity;
+        await dbContext.SaveChangesAsync(ct);
     }
 
-    private async Task<int> UpdateAsync(Zone item, CancellationToken ct = default)
+    public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         int rowsAffected = await dbContext.Zones
-            .Where(x => x.Id == item.Id)
+            .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.Name, item.Name)
-                .SetProperty(e => e.DeletionMark, item.DeletionMark), ct);
+                .SetProperty(e => e.DeletionMark, true), ct);
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(UpdateAsync), item);
+        return rowsAffected;
+    }
+
+    public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        int rowsAffected = await dbContext.Zones
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.DeletionMark, false), ct);
 
         return rowsAffected;
     }
@@ -106,35 +101,5 @@ internal class ZoneService(
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
             _ => query.OrderByDescending(x => x.Name),
         };
-    }
-
-    public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        int rowsAffected = await dbContext.Zones
-            .Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, true), ct);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@EntityId}", nameof(MarkDeleteAsync), id);
-
-        return rowsAffected;
-    }
-
-    public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        int rowsAffected = await dbContext.Zones
-            .Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, false), ct);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@EntityId}", nameof(UnMarkDeleteAsync), id);
-
-        return rowsAffected;
     }
 }
