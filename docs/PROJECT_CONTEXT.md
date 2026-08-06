@@ -70,7 +70,7 @@ The active business flow is:
      WMS records inventory balances and turnovers
 ```
 
-The receiving location belongs to the whole order. At the current stage it must be selected on the order details page before the order can be started; the UI loads storage locations together with the order and does not enable "Взять в работу" until one is selected. The selected location is saved immediately before starting. A default receiving location/zone may be introduced later.
+The receiving location belongs to the whole order. At the current stage the operator selects a receiving zone and then a storage location from that zone on the order details page before the order can be started. Both choices are limited to the order's warehouse; the UI does not enable "Взять в работу" until a location is selected. The selected location is saved immediately before starting. A default receiving location/zone may be introduced later.
 
 `ProcessingRequired` is currently only passed through from 1C's `ТребуетсяОбработка`. It is not part of the active operational flow, which is `Pending -> InProcess -> Completed`.
 

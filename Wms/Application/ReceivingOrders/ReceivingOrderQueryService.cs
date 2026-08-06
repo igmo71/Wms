@@ -15,6 +15,7 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.ReceivingLocation)
+                .ThenInclude(x => x!.Zone)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (order is null)

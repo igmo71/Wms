@@ -17,13 +17,15 @@ public partial class Details
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject]
     private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject]
+    private ZoneService ZoneService { get; set; } = null!;
 
     [Inject]
     private NavigationManager NavigationManager { get; set; } = null!;
 
     private ReceivingOrder? _order;
-    private List<StorageLocation> _storageLocations = [];
-    private Guid? _receivingLocationId;
+    private Zone? _receivingZone;
+    private StorageLocation? _receivingLocation;
     private bool _isLoading = true;
     private bool _isStarting;
     private bool _startOrderFailed;
@@ -33,33 +35,64 @@ public partial class Details
     {
         _isLoading = true;
 
-        var orderTask = OrderQueryService.GetOrderAsync(Id);
-        var storageLocationsTask = StorageLocationService.ListAsync(new ListQuery
-        {
-            SortBy = "Name",
-            Take = int.MaxValue
-        });
-
-        await Task.WhenAll(orderTask, storageLocationsTask);
-
-        _order = await orderTask;
-        _storageLocations = (await storageLocationsTask).Items;
-        _receivingLocationId = _order?.ReceivingLocationId;
+        _order = await OrderQueryService.GetOrderAsync(Id);
+        _receivingZone = _order?.ReceivingLocation?.Zone;
+        _receivingLocation = _order?.ReceivingLocation;
         _isLoading = false;
     }
 
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
-    private Task OnReceivingLocationChanged(Guid? receivingLocationId)
+    private async Task<IEnumerable<Zone>> SearchReceivingZonesAsync(string? searchText, CancellationToken ct)
     {
-        _receivingLocationId = receivingLocationId;
+        if (_order is null)
+            return [];
+
+        var result = await ZoneService.ListAsync(new ZoneListQuery
+        {
+            SearchString = searchText,
+            WarehouseId = _order.WarehouseId,
+            SortBy = "Name",
+            Take = 10
+        }, ct);
+
+        return result.Items;
+    }
+
+    private async Task<IEnumerable<StorageLocation>> SearchReceivingLocationsAsync(string? searchText, CancellationToken ct)
+    {
+        if (_order is null || _receivingZone is null)
+            return [];
+
+        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        {
+            SearchString = searchText,
+            WarehouseId = _order.WarehouseId,
+            ZoneId = _receivingZone.Id,
+            SortBy = "Name",
+            Take = 10
+        }, ct);
+
+        return result.Items;
+    }
+
+    private Task OnReceivingZoneChanged(Zone? receivingZone)
+    {
+        _receivingZone = receivingZone;
+        _receivingLocation = null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnReceivingLocationChanged(StorageLocation? receivingLocation)
+    {
+        _receivingLocation = receivingLocation;
         return Task.CompletedTask;
     }
 
     private async Task StartOrderAsync()
     {
-        if (_receivingLocationId is not Guid receivingLocationId)
+        if (_receivingLocation is not StorageLocation receivingLocation)
             return;
 
         _isStarting = true;
@@ -67,7 +100,7 @@ public partial class Details
 
         try
         {
-            var setLocationResult = await OrderCommandService.SetReceivingLocationAsync(Id, receivingLocationId);
+            var setLocationResult = await OrderCommandService.SetReceivingLocationAsync(Id, receivingLocation.Id);
             if (!setLocationResult.IsSuccess)
             {
                 _startOrderFailed = true;

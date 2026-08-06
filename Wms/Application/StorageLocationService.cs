@@ -56,17 +56,6 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         return result;
     }
 
-    public Task<ListResult<StorageLocation>> ListAsync(ListQuery listQuery, CancellationToken ct = default) =>
-        ListAsync(new StorageLocationListQuery
-        {
-            SearchString = listQuery.SearchString,
-            SortBy = listQuery.SortBy,
-            SortDescending = listQuery.SortDescending,
-            Skip = listQuery.Skip,
-            Take = listQuery.Take,
-            ExcludeDeleted = listQuery.ExcludeDeleted
-        }, ct);
-
     public async Task<ListResult<StorageLocation>> ListAsync(StorageLocationListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

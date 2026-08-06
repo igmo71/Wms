@@ -23,7 +23,7 @@ else
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="@(_isStarting || _receivingLocationId is null)"
+                           Disabled="@(_isStarting || _receivingLocation is null)"
                            StartIcon="@Icons.Material.Filled.PlayArrow"
                            OnClick="StartOrderAsync">
                     Взять в работу
@@ -58,18 +58,28 @@ else
                     <MudText>@_order.Warehouse?.Name</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    <MudSelect T="Guid?"
-                               Value="_receivingLocationId"
-                               ValueChanged="OnReceivingLocationChanged"
+                    <MudText Typo="Typo.caption">Зона приёмки</MudText>
+                    <MudAutocomplete T="Zone"
+                               Value="_receivingZone"
+                               ValueChanged="OnReceivingZoneChanged"
+                               SearchFunc="SearchReceivingZonesAsync"
+                               ToStringFunc="zone => zone?.Name ?? string.Empty"
                                Disabled="@(_order.Status != ReceivingOrderStatus.Pending)"
                                Variant="Variant.Text"
-                               Dense="true">
-                        @foreach (var location in _storageLocations)
-                        {
-                            <MudSelectItem T="Guid?" Value="@((Guid?)location.Id)">@location.Name</MudSelectItem>
-                        }
-                    </MudSelect>
+                               Dense="true"
+                               Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption">Место приёмки</MudText>
+                    <MudAutocomplete T="StorageLocation"
+                               Value="_receivingLocation"
+                               ValueChanged="OnReceivingLocationChanged"
+                               SearchFunc="SearchReceivingLocationsAsync"
+                               ToStringFunc="location => location?.Name ?? string.Empty"
+                               Disabled="@(_order.Status != ReceivingOrderStatus.Pending || _receivingZone is null)"
+                               Variant="Variant.Text"
+                               Dense="true"
+                               Clearable="true" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">В работе с</MudText>
