@@ -23,7 +23,7 @@ else
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="_isStarting"
+                           Disabled="@(_isStarting || _receivingLocationId is null)"
                            StartIcon="@Icons.Material.Filled.PlayArrow"
                            OnClick="StartOrderAsync">
                     Взять в работу
@@ -59,7 +59,17 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    <MudText>@_order.ReceivingLocation?.Name</MudText>
+                    <MudSelect T="Guid?"
+                               Value="_receivingLocationId"
+                               ValueChanged="OnReceivingLocationChanged"
+                               Disabled="@(_order.Status != ReceivingOrderStatus.Pending)"
+                               Variant="Variant.Text"
+                               Dense="true">
+                        @foreach (var location in _storageLocations)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)location.Id)">@location.Name</MudSelectItem>
+                        }
+                    </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">В работе с</MudText>

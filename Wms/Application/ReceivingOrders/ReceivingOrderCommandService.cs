@@ -190,4 +190,22 @@ public class ReceivingOrderCommandService(
 
         return ServiceResult.Success();
     }
+
+    public async Task<ServiceResult> SetReceivingLocationAsync(
+        Guid receivingOrderId,
+        Guid receivingLocationId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var affected = await dbContext.ReceivingOrders
+            .Where(x => x.Id == receivingOrderId)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.ReceivingLocationId, receivingLocationId), ct);
+
+        if (affected == 0)
+            return ServiceError.NotFound<ReceivingOrder>();
+
+        return ServiceResult.Success();
+    }
 }

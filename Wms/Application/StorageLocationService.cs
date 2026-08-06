@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(StorageLocation item, CancellationToken ct = default)
     {
