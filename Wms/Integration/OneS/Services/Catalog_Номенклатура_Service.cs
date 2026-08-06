@@ -11,26 +11,39 @@ internal class Catalog_Номенклатура_Service(
     StockKeepingUnitService stockKeepingUnitService,
     ILogger<Catalog_Номенклатура_Service> logger)
 {
+
+
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        //using var scope = logger.BeginScope("Catalog_Номенклатура Import {Ref_Key}", Ref_Key);
-        using var activity = AppTracing.StartActivity("Catalog_Номенклатура Import", nameof(Catalog_Номенклатура_Service));
+        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
 
-        var fetchedItem = await GetAsync(Ref_Key, ct);
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
             return;
 
-        var stockKeepingUnit = MapToStockKeepingUnit(fetchedItem);
+        var sku = MapToStockKeepingUnit(fetchedItem);
 
-        await stockKeepingUnitService.CreateOrUpdateAsync(stockKeepingUnit, ct);
+        await stockKeepingUnitService.CreateOrUpdateAsync(sku, ct);
     }
 
     public async Task ImportListAsync(CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity("Catalog_Номенклатура Import List", nameof(Catalog_Номенклатура_Service));
 
-        int totalItems = await GetTotalAsync(ct);
+        var totalUri = Catalog_Номенклатура.TotalUri;
+
+        var serviceResult = await oneCClient.GetValueAsync<int>(totalUri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        int totalItems = serviceResult.Value;
 
         int batchSize = Catalog_Номенклатура.BatchSize;
 
@@ -47,9 +60,17 @@ internal class Catalog_Номенклатура_Service(
             tasks.Add(Task.Run(async () =>
             {
                 await semaphore.WaitAsync(ct);
+
                 try
                 {
-                    var fetchedItems = await GetListAsync(batchIndex, ct);
+                    var uri = Catalog_Номенклатура.GetListUri(batchIndex);
+
+                    var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+
+                    if (!serviceResult.IsSuccess)
+                        return;
+
+                    var fetchedItems = serviceResult.Value?.Value;
 
                     if (fetchedItems is null || fetchedItems.Count == 0)
                         return;
@@ -68,35 +89,6 @@ internal class Catalog_Номенклатура_Service(
         }
 
         await Task.WhenAll(tasks);
-    }
-
-    private async Task<int> GetTotalAsync(CancellationToken ct = default)
-    {
-        var uri = Catalog_Номенклатура.TotalUri;
-
-        var result = await oneCClient.GetValueAsync<int>(uri, ct);
-
-        return result;
-    }
-
-    private async Task<Catalog_Номенклатура?> GetAsync(string Ref_Key, CancellationToken ct = default)
-    {
-        var uri = Catalog_Номенклатура.GetUri(Ref_Key);
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-
-        var result = rootObject?.Value?[0];
-
-        return result;
-    }
-
-    private async Task<List<Catalog_Номенклатура>?> GetListAsync(int page, CancellationToken ct = default)
-    {
-        var uri = Catalog_Номенклатура.GetListUri(page);
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
-
-        return rootObject?.Value;
     }
 
     private static StockKeepingUnit MapToStockKeepingUnit(Catalog_Номенклатура fetchedItem)

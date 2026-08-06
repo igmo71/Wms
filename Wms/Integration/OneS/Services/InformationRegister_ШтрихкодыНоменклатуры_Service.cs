@@ -10,7 +10,14 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
 {
     public async Task ImportAsync(string refKey, CancellationToken ct)
     {
-        var fetchedItems = await GetListAsync(refKey, ct);
+        var uri = InformationRegister_ШтрихкодыНоменклатуры.GetUri(refKey);
+
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
             return;
@@ -24,20 +31,17 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         await skuBarcodeService.CreateListAsync(newItems, ct);
     }
 
-    private async Task<List<InformationRegister_ШтрихкодыНоменклатуры>?> GetListAsync(string refKey, CancellationToken ct)
-    {
-        var uri = InformationRegister_ШтрихкодыНоменклатуры.GetUri(refKey);
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
-
-        var result = rootObject?.Value;
-
-        return result;
-    }
-
     public async Task ImportListAsync(CancellationToken ct = default)
     {
-        var fetchedItems = await GetListAsync(ct);
+
+        var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
+
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
             return;
@@ -49,17 +53,6 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
             .ToList();
 
         await skuBarcodeService.CreateListAsync(newItems, ct);
-    }
-
-    private async Task<List<InformationRegister_ШтрихкодыНоменклатуры>?> GetListAsync(CancellationToken ct)
-    {
-        var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
-
-        var result = rootObject?.Value;
-
-        return result;
     }
 
     private static SkuBarcode CreateNew(InformationRegister_ШтрихкодыНоменклатуры fetchedItem)

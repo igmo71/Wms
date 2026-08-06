@@ -10,54 +10,46 @@ public class Catalog_Склады_Service(
 {
     public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var fetchedItem = await GetAsync(Ref_Key, ct);
+        var uri = Catalog_Склады.GetUri(Ref_Key);
+
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
             return;
 
-        Warehouse newItem = CreateNew(fetchedItem);
+        var warehouse = MapToWarehouse(fetchedItem);
 
-        await warehouseService.CreateOrUpdateAsync(newItem, ct);
-    }
-
-    private async Task<Catalog_Склады?> GetAsync(string Ref_Key, CancellationToken ct = default)
-    {
-        var uri = Catalog_Склады.GetUri(Ref_Key);
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
-
-        var result = rootObject?.Value?[0];
-
-        return result;
+        await warehouseService.CreateOrUpdateAsync(warehouse, ct);
     }
 
     public async Task ImportListAsync(CancellationToken ct = default)
     {
-        var fetchedItems = await GetListAsync(ct);
+        var uri = Catalog_Склады.GetListUri;
+
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
+
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
             return;
 
         foreach (var fetchedItem in fetchedItems)
         {
-            var newItem = CreateNew(fetchedItem);
+            var warehouse = MapToWarehouse(fetchedItem);
 
-            await warehouseService.CreateOrUpdateAsync(newItem, ct);
+            await warehouseService.CreateOrUpdateAsync(warehouse, ct);
         }
     }
 
-    private async Task<List<Catalog_Склады>?> GetListAsync(CancellationToken ct)
-    {
-        var uri = Catalog_Склады.GetListUri;
-
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
-
-        var result = rootObject?.Value;
-
-        return result;
-    }
-
-    private static Warehouse CreateNew(Catalog_Склады fetchedItem)
+    private static Warehouse MapToWarehouse(Catalog_Склады fetchedItem)
     {
         return new Warehouse
         {

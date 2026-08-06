@@ -24,13 +24,15 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 
         var uri = Document.GetUri(refKey);
 
-        var rootObject = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
+        var serviceResult = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
-        var fetchedDocument = rootObject?.Value?[0];
+        if (!serviceResult.IsSuccess)
+            return;
+
+        var fetchedDocument = serviceResult.Value?.Value?[0];
 
         if (fetchedDocument is null)
         {
-            logger.LogError("Failed to fetch document");
             return;
         }
 

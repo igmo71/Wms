@@ -28,18 +28,18 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(patchUri, patchCommand, ct);
 
-        if (patchResult is null)
+        if (!patchResult.IsSuccess)
         {
-            return ServiceError.Failure<ReceivingOrder>("Failed to patch document status");
+            return patchResult;
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
 
-        var postSuccess = await oneCClient.PostValueAsync(postUri, ct);
+        var postResult = await oneCClient.PostValueAsync(postUri, ct);
 
-        if (!postSuccess)
+        if (!postResult.IsSuccess)
         {
-            return ServiceError.Failure<ReceivingOrder>("Failed to post document");
+            return postResult;
         }
 
         return ServiceResult.Success();
