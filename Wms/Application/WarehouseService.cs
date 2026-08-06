@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class WarehouseService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class WarehouseService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(Warehouse item, CancellationToken ct = default)
     {

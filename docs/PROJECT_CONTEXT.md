@@ -41,6 +41,10 @@ Core domain concepts:
 - inventory balance: current quantity of an SKU in a warehouse storage location;
 - inventory turnover: an immutable movement recording balance before/after and its source document.
 
+## Configuration UI
+
+The operator UI exposes configuration screens under the `Конфигурация` navigation group. The first such screen is `Зоны`: it supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
+
 ## Receiving
 
 `ReceivingOrder` is WMS's local operational representation of the 1C document `ПриходныйОрдерНаТовары`.

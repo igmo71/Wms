@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application;
 
-internal class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
     {
@@ -56,17 +56,18 @@ internal class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFact
         return result;
     }
 
-    public async Task<ListResult<Zone>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Zone>> ListAsync(ZoneListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<Zone> query = dbContext.Zones
-                .AsNoTracking();
+            .AsNoTracking()
+            .Include(x => x.Warehouse);
 
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
 
-        query = ApplySearch(query, listQuery.SearchString);
+        query = ApplySearch(query, listQuery);
 
         int totalItems = await query.CountAsync(ct);
 
@@ -84,12 +85,13 @@ internal class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFact
         };
     }
 
-    private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, string? searchString)
+    private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, ZoneListQuery listQuery)
     {
-        if (!string.IsNullOrWhiteSpace(searchString))
-        {
-            query = query.Where(x => x.Name!.Contains(searchString));
-        }
+        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
+            query = query.Where(x => x.Name!.Contains(listQuery.SearchString));
+
+        if (listQuery.WarehouseId is Guid warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
 
         return query;
     }
