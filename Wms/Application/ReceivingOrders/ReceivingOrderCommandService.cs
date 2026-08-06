@@ -18,7 +18,7 @@ public class ReceivingOrderCommandService(
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task CreateOrUpdateImportedOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
+    public async Task ImportOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder CreateOrUpdateImported  {externalOrderId}", externalOrder.Id);
         using var activity = AppTracing.StartActivity("ReceivingOrder.Import ", nameof(ReceivingOrderCommandService));
@@ -168,7 +168,7 @@ public class ReceivingOrderCommandService(
 
         existingOrder.CompletedAtUtc = DateTimeOffset.UtcNow;
 
-        await balanceAndTurnoverService.CreateOrUpdateAsync(existingOrder, dbContext, ct);
+        await balanceAndTurnoverService.CompleteReceivingOrder(existingOrder, dbContext, ct);
 
         await dbContext.SaveChangesAsync(ct);
 

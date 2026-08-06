@@ -8,7 +8,7 @@ namespace Wms.Application;
 
 public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger)
 {
-    public async Task CreateOrUpdateAsync(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
+    public async Task CompleteReceivingOrder(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
     {
         using var scope = logger.BeginScope("InventoryBalance CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
             receivingOrder.Id, receivingOrder.WarehouseId, receivingOrder.ReceivingLocationId);

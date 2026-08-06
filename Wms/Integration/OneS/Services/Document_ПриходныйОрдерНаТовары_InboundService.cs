@@ -16,46 +16,29 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task ImportDocumentAsync(string Ref_Key, CancellationToken ct = default)
     {
-        var source = nameof(ImportAsync);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Delay {Ref_Key}", source, Ref_Key);
+        using var scope = logger.BeginScope("ImportDocument {Ref_Key}", Ref_Key);
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Start {Ref_Key}", source, Ref_Key);
-
-        var fetchedItem = await GetAsync(Ref_Key, ct);
-
-        if (fetchedItem is null)
-        {
-            logger.LogError("{Source} Not Found {Ref_Key}", source, Ref_Key);
-            return;
-        }
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Fetched {@fetchedItem}", source, fetchedItem);
-
-        ReceivingOrder importedOrder = Document.MapToReceivingOrder(fetchedItem);
-
-        await receivingOrderCommandService.CreateOrUpdateImportedOrderAsync(importedOrder, ct);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} Ok {Ref_Key}", source, Ref_Key);
-    }
-
-    private async Task<Document?> GetAsync(string Ref_Key, CancellationToken ct = default)
-    {
         var uri = Document.GetUri(Ref_Key);
 
         var rootObject = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
-        var result = rootObject?.Value?[0];
+        var fetchedDocument = rootObject?.Value?[0];
 
-        return result;
+        if (fetchedDocument is null)
+        {
+            logger.LogError("Failed to fetch document");
+            return;
+        }
+
+        logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
+
+        ReceivingOrder order = Document.MapToReceivingOrder(fetchedDocument);
+
+        await receivingOrderCommandService.ImportOrderAsync(order, ct);
     }
 
     internal async Task ImportListAsync(CancellationToken ct)

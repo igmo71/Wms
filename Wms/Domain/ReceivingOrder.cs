@@ -173,7 +173,7 @@ public class ReceivingOrder
         return receivingLocationId;
     }
 
-    public Guid Complete()
+    public bool IsCorrectToComplete()
     {
         if (Status != ReceivingOrderStatus.InProcess)
         {

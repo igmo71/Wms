@@ -19,6 +19,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
     private async Task<ReceivingOrder?> SwitchStatusAsync(string status, Guid refKey, CancellationToken ct)
     {
+        using var scope = logger.BeginScope("SwitchStatus {refKey} {Status}", refKey, status);
+
         var patchUri = Document.PatchUri(refKey.ToString());
 
         var patchCommand = new StatusOrderCommand(status);
@@ -27,7 +29,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            logger.LogError("{Source} Failed to patch status to {Status} {refKey}", nameof(SwitchStatusAsync), status, refKey);
+            logger.LogError("Failed to patch document status");
             return null;
         }
 
@@ -37,7 +39,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (!postSuccessResult)
         {
-            logger.LogError("{Source} Failed to post document {refKey}", nameof(SwitchStatusAsync), refKey);
+            logger.LogError("Failed to post document");
             return null;
         }
 
@@ -48,6 +50,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
     internal async Task<ReceivingOrder?> UpdateDocumentItemsAsync(Guid refKey, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
     {
+        using var scope = logger.BeginScope("UpdateDocumentItems {refKey}", refKey);
+
         var documentItems = receivingOrderItems
             .Select(x => DocumentItem.MapFromReceivingOrderItem(x))
             .ToList();
@@ -58,7 +62,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            logger.LogError("{Source} Failed to patch items {refKey}", nameof(UpdateDocumentItemsAsync), refKey);
+            logger.LogError("Failed to patch document items");
             return null;
         }
 
