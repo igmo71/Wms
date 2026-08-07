@@ -38,6 +38,7 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<ReceivingOrder> query = dbContext.ReceivingOrders
+            .Include(x => x.Warehouse)
             .AsNoTracking();
 
         query = ApplySearch(query, listQuery);

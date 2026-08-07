@@ -57,9 +57,7 @@
         <TemplateColumn Title="Статус" Sortable="false">
             <CellTemplate>
                 <MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирована" : "Активна")">
-                    <MudIcon Icon="@(context.Item.DeletionMark
-                                         ? Icons.Material.Filled.Block
-                                         : Icons.Material.Filled.CheckCircle)"
+                    <MudIcon Icon="@(context.Item.DeletionMark ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)"
                              Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" />
                 </MudTooltip>
             </CellTemplate>

@@ -11,6 +11,9 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
     private readonly HttpClient _httpClient = httpClient;
     private readonly ILogger<OneCClient> _logger = logger;
 
+    //private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+
+
     public Task<ServiceResult<TResponse?>> GetValueAsync<TResponse>(
         string uri,
         CancellationToken ct = default)

@@ -7,7 +7,7 @@ using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
-public partial class Index
+public partial class Index : IAsyncDisposable
 {
     [Inject]
     private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
@@ -20,6 +20,7 @@ public partial class Index
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private ReceivingOrderStatus? _status;
+    private readonly CancellationTokenSource _refreshCts = new();
 
     private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(
         GridState<ReceivingOrder> state,
@@ -69,5 +70,41 @@ public partial class Index
     {
         _status = status;
         return _dataGrid.ReloadServerData();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _ = RefreshLoopAsync(_refreshCts.Token);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshLoopAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(async () =>
+                {
+                    if (_dataGrid is not null)
+                        await _dataGrid.ReloadServerData();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _refreshCts.Cancel();
+        _refreshCts.Dispose();
+
+        return ValueTask.CompletedTask;
     }
 }

@@ -26,7 +26,7 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var result = await service.StartOrderAsync(id, ct);
+        var result = await service.StartOrderAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
 
         return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }
@@ -36,7 +36,7 @@ public static class ReceivingOrderEndpoints
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var result = await service.CompleteOrderAsync(id, ct);
+        var result = await service.CompleteOrderAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
 
         return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }

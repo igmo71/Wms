@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
 using Wms.Application;
 using Wms.Application.ReceivingOrders;
 using Wms.Common;
@@ -19,9 +21,10 @@ public partial class Details
     private StorageLocationService StorageLocationService { get; set; } = null!;
     [Inject]
     private ZoneService ZoneService { get; set; } = null!;
-
     [Inject]
     private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private ReceivingOrder? _order;
     private Zone? _receivingZone;
@@ -98,6 +101,15 @@ public partial class Details
         _isStarting = true;
         _startOrderFailed = false;
 
+        var userId = await GetCurrentUserIdAsync();
+
+        if (userId is null)
+        {
+            _startOrderFailed = true;
+            _errorMessage = "Не удалось определить текущего пользователя.";
+            return;
+        }
+
         try
         {
             var setLocationResult = await OrderCommandService.SetReceivingLocationAsync(Id, receivingLocation.Id);
@@ -108,7 +120,7 @@ public partial class Details
                 return;
             }
 
-            var result = await OrderCommandService.StartOrderAsync(Id);
+            var result = await OrderCommandService.StartOrderAsync(Id, userId);
             if (result.IsSuccess)
                 NavigationManager.NavigateTo($"receiving-orders/{Id}/in-process");
             else
@@ -125,5 +137,12 @@ public partial class Details
         {
             _isStarting = false;
         }
+    }
+
+    private async Task<string?> GetCurrentUserIdAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        return authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
     }
 }

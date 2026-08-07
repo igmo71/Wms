@@ -2,7 +2,6 @@
 using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
-using DocumentItem = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары_Товары;
 
 namespace Wms.Integration.OneS.Services;
 
@@ -49,13 +48,23 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
 
-        var documentItems = receivingOrderItems
-            .Select(x => DocumentItem.MapFromReceivingOrderItem(x))
+        var patchItems = receivingOrderItems
+            .Select(x => new PatchItem
+            {
+                Ref_Key = x.ReceivingOrderId,
+                LineNumber = x.LineNumber,
+                Номенклатура_Key = x.StockKeepingUnitId,
+                Количество = x.FactQuantity,
+                КоличествоУпаковок = x.FactQuantity,
+                Комментарий = x.Comment
+            })
             .ToList();
+
+        var patchBody = new PatchBody { Товары = patchItems };
 
         var patchUri = Document.PatchUri(orderId.ToString());
 
-        var patchResult = await oneCClient.PatchValueAsync<List<DocumentItem>, Document>(patchUri, documentItems, ct);
+        var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
         if (patchResult is null)
         {
@@ -63,5 +72,20 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         }
 
         return ServiceResult.Success();
+    }
+
+    internal class PatchBody
+    {
+        public List<PatchItem> Товары { get; set; } = [];
+    }
+
+    internal class PatchItem
+    {
+        public Guid Ref_Key { get; set; }
+        public int LineNumber { get; set; }
+        public Guid Номенклатура_Key { get; set; }
+        public double КоличествоУпаковок { get; set; }
+        public double Количество { get; set; }
+        public string? Комментарий { get; set; }
     }
 }

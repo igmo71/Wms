@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -8,13 +9,18 @@ namespace Wms.Application;
 
 public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger)
 {
-    public async Task CompleteReceivingOrder(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
+    public async Task<ServiceResult> CompleteReceivingOrder(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
     {
         using var scope = logger.BeginScope("BalanceAndTurnover CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
             receivingOrder.Id, receivingOrder.WarehouseId, receivingOrder.ReceivingLocationId);
 
-        var receivingLocationId = receivingOrder.ReceivingLocationId
-            ?? throw new InvalidOperationException("Receiving location must be specified.");
+        if (receivingOrder.ReceivingLocationId is null)
+        {
+            logger.LogError("Receiving location must be specified");
+            return ServiceError.Invalid("Receiving location must be specified");
+        }
+
+        Guid receivingLocationId = (Guid)receivingOrder.ReceivingLocationId;
 
         var now = DateTimeOffset.UtcNow;
 
@@ -33,10 +39,22 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
         foreach (var item in receivingOrder.Items)
         {
             if (item.FactQuantity < 0)
-                throw new InvalidOperationException($"Fact quantity cannot be negative for line {item.LineNumber}.");
+            {
+                logger.LogError("Fact quantity cannot be negative for line {LineNumber}", item.LineNumber);
+                return ServiceError.Invalid("Fact quantity cannot be negative for line {item.LineNumber}");
+            }
 
             if (item.FactQuantity == 0)
                 continue;
+
+            var alreadyPosted = await dbContext.InventoryTurnovers
+                .AnyAsync(x => x.RecorderId == receivingOrder.Id, ct);
+            // TODO: Если разрешать перепроводить документ, то нужно сначала реализовать откат и InventoryBalance, и InventoryTurnover
+            if (alreadyPosted)
+            {
+                logger.LogError("Receiving order has already been posted.");
+                return ServiceError.Failure("Receiving order has already been posted");
+            }
 
             double balanceBefore;
 
@@ -49,7 +67,8 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                     StockKeepingUnitId = item.StockKeepingUnitId,
                     StorageLocationId = receivingLocationId,
                     WarehouseId = receivingOrder.WarehouseId,
-                    Quantity = item.FactQuantity
+                    Quantity = item.FactQuantity,
+                    CreatedAtUtc = now
                 };
 
                 dbContext.InventoryBalances.Add(balance);
@@ -64,19 +83,11 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                 balanceBefore = balance.Quantity;
 
                 balance.Quantity += item.FactQuantity;
+                balance.UpdatedAtUtc = now;
 
                 logger.LogDebug("Updated InventoryBalance for SKU {SkuId} from {QuantityBefore} to {QuantityAfter}",
                     item.StockKeepingUnitId, balanceBefore, balance.Quantity);
             }
-
-            var alreadyPosted = await dbContext.InventoryTurnovers
-                .AnyAsync(x =>
-                    x.RecorderId == receivingOrder.Id &&
-                    x.RecorderType == RecorderType.ReceivingOrder,
-                    ct);
-
-            if (alreadyPosted)
-                throw new InvalidOperationException("Receiving order has already been posted.");
 
             var turnover = new InventoryTurnover
             {
@@ -86,10 +97,10 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                 BalanceBefore = balanceBefore,
                 QuantityDelta = item.FactQuantity,
                 BalanceAfter = balance.Quantity,
-                DateTimeUtc = now,
+                CreatedAtUtc = now,
                 RecorderId = receivingOrder.Id,
-                RecorderType = RecorderType.ReceivingOrder,
-                RecorderLineNumber = item.LineNumber
+                RecorderLineNumber = item.LineNumber,
+                RecorderType = RecorderType.ReceivingOrder
             };
 
             dbContext.InventoryTurnovers.Add(turnover);
@@ -97,5 +108,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
             logger.LogDebug("Created InventoryTurnover for SKU {SkuId}, delta {QuantityDelta}, balance {BalanceAfter}",
                 item.StockKeepingUnitId, turnover.QuantityDelta, turnover.BalanceAfter);
         }
+
+        return ServiceResult.Success();
     }
 }

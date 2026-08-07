@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
 using Wms.Application.ReceivingOrders;
 using Wms.Domain;
 
@@ -17,6 +19,8 @@ public partial class InProcess
 
     [Inject]
     private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private ReceivingOrder? _order;
     private bool _isLoading = true;
@@ -76,9 +80,18 @@ public partial class InProcess
         _isCompleting = true;
         _completeFailed = false;
 
+        var userId = await GetCurrentUserIdAsync();
+
+        if (userId is null)
+        {
+            _completeFailed = true;
+            _completeErrorMessage = "Не удалось определить текущего пользователя.";
+            return;
+        }
+
         try
         {
-            var result = await OrderCommandService.CompleteOrderAsync(Id);
+            var result = await OrderCommandService.CompleteOrderAsync(Id, userId);
             if (result.IsSuccess)
                 NavigationManager.NavigateTo($"receiving-orders/{Id}");
             else
@@ -99,4 +112,11 @@ public partial class InProcess
 
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+
+    private async Task<string?> GetCurrentUserIdAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        return authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
 }

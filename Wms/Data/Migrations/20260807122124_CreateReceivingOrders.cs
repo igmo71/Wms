@@ -46,6 +46,16 @@ namespace Wms.Data.Migrations
                 oldType: "float");
 
             migrationBuilder.AlterColumn<Guid>(
+                name: "ZoneId",
+                table: "StorageLocations",
+                type: "uniqueidentifier",
+                nullable: false,
+                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"),
+                oldClrType: typeof(Guid),
+                oldType: "uniqueidentifier",
+                oldNullable: true);
+
+            migrationBuilder.AlterColumn<Guid>(
                 name: "WarehouseId",
                 table: "StorageLocations",
                 type: "uniqueidentifier",
@@ -64,6 +74,8 @@ namespace Wms.Data.Migrations
                     StorageLocationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StockKeepingUnitId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Quantity = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
@@ -100,7 +112,7 @@ namespace Wms.Data.Migrations
                     QuantityDelta = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
                     BalanceBefore = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
                     BalanceAfter = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
-                    DateTimeUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     RecorderId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     RecorderLineNumber = table.Column<int>(type: "int", nullable: false),
                     RecorderType = table.Column<int>(type: "int", nullable: false)
@@ -149,8 +161,8 @@ namespace Wms.Data.Migrations
                     StartedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CompletedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     ExternalChangeDetected = table.Column<bool>(type: "bit", nullable: false),
-                    StartedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    CompletedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    StartedBy = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: true),
+                    CompletedBy = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: true),
                     SenderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     SenderType = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     BaseOrderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -293,6 +305,14 @@ namespace Wms.Data.Migrations
                 nullable: false,
                 oldClrType: typeof(long),
                 oldType: "bigint");
+
+            migrationBuilder.AlterColumn<Guid>(
+                name: "ZoneId",
+                table: "StorageLocations",
+                type: "uniqueidentifier",
+                nullable: true,
+                oldClrType: typeof(Guid),
+                oldType: "uniqueidentifier");
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "WarehouseId",

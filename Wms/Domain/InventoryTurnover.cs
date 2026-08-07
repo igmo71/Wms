@@ -19,7 +19,7 @@ public class InventoryTurnover
     public double BalanceBefore { get; set; }
     public double BalanceAfter { get; set; }
 
-    public DateTimeOffset DateTimeUtc { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
 
     public Guid? RecorderId { get; set; }
     public int RecorderLineNumber { get; set; }

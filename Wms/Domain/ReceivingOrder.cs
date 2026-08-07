@@ -29,8 +29,8 @@ public class ReceivingOrder
     public DateTimeOffset? CompletedAtUtc { get; set; }
     public bool ExternalChangeDetected { get; set; }
 
-    public Guid? StartedBy { get; set; }
-    public Guid? CompletedBy { get; set; }
+    public string? StartedBy { get; set; }
+    public string? CompletedBy { get; set; }
 
     public Guid SenderId { get; set; }
     public string? SenderType { get; set; }
@@ -42,6 +42,13 @@ public class ReceivingOrder
 
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
+
+    public bool AllowExternalCreate(WmsSettings settings) =>
+    Status switch
+    {
+        ReceivingOrderStatus.Completed => settings.AllowExternalCreateCompleted,
+        _ => true
+    };
 
     public bool AllowExternalUpdate(WmsSettings settings) =>
     Status switch
@@ -160,11 +167,13 @@ public class ReceivingOrder
         return ServiceResult.Success();
     }
 
-    public void Start()
+    public void Start(string userId)
     {
         Status = ReceivingOrderStatus.InProcess;
 
         StartedAtUtc = DateTimeOffset.UtcNow;
+
+        StartedBy = userId;
     }
 
     public ServiceResult ValidateToComplete()
@@ -182,10 +191,12 @@ public class ReceivingOrder
         return ServiceResult.Success();
     }
 
-    public void Complete()
+    public void Complete(string userId)
     {
         Status = ReceivingOrderStatus.Completed;
 
         CompletedAtUtc = DateTimeOffset.UtcNow;
+
+        CompletedBy = userId;
     }
 }

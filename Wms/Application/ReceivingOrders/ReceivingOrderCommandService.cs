@@ -33,6 +33,13 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
+            if (!externalOrder.AllowExternalCreate(_wmsSettings))
+            {
+                logger.LogDebug("External status is completed, create new not allowed");
+
+                return;
+            }
+
             externalOrder.CreatedAtUtc = now;
 
             dbContext.ReceivingOrders.Add(externalOrder);
@@ -49,6 +56,7 @@ public class ReceivingOrderCommandService(
             }
 
             if (!existingOrder.AllowExternalUpdate(_wmsSettings))
+            // Что бы разрешить для статуса Complete, вероятно, потребуется доработка (откат BalanceAndTurnover...)
             {
                 existingOrder.ExternalChangeDetected = true;
 
@@ -67,7 +75,7 @@ public class ReceivingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<ServiceResult> StartOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder Start {OrderId}", orderId);
 
@@ -101,14 +109,14 @@ public class ReceivingOrderCommandService(
             return ServiceError.Failure<ReceivingOrder>("Failed to start external order");
         }
 
-        existingOrder.Start();
+        existingOrder.Start(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct = default)
+    public async Task<ServiceResult> CompleteOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder Complete {OrderId}", orderId);
 
@@ -154,9 +162,12 @@ public class ReceivingOrderCommandService(
             return ServiceError.Failure<ReceivingOrder>("Failed to complete external order");
         }
 
-        existingOrder.Complete();
+        existingOrder.Complete(userId);
 
-        await balanceAndTurnoverService.CompleteReceivingOrder(existingOrder, dbContext, ct);
+        var balanceAndTurnoverResult = await balanceAndTurnoverService.CompleteReceivingOrder(existingOrder, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
 
         await dbContext.SaveChangesAsync(ct);
 
