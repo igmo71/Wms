@@ -32,7 +32,7 @@ else
         </MudStack>
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-            <MudGrid Spacing="2">
+            <MudGrid Spacing="6">
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Номер</MudText>
                     <MudText>@_order.Number</MudText>
@@ -40,6 +40,10 @@ else
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Дата</MudText>
                     <MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Склад</MudText>
+                    <MudText>@_order.Warehouse?.Name</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Статус</MudText>
@@ -53,11 +57,7 @@ else
                     <MudText Typo="Typo.caption">Принят</MudText>
                     <MudText>@FormatDateTimeOffset(_order.CompletedAtUtc)</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Склад</MudText>
-                    <MudText>@_order.Warehouse?.Name</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Зона приёмки</MudText>
                     <MudAutocomplete T="Zone"
                                      Value="_receivingZone"
@@ -69,7 +69,7 @@ else
                                      Dense="true"
                                      Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Место приёмки</MudText>
                     <MudAutocomplete T="StorageLocation"
                                      Value="_receivingLocation"
@@ -81,7 +81,7 @@ else
                                      Dense="true"
                                      Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" md="12">
+                <MudItem xs="12" md="8">
                     <MudText Typo="Typo.caption">Комментарий</MudText>
                     <MudText>@_order.Comment</MudText>
                 </MudItem>
