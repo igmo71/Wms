@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Options;
 using MudBlazor;
 using Wms.Application.ReceivingOrders;
 using Wms.Common;
@@ -15,11 +16,16 @@ public partial class Index : IAsyncDisposable
     [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
 
+    [Inject]
+    private IOptions<WmsSettings> Options { get; set; } = null!;
+
     private MudDataGrid<ReceivingOrder> _dataGrid = null!;
+    private bool _dataGridLoading = true;
     private string? _searchString;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private ReceivingOrderStatus? _status;
+    private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
 
     private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(
@@ -39,13 +45,20 @@ public partial class Index : IAsyncDisposable
             Take = state.PageSize
         };
 
-        var result = await OrderQueryService.ListOrdersAsync(query, cancellationToken);
-
-        return new GridData<ReceivingOrder>
+        try
         {
-            Items = result.Items,
-            TotalItems = result.TotalItems
-        };
+            var result = await OrderQueryService.ListOrdersAsync(query, cancellationToken);
+
+            return new GridData<ReceivingOrder>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalItems
+            };
+        }
+        finally
+        {
+            _dataGridLoading = false;
+        }
     }
 
     private Task OnSearchChangedAsync(string searchString)
@@ -75,14 +88,17 @@ public partial class Index : IAsyncDisposable
     protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
+        {
+            _wmsSettings = Options.Value;
             _ = RefreshLoopAsync(_refreshCts.Token);
+        }
 
         return Task.CompletedTask;
     }
 
     private async Task RefreshLoopAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_wmsSettings?.ReceivingRefreshLoop ?? 5));
 
         try
         {

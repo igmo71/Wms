@@ -9,4 +9,6 @@ public class WmsSettings
     public bool AllowExternalUpdatePending { get; set; }
     public bool AllowExternalUpdateInProcess { get; set; }
     public bool AllowExternalUpdateCompleted { get; set; }
+
+    public int ReceivingRefreshLoop { get; set; }
 }
