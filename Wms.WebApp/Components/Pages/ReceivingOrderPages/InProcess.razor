@@ -1,6 +1,7 @@
 @page "/receiving-orders/{Id:guid}/in-process"
 @using Wms.Common
 @using Wms.Domain
+@using Wms.Domain.Enums
 
 <PageTitle>Приёмка приходного ордера</PageTitle>
 
@@ -20,7 +21,7 @@ else
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="_isCompleting"
+                       Disabled="@(_isCompleting || _receivingLocation is null)"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="CompleteOrderAsync">
                 Завершить
@@ -32,21 +33,25 @@ else
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Номер</MudText>
                     <MudText>@_order.Number</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Дата</MudText>
                     <MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Статус</MudText>
                     <MudText>@_order.Status.GetDisplayName()</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">В работе с</MudText>
                     <MudText>@FormatDateTimeOffset(_order.StartedAtUtc)</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Принят</MudText>
+                    <MudText>@FormatDateTimeOffset(_order.CompletedAtUtc)</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Склад</MudText>
@@ -54,23 +59,38 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Зона приёмки</MudText>
-                    <MudText>@_order.ReceivingLocation?.Zone?.Name</MudText>
+                    <MudAutocomplete T="Zone"
+                                     Value="_receivingZone"
+                                     ValueChanged="OnReceivingZoneChanged"
+                                     SearchFunc="SearchReceivingZonesAsync"
+                                     ToStringFunc="zone => zone?.Name ?? string.Empty"
+                                     Disabled="@(_order.Status != ReceivingOrderStatus.InProcess)"
+                                     Variant="Variant.Text"
+                                     Dense="true"
+                                     Clearable="true" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    <MudText>@_order.ReceivingLocation?.Name</MudText>
+                    <MudAutocomplete T="StorageLocation"
+                                     Value="_receivingLocation"
+                                     ValueChanged="OnReceivingLocationChanged"
+                                     SearchFunc="SearchReceivingLocationsAsync"
+                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                     Disabled="@(_order.Status != ReceivingOrderStatus.InProcess || _receivingZone is null)"
+                                     Variant="Variant.Text"
+                                     Dense="true"
+                                     Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" md="12">
+                    <MudText Typo="Typo.caption">Комментарий</MudText>
+                    <MudText>@_order.Comment</MudText>
                 </MudItem>
             </MudGrid>
         </MudPaper>
 
-        @if (_updateFailed)
-        {
-            <MudAlert Severity="Severity.Error">@_updateErrorMessage</MudAlert>
-        }
-
         @if (_completeFailed)
         {
-            <MudAlert Severity="Severity.Error">@_completeErrorMessage</MudAlert>
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
         <MudDataGrid T="ReceivingOrderItem"

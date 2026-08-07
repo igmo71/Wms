@@ -363,8 +363,8 @@ namespace Wms.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("CompletedBy")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<DateTimeOffset?>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -402,8 +402,8 @@ namespace Wms.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("StartedBy")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

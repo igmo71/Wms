@@ -12,7 +12,7 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260807122124_CreateReceivingOrders")]
+    [Migration("20260807134333_CreateReceivingOrders")]
     partial class CreateReceivingOrders
     {
         /// <inheritdoc />
@@ -366,8 +366,8 @@ namespace Wms.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("CompletedBy")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<DateTimeOffset?>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -405,8 +405,8 @@ namespace Wms.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("StartedBy")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

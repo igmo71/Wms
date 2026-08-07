@@ -121,13 +121,14 @@ public partial class Details
             }
 
             var result = await OrderCommandService.StartOrderAsync(Id, userId);
-            if (result.IsSuccess)
-                NavigationManager.NavigateTo($"receiving-orders/{Id}/in-process");
-            else
+            if (!result.IsSuccess)
             {
                 _startOrderFailed = true;
                 _errorMessage = result.Error?.Message ?? "Не удалось взять ордер в работу";
+                return;
             }
+            NavigationManager.NavigateTo($"receiving-orders/{Id}/in-process");
+
         }
         catch
         {
