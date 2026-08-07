@@ -6,17 +6,18 @@ namespace Wms.Domain;
 public class ReceivingOrder
 {
     public Guid Id { get; set; }
-    public bool Posted { get; set; }
     public bool DeletionMark { get; set; }
-    public DateTime Date { get; set; }
+    public bool Posted { get; set; }
     public string? Number { get; set; }
-    public string? Comment { get; set; }
+    public DateTime Date { get; set; }
 
     public Guid WarehouseId { get; set; }
     public Warehouse? Warehouse { get; set; }
 
     public Guid? ReceivingLocationId { get; set; }
     public StorageLocation? ReceivingLocation { get; set; }
+
+    public string? Comment { get; set; }
 
     public ReceivingOrderStatus Status { get; set; }
     public ReceivingOrderQueue Queue { get; set; }
@@ -27,10 +28,11 @@ public class ReceivingOrder
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
     public DateTimeOffset? CompletedAtUtc { get; set; }
-    public bool ExternalChangeDetected { get; set; }
 
     public string? StartedBy { get; set; }
     public string? CompletedBy { get; set; }
+
+    public bool ExternalChangeDetected { get; set; }
 
     public Guid SenderId { get; set; }
     public string? SenderType { get; set; }

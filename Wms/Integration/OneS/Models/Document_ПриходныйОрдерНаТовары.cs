@@ -9,23 +9,22 @@ internal class Document_ПриходныйОрдерНаТовары
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
+    public bool Posted { get; set; }
     public string? Number { get; set; }
     public DateTime Date { get; set; }
-    public bool Posted { get; set; }
     public Guid Склад_Key { get; set; }
-    public string? Комментарий { get; set; }
     public string? Статус { get; set; }
     public string? СкладскаяОперация { get; set; }
+    public Guid Отправитель { get; set; }
+    public string? Отправитель_Type { get; set; }
+    public string? Комментарий { get; set; }
+    public string? Доброга_ТипОчереди { get; set; }
+    public Guid Распоряжение { get; set; }
+    public string? Распоряжение_Type { get; set; }
     public string? ХозяйственнаяОперация { get; set; }
 
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public int ВсегоМест { get; set; }
-
-    public Guid Отправитель { get; set; }
-    public string? Отправитель_Type { get; set; }
-    public Guid Распоряжение { get; set; }
-    public string? Распоряжение_Type { get; set; }
-    public string? Доброга_ТипОчереди { get; set; }
     public List<Document_ПриходныйОрдерНаТовары_Товары> Товары { get; set; } = [];
 
 
@@ -34,11 +33,11 @@ internal class Document_ПриходныйОрдерНаТовары
     public static string TotalUri => "Document_ПриходныйОрдерНаТовары/$count?$format=json";
 
     private static readonly string select =
-        "Ref_Key,DeletionMark,Number,Date,Posted,Склад_Key,Комментарий,Статус,СкладскаяОперация,ВсегоМест," +
-        "Отправитель,Отправитель_Type,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,Доброга_ТипОчереди,Товары";
+        "Ref_Key,DeletionMark,Posted,Number,Date,Склад_Key,Статус,СкладскаяОперация,Отправитель,Отправитель_Type,Комментарий," +
+        "Доброга_ТипОчереди,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,ВсегоМест,Товары";
 
-
-    public static string GetListUri(DateTime dateFrom, DateTime dateTo, int page) => $"Document_ПриходныйОрдерНаТовары" +
+    public static string GetListUri(DateTime dateFrom, DateTime dateTo, int page) =>
+        $"Document_ПриходныйОрдерНаТовары" +
         $"?$format=json" +
         $"&$select={select}" +
         $"&$filter=Date ge datetime'{dateFrom:s}' and Date lt datetime'{dateTo:s}'" +
@@ -46,11 +45,11 @@ internal class Document_ПриходныйОрдерНаТовары
         $"&$skip={page * BatchSize}" +
         $"&$top={BatchSize}";
 
-    public static string GetUri(string refKey) => $"Document_ПриходныйОрдерНаТовары" +
+    public static string GetUri(string refKey) =>
+        $"Document_ПриходныйОрдерНаТовары" +
         $"?$format=json" +
         $"&$select={select}" +
         $"&$filter=Ref_Key eq guid'{refKey}'";
-
 
     public static string PatchUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')?$format=json";
 

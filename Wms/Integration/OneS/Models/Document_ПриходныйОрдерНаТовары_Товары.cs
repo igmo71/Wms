@@ -11,10 +11,11 @@ internal class Document_ПриходныйОрдерНаТовары_Товар�
     public int LineNumber { get; set; }
 
     public Guid Номенклатура_Key { get; set; }
-    public double КоличествоУпаковок { get; set; }
     public double Количество { get; set; }
-    public string? Штрихкод { get; set; }
+    public double КоличествоУпаковок { get; set; }
     public string? Комментарий { get; set; }
+
+    //public Guid? Характеристика_Key { get; set; }
 
     public static Document_ПриходныйОрдерНаТовары_Товары MapFromReceivingOrderItem(ReceivingOrderItem item)
     {
