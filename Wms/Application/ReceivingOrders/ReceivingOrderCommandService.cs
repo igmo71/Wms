@@ -35,7 +35,7 @@ public class ReceivingOrderCommandService(
         {
             if (!externalOrder.AllowExternalCreate(_wmsSettings))
             {
-                logger.LogDebug("External status is completed, create new not allowed");
+                logger.LogDebug("External document status is completed, new order create not allowed");
 
                 return;
             }
@@ -50,7 +50,7 @@ public class ReceivingOrderCommandService(
 
             if (!hasExternalChanges)
             {
-                logger.LogDebug("No external changes");
+                logger.LogDebug("No external document changes detected");
 
                 return;
             }
@@ -60,7 +60,7 @@ public class ReceivingOrderCommandService(
             {
                 existingOrder.ExternalChangeDetected = true;
 
-                logger.LogWarning("External changes detected, update not allowed");
+                logger.LogWarning("External document changes detected, order update not allowed");
             }
             else
             {
@@ -97,7 +97,7 @@ public class ReceivingOrderCommandService(
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to start failed {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to start failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
@@ -105,8 +105,8 @@ public class ReceivingOrderCommandService(
 
         if (!externalStartResult.IsSuccess)
         {
-            logger.LogError("Failed to start external order {ErrorMessage}", externalStartResult.Error?.Message);
-            return ServiceError.Failure<ReceivingOrder>("Failed to start external order");
+            logger.LogError("Failed to start external document: {ErrorMessage}", externalStartResult.Error?.Message);
+            return ServiceError.Failure<ReceivingOrder>("Failed to start external document");
         }
 
         existingOrder.Start(userId);
@@ -138,9 +138,17 @@ public class ReceivingOrderCommandService(
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to complete failed {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to complete failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
+
+        existingOrder.Complete(userId);
+
+        var balanceAndTurnoverResult = await balanceAndTurnoverService
+            .CompleteReceivingOrder(existingOrder, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
 
         if (existingOrder.HasPlanFactDifference)
         {
@@ -149,8 +157,8 @@ public class ReceivingOrderCommandService(
 
             if (!externalItemsUpdateResult.IsSuccess)
             {
-                logger.LogError("Failed to update external order items");
-                return ServiceError.Failure<ReceivingOrder>("Failed to update external order items");
+                logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
+                return externalItemsUpdateResult;
             }
         }
 
@@ -158,16 +166,9 @@ public class ReceivingOrderCommandService(
 
         if (!externalCompletionResult.IsSuccess)
         {
-            logger.LogError("Failed to complete external order");
-            return ServiceError.Failure<ReceivingOrder>("Failed to complete external order");
+            logger.LogError("Failed to complete external document: {ErrorMessage}", externalCompletionResult.Error?.Message);
+            return ServiceError.Failure<ReceivingOrder>("Failed to complete external document");
         }
-
-        existingOrder.Complete(userId);
-
-        var balanceAndTurnoverResult = await balanceAndTurnoverService.CompleteReceivingOrder(existingOrder, dbContext, ct);
-
-        if (!balanceAndTurnoverResult.IsSuccess)
-            return balanceAndTurnoverResult;
 
         await dbContext.SaveChangesAsync(ct);
 

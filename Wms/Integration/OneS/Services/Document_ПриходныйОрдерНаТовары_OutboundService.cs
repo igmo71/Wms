@@ -68,7 +68,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            return ServiceError.Failure<ReceivingOrder>("Failed to patch document items");
+            return ServiceError.Failure<ReceivingOrder>("Failed to update external document items");
         }
 
         return ServiceResult.Success();
