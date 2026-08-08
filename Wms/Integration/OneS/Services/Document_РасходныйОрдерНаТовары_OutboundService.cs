@@ -44,15 +44,15 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
     // TODO: Выяснить как в 1С работает с товарами по распоряжениям и отгружаемыми товарами (Отгружать - НеОтгружать)
     // Вероятно нужно добавить строку с НеОтгружать на разницу между План и Факт
-    internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ShippingOrderItem> shippingOrderItems, CancellationToken ct)
+    internal async Task<ServiceResult> UpdateDocumentItemsAsync(ShippingOrder shippingOrder, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
+        using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
 
-        var patchItems = shippingOrderItems
+        var patchItems = shippingOrder.Items
             .Select(x => PatchItem.From(x))
             .ToList();
 
-        var patchBaseItems = shippingOrderItems
+        var patchBaseItems = shippingOrder.BaseItems
             .Select(x => PatchBaseItem.From(x))
             .ToList();
 
@@ -62,13 +62,13 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             ТоварыПоРаспоряжениям = patchBaseItems
         };
 
-        var patchUri = Document.PatchUri(orderId.ToString());
+        var patchUri = Document.PatchUri(shippingOrder.Id.ToString());
 
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
-        if (patchResult is null)
+        if (!patchResult.IsSuccess)
         {
-            return ServiceError.Failure<ShippingOrder>("Failed to update external document items");
+            return patchResult;
         }
 
         return ServiceResult.Success();
@@ -88,12 +88,12 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         public Guid Номенклатура_Key { get; set; }
         public double Количество { get; set; }
 
-        public static PatchBaseItem From(ShippingOrderItem orderItem) => new()
+        public static PatchBaseItem From(ShippingOrderBaseItem orderBaseItem) => new()
         {
-            Ref_Key = orderItem.ShippingOrderId,
-            LineNumber = orderItem.LineNumber,
-            Номенклатура_Key = orderItem.StockKeepingUnitId,
-            Количество = orderItem.FactQuantity
+            Ref_Key = orderBaseItem.ShippingOrderId,
+            LineNumber = orderBaseItem.LineNumber,
+            Номенклатура_Key = orderBaseItem.StockKeepingUnitId,
+            Количество = orderBaseItem.PlanQuantity
         };
     }
 
@@ -102,8 +102,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         public Guid Ref_Key { get; set; }
         public int LineNumber { get; set; }
         public Guid Номенклатура_Key { get; set; }
-        public double КоличествоУпаковок { get; set; }
         public double Количество { get; set; }
+        public double КоличествоУпаковок { get; set; }
         public string? Действие { get; set; }
 
         public static PatchItem From(ShippingOrderItem orderItem) => new()

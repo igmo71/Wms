@@ -56,9 +56,9 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
-        if (patchResult is null)
+        if (!patchResult.IsSuccess)
         {
-            return ServiceError.Failure<ReceivingOrder>("Failed to update external document items");
+            return patchResult;
         }
 
         return ServiceResult.Success();

@@ -154,7 +154,7 @@ internal class ShippingOrderCommandService(
         if (existingOrder.HasPlanFactDifference)
         {
             var externalItemsUpdateResult = await outboundService
-                .UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
+                .UpdateDocumentItemsAsync(existingOrder, ct);
 
             if (!externalItemsUpdateResult.IsSuccess)
             {

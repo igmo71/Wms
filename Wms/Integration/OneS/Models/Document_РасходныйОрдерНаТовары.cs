@@ -19,7 +19,7 @@ internal class Document_РасходныйОрдерНаТовары
     public string? Получатель_Type { get; set; }
     public string? Комментарий { get; set; }
     public string? Доброга_ТипОчереди { get; set; }
-    public string? Доброга_НаправлениеДоставки_Key { get; set; }
+    public Guid? Доброга_НаправлениеДоставки_Key { get; set; }
     public DateTime Доброга_ПланируемаяДатаОтгрузки { get; set; }
 
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
@@ -91,6 +91,8 @@ internal class Document_РасходныйОрдерНаТовары
             WarehouseId = fetchedDocument.Склад_Key,
             Status = ODataEnumMapper.Parse<ShippingOrderStatus>(fetchedDocument.Статус),
             Queue = ODataEnumMapper.Parse<ShippingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
+            PlannedShippingDate = fetchedDocument.Доброга_ПланируемаяДатаОтгрузки,
+            DeliveryDirectionId = fetchedDocument.Доброга_НаправлениеДоставки_Key,
             WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
             RecipientId = fetchedDocument.Получатель,
             RecipientType = fetchedDocument.Получатель_Type.TrimODataPrefix(),

@@ -20,6 +20,6 @@ public class ShippingOrderItem
     public ShippingOrderAction Action { get; set; }
 
     public double RemainingQuantity => PlanQuantity - FactQuantity;
-    public bool IsFullyReceived => FactQuantity == PlanQuantity;
+    public bool IsFullyShipped => FactQuantity == PlanQuantity;
     public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

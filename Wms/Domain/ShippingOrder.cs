@@ -43,7 +43,7 @@ public class ShippingOrder
     public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
     public List<ShippingOrderItem> Items { get; set; } = [];
 
-    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
+    public bool IsFullyShipped => Items.All(x => x.IsFullyShipped);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
     internal bool AllowExternalCreate(WmsSettings wmsSettings) =>
@@ -77,6 +77,8 @@ public class ShippingOrder
             || Date != externalOrder.Date
             || Number != externalOrder.Number
             || WarehouseId != externalOrder.WarehouseId
+            || PlannedShippingDate != externalOrder.PlannedShippingDate
+            || DeliveryDirectionId != externalOrder.DeliveryDirectionId
             || RecipientId != externalOrder.RecipientId
             || RecipientType != externalOrder.RecipientType)
         {
@@ -117,7 +119,8 @@ public class ShippingOrder
 
             if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
                 || existingItem.PlanQuantity != external.PlanQuantity
-                || existingItem.BaseOrderId != external.BaseOrderId)
+                || existingItem.BaseOrderId != external.BaseOrderId
+                || existingItem.BaseOrderType != external.BaseOrderType)
             {
                 return true;
             }
@@ -161,6 +164,7 @@ public class ShippingOrder
             {
                 existing.StockKeepingUnitId = external.StockKeepingUnitId;
                 existing.PlanQuantity = external.PlanQuantity;
+                existing.Action = external.Action;
             }
             else
             {
@@ -170,7 +174,8 @@ public class ShippingOrder
                     LineNumber = external.LineNumber,
                     StockKeepingUnitId = external.StockKeepingUnitId,
                     PlanQuantity = external.PlanQuantity,
-                    FactQuantity = 0
+                    FactQuantity = 0,
+                    Action = external.Action
                 });
             }
         }
@@ -190,6 +195,8 @@ public class ShippingOrder
             {
                 existing.StockKeepingUnitId = external.StockKeepingUnitId;
                 existing.PlanQuantity = external.PlanQuantity;
+                existing.BaseOrderId = external.BaseOrderId;
+                existing.BaseOrderType = external.BaseOrderType;
             }
             else
             {
@@ -199,6 +206,8 @@ public class ShippingOrder
                     LineNumber = external.LineNumber,
                     StockKeepingUnitId = external.StockKeepingUnitId,
                     PlanQuantity = external.PlanQuantity,
+                    BaseOrderId = external.BaseOrderId,
+                    BaseOrderType = external.BaseOrderType
                 });
             }
         }
@@ -231,12 +240,13 @@ public class ShippingOrder
     public ServiceResult ValidateToComplete()
     {
         if (Status is not (ShippingOrderStatus.InProcess
-                or ShippingOrderStatus.ForShipment
+                or ShippingOrderStatus.ForVerification
                 or ShippingOrderStatus.InVerification
                 or ShippingOrderStatus.Verified
                 or ShippingOrderStatus.ForShipment))
         {
-            return ServiceError.Invalid<ShippingOrder>("Only an InProcess or ProcessingRequired shipping order can be completed.");
+            return ServiceError.Invalid<ShippingOrder>(
+                "Only an InProcess or ForVerification or InVerification or Verified or ForShipment shipping order can be completed.");
         }
 
         if (ShippingLocationId is null)
