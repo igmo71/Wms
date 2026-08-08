@@ -12,7 +12,7 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260807134333_CreateReceivingOrders")]
+    [Migration("20260808095150_CreateReceivingOrders")]
     partial class CreateReceivingOrders
     {
         /// <inheritdoc />
@@ -245,6 +245,34 @@ namespace Wms.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Wms.Domain.DeliveryDirection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("DeletionMark")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsFolder")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("Parent_Key")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DeliveryDirections");
+                });
+
             modelBuilder.Entity("Wms.Domain.InventoryBalance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -255,8 +283,7 @@ namespace Wms.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<double>("Quantity")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("float(18)");
+                        .HasColumnType("float");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -295,19 +322,16 @@ namespace Wms.Data.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<double>("BalanceAfter")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("float(18)");
+                        .HasColumnType("float");
 
                     b.Property<double>("BalanceBefore")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("float(18)");
+                        .HasColumnType("float");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<double>("QuantityDelta")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("float(18)");
+                        .HasColumnType("float");
 
                     b.Property<Guid?>("RecorderId")
                         .HasColumnType("uniqueidentifier");

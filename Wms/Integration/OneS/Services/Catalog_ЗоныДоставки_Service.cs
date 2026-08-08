@@ -55,6 +55,8 @@ internal class Catalog_ЗоныДоставки_Service(
         {
             Id = fetchedItem.Ref_Key,
             DeletionMark = fetchedItem.DeletionMark,
+            Parent_Key = fetchedItem.Parent_Key == Guid.Empty ? null : fetchedItem.Parent_Key,
+            IsFolder = fetchedItem.IsFolder,
             Description = fetchedItem.Description,
             Comment = fetchedItem.Описание
         };

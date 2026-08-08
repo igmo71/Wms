@@ -66,6 +66,22 @@ namespace Wms.Data.Migrations
                 oldNullable: true);
 
             migrationBuilder.CreateTable(
+                name: "DeliveryDirections",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    DeletionMark = table.Column<bool>(type: "bit", nullable: false),
+                    Parent_Key = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    IsFolder = table.Column<bool>(type: "bit", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    Comment = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeliveryDirections", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "InventoryBalances",
                 columns: table => new
                 {
@@ -73,7 +89,7 @@ namespace Wms.Data.Migrations
                     WarehouseId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StorageLocationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StockKeepingUnitId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Quantity = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
+                    Quantity = table.Column<double>(type: "float", nullable: false),
                     CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
@@ -109,9 +125,9 @@ namespace Wms.Data.Migrations
                     WarehouseId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StorageLocationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StockKeepingUnitId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    QuantityDelta = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
-                    BalanceBefore = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
-                    BalanceAfter = table.Column<double>(type: "float(18)", precision: 18, scale: 3, nullable: false),
+                    QuantityDelta = table.Column<double>(type: "float", nullable: false),
+                    BalanceBefore = table.Column<double>(type: "float", nullable: false),
+                    BalanceAfter = table.Column<double>(type: "float", nullable: false),
                     CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     RecorderId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     RecorderLineNumber = table.Column<int>(type: "int", nullable: false),
@@ -145,13 +161,13 @@ namespace Wms.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Posted = table.Column<bool>(type: "bit", nullable: false),
                     DeletionMark = table.Column<bool>(type: "bit", nullable: false),
-                    Date = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Posted = table.Column<bool>(type: "bit", nullable: false),
                     Number = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: true),
-                    Comment = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    Date = table.Column<DateTime>(type: "datetime2", nullable: false),
                     WarehouseId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ReceivingLocationId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    Comment = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     Queue = table.Column<int>(type: "int", nullable: false),
                     WarehouseOperation = table.Column<int>(type: "int", nullable: false),
@@ -160,9 +176,9 @@ namespace Wms.Data.Migrations
                     UpdatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     StartedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CompletedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    ExternalChangeDetected = table.Column<bool>(type: "bit", nullable: false),
                     StartedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
                     CompletedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
+                    ExternalChangeDetected = table.Column<bool>(type: "bit", nullable: false),
                     SenderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     SenderType = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     BaseOrderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -270,6 +286,9 @@ namespace Wms.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "DeliveryDirections");
+
             migrationBuilder.DropTable(
                 name: "InventoryBalances");
 
