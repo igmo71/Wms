@@ -62,6 +62,9 @@ public class ReceivingOrder
         _ => false
     };
 
+    internal bool HasConflictingExternalStatus(ReceivingOrder externalOrder) =>
+        Status != externalOrder.Status;
+
     public bool HasExternalChanges(ReceivingOrder externalOrder)
     {
         if (BaseOrderId != externalOrder.BaseOrderId
@@ -180,14 +183,14 @@ public class ReceivingOrder
 
     public ServiceResult ValidateToComplete()
     {
-        if (Status is not (ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired))
+        if (Status != ReceivingOrderStatus.InReceiving)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only an InReceiving or ProcessingRequired receiving order can be completed.");
+            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order in receiving can be received.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before completing the order.");
+            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before receiving the order.");
         }
 
         return ServiceResult.Success();

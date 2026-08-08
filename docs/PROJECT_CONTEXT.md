@@ -74,7 +74,7 @@ The active business flow is:
 
 The receiving location belongs to the whole order. At the current stage the operator selects a receiving zone and then a storage location from that zone on the order details page before the order can be started. Both choices are limited to the order's warehouse; the UI does not enable "Взять в работу" until a location is selected. The selected location is saved immediately before starting. A default receiving location/zone may be introduced later.
 
-`ProcessingRequired` is currently only passed through from 1C's `ТребуетсяОбработка`. It is not part of the active operational flow, which is `ReadyForReceiving -> InReceiving -> Received`.
+`ProcessingRequired` is currently only passed through from 1C's `ТребуетсяОбработка`. It is not part of the active operational flow, which is `ReadyForReceiving -> InReceiving -> Received`. Actual quantities are immutable after `Received` and are preserved when an inbound document is reconciled.
 
 ### Receiving UI
 
@@ -89,6 +89,8 @@ The receiving location belongs to the whole order. At the current stage the oper
 - `BalanceAndTurnoverService` records inventory movements and updates balances when a receiving order is completed.
 
 External updates to an already imported order are controlled by `WmsSettings` according to its status. This protects in-progress warehouse work from being overwritten by 1C changes.
+
+If inbound synchronization reports a status that conflicts with the local WMS-controlled lifecycle, WMS leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Shipping facts are immutable from `ReadyForShipment` onward.
 
 ## 1C integration
 

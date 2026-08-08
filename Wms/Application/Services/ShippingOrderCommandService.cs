@@ -56,7 +56,16 @@ internal class ShippingOrderCommandService(
                 return;
             }
 
-            if (!existingOrder.AllowExternalUpdate(_wmsSettings))
+            if (existingOrder.HasConflictingExternalStatus(externalOrder))
+            {
+                existingOrder.ExternalChangeDetected = true;
+
+                logger.LogWarning(
+                    "External shipping order status conflicts with local workflow. Local: {LocalStatus}, external: {ExternalStatus}",
+                    existingOrder.Status,
+                    externalOrder.Status);
+            }
+            else if (!existingOrder.AllowExternalUpdate(_wmsSettings))
             // Чтобы разрешить для статуса Shipped, вероятно, потребуется доработка (откат BalanceAndTurnover...)
             {
                 existingOrder.ExternalChangeDetected = true;

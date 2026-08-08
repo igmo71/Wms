@@ -68,6 +68,21 @@ public class ShippingOrder
         _ => false
     };
 
+    internal bool HasConflictingExternalStatus(ShippingOrder externalOrder) =>
+        Status switch
+        {
+            ShippingOrderStatus.ReadyForPicking => externalOrder.Status is not (ShippingOrderStatus.ReadyForPicking
+                or ShippingOrderStatus.ReadyForVerification
+                or ShippingOrderStatus.InVerification
+                or ShippingOrderStatus.Verified),
+            ShippingOrderStatus.ReadyForVerification => externalOrder.Status is not (ShippingOrderStatus.ReadyForVerification
+                    or ShippingOrderStatus.InVerification
+                    or ShippingOrderStatus.Verified),
+            ShippingOrderStatus.InVerification => externalOrder.Status is not (ShippingOrderStatus.InVerification
+                or ShippingOrderStatus.Verified),
+            _ => Status != externalOrder.Status
+        };
+
     internal bool HasExternalChanges(ShippingOrder externalOrder)
     {
         if (Status != externalOrder.Status

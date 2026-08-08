@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS.Services;
 
 namespace Wms.Application.Services;
@@ -55,7 +56,16 @@ public class ReceivingOrderCommandService(
                 return;
             }
 
-            if (!existingOrder.AllowExternalUpdate(_wmsSettings))
+            if (existingOrder.HasConflictingExternalStatus(externalOrder))
+            {
+                existingOrder.ExternalChangeDetected = true;
+
+                logger.LogWarning(
+                    "External receiving order status conflicts with local workflow. Local: {LocalStatus}, external: {ExternalStatus}",
+                    existingOrder.Status,
+                    externalOrder.Status);
+            }
+            else if (!existingOrder.AllowExternalUpdate(_wmsSettings))
             // Чтобы разрешить для статуса Received, вероятно, потребуется доработка (откат BalanceAndTurnover...)
             {
                 existingOrder.ExternalChangeDetected = true;
@@ -189,16 +199,27 @@ public class ReceivingOrderCommandService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var affected = await dbContext.ReceivingOrderItems
-            .Where(x => x.ReceivingOrderId == receivingOrderId && x.LineNumber == lineNumber)
-            .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.FactQuantity, factQuantity)
-                .SetProperty(p => p.Comment, comment), ct);
+        var existingOrder = await dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
 
-        if (affected == 0)
+        if (existingOrder is null)
+            return ServiceError.NotFound<ReceivingOrder>();
+
+        if (existingOrder.Status == ReceivingOrderStatus.Received)
+            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be edited after the receiving order is received.");
+
+        var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
+
+        if (existingItem is null)
         {
             return ServiceError.NotFound<ReceivingOrderItem>();
         }
+
+        existingItem.FactQuantity = factQuantity;
+        existingItem.Comment = comment;
+
+        await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
