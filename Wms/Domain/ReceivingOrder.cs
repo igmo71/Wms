@@ -45,20 +45,20 @@ public class ReceivingOrder
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
-    public bool AllowExternalCreate(WmsSettings settings) =>
+    public bool AllowExternalCreate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ReceivingOrderStatus.Completed => settings.AllowExternalCreateCompleted,
+        ReceivingOrderStatus.Completed => wmsSettings.AllowExternalCreateCompleted,
         _ => true
     };
 
-    public bool AllowExternalUpdate(WmsSettings settings) =>
+    public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ReceivingOrderStatus.Pending => settings.AllowExternalUpdatePending,
-        ReceivingOrderStatus.InProcess => settings.AllowExternalUpdateInProcess,
-        ReceivingOrderStatus.ProcessingRequired => settings.AllowExternalUpdateInProcess,
-        ReceivingOrderStatus.Completed => settings.AllowExternalUpdateCompleted,
+        ReceivingOrderStatus.Pending => wmsSettings.AllowExternalUpdatePending,
+        ReceivingOrderStatus.InProcess => wmsSettings.AllowExternalUpdateInProcess,
+        ReceivingOrderStatus.ProcessingRequired => wmsSettings.AllowExternalUpdateInProcess,
+        ReceivingOrderStatus.Completed => wmsSettings.AllowExternalUpdateCompleted,
         _ => false
     };
 
@@ -105,24 +105,24 @@ public class ReceivingOrder
         return false;
     }
 
-    public void UpdateOrder(ReceivingOrder externaOrder)
+    public void UpdateOrder(ReceivingOrder externalOrder)
     {
-        BaseOrderId = externaOrder.BaseOrderId;
-        BaseOrderType = externaOrder.BaseOrderType;
-        Status = externaOrder.Status;
-        Queue = externaOrder.Queue;
-        BusinessOperation = externaOrder.BusinessOperation;
-        WarehouseOperation = externaOrder.WarehouseOperation;
-        Comment = externaOrder.Comment;
-        Posted = externaOrder.Posted;
-        DeletionMark = externaOrder.DeletionMark;
-        Date = externaOrder.Date;
-        Number = externaOrder.Number;
-        WarehouseId = externaOrder.WarehouseId;
-        SenderId = externaOrder.SenderId;
-        SenderType = externaOrder.SenderType;
+        DeletionMark = externalOrder.DeletionMark;
+        Posted = externalOrder.Posted;
+        Number = externalOrder.Number;
+        Date = externalOrder.Date;
+        WarehouseId = externalOrder.WarehouseId;
+        Comment = externalOrder.Comment;
+        Status = externalOrder.Status;
+        Queue = externalOrder.Queue;
+        WarehouseOperation = externalOrder.WarehouseOperation;
+        BusinessOperation = externalOrder.BusinessOperation;
+        SenderId = externalOrder.SenderId;
+        SenderType = externalOrder.SenderType;
+        BaseOrderId = externalOrder.BaseOrderId;
+        BaseOrderType = externalOrder.BaseOrderType;
 
-        UpdateOrderItems(externaOrder.Items);
+        UpdateOrderItems(externalOrder.Items);
     }
 
     private void UpdateOrderItems(List<ReceivingOrderItem> externalOrderItems)
