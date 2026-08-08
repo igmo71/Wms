@@ -10,11 +10,11 @@ public enum ReceivingOrderStatus
 
     [EnumMember(Value = "КПоступлению")]
     [Display(Name = "К поступлению")]
-    Pending = 1,
+    ReadyForReceiving = 1,
 
     [EnumMember(Value = "ВРаботе")]
     [Display(Name = "В работе")]
-    InProcess = 2,
+    InReceiving = 2,
 
     [EnumMember(Value = "ТребуетсяОбработка")]
     [Display(Name = "Требуется обработка")]
@@ -22,5 +22,5 @@ public enum ReceivingOrderStatus
 
     [EnumMember(Value = "Принят")]
     [Display(Name = "Принят")]
-    Completed = 4
+    Received = 4
 }

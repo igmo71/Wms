@@ -49,20 +49,20 @@ public class ShippingOrder
     internal bool AllowExternalCreate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ShippingOrderStatus.Completed => wmsSettings.AllowExternalCreateCompleted,
+        ShippingOrderStatus.Shipped => wmsSettings.AllowExternalCreateShipped,
         _ => true
     };
 
     public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ShippingOrderStatus.Pending => wmsSettings.AllowExternalUpdatePending,
-        ShippingOrderStatus.InProcess => wmsSettings.AllowExternalUpdateInProcess,
-        ShippingOrderStatus.ForVerification => wmsSettings.AllowExternalUpdateInProcess,
-        ShippingOrderStatus.InVerification => wmsSettings.AllowExternalUpdateInProcess,
-        ShippingOrderStatus.Verified => wmsSettings.AllowExternalUpdateInProcess,
-        ShippingOrderStatus.ForShipment => wmsSettings.AllowExternalUpdateInProcess,
-        ShippingOrderStatus.Completed => wmsSettings.AllowExternalUpdateCompleted,
+        ShippingOrderStatus.Prepared => wmsSettings.AllowExternalUpdatePrepared,
+        ShippingOrderStatus.ReadyForPicking => wmsSettings.AllowExternalUpdateReadyForPicking,
+        ShippingOrderStatus.ReadyForVerification => wmsSettings.AllowExternalUpdateReadyForVerification,
+        ShippingOrderStatus.InVerification => wmsSettings.AllowExternalUpdateInVerification,
+        ShippingOrderStatus.Verified => wmsSettings.AllowExternalUpdateVerified,
+        ShippingOrderStatus.ReadyForShipment => wmsSettings.AllowExternalUpdateReadyForShipment,
+        ShippingOrderStatus.Shipped => wmsSettings.AllowExternalUpdateShipped,
         _ => false
     };
 
@@ -215,9 +215,9 @@ public class ShippingOrder
 
     internal ServiceResult ValidateToStart()
     {
-        if (Status != ShippingOrderStatus.Pending)
+        if (Status != ShippingOrderStatus.Prepared)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a pending shipping order can be started.");
+            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can be started.");
         }
 
         if (ShippingLocationId is null)
@@ -230,7 +230,7 @@ public class ShippingOrder
 
     public void Start(string userId)
     {
-        Status = ShippingOrderStatus.InProcess;
+        Status = ShippingOrderStatus.ReadyForPicking;
 
         StartedAtUtc = DateTimeOffset.UtcNow;
 
@@ -239,11 +239,11 @@ public class ShippingOrder
 
     public ServiceResult ValidateToComplete()
     {
-        if (Status is not (ShippingOrderStatus.InProcess
-                or ShippingOrderStatus.ForVerification
+        if (Status is not (ShippingOrderStatus.ReadyForPicking
+                or ShippingOrderStatus.ReadyForVerification
                 or ShippingOrderStatus.InVerification
                 or ShippingOrderStatus.Verified
-                or ShippingOrderStatus.ForShipment))
+                or ShippingOrderStatus.ReadyForShipment))
         {
             return ServiceError.Invalid<ShippingOrder>("Shipping order cannot be completed in the current status.");
         }
@@ -258,7 +258,7 @@ public class ShippingOrder
 
     public void Complete(string userId)
     {
-        Status = ShippingOrderStatus.Completed;
+        Status = ShippingOrderStatus.Shipped;
 
         CompletedAtUtc = DateTimeOffset.UtcNow;
 

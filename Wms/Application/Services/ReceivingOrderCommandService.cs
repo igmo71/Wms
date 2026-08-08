@@ -35,7 +35,7 @@ public class ReceivingOrderCommandService(
         {
             if (!externalOrder.AllowExternalCreate(_wmsSettings))
             {
-                logger.LogDebug("External document status is completed, new order create not allowed");
+                logger.LogDebug("External document status is received, new order create not allowed");
 
                 return;
             }
@@ -56,7 +56,7 @@ public class ReceivingOrderCommandService(
             }
 
             if (!existingOrder.AllowExternalUpdate(_wmsSettings))
-            // Что бы разрешить для статуса Complete, вероятно, потребуется доработка (откат BalanceAndTurnover...)
+            // Чтобы разрешить для статуса Received, вероятно, потребуется доработка (откат BalanceAndTurnover...)
             {
                 existingOrder.ExternalChangeDetected = true;
 

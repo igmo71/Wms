@@ -48,17 +48,17 @@ public class ReceivingOrder
     public bool AllowExternalCreate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ReceivingOrderStatus.Completed => wmsSettings.AllowExternalCreateCompleted,
+        ReceivingOrderStatus.Received => wmsSettings.AllowExternalCreateReceived,
         _ => true
     };
 
     public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
     Status switch
     {
-        ReceivingOrderStatus.Pending => wmsSettings.AllowExternalUpdatePending,
-        ReceivingOrderStatus.InProcess => wmsSettings.AllowExternalUpdateInProcess,
-        ReceivingOrderStatus.ProcessingRequired => wmsSettings.AllowExternalUpdateInProcess,
-        ReceivingOrderStatus.Completed => wmsSettings.AllowExternalUpdateCompleted,
+        ReceivingOrderStatus.ReadyForReceiving => wmsSettings.AllowExternalUpdateReadyForReceiving,
+        ReceivingOrderStatus.InReceiving => wmsSettings.AllowExternalUpdateInReceiving,
+        ReceivingOrderStatus.ProcessingRequired => wmsSettings.AllowExternalUpdateProcessingRequired,
+        ReceivingOrderStatus.Received => wmsSettings.AllowExternalUpdateReceived,
         _ => false
     };
 
@@ -156,9 +156,9 @@ public class ReceivingOrder
 
     public ServiceResult ValidateToStart()
     {
-        if (Status != ReceivingOrderStatus.Pending)
+        if (Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a pending receiving order can be started.");
+            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be started.");
         }
 
         if (ReceivingLocationId is null)
@@ -171,7 +171,7 @@ public class ReceivingOrder
 
     public void Start(string userId)
     {
-        Status = ReceivingOrderStatus.InProcess;
+        Status = ReceivingOrderStatus.InReceiving;
 
         StartedAtUtc = DateTimeOffset.UtcNow;
 
@@ -180,9 +180,9 @@ public class ReceivingOrder
 
     public ServiceResult ValidateToComplete()
     {
-        if (Status is not (ReceivingOrderStatus.InProcess or ReceivingOrderStatus.ProcessingRequired))
+        if (Status is not (ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired))
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only an InProcess or ProcessingRequired receiving order can be completed.");
+            return ServiceError.Invalid<ReceivingOrder>("Only an InReceiving or ProcessingRequired receiving order can be completed.");
         }
 
         if (ReceivingLocationId is null)
@@ -195,7 +195,7 @@ public class ReceivingOrder
 
     public void Complete(string userId)
     {
-        Status = ReceivingOrderStatus.Completed;
+        Status = ReceivingOrderStatus.Received;
 
         CompletedAtUtc = DateTimeOffset.UtcNow;
 

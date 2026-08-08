@@ -64,7 +64,7 @@ else
                                      ValueChanged="OnReceivingZoneChanged"
                                      SearchFunc="SearchReceivingZonesAsync"
                                      ToStringFunc="zone => zone?.Name ?? string.Empty"
-                                     Disabled="@(_order.Status != ReceivingOrderStatus.InProcess)"
+                                     Disabled="@(_order.Status != ReceivingOrderStatus.InReceiving)"
                                      Variant="Variant.Text"
                                      Dense="true"
                                      Clearable="true" />
@@ -76,7 +76,7 @@ else
                                      ValueChanged="OnReceivingLocationChanged"
                                      SearchFunc="SearchReceivingLocationsAsync"
                                      ToStringFunc="location => location?.Name ?? string.Empty"
-                                     Disabled="@(_order.Status != ReceivingOrderStatus.InProcess || _receivingZone is null)"
+                                     Disabled="@(_order.Status != ReceivingOrderStatus.InReceiving || _receivingZone is null)"
                                      Variant="Variant.Text"
                                      Dense="true"
                                      Clearable="true" />

@@ -10,15 +10,15 @@ public enum ShippingOrderStatus
 
     [EnumMember(Value = "Подготовлен")]
     [Display(Name = "Подготовлен")]
-    Pending = 1,
+    Prepared = 1,
 
-    [EnumMember(Value = "ВРаботе")]
-    [Display(Name = "В работе")]
-    InProcess = 2,
+    [EnumMember(Value = "КОтбору")]
+    [Display(Name = "К отбору")]
+    ReadyForPicking = 2,
 
     [EnumMember(Value = "КПроверке")]
     [Display(Name = "К проверке")]
-    ForVerification = 3,
+    ReadyForVerification = 3,
 
     [EnumMember(Value = "ВПроцессеПроверки")]
     [Display(Name = "В процессе проверки")]
@@ -30,9 +30,9 @@ public enum ShippingOrderStatus
 
     [EnumMember(Value = "КОтгрузке")]
     [Display(Name = "К отгрузке")]
-    ForShipment = 6,
+    ReadyForShipment = 6,
 
     [EnumMember(Value = "Отгружен")]
     [Display(Name = "Отгружен")]
-    Completed = 7
+    Shipped = 7
 }

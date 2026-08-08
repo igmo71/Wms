@@ -82,7 +82,7 @@
                                    Icon="@Icons.Material.Filled.Visibility"
                                    Color="Color.Primary" />
                 </MudTooltip>
-                @if (context.Item.Status == ReceivingOrderStatus.InProcess)
+                @if (context.Item.Status == ReceivingOrderStatus.InReceiving)
                 {
                     <MudTooltip Text="Приёмка">
                         <MudIconButton Href="@($"receiving-orders/{context.Item.Id}/in-process")"

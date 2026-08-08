@@ -36,7 +36,7 @@ internal class ShippingOrderCommandService(
         {
             if (!externalOrder.AllowExternalCreate(_wmsSettings))
             {
-                logger.LogDebug("External document status is completed, new order create not allowed");
+                logger.LogDebug("External document status is shipped, new order create not allowed");
 
                 return;
             }
@@ -57,7 +57,7 @@ internal class ShippingOrderCommandService(
             }
 
             if (!existingOrder.AllowExternalUpdate(_wmsSettings))
-            // Что бы разрешить для статуса Complete, вероятно, потребуется доработка (откат BalanceAndTurnover...)
+            // Чтобы разрешить для статуса Shipped, вероятно, потребуется доработка (откат BalanceAndTurnover...)
             {
                 existingOrder.ExternalChangeDetected = true;
 
