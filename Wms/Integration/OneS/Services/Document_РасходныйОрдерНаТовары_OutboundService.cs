@@ -94,6 +94,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             LineNumber = orderBaseItem.LineNumber,
             Номенклатура_Key = orderBaseItem.StockKeepingUnitId,
             Количество = orderBaseItem.PlanQuantity
+            // Verify whether 1C PATCH of table section requires
+            // Распоряжение / Распоряжение_Type to be sent back.
         };
     }
 
@@ -113,7 +115,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             Номенклатура_Key = orderItem.StockKeepingUnitId,
             Количество = orderItem.FactQuantity,         // Отгружать - НеОтгружать 
             КоличествоУпаковок = orderItem.FactQuantity, // Отгружать - НеОтгружать
-            Действие = ODataEnumMapper.ToODataValue(orderItem.Action)
+            Действие = ODataEnumMapper.ToODataValue(orderItem.Action) // Отгружать - НеОтгружать
         };
     }
 }

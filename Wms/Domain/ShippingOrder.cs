@@ -245,8 +245,7 @@ public class ShippingOrder
                 or ShippingOrderStatus.Verified
                 or ShippingOrderStatus.ForShipment))
         {
-            return ServiceError.Invalid<ShippingOrder>(
-                "Only an InProcess or ForVerification or InVerification or Verified or ForShipment shipping order can be completed.");
+            return ServiceError.Invalid<ShippingOrder>("Shipping order cannot be completed in the current status.");
         }
 
         if (ShippingLocationId is null)
