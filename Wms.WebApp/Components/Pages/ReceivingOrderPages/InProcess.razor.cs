@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
-using Wms.Application;
-using Wms.Application.ReceivingOrders;
+using Wms.Application.Services;
+using Wms.Application.Services.ReceivingOrders;
 using Wms.Common;
 using Wms.Domain;
 

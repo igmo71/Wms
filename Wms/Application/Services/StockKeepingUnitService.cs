@@ -3,7 +3,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application;
+namespace Wms.Application.Services;
 
 internal class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {

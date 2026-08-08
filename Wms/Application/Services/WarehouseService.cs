@@ -3,40 +3,40 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application;
+namespace Wms.Application.Services;
 
-internal class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class WarehouseService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task CreateOrUpdateAsync(UnitOfMeasure item, CancellationToken ct = default)
+    public async Task CreateOrUpdateAsync(Warehouse item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var exists = await dbContext.UnitsOfMeasure.AnyAsync(x => x.Id == item.Id, ct);
+        var exists = await dbContext.Warehouses.AnyAsync(x => x.Id == item.Id, ct);
 
         if (exists)
-            dbContext.UnitsOfMeasure.Update(item);
+            dbContext.Warehouses.Update(item);
         else
-            dbContext.UnitsOfMeasure.Add(item);
+            dbContext.Warehouses.Add(item);
 
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<UnitOfMeasure?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<Warehouse?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.UnitsOfMeasure
+        var result = await dbContext.Warehouses
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         return result;
     }
 
-    public async Task<ListResult<UnitOfMeasure>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Warehouse>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        IQueryable<UnitOfMeasure> query = dbContext.UnitsOfMeasure
+        IQueryable<Warehouse> query = dbContext.Warehouses
                 .AsNoTracking();
 
         if (listQuery.ExcludeDeleted)
@@ -53,14 +53,14 @@ internal class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCo
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
-        return new ListResult<UnitOfMeasure>
+        return new ListResult<Warehouse>
         {
             Items = items,
             TotalItems = totalItems
         };
     }
 
-    private static IQueryable<UnitOfMeasure> ApplySearch(IQueryable<UnitOfMeasure> query, string? searchString)
+    private static IQueryable<Warehouse> ApplySearch(IQueryable<Warehouse> query, string? searchString)
     {
         if (!string.IsNullOrWhiteSpace(searchString))
         {
@@ -70,7 +70,7 @@ internal class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCo
         return query;
     }
 
-    private static IQueryable<UnitOfMeasure> ApplySorting(IQueryable<UnitOfMeasure> query, string? sortBy, bool sortDescending)
+    private static IQueryable<Warehouse> ApplySorting(IQueryable<Warehouse> query, string? sortBy, bool sortDescending)
     {
         return sortBy switch
         {

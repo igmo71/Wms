@@ -33,13 +33,13 @@ internal class InventoryTurnoverConfiguration : IEntityTypeConfiguration<Invento
         })
         .IsUnique();
 
-        builder.Property(x => x.BalanceBefore)
-            .HasPrecision(18, 3);
+        //builder.Property(x => x.BalanceBefore)
+        //    .HasPrecision(18, 3);
 
-        builder.Property(x => x.QuantityDelta)
-            .HasPrecision(18, 3);
+        //builder.Property(x => x.QuantityDelta)
+        //    .HasPrecision(18, 3);
 
-        builder.Property(x => x.BalanceAfter)
-            .HasPrecision(18, 3);
+        //builder.Property(x => x.BalanceAfter)
+        //    .HasPrecision(18, 3);
     }
 }

@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using Wms.Application;
+using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application;
+namespace Wms.Application.Services;
 
 internal class SkuBarcodeService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,

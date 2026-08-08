@@ -7,7 +7,7 @@ namespace Wms.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
-
+    public DbSet<DeliveryDirection> DeliveryDirections => Set<DeliveryDirection>();
     public DbSet<InventoryBalance> InventoryBalances => Set<InventoryBalance>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();

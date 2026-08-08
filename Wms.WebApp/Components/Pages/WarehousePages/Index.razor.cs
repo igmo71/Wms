@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application;
+using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
 

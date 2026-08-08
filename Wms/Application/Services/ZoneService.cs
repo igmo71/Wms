@@ -3,20 +3,20 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application;
+namespace Wms.Application.Services;
 
-public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task CreateOrUpdateAsync(StorageLocation item, CancellationToken ct = default)
+    public async Task CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var exists = await dbContext.StorageLocations.AnyAsync(x => x.Id == item.Id, ct);
+        var exists = await dbContext.Zones.AnyAsync(x => x.Id == item.Id, ct);
 
         if (exists)
-            dbContext.StorageLocations.Update(item);
+            dbContext.Zones.Update(item);
         else
-            dbContext.StorageLocations.Add(item);
+            dbContext.Zones.Add(item);
 
         await dbContext.SaveChangesAsync(ct);
     }
@@ -25,7 +25,7 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        int rowsAffected = await dbContext.StorageLocations
+        int rowsAffected = await dbContext.Zones
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.DeletionMark, true), ct);
@@ -37,7 +37,7 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        int rowsAffected = await dbContext.StorageLocations
+        int rowsAffected = await dbContext.Zones
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.DeletionMark, false), ct);
@@ -45,25 +45,24 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         return rowsAffected;
     }
 
-    public async Task<StorageLocation?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<Zone?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.StorageLocations
+        var result = await dbContext.Zones
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         return result;
     }
 
-    public async Task<ListResult<StorageLocation>> ListAsync(StorageLocationListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Zone>> ListAsync(ZoneListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        IQueryable<StorageLocation> query = dbContext.StorageLocations
+        IQueryable<Zone> query = dbContext.Zones
             .AsNoTracking()
-            .Include(x => x.Warehouse)
-            .Include(x => x.Zone);
+            .Include(x => x.Warehouse);
 
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
@@ -79,32 +78,25 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
-        return new ListResult<StorageLocation>
+        return new ListResult<Zone>
         {
             Items = items,
             TotalItems = totalItems
         };
     }
 
-    private static IQueryable<StorageLocation> ApplySearch(
-        IQueryable<StorageLocation> query,
-        StorageLocationListQuery listQuery)
+    private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, ZoneListQuery listQuery)
     {
+        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
+            query = query.Where(x => x.Name!.Contains(listQuery.SearchString));
+
         if (listQuery.WarehouseId is Guid warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);
-
-        if (listQuery.ZoneId is Guid zoneId)
-            query = query.Where(x => x.ZoneId == zoneId);
-
-        if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
-        {
-            query = query.Where(x => x.Name!.Contains(listQuery.SearchString));
-        }
 
         return query;
     }
 
-    private static IQueryable<StorageLocation> ApplySorting(IQueryable<StorageLocation> query, string? sortBy, bool sortDescending)
+    private static IQueryable<Zone> ApplySorting(IQueryable<Zone> query, string? sortBy, bool sortDescending)
     {
         return sortBy switch
         {
@@ -113,4 +105,3 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         };
     }
 }
-

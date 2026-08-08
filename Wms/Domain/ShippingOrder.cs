@@ -22,7 +22,7 @@ public class ShippingOrder
     public ReceivingOrderQueue Queue { get; set; }
     public DateTime PlannedShippingDate { get; set; }
     public Guid? DeliveryDirectionId { get; set; }
-    //public DeliveryDirection? DeliveryDirection { get; set; }
+    public DeliveryDirection? DeliveryDirection { get; set; }
     public WarehouseOperation WarehouseOperation { get; set; }
 
 
@@ -39,6 +39,6 @@ public class ShippingOrder
     public Guid RecipientId { get; set; }
     public string? RecipientType { get; set; }
 
-    public List<BaseOrderItems> BaseOrderItems { get; set; } = [];
-    public List<ShippingItem> ShippingItems { get; set; } = [];
+    public List<ShippingOrderBaseItem> BaseOrderItems { get; set; } = [];
+    public List<ShippingOrderItem> ShippingItems { get; set; } = [];
 }

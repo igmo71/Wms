@@ -26,6 +26,7 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json));
         });
 
+        services.AddScoped<Catalog_ЗоныДоставки_Service>();
         services.AddScoped<Catalog_Номенклатура_Service>();
         services.AddScoped<Catalog_Склады_Service>();
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();

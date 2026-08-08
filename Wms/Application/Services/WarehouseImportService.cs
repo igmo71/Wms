@@ -1,6 +1,6 @@
 using Wms.Integration.OneS.Services;
 
-namespace Wms.Application;
+namespace Wms.Application.Services;
 
 public class WarehouseImportService(Catalog_Склады_Service catalogWarehousesService)
 {

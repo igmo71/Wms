@@ -4,8 +4,7 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-internal class InventoryBalanceConfiguration
-    : IEntityTypeConfiguration<InventoryBalance>
+internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<InventoryBalance>
 {
     public void Configure(EntityTypeBuilder<InventoryBalance> builder)
     {
@@ -34,8 +33,8 @@ internal class InventoryBalanceConfiguration
         })
         .IsUnique();
 
-        builder.Property(x => x.Quantity)
-            .HasPrecision(18, 3);
+        //builder.Property(x => x.Quantity)
+        //    .HasPrecision(18, 3);
 
         builder.Property(x => x.RowVersion)
             .IsRowVersion();

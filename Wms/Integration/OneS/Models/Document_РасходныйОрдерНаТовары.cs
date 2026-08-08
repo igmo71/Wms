@@ -21,8 +21,8 @@ internal class Document_РасходныйОрдерНаТовары
 
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public int ВсегоМест { get; set; }
-    public List<Document_РасходныйОрдерНаТовары_Товарыпораспоряжениям>? ТоварыПоРаспоряжениям { get; set; }
-    public List<Document_РасходныйОрдерНаТовары_Отгружаемыетовары>? ОтгружаемыеТовары { get; set; }
+    public List<Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям>? ТоварыПоРаспоряжениям { get; set; }
+    public List<Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары>? ОтгружаемыеТовары { get; set; }
 
     public const int BatchSize = 10;
 

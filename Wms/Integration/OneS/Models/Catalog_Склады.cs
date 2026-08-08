@@ -16,5 +16,4 @@ public class Catalog_Склады
         $"&$filter=Ref_Key eq guid'{refKey}'";
 
     private static readonly string select = "Ref_Key,DeletionMark,Description";
-
 }
