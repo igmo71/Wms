@@ -13,8 +13,9 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
         builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
         builder.Property(x => x.RecipientType).HasMaxLength(DefaultConfiguration.Name);
-        builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.PickingStartedBy).HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.ReadyForShipmentBy).HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.ShippedBy).HasMaxLength(DefaultConfiguration.Guid);
 
         builder.HasOne(x => x.Warehouse).WithMany()
             .HasForeignKey(x => x.WarehouseId).HasPrincipalKey(x => x.Id)

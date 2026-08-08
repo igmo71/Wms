@@ -29,11 +29,13 @@ public class ShippingOrder
 
     public DateTimeOffset? CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }
-    public DateTimeOffset? StartedAtUtc { get; set; }
-    public DateTimeOffset? CompletedAtUtc { get; set; }
+    public DateTimeOffset? PickingStartedAtUtc { get; set; }
+    public DateTimeOffset? ReadyForShipmentAtUtc { get; set; }
+    public DateTimeOffset? ShippedAtUtc { get; set; }
 
-    public string? StartedBy { get; set; }
-    public string? CompletedBy { get; set; }
+    public string? PickingStartedBy { get; set; }
+    public string? ReadyForShipmentBy { get; set; }
+    public string? ShippedBy { get; set; }
 
     public bool ExternalChangeDetected { get; set; }
 
@@ -213,55 +215,73 @@ public class ShippingOrder
         }
     }
 
-    internal ServiceResult ValidateToStart()
+    internal ServiceResult ValidateToStartPicking()
     {
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can be started.");
+            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can start picking.");
         }
 
         if (ShippingLocationId is null)
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before starting the order.");
+            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before starting picking.");
         }
 
         return ServiceResult.Success();
     }
 
-    public void Start(string userId)
+    public void StartPicking(string userId)
     {
         Status = ShippingOrderStatus.ReadyForPicking;
 
-        StartedAtUtc = DateTimeOffset.UtcNow;
+        PickingStartedAtUtc = DateTimeOffset.UtcNow;
 
-        StartedBy = userId;
+        PickingStartedBy = userId;
     }
 
-    public ServiceResult ValidateToComplete()
+    public ServiceResult ValidateToMarkReadyForShipment()
     {
         if (Status is not (ShippingOrderStatus.ReadyForPicking
                 or ShippingOrderStatus.ReadyForVerification
                 or ShippingOrderStatus.InVerification
-                or ShippingOrderStatus.Verified
-                or ShippingOrderStatus.ReadyForShipment))
+                or ShippingOrderStatus.Verified))
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping order cannot be completed in the current status.");
-        }
-
-        if (ShippingLocationId is null)
-        {
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before completing the order.");
+            return ServiceError.Invalid<ShippingOrder>("Shipping order cannot be marked ready for shipment in the current status.");
         }
 
         return ServiceResult.Success();
     }
 
-    public void Complete(string userId)
+    public void MarkReadyForShipment(string userId)
+    {
+        Status = ShippingOrderStatus.ReadyForShipment;
+
+        ReadyForShipmentAtUtc = DateTimeOffset.UtcNow;
+
+        ReadyForShipmentBy = userId;
+    }
+
+    public ServiceResult ValidateToShip()
+    {
+        if (Status != ShippingOrderStatus.ReadyForShipment)
+        {
+            return ServiceError.Invalid<ShippingOrder>("Only a shipping order ready for shipment can be shipped.");
+        }
+
+        if (ShippingLocationId is null)
+        {
+            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before shipping the order.");
+        }
+
+        return ServiceResult.Success();
+    }
+
+    public void Ship(string userId)
     {
         Status = ShippingOrderStatus.Shipped;
 
-        CompletedAtUtc = DateTimeOffset.UtcNow;
+        ShippedAtUtc = DateTimeOffset.UtcNow;
 
-        CompletedBy = userId;
+        ShippedBy = userId;
     }
 }

@@ -17,6 +17,8 @@ WMS is responsible for these warehouse processes:
 
 Only receiving is currently being implemented. The other processes are roadmap items. Outgoing orders will be imported from 1C and are expected to follow a pattern analogous to receiving orders.
 
+Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Inventory balances and turnovers are changed only when the order is shipped.
+
 ## MVP implementation principles
 
 The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.

@@ -11,10 +11,13 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct) =>
+    internal async Task<ServiceResult> StartPickingAsync(Guid orderId, CancellationToken ct) =>
         await SwitchStatusAsync(new StatusOrderCommand("КОтбору"), orderId, ct); // TODO: Магическая строка
 
-    internal async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct) =>
+    internal async Task<ServiceResult> MarkReadyForShipmentAsync(Guid orderId, CancellationToken ct) =>
+        await SwitchStatusAsync(new StatusOrderCommand("КОтгрузке"), orderId, ct); // TODO: Магическая строка
+
+    internal async Task<ServiceResult> ShipAsync(Guid orderId, CancellationToken ct) =>
         await SwitchStatusAsync(new StatusOrderCommand("Отгружен"), orderId, ct); // TODO: Магическая строка
 
     private async Task<ServiceResult> SwitchStatusAsync(StatusOrderCommand statusOrderCommand, Guid orderId, CancellationToken ct)

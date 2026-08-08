@@ -488,10 +488,10 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                    b.Property<DateTimeOffset?>("ShippedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("CompletedBy")
+                    b.Property<string>("ShippedBy")
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
@@ -517,6 +517,13 @@ namespace Wms.Data.Migrations
                     b.Property<DateTime>("PlannedShippingDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTimeOffset?>("ReadyForShipmentAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReadyForShipmentBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
                     b.Property<bool>("Posted")
                         .HasColumnType("bit");
 
@@ -533,10 +540,10 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("ShippingLocationId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                    b.Property<DateTimeOffset?>("PickingStartedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("StartedBy")
+                    b.Property<string>("PickingStartedBy")
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 

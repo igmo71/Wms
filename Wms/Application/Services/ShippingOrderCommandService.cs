@@ -76,11 +76,11 @@ internal class ShippingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> StartOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> StartPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder Start {OrderId}", orderId);
+        using var scope = logger.BeginScope("ShippingOrder StartPicking {OrderId}", orderId);
 
-        using var activity = AppTracing.StartActivity("ShippingOrder.Start", nameof(ShippingOrderCommandService));
+        using var activity = AppTracing.StartActivity("ShippingOrder.StartPicking", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -94,34 +94,34 @@ internal class ShippingOrderCommandService(
             return ServiceError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToStart();
+        var validationResult = existingOrder.ValidateToStartPicking();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to start failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to start picking failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        var externalStartResult = await outboundService.StartOrderAsync(orderId, ct);
+        var externalStartResult = await outboundService.StartPickingAsync(orderId, ct);
 
         if (!externalStartResult.IsSuccess)
         {
-            logger.LogError("Failed to start external document: {ErrorMessage}", externalStartResult.Error?.Message);
-            return ServiceError.Failure<ShippingOrder>("Failed to start external document");
+            logger.LogError("Failed to start picking in external document: {ErrorMessage}", externalStartResult.Error?.Message);
+            return ServiceError.Failure<ShippingOrder>("Failed to start picking in external document");
         }
 
-        existingOrder.Start(userId);
+        existingOrder.StartPicking(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> CompleteOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> MarkReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder Complete {OrderId}", orderId);
+        using var scope = logger.BeginScope("ShippingOrder MarkReadyForShipment {OrderId}", orderId);
 
-        using var activity = AppTracing.StartActivity("ShippingOrder.Complete", nameof(ShippingOrderCommandService));
+        using var activity = AppTracing.StartActivity("ShippingOrder.MarkReadyForShipment", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -135,41 +135,79 @@ internal class ShippingOrderCommandService(
             return ServiceError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToComplete();
+        var validationResult = existingOrder.ValidateToMarkReadyForShipment();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to complete failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to mark ready for shipment failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        existingOrder.Complete(userId);
+        var externalItemsUpdateResult = await outboundService
+            .UpdateDocumentItemsAsync(existingOrder, ct);
+
+        if (!externalItemsUpdateResult.IsSuccess)
+        {
+            logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
+            return externalItemsUpdateResult;
+        }
+
+        var externalReadyForShipmentResult = await outboundService.MarkReadyForShipmentAsync(orderId, ct);
+
+        if (!externalReadyForShipmentResult.IsSuccess)
+        {
+            logger.LogError("Failed to mark external document ready for shipment: {ErrorMessage}", externalReadyForShipmentResult.Error?.Message);
+            return ServiceError.Failure<ShippingOrder>("Failed to mark external document ready for shipment");
+        }
+
+        existingOrder.MarkReadyForShipment(userId);
+
+        await dbContext.SaveChangesAsync(ct);
+
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> ShipAsync(Guid orderId, string userId, CancellationToken ct = default)
+    {
+        using var scope = logger.BeginScope("ShippingOrder Ship {OrderId}", orderId);
+
+        using var activity = AppTracing.StartActivity("ShippingOrder.Ship", nameof(ShippingOrderCommandService));
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existingOrder = await dbContext.ShippingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+
+        if (existingOrder is null)
+        {
+            logger.LogError("Not Found");
+            return ServiceError.NotFound<ShippingOrder>();
+        }
+
+        var validationResult = existingOrder.ValidateToShip();
+
+        if (!validationResult.IsSuccess)
+        {
+            logger.LogError("Validation to ship failed: {ErrorMessage}", validationResult.Error?.Message);
+            return validationResult;
+        }
+
+        var externalShipmentResult = await outboundService.ShipAsync(orderId, ct);
+
+        if (!externalShipmentResult.IsSuccess)
+        {
+            logger.LogError("Failed to ship external document: {ErrorMessage}", externalShipmentResult.Error?.Message);
+            return ServiceError.Failure<ShippingOrder>("Failed to ship external document");
+        }
+
+        existingOrder.Ship(userId);
 
         var balanceAndTurnoverResult = await balanceAndTurnoverService
-            .CompleteShippingOrder(existingOrder, dbContext, ct);
+            .ShipShippingOrder(existingOrder, dbContext, ct);
 
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
-
-        if (existingOrder.HasPlanFactDifference)
-        {
-            var externalItemsUpdateResult = await outboundService
-                .UpdateDocumentItemsAsync(existingOrder, ct);
-
-            if (!externalItemsUpdateResult.IsSuccess)
-            {
-                logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
-                return externalItemsUpdateResult;
-            }
-        }
-
-        var externalCompletionResult = await outboundService.CompleteOrderAsync(orderId, ct);
-
-        if (!externalCompletionResult.IsSuccess)
-        {
-            logger.LogError("Failed to complete external document: {ErrorMessage}", externalCompletionResult.Error?.Message);
-            return ServiceError.Failure<ShippingOrder>("Failed to complete external document");
-        }
 
         await dbContext.SaveChangesAsync(ct);
 

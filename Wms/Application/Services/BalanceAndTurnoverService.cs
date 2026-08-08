@@ -112,8 +112,88 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
         return ServiceResult.Success();
     }
 
-    internal async Task<ServiceResult> CompleteShippingOrder(ShippingOrder existingOrder, ApplicationDbContext dbContext, CancellationToken ct)
+    internal async Task<ServiceResult> ShipShippingOrder(ShippingOrder shippingOrder, ApplicationDbContext dbContext, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        using var scope = logger.BeginScope("BalanceAndTurnover CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
+            shippingOrder.Id, shippingOrder.WarehouseId, shippingOrder.ShippingLocationId);
+
+        if (shippingOrder.ShippingLocationId is null)
+        {
+            logger.LogError("Shipping location must be specified");
+            return ServiceError.Invalid("Shipping location must be specified");
+        }
+
+        var shippingLocationId = (Guid)shippingOrder.ShippingLocationId;
+        var now = DateTimeOffset.UtcNow;
+
+        var skuIds = shippingOrder.Items
+            .Select(x => x.StockKeepingUnitId)
+            .Distinct()
+            .ToArray();
+
+        var balances = await dbContext.InventoryBalances
+            .Where(x =>
+                x.WarehouseId == shippingOrder.WarehouseId &&
+                x.StorageLocationId == shippingLocationId &&
+                skuIds.Contains(x.StockKeepingUnitId))
+            .ToDictionaryAsync(x => x.StockKeepingUnitId, ct);
+
+        var alreadyPosted = await dbContext.InventoryTurnovers
+            .AnyAsync(x => x.RecorderId == shippingOrder.Id, ct);
+
+        if (alreadyPosted)
+        {
+            logger.LogError("Shipping order has already been posted.");
+            return ServiceError.Failure("Shipping order has already been posted");
+        }
+
+        foreach (var item in shippingOrder.Items)
+        {
+            if (item.FactQuantity < 0)
+            {
+                logger.LogError("Fact quantity cannot be negative for line {LineNumber}", item.LineNumber);
+                return ServiceError.Invalid("Fact quantity cannot be negative for line {item.LineNumber}");
+            }
+
+            if (item.FactQuantity == 0)
+                continue;
+
+            if (!balances.TryGetValue(item.StockKeepingUnitId, out var balance))
+            {
+                logger.LogError("Inventory balance not found for SKU {SkuId}", item.StockKeepingUnitId);
+                return ServiceError.Failure("Inventory balance not found for shipping order item");
+            }
+
+            if (balance.Quantity < item.FactQuantity)
+            {
+                logger.LogError("Insufficient inventory balance for SKU {SkuId}", item.StockKeepingUnitId);
+                return ServiceError.Failure("Insufficient inventory balance for shipping order item");
+            }
+
+            var balanceBefore = balance.Quantity;
+            balance.Quantity -= item.FactQuantity;
+            balance.UpdatedAtUtc = now;
+
+            var turnover = new InventoryTurnover
+            {
+                StockKeepingUnitId = item.StockKeepingUnitId,
+                WarehouseId = shippingOrder.WarehouseId,
+                StorageLocationId = shippingLocationId,
+                BalanceBefore = balanceBefore,
+                QuantityDelta = -item.FactQuantity,
+                BalanceAfter = balance.Quantity,
+                CreatedAtUtc = now,
+                RecorderId = shippingOrder.Id,
+                RecorderLineNumber = item.LineNumber,
+                RecorderType = RecorderType.ShippingOrder
+            };
+
+            dbContext.InventoryTurnovers.Add(turnover);
+
+            logger.LogDebug("Updated InventoryBalance for SKU {SkuId} from {QuantityBefore} to {QuantityAfter}",
+                item.StockKeepingUnitId, balanceBefore, balance.Quantity);
+        }
+
+        return ServiceResult.Success();
     }
 }
