@@ -43,6 +43,9 @@ public class ShippingOrder
     public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
     public List<ShippingOrderItem> Items { get; set; } = [];
 
+    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
+    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
+
     internal bool AllowExternalCreate(WmsSettings wmsSettings) =>
     Status switch
     {
@@ -199,5 +202,57 @@ public class ShippingOrder
                 });
             }
         }
+    }
+
+    internal ServiceResult ValidateToStart()
+    {
+        if (Status != ShippingOrderStatus.Pending)
+        {
+            return ServiceError.Invalid<ShippingOrder>("Only a pending shipping order can be started.");
+        }
+
+        if (ShippingLocationId is null)
+        {
+            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before starting the order.");
+        }
+
+        return ServiceResult.Success();
+    }
+
+    public void Start(string userId)
+    {
+        Status = ShippingOrderStatus.InProcess;
+
+        StartedAtUtc = DateTimeOffset.UtcNow;
+
+        StartedBy = userId;
+    }
+
+    public ServiceResult ValidateToComplete()
+    {
+        if (Status is not (ShippingOrderStatus.InProcess
+                or ShippingOrderStatus.ForShipment
+                or ShippingOrderStatus.InVerification
+                or ShippingOrderStatus.Verified
+                or ShippingOrderStatus.ForShipment))
+        {
+            return ServiceError.Invalid<ShippingOrder>("Only an InProcess or ProcessingRequired shipping order can be completed.");
+        }
+
+        if (ShippingLocationId is null)
+        {
+            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before completing the order.");
+        }
+
+        return ServiceResult.Success();
+    }
+
+    public void Complete(string userId)
+    {
+        Status = ShippingOrderStatus.Completed;
+
+        CompletedAtUtc = DateTimeOffset.UtcNow;
+
+        CompletedBy = userId;
     }
 }

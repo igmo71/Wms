@@ -42,6 +42,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         return ServiceResult.Success();
     }
 
+    // TODO: Выяснить как в 1С работает с товарами по распоряжениям и отгружаемыми товарами (Отгружать - НеОтгружать)
+    // Вероятно нужно добавить строку с НеОтгружать на разницу между План и Факт
     internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ShippingOrderItem> shippingOrderItems, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
@@ -109,8 +111,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             Ref_Key = orderItem.ShippingOrderId,
             LineNumber = orderItem.LineNumber,
             Номенклатура_Key = orderItem.StockKeepingUnitId,
-            Количество = orderItem.FactQuantity,
-            КоличествоУпаковок = orderItem.FactQuantity,
+            Количество = orderItem.FactQuantity,         // Отгружать - НеОтгружать 
+            КоличествоУпаковок = orderItem.FactQuantity, // Отгружать - НеОтгружать
             Действие = ODataEnumMapper.ToODataValue(orderItem.Action)
         };
     }

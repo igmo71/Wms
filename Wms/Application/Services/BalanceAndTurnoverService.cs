@@ -111,4 +111,9 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
 
         return ServiceResult.Success();
     }
+
+    internal async Task<ServiceResult> CompleteShippingOrder(ShippingOrder existingOrder, ApplicationDbContext dbContext, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
 }

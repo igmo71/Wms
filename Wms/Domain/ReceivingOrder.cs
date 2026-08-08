@@ -161,7 +161,7 @@ public class ReceivingOrder
             return ServiceError.Invalid<ReceivingOrder>("Only a pending receiving order can be started.");
         }
 
-        if (ReceivingLocationId is not Guid receivingLocationId)
+        if (ReceivingLocationId is null)
         {
             return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting the order.");
         }
