@@ -55,9 +55,9 @@ internal class Document_ПриходныйОрдерНаТовары
 
     public static string PostDocumentUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
 
-    public static ReceivingOrder MapToReceivingOrder(Document_ПриходныйОрдерНаТовары fetchedItem)
+    public static ReceivingOrder MapToReceivingOrder(Document_ПриходныйОрдерНаТовары fetchedDocument)
     {
-        var items = fetchedItem.Товары
+        var items = fetchedDocument.Товары
             .Select(x => new ReceivingOrderItem
             {
                 ReceivingOrderId = x.Ref_Key,
@@ -70,24 +70,21 @@ internal class Document_ПриходныйОрдерНаТовары
 
         return new ReceivingOrder
         {
-            Id = fetchedItem.Ref_Key,
-            Posted = fetchedItem.Posted,
-            DeletionMark = fetchedItem.DeletionMark,
-            Date = fetchedItem.Date,
-            Number = fetchedItem.Number,
-            Comment = fetchedItem.Комментарий,
-            WarehouseId = fetchedItem.Склад_Key,
-            ReceivingLocationId = null,
-            Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedItem.Статус),
-            Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedItem.Доброга_ТипОчереди),
-            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedItem.СкладскаяОперация),
-            BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedItem.ХозяйственнаяОперация),
-            StartedAtUtc = null,
-            CompletedAtUtc = null,
-            SenderId = fetchedItem.Отправитель,
-            SenderType = fetchedItem.Отправитель_Type.TrimODataPrefix(),
-            BaseOrderId = fetchedItem.Распоряжение,
-            BaseOrderType = fetchedItem.Распоряжение_Type.TrimODataPrefix(),
+            Id = fetchedDocument.Ref_Key,
+            Posted = fetchedDocument.Posted,
+            DeletionMark = fetchedDocument.DeletionMark,
+            Date = fetchedDocument.Date,
+            Number = fetchedDocument.Number,
+            Comment = fetchedDocument.Комментарий,
+            WarehouseId = fetchedDocument.Склад_Key,
+            Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedDocument.Статус),
+            Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
+            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
+            BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedDocument.ХозяйственнаяОперация),
+            SenderId = fetchedDocument.Отправитель,
+            SenderType = fetchedDocument.Отправитель_Type.TrimODataPrefix(),
+            BaseOrderId = fetchedDocument.Распоряжение,
+            BaseOrderType = fetchedDocument.Распоряжение_Type.TrimODataPrefix(),
             Items = items
         };
     }

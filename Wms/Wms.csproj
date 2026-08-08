@@ -33,8 +33,4 @@
     <PackageReference Include="SerilogTracing.Instrumentation.SqlClient" Version="2.4.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Integration\Abstractions\" />
-  </ItemGroup>
-
 </Project>

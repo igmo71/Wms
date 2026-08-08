@@ -64,6 +64,14 @@ public class NotifyBackgroundService(
                         await service.ImportDocumentAsync(notifyRecord.Ref_Key, ct);
                     break;
                 }
+
+            case nameof(Document_РасходныйОрдерНаТовары):
+                {
+                    var service = scope.ServiceProvider.GetService<Document_РасходныйОрдерНаТовары_InboundService>();
+                    if (service is not null)
+                        await service.ImportDocumentAsync(notifyRecord.Ref_Key, ct);
+                    break;
+                }
             case nameof(InformationRegister_ШтрихкодыНоменклатуры):
                 {
                     var service = scope.ServiceProvider.GetService<InformationRegister_ШтрихкодыНоменклатуры_Service>();

@@ -4,15 +4,15 @@ using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
-using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
+using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Document_ПриходныйОрдерНаТовары_InboundService(
+internal class Document_РасходныйОрдерНаТовары_InboundService(
     OneCClient oneCClient,
-    ReceivingOrderCommandService receivingOrderCommandService,
+    ShippingOrderCommandService shippingOrderCommandService,
     IOptions<WmsSettings> options,
-    ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger)
+    ILogger<Document_РасходныйОрдерНаТовары_InboundService> logger)
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
@@ -38,9 +38,9 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 
         logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
 
-        ReceivingOrder order = Document.MapToReceivingOrder(fetchedDocument);
+        ShippingOrder order = Document.MapToShippingOrder(fetchedDocument);
 
-        await receivingOrderCommandService.ImportOrderAsync(order, ct);
+        await shippingOrderCommandService.ImportOrderAsync(order, ct);
     }
 
     internal async Task ImportDocumentListAsync(CancellationToken ct)

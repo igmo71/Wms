@@ -4,16 +4,16 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-internal class ReceivingOrderItemConfiguration : IEntityTypeConfiguration<ReceivingOrderItem>
+internal class ShippingOrderItemConfiguration : IEntityTypeConfiguration<ShippingOrderItem>
 {
-    public void Configure(EntityTypeBuilder<ReceivingOrderItem> builder)
+    public void Configure(EntityTypeBuilder<ShippingOrderItem> builder)
     {
-        builder.HasKey(x => new { x.ReceivingOrderId, x.LineNumber });
+        builder.HasKey(x => new { x.ShippingOrderId, x.LineNumber });
 
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
 
-        builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.Items)
-            .HasForeignKey(x => x.ReceivingOrderId).HasPrincipalKey(x => x.Id)
+        builder.HasOne(x => x.ShippingOrder).WithMany(x => x.Items)
+            .HasForeignKey(x => x.ShippingOrderId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(x => x.StockKeepingUnit).WithMany()

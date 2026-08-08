@@ -1,21 +1,21 @@
 ﻿using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Domain;
-using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
+using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
 
-public class Document_ПриходныйОрдерНаТовары_OutboundService(
+public class Document_РасходныйОрдерНаТовары_OutboundService(
     OneCClient oneCClient,
-    ILogger<Document_ПриходныйОрдерНаТовары_OutboundService> logger)
+    ILogger<Document_РасходныйОрдерНаТовары_OutboundService> logger)
 {
     private record StatusOrderCommand(string Статус);
 
     internal async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("ВРаботе"), orderId, ct); // TODO: Магическая строка
+        await SwitchStatusAsync(new StatusOrderCommand("КОтбору"), orderId, ct); // TODO: Магическая строка
 
     internal async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("Принят"), orderId, ct); // TODO: Магическая строка
+        await SwitchStatusAsync(new StatusOrderCommand("Отгружен"), orderId, ct); // TODO: Магическая строка
 
     private async Task<ServiceResult> SwitchStatusAsync(StatusOrderCommand statusOrderCommand, Guid orderId, CancellationToken ct)
     {
@@ -42,15 +42,23 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         return ServiceResult.Success();
     }
 
-    internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
+    internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ShippingOrderItem> shippingOrderItems, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
 
-        var patchItems = receivingOrderItems
+        var patchItems = shippingOrderItems
             .Select(x => PatchItem.From(x))
             .ToList();
 
-        var patchBody = new PatchBody { Товары = patchItems };
+        var patchBaseItems = shippingOrderItems
+            .Select(x => PatchBaseItem.From(x))
+            .ToList();
+
+        var patchBody = new PatchBody
+        {
+            ОтгружаемыеТовары = patchItems,
+            ТоварыПоРаспоряжениям = patchBaseItems
+        };
 
         var patchUri = Document.PatchUri(orderId.ToString());
 
@@ -58,7 +66,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (patchResult is null)
         {
-            return ServiceError.Failure<ReceivingOrder>("Failed to update external document items");
+            return ServiceError.Failure<ShippingOrder>("Failed to update external document items");
         }
 
         return ServiceResult.Success();
@@ -66,7 +74,25 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
     private class PatchBody
     {
-        public List<PatchItem> Товары { get; set; } = [];
+        public List<PatchBaseItem> ТоварыПоРаспоряжениям { get; set; } = [];
+
+        public List<PatchItem> ОтгружаемыеТовары { get; set; } = [];
+    }
+
+    private class PatchBaseItem
+    {
+        public Guid Ref_Key { get; set; }
+        public int LineNumber { get; set; }
+        public Guid Номенклатура_Key { get; set; }
+        public double Количество { get; set; }
+
+        public static PatchBaseItem From(ShippingOrderItem orderItem) => new()
+        {
+            Ref_Key = orderItem.ShippingOrderId,
+            LineNumber = orderItem.LineNumber,
+            Номенклатура_Key = orderItem.StockKeepingUnitId,
+            Количество = orderItem.FactQuantity
+        };
     }
 
     private class PatchItem
@@ -76,17 +102,16 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         public Guid Номенклатура_Key { get; set; }
         public double КоличествоУпаковок { get; set; }
         public double Количество { get; set; }
-        public string? Комментарий { get; set; }
+        public string? Действие { get; set; }
 
-        public static PatchItem From(ReceivingOrderItem orderItem) => new()
+        public static PatchItem From(ShippingOrderItem orderItem) => new()
         {
-            Ref_Key = orderItem.ReceivingOrderId,
+            Ref_Key = orderItem.ShippingOrderId,
             LineNumber = orderItem.LineNumber,
             Номенклатура_Key = orderItem.StockKeepingUnitId,
             Количество = orderItem.FactQuantity,
             КоличествоУпаковок = orderItem.FactQuantity,
-            Комментарий = orderItem.Comment
+            Действие = ODataEnumMapper.ToODataValue(orderItem.Action)
         };
-
     }
 }

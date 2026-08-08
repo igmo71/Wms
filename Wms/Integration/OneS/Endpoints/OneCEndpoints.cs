@@ -11,6 +11,7 @@ public static class OneCEndpoints
         routeBuilder.MapCatalog_Склады_Endpoints();
         routeBuilder.MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints();
         routeBuilder.MapDocument_ПриходныйОрдерНаТовары_Endpoints();
+        routeBuilder.MapDocument_РасходныйОрдерНаТовары_Endpoints();
         routeBuilder.MapInformationRegister_ШтрихкодыНоменклатуры_Endpoints();
 
         return routeBuilder;

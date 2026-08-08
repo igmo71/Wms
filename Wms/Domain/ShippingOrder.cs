@@ -18,8 +18,8 @@ public class ShippingOrder
 
     public string? Comment { get; set; }
 
-    public ReceivingOrderStatus Status { get; set; }
-    public ReceivingOrderQueue Queue { get; set; }
+    public ShippingOrderStatus Status { get; set; }
+    public ShippingOrderQueue Queue { get; set; }
     public DateTime PlannedShippingDate { get; set; }
     public Guid? DeliveryDirectionId { get; set; }
     public DeliveryDirection? DeliveryDirection { get; set; }
@@ -39,6 +39,6 @@ public class ShippingOrder
     public Guid RecipientId { get; set; }
     public string? RecipientType { get; set; }
 
-    public List<ShippingOrderBaseItem> BaseOrderItems { get; set; } = [];
-    public List<ShippingOrderItem> ShippingItems { get; set; } = [];
+    public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
+    public List<ShippingOrderItem> Items { get; set; } = [];
 }

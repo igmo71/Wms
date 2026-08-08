@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.Services;
-using Wms.Application.Services.ReceivingOrders;
 using Wms.Common;
 
 namespace Wms.Application;
@@ -14,6 +13,8 @@ public static class DependencyInjection
         services.AddScoped<DeliveryDirectionService>();
         services.AddScoped<ReceivingOrderCommandService>();
         services.AddScoped<ReceivingOrderQueryService>();
+        services.AddScoped<ShippingOrderCommandService>();
+        services.AddScoped<ShippingOrderQueryService>();
         services.AddScoped<SkuBarcodeService>();
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<StorageLocationService>();

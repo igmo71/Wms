@@ -28,4 +28,16 @@ public static class ODataEnumMapper
 
         return default;
     }
+
+    public static string ToODataValue<TEnum>(TEnum value) where TEnum : struct, Enum
+    {
+        var field = typeof(TEnum).GetField(value.ToString());
+
+        if (field is null)
+            return value.ToString();
+
+        var attribute = field.GetCustomAttribute<EnumMemberAttribute>();
+
+        return attribute?.Value ?? field.Name;
+    }
 }

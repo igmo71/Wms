@@ -7,22 +7,22 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS.Endpoints;
 
-public static class Document_ПриходныйОрдерНаТовары_Endpoints
+public static class Document_РасходныйОрдерНаТовары_Endpoints
 {
-    public static IEndpointRouteBuilder MapDocument_ПриходныйОрдерНаТовары_Endpoints(this IEndpointRouteBuilder routeBuilder)
+    public static IEndpointRouteBuilder MapDocument_РасходныйОрдерНаТовары_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {
         var group = routeBuilder.MapGroup("/api/1c")
-            .WithTags("Document_ПриходныйОрдерНаТовары")
+            .WithTags("Document_РасходныйОрдерНаТовары")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder);
-        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder);
+        group.MapGet("/Document_РасходныйОрдерНаТовары/import", ImportOrder);
+        group.MapPost("/Document_РасходныйОрдерНаТовары/notify", NotifyOrder);
 
         return routeBuilder;
     }
 
     static async Task<IResult> ImportOrder(
-        [FromServices] Document_ПриходныйОрдерНаТовары_InboundService service,
+        [FromServices] Document_РасходныйОрдерНаТовары_InboundService service,
         CancellationToken ct)
     {
         await service.ImportDocumentListAsync(ct);
@@ -36,7 +36,7 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
         CancellationToken ct)
     {
         await notifyChannel.Writer.WriteAsync(
-            new NotifyRecord(request.Ref_Key, nameof(Document_ПриходныйОрдерНаТовары)),
+            new NotifyRecord(request.Ref_Key, nameof(Document_РасходныйОрдерНаТовары)),
             ct);
 
         return TypedResults.Ok();

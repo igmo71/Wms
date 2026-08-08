@@ -1,4 +1,7 @@
 ﻿using System.Text.Json.Serialization;
+using Wms.Common;
+using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Integration.OneS.Models;
 
@@ -9,7 +12,7 @@ internal class Document_РасходныйОрдерНаТовары
     public bool Posted { get; set; }
     public string? Number { get; set; }
     public DateTime Date { get; set; }
-    public Guid? Склад_Key { get; set; }
+    public Guid Склад_Key { get; set; }
     public string? Статус { get; set; }
     public string? СкладскаяОперация { get; set; }
     public Guid Получатель { get; set; }
@@ -21,8 +24,8 @@ internal class Document_РасходныйОрдерНаТовары
 
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public int ВсегоМест { get; set; }
-    public List<Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям>? ТоварыПоРаспоряжениям { get; set; }
-    public List<Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары>? ОтгружаемыеТовары { get; set; }
+    public List<Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям> ТоварыПоРаспоряжениям { get; set; } = [];
+    public List<Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары> ОтгружаемыеТовары { get; set; } = [];
 
     public const int BatchSize = 10;
 
@@ -50,4 +53,49 @@ internal class Document_РасходныйОрдерНаТовары
     public static string PatchUri(string refKey) => $"Document_РасходныйОрдерНаТовары(guid'{refKey}')?$format=json";
 
     public static string PostDocumentUri(string refKey) => $"Document_РасходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
+
+    internal static ShippingOrder MapToShippingOrder(Document_РасходныйОрдерНаТовары fetchedDocument)
+    {
+        var items = fetchedDocument.ОтгружаемыеТовары
+          .Select(x => new ShippingOrderItem
+          {
+              ShippingOrderId = x.Ref_Key,
+              LineNumber = x.LineNumber,
+              StockKeepingUnitId = x.Номенклатура_Key,
+              PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество?
+              FactQuantity = 0,
+              Action = ODataEnumMapper.Parse<ShippingOrderAction>(x.Действие)
+          })
+          .ToList();
+
+        var baseItems = fetchedDocument.ТоварыПоРаспоряжениям
+            .Select(x => new ShippingOrderBaseItem
+            {
+                ShippingOrderId = x.Ref_Key,
+                LineNumber = x.LineNumber,
+                StockKeepingUnitId = x.Номенклатура_Key,
+                PlanQuantity = x.Количество,
+                BaseOrderId = x.Распоряжение,
+                BaseOrderType = x.Распоряжение_Type.TrimODataPrefix()
+            })
+            .ToList();
+
+        return new ShippingOrder
+        {
+            Id = fetchedDocument.Ref_Key,
+            Posted = fetchedDocument.Posted,
+            DeletionMark = fetchedDocument.DeletionMark,
+            Date = fetchedDocument.Date,
+            Number = fetchedDocument.Number,
+            Comment = fetchedDocument.Комментарий,
+            WarehouseId = fetchedDocument.Склад_Key,
+            Status = ODataEnumMapper.Parse<ShippingOrderStatus>(fetchedDocument.Статус),
+            Queue = ODataEnumMapper.Parse<ShippingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
+            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
+            RecipientId = fetchedDocument.Получатель,
+            RecipientType = fetchedDocument.Получатель_Type.TrimODataPrefix(),
+            Items = items,
+            BaseItems = baseItems
+        };
+    }
 }
