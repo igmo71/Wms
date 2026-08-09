@@ -183,6 +183,12 @@ internal class ShippingOrderCommandService(
             return validationResult;
         }
 
+        var balanceAndTurnoverResult = await balanceAndTurnoverService
+            .ShipShippingOrder(existingOrder, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
+
         var externalResult = await outboundService.SetShippedAsync(orderId, ct);
 
         if (!externalResult.IsSuccess)
@@ -192,12 +198,6 @@ internal class ShippingOrderCommandService(
         }
 
         existingOrder.SetShipped(userId);
-
-        var balanceAndTurnoverResult = await balanceAndTurnoverService
-            .ShipShippingOrder(existingOrder, dbContext, ct);
-
-        if (!balanceAndTurnoverResult.IsSuccess)
-            return balanceAndTurnoverResult;
 
         await dbContext.SaveChangesAsync(ct);
 

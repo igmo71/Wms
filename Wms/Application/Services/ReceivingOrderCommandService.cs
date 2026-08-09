@@ -131,6 +131,12 @@ public class ReceivingOrderCommandService(
             return validationResult;
         }
 
+        var balanceAndTurnoverResult = await balanceAndTurnoverService
+            .PostReceivedOrderInventoryAsync(existingOrder, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
+
         if (existingOrder.HasPlanFactDifference)
         {
             var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
@@ -151,12 +157,6 @@ public class ReceivingOrderCommandService(
         }
 
         existingOrder.SetReceived(userId);
-
-        var balanceAndTurnoverResult = await balanceAndTurnoverService
-            .PostReceivedOrderInventoryAsync(existingOrder, dbContext, ct);
-
-        if (!balanceAndTurnoverResult.IsSuccess)
-            return balanceAndTurnoverResult;
 
         await dbContext.SaveChangesAsync(ct);
 
