@@ -312,6 +312,58 @@ namespace Wms.Data.Migrations
                     b.ToTable("InventoryBalances");
                 });
 
+            modelBuilder.Entity("Wms.Domain.InventoryMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DestinationStorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("PostedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<double>("Quantity")
+                        .HasColumnType("float");
+
+                    b.Property<Guid?>("RecorderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("RecorderLineNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RecorderType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SourceStorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DestinationStorageLocationId");
+
+                    b.HasIndex("SourceStorageLocationId");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("InventoryMovements");
+                });
+
             modelBuilder.Entity("Wms.Domain.InventoryTurnover", b =>
                 {
                     b.Property<Guid>("Id")
@@ -333,7 +385,7 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("RecorderId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("RecorderLineNumber")
+                    b.Property<int?>("RecorderLineNumber")
                         .HasColumnType("int");
 
                     b.Property<int>("RecorderType")
@@ -903,6 +955,39 @@ namespace Wms.Data.Migrations
                     b.Navigation("StockKeepingUnit");
 
                     b.Navigation("StorageLocation");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Wms.Domain.InventoryMovement", b =>
+                {
+                    b.HasOne("Wms.Domain.StorageLocation", "DestinationStorageLocation")
+                        .WithMany()
+                        .HasForeignKey("DestinationStorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.StorageLocation", "SourceStorageLocation")
+                        .WithMany()
+                        .HasForeignKey("SourceStorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinationStorageLocation");
+
+                    b.Navigation("SourceStorageLocation");
+
+                    b.Navigation("StockKeepingUnit");
 
                     b.Navigation("Warehouse");
                 });
