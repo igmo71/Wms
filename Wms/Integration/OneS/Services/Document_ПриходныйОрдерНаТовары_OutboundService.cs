@@ -22,6 +22,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
 
         var patchUri = Document.PatchUri(orderId.ToString());
+
         var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(
             patchUri,
             new StatusOrderCommand(expectedStatus),
@@ -34,9 +35,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (actualStatus != expectedStatus)
         {
-            logger.LogError("1C returned unexpected receiving order status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return ServiceResult.Fail(ServiceErrorType.Conflict,
-                $"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
+            return ServiceResult.Fail(ServiceErrorType.Conflict, $"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
