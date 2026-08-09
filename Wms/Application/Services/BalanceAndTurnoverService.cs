@@ -9,7 +9,7 @@ namespace Wms.Application.Services;
 
 public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger)
 {
-    public async Task<ServiceResult> CompleteReceivingOrder(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
+    public async Task<ServiceResult> PostReceivedOrderInventoryAsync(ReceivingOrder receivingOrder, ApplicationDbContext dbContext, CancellationToken ct)
     {
         using var scope = logger.BeginScope("BalanceAndTurnover CreateOrUpdate {OrderId} {WarehouseId} {StorageLocationId}",
             receivingOrder.Id, receivingOrder.WarehouseId, receivingOrder.ReceivingLocationId);
@@ -47,9 +47,9 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
             if (item.FactQuantity == 0)
                 continue;
 
+            // TODO: Если разрешать перепроводить документ, то нужно сначала реализовать откат и InventoryBalance, и InventoryTurnover
             var alreadyPosted = await dbContext.InventoryTurnovers
                 .AnyAsync(x => x.RecorderId == receivingOrder.Id, ct);
-            // TODO: Если разрешать перепроводить документ, то нужно сначала реализовать откат и InventoryBalance, и InventoryTurnover
             if (alreadyPosted)
             {
                 logger.LogError("Receiving order has already been posted.");
@@ -83,6 +83,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                 balanceBefore = balance.Quantity;
 
                 balance.Quantity += item.FactQuantity;
+
                 balance.UpdatedAtUtc = now;
 
                 logger.LogDebug("Updated InventoryBalance for SKU {SkuId} from {QuantityBefore} to {QuantityAfter}",

@@ -64,10 +64,10 @@ The active business flow is:
   -> WMS imports the document
   -> ReadyForReceiving (КПоступлению)
   -> operator selects a receiving storage location
-  -> Start
+  -> SetInReceiving
   -> InReceiving (ВРаботе)
   -> operator records actual quantities and comments
-  -> Complete
+  -> SetReceived
   -> Received (Принят), 1C updated and posted,
      WMS records inventory balances and turnovers
 ```
@@ -80,17 +80,15 @@ The receiving location belongs to the whole order. At the current stage the oper
 
 - `Index` lists receiving orders.
 - `Details` shows one order and offers "Взять в работу" for a pending order when it can be started.
-- `InProcess` lets the operator edit actual quantities and comments, then complete the order through `CompleteOrderAsync`.
+- `InProcess` lets the operator edit actual quantities and comments, then set the order received through `SetReceivedAsync`.
 
 ### Receiving application services
 
-- `ReceivingOrderCommandService` imports and reconciles orders, starts and completes them, and updates item actual quantities.
+- `ReceivingOrderCommandService` imports and reconciles orders, sets orders in receiving or received, and updates item actual quantities.
 - `ReceivingOrderQueryService` reads order details and paged, filtered lists.
 - `BalanceAndTurnoverService` records inventory movements and updates balances when a receiving order is completed.
 
-External updates to an already imported order are controlled by `WmsSettings` according to its status. This protects in-progress warehouse work from being overwritten by 1C changes.
-
-If inbound synchronization reports a status that conflicts with the local WMS-controlled lifecycle, WMS leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Shipping facts are immutable from `ReadyForShipment` onward.
+Inbound synchronization may create and reconcile receiving orders only in `ReadyForReceiving` and shipping orders only in `Prepared`. Once WMS work has started, any inbound difference leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Receiving facts are editable only in `InReceiving` or `ProcessingRequired`; shipping facts are editable only while picking or verification is in progress.
 
 ## 1C integration
 

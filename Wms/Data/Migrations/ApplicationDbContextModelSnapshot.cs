@@ -488,13 +488,6 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<DateTimeOffset?>("ShippedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("ShippedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
                     b.Property<DateTimeOffset?>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -514,8 +507,21 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<DateTimeOffset?>("PickingStartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PickingStartedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
                     b.Property<DateTime>("PlannedShippingDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("Posted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Queue")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset?>("ReadyForShipmentAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -524,12 +530,6 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
-                    b.Property<bool>("Posted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("Queue")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("RecipientId")
                         .HasColumnType("uniqueidentifier");
 
@@ -537,15 +537,15 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid?>("ShippingLocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("PickingStartedAtUtc")
+                    b.Property<DateTimeOffset?>("ShippedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("PickingStartedBy")
+                    b.Property<string>("ShippedBy")
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
+
+                    b.Property<Guid?>("ShippingLocationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

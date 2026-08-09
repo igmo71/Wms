@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
@@ -11,57 +11,48 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal async Task<ServiceResult> StartOrderAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("ВРаботе"), orderId, ct); // TODO: Магическая строка
+    internal Task<ServiceResult> SetInReceivingAsync(Guid orderId, CancellationToken ct) =>
+        SwitchStatusAsync("ВРаботе", orderId, ct);
 
-    internal async Task<ServiceResult> CompleteOrderAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("Принят"), orderId, ct); // TODO: Магическая строка
+    internal Task<ServiceResult> SetReceivedAsync(Guid orderId, CancellationToken ct) =>
+        SwitchStatusAsync("Принят", orderId, ct);
 
-    private async Task<ServiceResult> SwitchStatusAsync(StatusOrderCommand statusOrderCommand, Guid orderId, CancellationToken ct)
+    private async Task<ServiceResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("SwitchStatus {OrderId} {@StatusOrderCommand}", orderId, statusOrderCommand);
+        using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
 
         var patchUri = Document.PatchUri(orderId.ToString());
-
-        var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(patchUri, statusOrderCommand, ct);
+        var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(
+            patchUri,
+            new StatusOrderCommand(expectedStatus),
+            ct);
 
         if (!patchResult.IsSuccess)
-        {
             return patchResult;
+
+        var actualStatus = patchResult.Value?.Статус;
+
+        if (actualStatus != expectedStatus)
+        {
+            logger.LogError("1C returned unexpected receiving order status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
+            return ServiceResult.Fail(ServiceErrorType.Conflict,
+                $"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
-
-        var postResult = await oneCClient.PostValueAsync(postUri, ct);
-
-        if (!postResult.IsSuccess)
-        {
-            return postResult;
-        }
-
-        return ServiceResult.Success();
+        return await oneCClient.PostValueAsync(postUri, ct);
     }
 
     internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
 
-        var patchItems = receivingOrderItems
-            .Select(x => PatchItem.From(x))
-            .ToList();
-
+        var patchItems = receivingOrderItems.Select(PatchItem.From).ToList();
         var patchBody = new PatchBody { Товары = patchItems };
-
         var patchUri = Document.PatchUri(orderId.ToString());
-
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
-        if (!patchResult.IsSuccess)
-        {
-            return patchResult;
-        }
-
-        return ServiceResult.Success();
+        return patchResult.IsSuccess ? ServiceResult.Success() : patchResult;
     }
 
     private class PatchBody
@@ -87,6 +78,5 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
             КоличествоУпаковок = orderItem.FactQuantity,
             Комментарий = orderItem.Comment
         };
-
     }
 }

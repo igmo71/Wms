@@ -1,26 +1,22 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS.Services;
 
 namespace Wms.Application.Services;
 
 internal class ShippingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    IOptions<WmsSettings> options,
     BalanceAndTurnoverService balanceAndTurnoverService,
     Document_РасходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ShippingOrderCommandService> logger)
 {
-    private readonly WmsSettings _wmsSettings = options.Value;
-
     internal async Task ImportOrderAsync(ShippingOrder externalOrder, CancellationToken ct)
     {
         using var scope = logger.BeginScope("ShippingOrder Import {OrderId}", externalOrder.Id);
-
         using var activity = AppTracing.StartActivity("ShippingOrder.Import", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -34,15 +30,13 @@ internal class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            if (!externalOrder.AllowExternalCreate(_wmsSettings))
+            if (externalOrder.Status != ShippingOrderStatus.Prepared)
             {
-                logger.LogDebug("External document status is shipped, new order create not allowed");
-
+                logger.LogWarning("External shipping order create is not allowed for status {Status}", externalOrder.Status);
                 return;
             }
 
             externalOrder.CreatedAtUtc = now;
-
             dbContext.ShippingOrders.Add(externalOrder);
         }
         else
@@ -52,32 +46,20 @@ internal class ShippingOrderCommandService(
             if (!hasExternalChanges)
             {
                 logger.LogDebug("No external document changes detected");
-
                 return;
             }
 
-            if (existingOrder.HasConflictingExternalStatus(externalOrder))
+            if (existingOrder.Status != ShippingOrderStatus.Prepared)
             {
                 existingOrder.ExternalChangeDetected = true;
 
-                logger.LogWarning(
-                    "External shipping order status conflicts with local workflow. Local: {LocalStatus}, external: {ExternalStatus}",
-                    existingOrder.Status,
-                    externalOrder.Status);
-            }
-            else if (!existingOrder.AllowExternalUpdate(_wmsSettings))
-            // Чтобы разрешить для статуса Shipped, вероятно, потребуется доработка (откат BalanceAndTurnover...)
-            {
-                existingOrder.ExternalChangeDetected = true;
-
-                logger.LogWarning("External document changes detected, order update not allowed");
+                logger.LogWarning("External shipping order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
+                    existingOrder.Status, externalOrder.Status);
             }
             else
             {
                 existingOrder.UpdateOrder(externalOrder);
-
                 existingOrder.UpdatedAtUtc = now;
-
                 existingOrder.ExternalChangeDetected = false;
             }
         }
@@ -85,11 +67,10 @@ internal class ShippingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> StartPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> SetReadyForPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder StartPicking {OrderId}", orderId);
-
-        using var activity = AppTracing.StartActivity("ShippingOrder.StartPicking", nameof(ShippingOrderCommandService));
+        using var scope = logger.BeginScope("ShippingOrder SetReadyForPicking {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForPicking", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -103,34 +84,33 @@ internal class ShippingOrderCommandService(
             return ServiceError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToStartPicking();
+        var validationResult = existingOrder.ValidateToSetReadyForPicking();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to start picking failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to set ready for picking failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        var externalStartResult = await outboundService.StartPickingAsync(orderId, ct);
+        var externalResult = await outboundService.SetReadyForPickingAsync(orderId, ct);
 
-        if (!externalStartResult.IsSuccess)
+        if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to start picking in external document: {ErrorMessage}", externalStartResult.Error?.Message);
-            return ServiceError.Failure<ShippingOrder>("Failed to start picking in external document");
+            logger.LogError("Failed to set external document ready for picking: {ErrorMessage}", externalResult.Error?.Message);
+            return externalResult;
         }
 
-        existingOrder.StartPicking(userId);
+        existingOrder.SetReadyForPicking(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> MarkReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> SetReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder MarkReadyForShipment {OrderId}", orderId);
-
-        using var activity = AppTracing.StartActivity("ShippingOrder.MarkReadyForShipment", nameof(ShippingOrderCommandService));
+        using var scope = logger.BeginScope("ShippingOrder SetReadyForShipment {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForShipment", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -144,43 +124,44 @@ internal class ShippingOrderCommandService(
             return ServiceError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToMarkReadyForShipment();
+        var validationResult = existingOrder.ValidateToSetReadyForShipment();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to mark ready for shipment failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to set ready for shipment failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        var externalItemsUpdateResult = await outboundService
-            .UpdateDocumentItemsAsync(existingOrder, ct);
-
-        if (!externalItemsUpdateResult.IsSuccess)
+        if (existingOrder.HasPlanFactDifference)
         {
-            logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
-            return externalItemsUpdateResult;
+            var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder, ct);
+
+            if (!externalItemsUpdateResult.IsSuccess)
+            {
+                logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
+                return externalItemsUpdateResult;
+            }
         }
 
-        var externalReadyForShipmentResult = await outboundService.MarkReadyForShipmentAsync(orderId, ct);
+        var externalResult = await outboundService.SetReadyForShipmentAsync(orderId, ct);
 
-        if (!externalReadyForShipmentResult.IsSuccess)
+        if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to mark external document ready for shipment: {ErrorMessage}", externalReadyForShipmentResult.Error?.Message);
-            return ServiceError.Failure<ShippingOrder>("Failed to mark external document ready for shipment");
+            logger.LogError("Failed to set external document ready for shipment: {ErrorMessage}", externalResult.Error?.Message);
+            return externalResult;
         }
 
-        existingOrder.MarkReadyForShipment(userId);
+        existingOrder.SetReadyForShipment(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> ShipAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder Ship {OrderId}", orderId);
-
-        using var activity = AppTracing.StartActivity("ShippingOrder.Ship", nameof(ShippingOrderCommandService));
+        using var scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ShippingOrder.SetShipped", nameof(ShippingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -194,29 +175,71 @@ internal class ShippingOrderCommandService(
             return ServiceError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToShip();
+        var validationResult = existingOrder.ValidateToSetShipped();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to ship failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to set shipped failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        var externalShipmentResult = await outboundService.ShipAsync(orderId, ct);
+        var externalResult = await outboundService.SetShippedAsync(orderId, ct);
 
-        if (!externalShipmentResult.IsSuccess)
+        if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to ship external document: {ErrorMessage}", externalShipmentResult.Error?.Message);
-            return ServiceError.Failure<ShippingOrder>("Failed to ship external document");
+            logger.LogError("Failed to set external document shipped: {ErrorMessage}", externalResult.Error?.Message);
+            return externalResult;
         }
 
-        existingOrder.Ship(userId);
+        existingOrder.SetShipped(userId);
 
         var balanceAndTurnoverResult = await balanceAndTurnoverService
             .ShipShippingOrder(existingOrder, dbContext, ct);
 
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
+
+        await dbContext.SaveChangesAsync(ct);
+
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> UpdateOrderItemFactQuantityAsync(
+        Guid shippingOrderId,
+        int lineNumber,
+        double factQuantity,
+        string? comment,
+        CancellationToken ct = default)
+    {
+        if (factQuantity < 0)
+            return ServiceError.Invalid<ShippingOrderItem>("Fact quantity cannot be negative.");
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existingOrder = await dbContext.ShippingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == shippingOrderId, ct);
+
+        if (existingOrder is null)
+            return ServiceError.NotFound<ShippingOrder>();
+
+        var canEditFactQuantity = existingOrder.Status is ShippingOrderStatus.ReadyForPicking
+            or ShippingOrderStatus.ReadyForVerification
+            or ShippingOrderStatus.InVerification
+            or ShippingOrderStatus.Verified;
+
+        if (!canEditFactQuantity)
+        {
+            return ServiceError.Invalid<ShippingOrderItem>("Fact quantity can be edited only while the shipping order is being picked or verified.");
+        }
+
+        var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
+
+        if (existingItem is null)
+            return ServiceError.NotFound<ShippingOrderItem>();
+
+        existingItem.FactQuantity = factQuantity;
+        existingItem.Comment = comment;
 
         await dbContext.SaveChangesAsync(ct);
 

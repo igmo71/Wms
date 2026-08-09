@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
@@ -11,38 +11,39 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal async Task<ServiceResult> StartPickingAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("КОтбору"), orderId, ct); // TODO: Магическая строка
+    internal Task<ServiceResult> SetReadyForPickingAsync(Guid orderId, CancellationToken ct) =>
+        SwitchStatusAsync("КОтбору", orderId, ct);
 
-    internal async Task<ServiceResult> MarkReadyForShipmentAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("КОтгрузке"), orderId, ct); // TODO: Магическая строка
+    internal Task<ServiceResult> SetReadyForShipmentAsync(Guid orderId, CancellationToken ct) =>
+        SwitchStatusAsync("КОтгрузке", orderId, ct);
 
-    internal async Task<ServiceResult> ShipAsync(Guid orderId, CancellationToken ct) =>
-        await SwitchStatusAsync(new StatusOrderCommand("Отгружен"), orderId, ct); // TODO: Магическая строка
+    internal Task<ServiceResult> SetShippedAsync(Guid orderId, CancellationToken ct) =>
+        SwitchStatusAsync("Отгружен", orderId, ct);
 
-    private async Task<ServiceResult> SwitchStatusAsync(StatusOrderCommand statusOrderCommand, Guid orderId, CancellationToken ct)
+    private async Task<ServiceResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("SwitchStatus {OrderId} {@StatusOrderCommand}", orderId, statusOrderCommand);
+        using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
 
         var patchUri = Document.PatchUri(orderId.ToString());
-
-        var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(patchUri, statusOrderCommand, ct);
+        var patchResult = await oneCClient.PatchValueAsync<StatusOrderCommand, Document>(
+            patchUri,
+            new StatusOrderCommand(expectedStatus),
+            ct);
 
         if (!patchResult.IsSuccess)
-        {
             return patchResult;
+
+        var actualStatus = patchResult.Value?.Статус;
+
+        if (actualStatus != expectedStatus)
+        {
+            logger.LogError("1C returned unexpected shipping order status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
+            return ServiceResult.Fail(ServiceErrorType.Conflict,
+                $"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
-
-        var postResult = await oneCClient.PostValueAsync(postUri, ct);
-
-        if (!postResult.IsSuccess)
-        {
-            return postResult;
-        }
-
-        return ServiceResult.Success();
+        return await oneCClient.PostValueAsync(postUri, ct);
     }
 
     // TODO: Выяснить как в 1С работает с товарами по распоряжениям и отгружаемыми товарами (Отгружать - НеОтгружать)
@@ -51,14 +52,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
 
-        var patchItems = shippingOrder.Items
-            .Select(x => PatchItem.From(x))
-            .ToList();
-
-        var patchBaseItems = shippingOrder.BaseItems
-            .Select(x => PatchBaseItem.From(x))
-            .ToList();
-
+        var patchItems = shippingOrder.Items.Select(PatchItem.From).ToList();
+        var patchBaseItems = shippingOrder.BaseItems.Select(PatchBaseItem.From).ToList();
         var patchBody = new PatchBody
         {
             ОтгружаемыеТовары = patchItems,
@@ -66,21 +61,14 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         };
 
         var patchUri = Document.PatchUri(shippingOrder.Id.ToString());
-
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
-        if (!patchResult.IsSuccess)
-        {
-            return patchResult;
-        }
-
-        return ServiceResult.Success();
+        return patchResult.IsSuccess ? ServiceResult.Success() : patchResult;
     }
 
     private class PatchBody
     {
         public List<PatchBaseItem> ТоварыПоРаспоряжениям { get; set; } = [];
-
         public List<PatchItem> ОтгружаемыеТовары { get; set; } = [];
     }
 
@@ -116,7 +104,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             Ref_Key = orderItem.ShippingOrderId,
             LineNumber = orderItem.LineNumber,
             Номенклатура_Key = orderItem.StockKeepingUnitId,
-            Количество = orderItem.FactQuantity,         // Отгружать - НеОтгружать 
+            Количество = orderItem.FactQuantity, // Отгружать - НеОтгружать
             КоличествоУпаковок = orderItem.FactQuantity, // Отгружать - НеОтгружать
             Действие = ODataEnumMapper.ToODataValue(orderItem.Action) // Отгружать - НеОтгружать
         };

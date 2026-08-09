@@ -15,28 +15,28 @@ public static class ReceivingOrderEndpoints
             .ProducesValidationProblem();
 
         group.MapGet("/ReceivingOrder/{id:guid}", GetOrder);
-        group.MapPost("/ReceivingOrder/{id:guid}/start", StartOrder);
-        group.MapPost("/ReceivingOrder/{id:guid}/complete", CompleteOrder);
+        group.MapPost("/ReceivingOrder/{id:guid}/set-in-receiving", SetInReceiving);
+        group.MapPost("/ReceivingOrder/{id:guid}/set-received", SetReceived);
 
         return routeBuilder;
     }
 
-    static async Task<IResult> StartOrder(
+    static async Task<IResult> SetInReceiving(
         [FromServices] ReceivingOrderCommandService service,
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var result = await service.StartOrderAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
+        var result = await service.SetInReceivingAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
 
         return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }
 
-    static async Task<IResult> CompleteOrder(
+    static async Task<IResult> SetReceived(
         [FromServices] ReceivingOrderCommandService service,
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var result = await service.CompleteOrderAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
+        var result = await service.SetReceivedAsync(id, "895f1153-a5b2-434e-b459-a2a120b291ce", ct); // TODO: Temporary crutch
 
         return result.IsSuccess ? TypedResults.Ok() : Results.BadRequest();
     }

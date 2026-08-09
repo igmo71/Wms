@@ -48,41 +48,6 @@ public class ShippingOrder
     public bool IsFullyShipped => Items.All(x => x.IsFullyShipped);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
-    internal bool AllowExternalCreate(WmsSettings wmsSettings) =>
-    Status switch
-    {
-        ShippingOrderStatus.Shipped => wmsSettings.AllowExternalCreateShipped,
-        _ => true
-    };
-
-    public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
-    Status switch
-    {
-        ShippingOrderStatus.Prepared => wmsSettings.AllowExternalUpdatePrepared,
-        ShippingOrderStatus.ReadyForPicking => wmsSettings.AllowExternalUpdateReadyForPicking,
-        ShippingOrderStatus.ReadyForVerification => wmsSettings.AllowExternalUpdateReadyForVerification,
-        ShippingOrderStatus.InVerification => wmsSettings.AllowExternalUpdateInVerification,
-        ShippingOrderStatus.Verified => wmsSettings.AllowExternalUpdateVerified,
-        ShippingOrderStatus.ReadyForShipment => wmsSettings.AllowExternalUpdateReadyForShipment,
-        ShippingOrderStatus.Shipped => wmsSettings.AllowExternalUpdateShipped,
-        _ => false
-    };
-
-    internal bool HasConflictingExternalStatus(ShippingOrder externalOrder) =>
-        Status switch
-        {
-            ShippingOrderStatus.ReadyForPicking => externalOrder.Status is not (ShippingOrderStatus.ReadyForPicking
-                or ShippingOrderStatus.ReadyForVerification
-                or ShippingOrderStatus.InVerification
-                or ShippingOrderStatus.Verified),
-            ShippingOrderStatus.ReadyForVerification => externalOrder.Status is not (ShippingOrderStatus.ReadyForVerification
-                    or ShippingOrderStatus.InVerification
-                    or ShippingOrderStatus.Verified),
-            ShippingOrderStatus.InVerification => externalOrder.Status is not (ShippingOrderStatus.InVerification
-                or ShippingOrderStatus.Verified),
-            _ => Status != externalOrder.Status
-        };
-
     internal bool HasExternalChanges(ShippingOrder externalOrder)
     {
         if (Status != externalOrder.Status
@@ -230,22 +195,22 @@ public class ShippingOrder
         }
     }
 
-    internal ServiceResult ValidateToStartPicking()
+    internal ServiceResult ValidateToSetReadyForPicking()
     {
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can start picking.");
+            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can be set ready for picking.");
         }
 
         if (ShippingLocationId is null)
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before starting picking.");
+            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before setting the order ready for picking.");
         }
 
         return ServiceResult.Success();
     }
 
-    public void StartPicking(string userId)
+    public void SetReadyForPicking(string userId)
     {
         Status = ShippingOrderStatus.ReadyForPicking;
 
@@ -254,20 +219,22 @@ public class ShippingOrder
         PickingStartedBy = userId;
     }
 
-    public ServiceResult ValidateToMarkReadyForShipment()
+    public ServiceResult ValidateToSetReadyForShipment()
     {
-        if (Status is not (ShippingOrderStatus.ReadyForPicking
-                or ShippingOrderStatus.ReadyForVerification
-                or ShippingOrderStatus.InVerification
-                or ShippingOrderStatus.Verified))
+        var canSetReadyForShipment = Status is ShippingOrderStatus.ReadyForPicking
+            or ShippingOrderStatus.ReadyForVerification
+            or ShippingOrderStatus.InVerification
+            or ShippingOrderStatus.Verified;
+
+        if (!canSetReadyForShipment)
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping order cannot be marked ready for shipment in the current status.");
+            return ServiceError.Invalid<ShippingOrder>("Only a shipping order being picked or verified can be set ready for shipment.");
         }
 
         return ServiceResult.Success();
     }
 
-    public void MarkReadyForShipment(string userId)
+    public void SetReadyForShipment(string userId)
     {
         Status = ShippingOrderStatus.ReadyForShipment;
 
@@ -276,7 +243,7 @@ public class ShippingOrder
         ReadyForShipmentBy = userId;
     }
 
-    public ServiceResult ValidateToShip()
+    public ServiceResult ValidateToSetShipped()
     {
         if (Status != ShippingOrderStatus.ReadyForShipment)
         {
@@ -291,7 +258,7 @@ public class ShippingOrder
         return ServiceResult.Success();
     }
 
-    public void Ship(string userId)
+    public void SetShipped(string userId)
     {
         Status = ShippingOrderStatus.Shipped;
 

@@ -1,6 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -11,17 +10,13 @@ namespace Wms.Application.Services;
 
 public class ReceivingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    IOptions<WmsSettings> options,
     BalanceAndTurnoverService balanceAndTurnoverService,
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderCommandService> logger)
 {
-    private readonly WmsSettings _wmsSettings = options.Value;
-
     public async Task ImportOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder Import {OrderId}", externalOrder.Id);
-
         using var activity = AppTracing.StartActivity("ReceivingOrder.Import", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -34,15 +29,13 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            if (!externalOrder.AllowExternalCreate(_wmsSettings))
+            if (externalOrder.Status != ReceivingOrderStatus.ReadyForReceiving)
             {
-                logger.LogDebug("External document status is received, new order create not allowed");
-
+                logger.LogWarning("External receiving order create is not allowed for status {Status}", externalOrder.Status);
                 return;
             }
 
             externalOrder.CreatedAtUtc = now;
-
             dbContext.ReceivingOrders.Add(externalOrder);
         }
         else
@@ -52,32 +45,20 @@ public class ReceivingOrderCommandService(
             if (!hasExternalChanges)
             {
                 logger.LogDebug("No external document changes detected");
-
                 return;
             }
 
-            if (existingOrder.HasConflictingExternalStatus(externalOrder))
+            if (existingOrder.Status != ReceivingOrderStatus.ReadyForReceiving)
             {
                 existingOrder.ExternalChangeDetected = true;
 
-                logger.LogWarning(
-                    "External receiving order status conflicts with local workflow. Local: {LocalStatus}, external: {ExternalStatus}",
-                    existingOrder.Status,
-                    externalOrder.Status);
-            }
-            else if (!existingOrder.AllowExternalUpdate(_wmsSettings))
-            // Чтобы разрешить для статуса Received, вероятно, потребуется доработка (откат BalanceAndTurnover...)
-            {
-                existingOrder.ExternalChangeDetected = true;
-
-                logger.LogWarning("External document changes detected, order update not allowed");
+                logger.LogWarning("External receiving order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
+                    existingOrder.Status, externalOrder.Status);
             }
             else
             {
                 existingOrder.UpdateOrder(externalOrder);
-
                 existingOrder.UpdatedAtUtc = now;
-
                 existingOrder.ExternalChangeDetected = false;
             }
         }
@@ -85,11 +66,10 @@ public class ReceivingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> StartOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Start {OrderId}", orderId);
-
-        using var activity = AppTracing.StartActivity("ReceivingOrder.Start", nameof(ReceivingOrderCommandService));
+        using var scope = logger.BeginScope("ReceivingOrder SetInReceiving {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ReceivingOrder.SetInReceiving", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -103,34 +83,33 @@ public class ReceivingOrderCommandService(
             return ServiceError.NotFound<ReceivingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToStart();
+        var validationResult = existingOrder.ValidateToSetInReceiving();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to start failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to set in receiving failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        var externalStartResult = await outboundService.StartOrderAsync(orderId, ct);
+        var externalResult = await outboundService.SetInReceivingAsync(orderId, ct);
 
-        if (!externalStartResult.IsSuccess)
+        if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to start external document: {ErrorMessage}", externalStartResult.Error?.Message);
-            return ServiceError.Failure<ReceivingOrder>("Failed to start external document");
+            logger.LogError("Failed to set external document in receiving: {ErrorMessage}", externalResult.Error?.Message);
+            return externalResult;
         }
 
-        existingOrder.Start(userId);
+        existingOrder.SetInReceiving(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> CompleteOrderAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<ServiceResult> SetReceivedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Complete {OrderId}", orderId);
-
-        using var activity = AppTracing.StartActivity("ReceivingOrder.Complete", nameof(ReceivingOrderCommandService));
+        using var scope = logger.BeginScope("ReceivingOrder SetReceived {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ReceivingOrder.SetReceived", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -144,26 +123,17 @@ public class ReceivingOrderCommandService(
             return ServiceError.NotFound<ReceivingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToComplete();
+        var validationResult = existingOrder.ValidateToSetReceived();
 
         if (!validationResult.IsSuccess)
         {
-            logger.LogError("Validation to complete failed: {ErrorMessage}", validationResult.Error?.Message);
+            logger.LogError("Validation to set received failed: {ErrorMessage}", validationResult.Error?.Message);
             return validationResult;
         }
 
-        existingOrder.Complete(userId);
-
-        var balanceAndTurnoverResult = await balanceAndTurnoverService
-            .CompleteReceivingOrder(existingOrder, dbContext, ct);
-
-        if (!balanceAndTurnoverResult.IsSuccess)
-            return balanceAndTurnoverResult;
-
         if (existingOrder.HasPlanFactDifference)
         {
-            var externalItemsUpdateResult = await outboundService
-                .UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
+            var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
 
             if (!externalItemsUpdateResult.IsSuccess)
             {
@@ -172,13 +142,21 @@ public class ReceivingOrderCommandService(
             }
         }
 
-        var externalCompletionResult = await outboundService.CompleteOrderAsync(orderId, ct);
+        var externalResult = await outboundService.SetReceivedAsync(orderId, ct);
 
-        if (!externalCompletionResult.IsSuccess)
+        if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to complete external document: {ErrorMessage}", externalCompletionResult.Error?.Message);
-            return ServiceError.Failure<ReceivingOrder>("Failed to complete external document");
+            logger.LogError("Failed to set external document received: {ErrorMessage}", externalResult.Error?.Message);
+            return externalResult;
         }
+
+        existingOrder.SetReceived(userId);
+
+        var balanceAndTurnoverResult = await balanceAndTurnoverService
+            .PostReceivedOrderInventoryAsync(existingOrder, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -193,9 +171,7 @@ public class ReceivingOrderCommandService(
         CancellationToken ct = default)
     {
         if (factQuantity < 0)
-        {
             return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
-        }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -206,15 +182,15 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
             return ServiceError.NotFound<ReceivingOrder>();
 
-        if (existingOrder.Status == ReceivingOrderStatus.Received)
-            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be edited after the receiving order is received.");
+        var canEditFactQuantity = existingOrder.Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
+
+        if (!canEditFactQuantity)
+            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity can be edited only while the receiving order is in receiving or requires processing.");
 
         var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
 
         if (existingItem is null)
-        {
             return ServiceError.NotFound<ReceivingOrderItem>();
-        }
 
         existingItem.FactQuantity = factQuantity;
         existingItem.Comment = comment;

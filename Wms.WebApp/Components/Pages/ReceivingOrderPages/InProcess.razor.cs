@@ -125,7 +125,7 @@ public partial class InProcess
         }
     }
 
-    private async Task CompleteOrderAsync()
+    private async Task SetReceivedAsync()
     {
         if (_receivingLocation is not StorageLocation receivingLocation)
             return;
@@ -154,7 +154,7 @@ public partial class InProcess
             }
 
 
-            var result = await OrderCommandService.CompleteOrderAsync(Id, userId);
+            var result = await OrderCommandService.SetReceivedAsync(Id, userId);
             if (result.IsSuccess)
                 NavigationManager.NavigateTo($"receiving-orders/{Id}");
             else

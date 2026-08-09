@@ -23,7 +23,7 @@ else
                        Variant="Variant.Filled"
                        Disabled="@(_isCompleting || _receivingLocation is null)"
                        StartIcon="@Icons.Material.Filled.Check"
-                       OnClick="CompleteOrderAsync">
+                       OnClick="SetReceivedAsync">
                 Завершить
             </MudButton>
             <MudButton Href="@($"receiving-orders/{Id}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">

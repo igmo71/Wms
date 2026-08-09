@@ -92,7 +92,7 @@ public partial class Details
         return Task.CompletedTask;
     }
 
-    private async Task StartOrderAsync()
+    private async Task SetInReceivingAsync()
     {
         if (_receivingLocation is not StorageLocation receivingLocation)
             return;
@@ -119,7 +119,7 @@ public partial class Details
                 return;
             }
 
-            var result = await OrderCommandService.StartOrderAsync(Id, userId);
+            var result = await OrderCommandService.SetInReceivingAsync(Id, userId);
             if (!result.IsSuccess)
             {
                 _startOrderFailed = true;

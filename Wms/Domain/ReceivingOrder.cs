@@ -45,26 +45,6 @@ public class ReceivingOrder
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
 
-    public bool AllowExternalCreate(WmsSettings wmsSettings) =>
-    Status switch
-    {
-        ReceivingOrderStatus.Received => wmsSettings.AllowExternalCreateReceived,
-        _ => true
-    };
-
-    public bool AllowExternalUpdate(WmsSettings wmsSettings) =>
-    Status switch
-    {
-        ReceivingOrderStatus.ReadyForReceiving => wmsSettings.AllowExternalUpdateReadyForReceiving,
-        ReceivingOrderStatus.InReceiving => wmsSettings.AllowExternalUpdateInReceiving,
-        ReceivingOrderStatus.ProcessingRequired => wmsSettings.AllowExternalUpdateProcessingRequired,
-        ReceivingOrderStatus.Received => wmsSettings.AllowExternalUpdateReceived,
-        _ => false
-    };
-
-    internal bool HasConflictingExternalStatus(ReceivingOrder externalOrder) =>
-        Status != externalOrder.Status;
-
     public bool HasExternalChanges(ReceivingOrder externalOrder)
     {
         if (BaseOrderId != externalOrder.BaseOrderId
@@ -157,22 +137,22 @@ public class ReceivingOrder
         }
     }
 
-    public ServiceResult ValidateToStart()
+    public ServiceResult ValidateToSetInReceiving()
     {
         if (Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be started.");
+            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be set in receiving.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting the order.");
+            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before setting the order in receiving.");
         }
 
         return ServiceResult.Success();
     }
 
-    public void Start(string userId)
+    public void SetInReceiving(string userId)
     {
         Status = ReceivingOrderStatus.InReceiving;
 
@@ -181,11 +161,13 @@ public class ReceivingOrder
         StartedBy = userId;
     }
 
-    public ServiceResult ValidateToComplete()
+    public ServiceResult ValidateToSetReceived()
     {
-        if (Status != ReceivingOrderStatus.InReceiving)
+        var canSetReceived = Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
+
+        if (!canSetReceived)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order in receiving can be received.");
+            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order in receiving or requiring processing can be set received.");
         }
 
         if (ReceivingLocationId is null)
@@ -196,7 +178,7 @@ public class ReceivingOrder
         return ServiceResult.Success();
     }
 
-    public void Complete(string userId)
+    public void SetReceived(string userId)
     {
         Status = ReceivingOrderStatus.Received;
 
