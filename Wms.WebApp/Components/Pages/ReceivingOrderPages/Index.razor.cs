@@ -33,7 +33,7 @@ public partial class Index : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         var sortDefinition = state.SortDefinitions.FirstOrDefault();
-        var query = new DocumentListQuery
+        var query = new ReceivingOrderListQuery
         {
             SearchString = _searchString,
             DateFrom = _dateFrom,

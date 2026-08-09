@@ -21,19 +21,16 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         if (order is null)
             return null;
 
-        var orderItems = await dbContext.ReceivingOrderItems
+        order.Items = await dbContext.ReceivingOrderItems
             .AsNoTracking()
             .Include(x => x.StockKeepingUnit)
             .Where(x => x.ReceivingOrderId == id)
             .ToListAsync(ct);
 
-
-        order.Items = orderItems;
-
         return order;
     }
 
-    public async Task<ListResult<ReceivingOrder>> ListOrdersAsync(DocumentListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<ReceivingOrder>> ListOrdersAsync(ReceivingOrderListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -59,7 +56,7 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         };
     }
 
-    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
+    private static IQueryable<ReceivingOrder> ApplySearch(IQueryable<ReceivingOrder> query, ReceivingOrderListQuery listQuery)
     {
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
@@ -82,7 +79,7 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         return query;
     }
 
-    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, DocumentListQuery listQuery)
+    private static IQueryable<ReceivingOrder> ApplySorting(IQueryable<ReceivingOrder> query, ReceivingOrderListQuery listQuery)
     {
         return listQuery.SortBy switch
         {
