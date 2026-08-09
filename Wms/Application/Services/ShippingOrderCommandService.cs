@@ -183,8 +183,27 @@ internal class ShippingOrderCommandService(
             return validationResult;
         }
 
+        var now = DateTimeOffset.UtcNow;
+        var movements = existingOrder.Items
+            .Where(x => x.FactQuantity > 0)
+            .Select(x => new InventoryMovement
+            {
+                WarehouseId = existingOrder.WarehouseId,
+                SourceStorageLocationId = existingOrder.ShippingLocationId,
+                StockKeepingUnitId = x.StockKeepingUnitId,
+                Quantity = x.FactQuantity,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                RecorderId = existingOrder.Id,
+                RecorderLineNumber = x.LineNumber,
+                RecorderType = RecorderType.ShippingOrder
+            })
+            .ToList();
+
+        dbContext.InventoryMovements.AddRange(movements);
+
         var balanceAndTurnoverResult = await balanceAndTurnoverService
-            .ShipShippingOrder(existingOrder, dbContext, ct);
+            .PostInventoryMovementsAsync(movements, dbContext, ct);
 
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
