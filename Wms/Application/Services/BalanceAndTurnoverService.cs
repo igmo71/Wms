@@ -89,9 +89,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                     QuantityDelta = -movement.Quantity,
                     BalanceAfter = sourceBalance.Quantity,
                     CreatedAtUtc = now,
-                    RecorderId = movement.RecorderId,
-                    RecorderLineNumber = movement.RecorderLineNumber,
-                    RecorderType = movement.RecorderType
+                    InventoryMovementId = movement.Id
                 });
             }
 
@@ -132,9 +130,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                     QuantityDelta = movement.Quantity,
                     BalanceAfter = destinationBalance.Quantity,
                     CreatedAtUtc = now,
-                    RecorderId = movement.RecorderId,
-                    RecorderLineNumber = movement.RecorderLineNumber,
-                    RecorderType = movement.RecorderType
+                    InventoryMovementId = movement.Id
                 });
             }
 

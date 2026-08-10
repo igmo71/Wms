@@ -2,7 +2,7 @@
 
 namespace Wms.Domain;
 
-internal class InventoryMovement
+public class InventoryMovement
 {
     public Guid Id { get; set; }
 

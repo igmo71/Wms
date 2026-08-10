@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
 
@@ -25,21 +25,12 @@ internal class InventoryTurnoverConfiguration : IEntityTypeConfiguration<Invento
             .HasForeignKey(x => x.StorageLocationId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => new
-        {
-            x.RecorderType,
-            x.RecorderId,
-            x.RecorderLineNumber
-        })
-        .IsUnique();
+        builder.HasOne(x => x.InventoryMovement)
+            .WithMany()
+            .HasForeignKey(x => x.InventoryMovementId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
 
-        //builder.Property(x => x.BalanceBefore)
-        //    .HasPrecision(18, 3);
-
-        //builder.Property(x => x.QuantityDelta)
-        //    .HasPrecision(18, 3);
-
-        //builder.Property(x => x.BalanceAfter)
-        //    .HasPrecision(18, 3);
+        builder.HasIndex(x => x.InventoryMovementId);
     }
 }

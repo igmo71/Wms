@@ -41,7 +41,8 @@ Core domain concepts:
 - warehouse, zone, and storage location;
 - SKU, unit of measure, and SKU barcode;
 - inventory balance: current quantity of an SKU in a warehouse storage location;
-- inventory turnover: an immutable movement recording balance before/after and its source document.
+- inventory movement: an editable draft of a warehouse movement, which becomes historical when posted;
+- inventory turnover: an immutable balance change recording before/after and its originating inventory movement.
 
 ## Configuration UI
 

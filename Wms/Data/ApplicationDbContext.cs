@@ -9,7 +9,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<DeliveryDirection> DeliveryDirections => Set<DeliveryDirection>();
     public DbSet<InventoryBalance> InventoryBalances => Set<InventoryBalance>();
-    internal DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
+    public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();
     public DbSet<ReceivingOrderItem> ReceivingOrderItems => Set<ReceivingOrderItem>();

@@ -1,5 +1,3 @@
-﻿using Wms.Domain.Enums;
-
 namespace Wms.Domain;
 
 public class InventoryTurnover
@@ -21,7 +19,6 @@ public class InventoryTurnover
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 
-    public Guid? RecorderId { get; set; }
-    public int? RecorderLineNumber { get; set; }
-    public RecorderType RecorderType { get; set; }
+    public Guid InventoryMovementId { get; set; }
+    public InventoryMovement? InventoryMovement { get; set; }
 }
