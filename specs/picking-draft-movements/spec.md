@@ -11,8 +11,9 @@ was picked from before inventory is posted.
 - Allow changes only during picking or verification statuses.
 - Recalculate each shipping line's actual quantity from its unposted draft
   movements.
+- Post the draft movements when the order is set ready for shipment.
 
 ## Non-goals
 
-- Inventory balance or turnover posting.
-- Picking endpoints, UI, or the ready-for-shipment transition.
+- Picking endpoints or UI.
+- Any other ready-for-shipment workflow behavior beyond posting its existing draft movements.

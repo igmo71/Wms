@@ -141,7 +141,6 @@ public class ReceivingOrderCommandService(
                 StockKeepingUnitId = x.StockKeepingUnitId,
                 Quantity = x.FactQuantity,
                 CreatedAtUtc = now,
-                UpdatedAtUtc = now,
                 RecorderId = existingOrder.Id,
                 RecorderLineNumber = x.LineNumber,
                 RecorderType = RecorderType.ReceivingOrder

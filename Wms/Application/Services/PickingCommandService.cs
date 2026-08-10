@@ -70,7 +70,6 @@ public class PickingCommandService(
             StockKeepingUnitId = orderItem.StockKeepingUnitId,
             Quantity = quantity,
             CreatedAtUtc = now,
-            UpdatedAtUtc = now,
             RecorderType = RecorderType.ShippingOrder,
             RecorderId = order.Id,
             RecorderLineNumber = orderItem.LineNumber

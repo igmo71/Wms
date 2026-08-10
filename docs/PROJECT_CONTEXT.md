@@ -17,9 +17,9 @@ WMS is responsible for these warehouse processes:
 
 Only receiving is currently being implemented. The other processes are roadmap items. Outgoing orders will be imported from 1C and are expected to follow a pattern analogous to receiving orders.
 
-Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Inventory balances and turnovers are changed only when the order is shipped.
+Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
-Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. Draft picking movements do not change inventory balances or turnovers.
+Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. They change inventory balances and create turnovers only when `SetReadyForShipmentAsync` posts them.
 
 ## MVP implementation principles
 

@@ -132,6 +132,18 @@ internal class ShippingOrderCommandService(
             return validationResult;
         }
 
+        var draftPickingMovements = await dbContext.InventoryMovements
+            .Where(x => x.PostedAtUtc == null
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == existingOrder.Id)
+            .ToListAsync(ct);
+
+        var balanceAndTurnoverResult = await balanceAndTurnoverService
+            .PostInventoryMovementsAsync(draftPickingMovements, dbContext, ct);
+
+        if (!balanceAndTurnoverResult.IsSuccess)
+            return balanceAndTurnoverResult;
+
         if (existingOrder.HasPlanFactDifference)
         {
             var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder, ct);
@@ -193,7 +205,6 @@ internal class ShippingOrderCommandService(
                 StockKeepingUnitId = x.StockKeepingUnitId,
                 Quantity = x.FactQuantity,
                 CreatedAtUtc = now,
-                UpdatedAtUtc = now,
                 RecorderId = existingOrder.Id,
                 RecorderLineNumber = x.LineNumber,
                 RecorderType = RecorderType.ShippingOrder
