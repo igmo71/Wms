@@ -133,7 +133,7 @@ public class ReceivingOrderCommandService(
 
         var now = DateTimeOffset.UtcNow;
         var movements = existingOrder.Items
-            .Where(x => x.FactQuantity > 0)
+            .Where(x => x.FactQuantity != 0)
             .Select(x => new InventoryMovement
             {
                 WarehouseId = existingOrder.WarehouseId,
