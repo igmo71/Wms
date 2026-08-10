@@ -16,8 +16,10 @@ public static class Catalog_Номенклатура_Endpoints
             .WithTags("Catalog_Номенклатура")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Номенклатура/import", Import);
-        group.MapPost("/Catalog_Номенклатура/notify", Notify);
+        group.MapGet("/Catalog_Номенклатура/import", Import)
+            .WithName("Catalog_Номенклатура.Import");
+        group.MapPost("/Catalog_Номенклатура/notify", Notify)
+            .WithName("Catalog_Номенклатура.Notify");
 
         return routeBuilder;
     }

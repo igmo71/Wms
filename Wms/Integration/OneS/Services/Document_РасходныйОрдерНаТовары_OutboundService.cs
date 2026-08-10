@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
@@ -23,6 +24,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
     private async Task<ServiceResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
     {
         using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
+        using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.SwitchStatus", nameof(ShippingOrderCommandService));
 
         var patchUri = Document.PatchUri(orderId.ToString());
 
@@ -51,6 +53,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
     internal async Task<ServiceResult> UpdateDocumentItemsAsync(ShippingOrder shippingOrder, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
+        using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));
 
         var patchItems = shippingOrder.Items.Select(PatchItem.From).ToList();
         var patchBaseItems = shippingOrder.BaseItems.Select(PatchBaseItem.From).ToList();

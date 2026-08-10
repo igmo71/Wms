@@ -15,8 +15,10 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
             .WithTags("Document_ПриходныйОрдерНаТовары")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder);
-        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder);
+        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder)
+            .WithName("Document_ПриходныйОрдерНаТовары.Import");
+        group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder)
+            .WithName("Document_ПриходныйОрдерНаТовары.Notify");
 
         return routeBuilder;
     }

@@ -1,0 +1,72 @@
+@page "/shipping-orders/{Id:guid}"
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Детали расходного ордера</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_order is null)
+{
+    <MudAlert Severity="Severity.Warning">Расходный ордер не найден.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h4">Расходный ордер @_order.Number</MudText>
+            <MudSpacer />
+            @if (_order.Status == ShippingOrderStatus.Prepared)
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isStarting || _shippingLocation is null)"
+                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="SetReadyForPickingAsync">
+                    Взять в отбор
+                </MudButton>
+            }
+            <MudButton Href="shipping-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
+        </MudStack>
+
+        @if (_startOrderFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Номер</MudText><MudText>@_order.Number</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">План отгрузки</MudText><MudText>@_order.PlannedShippingDate.ToString("dd.MM.yyyy")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Зона отгрузки</MudText>
+                    <MudAutocomplete T="Zone" Value="_shippingZone" ValueChanged="OnShippingZoneChanged" SearchFunc="SearchShippingZonesAsync"
+                                     ToStringFunc="zone => zone?.Name ?? string.Empty" Disabled="@(_order.Status != ShippingOrderStatus.Prepared)"
+                                     Variant="Variant.Text" Dense="true" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Место отгрузки</MudText>
+                    <MudAutocomplete T="StorageLocation" Value="_shippingLocation" ValueChanged="OnShippingLocationChanged" SearchFunc="SearchShippingLocationsAsync"
+                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                     Disabled="@(_order.Status != ShippingOrderStatus.Prepared || _shippingZone is null)"
+                                     Variant="Variant.Text" Dense="true" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudDataGrid T="ShippingOrderItem" Items="_order.Items" Hover="true" Striped="true" Dense="true">
+            <Columns>
+                <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
+                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
+                <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+            </Columns>
+        </MudDataGrid>
+    </MudStack>
+}

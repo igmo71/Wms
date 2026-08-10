@@ -14,6 +14,7 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
         var order = await dbContext.ShippingOrders
             .AsNoTracking()
             .Include(x => x.Warehouse)
+            .Include(x => x.DeliveryDirection)
             .Include(x => x.ShippingLocation)
                 .ThenInclude(x => x!.Zone)
             .FirstOrDefaultAsync(x => x.Id == id, ct);

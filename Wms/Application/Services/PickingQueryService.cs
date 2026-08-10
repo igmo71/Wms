@@ -16,6 +16,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
 
         return await dbContext.InventoryMovements
             .AsNoTracking()
+            .Include(x => x.SourceStorageLocation)
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder
                 && x.RecorderId == orderId
@@ -23,39 +24,35 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .OrderBy(x => x.CreatedAtUtc)
             .ToListAsync(ct);
     }
-
-    public async Task<List<InventoryBalance>> GetAvailableSourceLocationsAsync(
-        Guid orderId,
-        int lineNumber,
-        CancellationToken ct = default)
+    public async Task<List<StorageLocation>> GetAvailableSourceLocationsAsync(
+    Guid orderId,
+    int lineNumber,
+    CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var orderLine = await dbContext.ShippingOrderItems
+        var order = await dbContext.ShippingOrders
             .AsNoTracking()
-            .Where(x => x.ShippingOrderId == orderId && x.LineNumber == lineNumber)
-            .Join(
-                dbContext.ShippingOrders.AsNoTracking(),
-                item => item.ShippingOrderId,
-                order => order.Id,
-                (item, order) => new
-                {
-                    order.WarehouseId,
-                    order.ShippingLocationId,
-                    item.StockKeepingUnitId
-                })
-            .FirstOrDefaultAsync(ct);
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
-        if (orderLine is null)
+        if (order is null)
+            return [];
+
+        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
+
+        if (orderItem is null)
             return [];
 
         return await dbContext.InventoryBalances
             .AsNoTracking()
-            .Where(x => x.WarehouseId == orderLine.WarehouseId
-                && x.StockKeepingUnitId == orderLine.StockKeepingUnitId
-                && x.Quantity > 0
-                && x.StorageLocationId != orderLine.ShippingLocationId)
+            .Where(x =>
+                x.WarehouseId == order.WarehouseId &&
+                x.StockKeepingUnitId == orderItem.StockKeepingUnitId &&
+                x.StorageLocationId != order.ShippingLocationId &&
+                x.Quantity > 0)
             .OrderBy(x => x.StorageLocation!.Name)
+            .Select(x => x.StorageLocation!)
             .ToListAsync(ct);
     }
 }

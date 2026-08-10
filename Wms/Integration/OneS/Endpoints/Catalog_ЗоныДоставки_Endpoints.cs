@@ -16,8 +16,10 @@ public static class Catalog_ЗоныДоставки_Endpoints
             .WithTags("Catalog_ЗоныДоставки_Endpoints")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_ЗоныДоставки_Endpoints/import", Import);
-        group.MapPost("/Catalog_ЗоныДоставки_Endpoints/notify", Notify);
+        group.MapGet("/Catalog_ЗоныДоставки_Endpoints/import", Import)
+            .WithName("Catalog_ЗоныДоставки.Import");
+        group.MapPost("/Catalog_ЗоныДоставки_Endpoints/notify", Notify)
+            .WithName("Catalog_ЗоныДоставки.Notify");
 
         return routeBuilder;
     }

@@ -1,0 +1,65 @@
+@page "/shipping-orders"
+@using Wms.Application.Services
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Расходные ордера</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Расходные ордера</MudText>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudStack Row>
+        <MudTextField T="string"
+                      @bind-Value="_searchString"
+                      Label="Поиск по номеру"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="OnSearchChangedAsync"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Clearable="true" />
+        <MudDatePicker Label="Дата с" Date="_dateFrom" DateChanged="OnDateFromChangedAsync" Clearable="true" Class="ml-4" />
+        <MudDatePicker Label="Дата по" Date="_dateTo" DateChanged="OnDateToChangedAsync" Clearable="true" Class="ml-4" />
+        <MudSelect T="ShippingOrderStatus?" Label="Статус" Value="_status" ValueChanged="OnStatusChangedAsync" Clearable="true" Class="ml-4">
+            @foreach (var status in Enum.GetValues<ShippingOrderStatus>())
+            {
+                <MudSelectItem T="ShippingOrderStatus?" Value="@((ShippingOrderStatus?)status)">@status.GetDisplayName()</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSpacer />
+    </MudStack>
+</MudPaper>
+
+<MudDataGrid T="ShippingOrder" @ref="_dataGrid" ServerData="LoadServerDataAsync" SortMode="SortMode.Single" Filterable="false"
+             Hover="true" Striped="true" Dense="true" RowsPerPage="25" Loading="@_dataGridLoading">
+    <Columns>
+        <TemplateColumn Title="Номер" SortBy="x => x.Number">
+            <CellTemplate><MudLink Href="@($"shipping-orders/{context.Item.Id}")">@context.Item.Number</MudLink></CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
+        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
+        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />
+        <PropertyColumn Property="x => x.PlannedShippingDate" Title="План отгрузки" Format="dd.MM.yyyy" Sortable="true" />
+        <PropertyColumn Property="x => x.PickingStartedAtUtc" Title="В отборе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.ReadyForShipmentAtUtc" Title="Готов к отгрузке" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.ShippedAtUtc" Title="Отгружен" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <TemplateColumn Title="1C" Sortable="false">
+            <CellTemplate>
+                <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "Синхронизирован с 1С")">
+                    <MudIcon Icon="@(context.Item.ExternalChangeDetected ? Icons.Material.Filled.Warning : Icons.Material.Filled.CheckCircle)"
+                             Color="@(context.Item.ExternalChangeDetected ? Color.Warning : Color.Success)" />
+                </MudTooltip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudTooltip Text="Детали">
+                    <MudIconButton Href="@($"shipping-orders/{context.Item.Id}")" Icon="@Icons.Material.Filled.Visibility" Color="Color.Primary" />
+                </MudTooltip>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent><MudDataGridPager T="ShippingOrder" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>
+</MudDataGrid>

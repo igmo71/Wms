@@ -15,8 +15,10 @@ public static class Document_РасходныйОрдерНаТовары_Endpoi
             .WithTags("Document_РасходныйОрдерНаТовары")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_РасходныйОрдерНаТовары/import", ImportOrder);
-        group.MapPost("/Document_РасходныйОрдерНаТовары/notify", NotifyOrder);
+        group.MapGet("/Document_РасходныйОрдерНаТовары/import", ImportOrder)
+            .WithName("Document_РасходныйОрдерНаТовары.Import");
+        group.MapPost("/Document_РасходныйОрдерНаТовары/notify", NotifyOrder)
+            .WithName("Document_РасходныйОрдерНаТовары.Notify");
 
         return routeBuilder;
     }

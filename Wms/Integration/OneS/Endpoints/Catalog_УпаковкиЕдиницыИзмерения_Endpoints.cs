@@ -15,8 +15,10 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
             .WithTags("Catalog_УпаковкиЕдиницыИзмерения")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import);
-        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify);
+        group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import)
+            .WithName("Catalog_УпаковкиЕдиницыИзмерения.Import");
+        group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify)
+            .WithName("Catalog_УпаковкиЕдиницыИзмерения.Notify");
 
         return routeBuilder;
     }

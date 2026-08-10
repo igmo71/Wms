@@ -15,13 +15,15 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Only receiving is currently being implemented. The other processes are roadmap items. Outgoing orders will be imported from 1C and are expected to follow a pattern analogous to receiving orders.
+Receiving and the initial shipping/picking flow are currently being implemented. Putaway, intra-warehouse transfers, and inventory counting remain roadmap items. Outgoing orders are imported from 1C and use their own shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
 Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. They change inventory balances and create turnovers only when `SetReadyForShipmentAsync` posts them.
 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. They do not reserve stock or subtract quantities already picked from the reported availability.
+
+The initial shipping UI has a filtered, paged list of shipping orders and a details page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking work page itself is not implemented yet.
 
 ## MVP implementation principles
 

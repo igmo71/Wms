@@ -8,7 +8,7 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Application.Services;
 
-internal class ShippingOrderCommandService(
+public class ShippingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     BalanceAndTurnoverService balanceAndTurnoverService,
     Document_РасходныйОрдерНаТовары_OutboundService outboundService,
@@ -230,6 +230,24 @@ internal class ShippingOrderCommandService(
         existingOrder.SetShipped(userId);
 
         await dbContext.SaveChangesAsync(ct);
+
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> SetShippingLocationAsync(
+        Guid shippingOrderId,
+        Guid shippingLocationId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var affected = await dbContext.ShippingOrders
+            .Where(x => x.Id == shippingOrderId)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.ShippingLocationId, shippingLocationId), ct);
+
+        if (affected == 0)
+            return ServiceError.NotFound<ShippingOrder>();
 
         return ServiceResult.Success();
     }

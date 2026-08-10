@@ -19,6 +19,7 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
     public async Task ImportDocumentAsync(string refKey, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ImportDocument {RefKey}", refKey);
+        using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.Import", nameof(ShippingOrderCommandService));
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 

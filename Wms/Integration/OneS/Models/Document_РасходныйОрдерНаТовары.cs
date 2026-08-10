@@ -92,7 +92,7 @@ internal class Document_РасходныйОрдерНаТовары
             Status = ODataEnumMapper.Parse<ShippingOrderStatus>(fetchedDocument.Статус),
             Queue = ODataEnumMapper.Parse<ShippingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
             PlannedShippingDate = fetchedDocument.Доброга_ПланируемаяДатаОтгрузки,
-            DeliveryDirectionId = fetchedDocument.Доброга_НаправлениеДоставки_Key,
+            DeliveryDirectionId = fetchedDocument.Доброга_НаправлениеДоставки_Key == Guid.Empty ? null : fetchedDocument.Доброга_НаправлениеДоставки_Key,
             WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
             RecipientId = fetchedDocument.Получатель,
             RecipientType = fetchedDocument.Получатель_Type.TrimODataPrefix(),

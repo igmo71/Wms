@@ -16,8 +16,10 @@ public static class Catalog_Склады_Endpoints
             .WithTags("Catalog_Склады")
             .ProducesValidationProblem();
 
-        group.MapGet("/Catalog_Склады/import", Import);
-        group.MapPost("/Catalog_Склады/notify", Notify);
+        group.MapGet("/Catalog_Склады/import", Import)
+            .WithName("Catalog_Склады.Import");
+        group.MapPost("/Catalog_Склады/notify", Notify)
+            .WithName("Catalog_Склады.Notify");
 
         return routeBuilder;
     }
