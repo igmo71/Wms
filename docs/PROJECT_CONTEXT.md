@@ -15,7 +15,7 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Receiving and the initial shipping/picking flow are currently being implemented. Putaway, intra-warehouse transfers, and inventory counting remain roadmap items. Outgoing orders are imported from 1C and use their own shipping workflow.
+Receiving, the initial shipping/picking flow, and inventory-count backend are currently being implemented. Putaway and intra-warehouse transfers remain roadmap items. Outgoing orders are imported from 1C and use their own shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
@@ -24,6 +24,8 @@ Picking records draft `InventoryMovement` rows from source storage locations to 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. They do not reserve stock or subtract quantities already picked from the reported availability.
 
 The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
+
+Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. Inventory-count UI, recounts, reservations, and inventory tasks are not implemented.
 
 ## MVP implementation principles
 

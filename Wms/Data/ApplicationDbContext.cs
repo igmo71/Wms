@@ -9,6 +9,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<DeliveryDirection> DeliveryDirections => Set<DeliveryDirection>();
     public DbSet<InventoryBalance> InventoryBalances => Set<InventoryBalance>();
+    public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
+    public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();

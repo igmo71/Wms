@@ -12,4 +12,7 @@ public enum RecorderType
 
     [Display(Name = "Расходный ордер")]
     ShippingOrder = 2,
+
+    [Display(Name = "Инвентаризация")]
+    InventoryCount = 3,
 }
