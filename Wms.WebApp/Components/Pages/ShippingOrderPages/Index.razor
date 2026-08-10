@@ -1,5 +1,4 @@
 @page "/shipping-orders"
-@using Wms.Application.Services
 @using Wms.Common
 @using Wms.Domain
 @using Wms.Domain.Enums
@@ -19,23 +18,60 @@
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
                       Clearable="true" />
-        <MudDatePicker Label="Дата с" Date="_dateFrom" DateChanged="OnDateFromChangedAsync" Clearable="true" Class="ml-4" />
-        <MudDatePicker Label="Дата по" Date="_dateTo" DateChanged="OnDateToChangedAsync" Clearable="true" Class="ml-4" />
-        <MudSelect T="ShippingOrderStatus?" Label="Статус" Value="_status" ValueChanged="OnStatusChangedAsync" Clearable="true" Class="ml-4">
+        <MudDatePicker Label="Дата с"
+                       Date="_dateFrom"
+                       DateChanged="OnDateFromChangedAsync"
+                       Clearable="true"
+                       Class="ml-4" />
+        <MudDatePicker Label="Дата по"
+                       Date="_dateTo"
+                       DateChanged="OnDateToChangedAsync"
+                       Clearable="true"
+                       Class="ml-4" />
+        <MudSelect T="ShippingOrderStatus?"
+                   Label="Статус"
+                   Value="_status"
+                   ValueChanged="OnStatusChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
             @foreach (var status in Enum.GetValues<ShippingOrderStatus>())
             {
-                <MudSelectItem T="ShippingOrderStatus?" Value="@((ShippingOrderStatus?)status)">@status.GetDisplayName()</MudSelectItem>
+                <MudSelectItem T="ShippingOrderStatus?" Value="@((ShippingOrderStatus?)status)">
+                    @status.GetDisplayName()
+                </MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="ShippingOrderQueue?"
+                   Label="Очередь"
+                   Value="_queue"
+                   ValueChanged="OnQueueChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
+            @foreach (var queue in Enum.GetValues<ShippingOrderQueue>())
+            {
+                <MudSelectItem T="ShippingOrderQueue?" Value="@((ShippingOrderQueue?)queue)">
+                    @queue.GetDisplayName()
+                </MudSelectItem>
             }
         </MudSelect>
         <MudSpacer />
     </MudStack>
 </MudPaper>
 
-<MudDataGrid T="ShippingOrder" @ref="_dataGrid" ServerData="LoadServerDataAsync" SortMode="SortMode.Single" Filterable="false"
-             Hover="true" Striped="true" Dense="true" RowsPerPage="25" Loading="@_dataGridLoading">
+<MudDataGrid T="ShippingOrder"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
     <Columns>
         <TemplateColumn Title="Номер" SortBy="x => x.Number">
-            <CellTemplate><MudLink Href="@($"shipping-orders/{context.Item.Id}")">@context.Item.Number</MudLink></CellTemplate>
+            <CellTemplate>
+                <MudLink Href="@($"shipping-orders/{context.Item.Id}")">@context.Item.Number</MudLink>
+            </CellTemplate>
         </TemplateColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
@@ -56,10 +92,14 @@
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
             <CellTemplate>
                 <MudTooltip Text="Детали">
-                    <MudIconButton Href="@($"shipping-orders/{context.Item.Id}")" Icon="@Icons.Material.Filled.Visibility" Color="Color.Primary" />
+                    <MudIconButton Href="@($"shipping-orders/{context.Item.Id}")"
+                                   Icon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Primary" />
                 </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
     </Columns>
-    <PagerContent><MudDataGridPager T="ShippingOrder" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>
+    <PagerContent>
+        <MudDataGridPager T="ShippingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
 </MudDataGrid>

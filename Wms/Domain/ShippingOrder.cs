@@ -21,7 +21,7 @@ public class ShippingOrder
 
     public ShippingOrderStatus Status { get; set; }
     public ShippingOrderQueue Queue { get; set; }
-    public DateTime PlannedShippingDate { get; set; }
+    public DateTime? PlannedShippingDate { get; set; }
     public Guid? DeliveryDirectionId { get; set; }
     public DeliveryDirection? DeliveryDirection { get; set; }
     public WarehouseOperation WarehouseOperation { get; set; }

@@ -41,6 +41,19 @@
                 </MudSelectItem>
             }
         </MudSelect>
+        <MudSelect T="ReceivingOrderQueue?"
+                   Label="Очередь"
+                   Value="_queue"
+                   ValueChanged="OnQueueChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
+            @foreach (var queue in Enum.GetValues<ReceivingOrderQueue>())
+            {
+                <MudSelectItem T="ReceivingOrderQueue?" Value="@((ReceivingOrderQueue?)queue)">
+                    @queue.GetDisplayName()
+                </MudSelectItem>
+            }
+        </MudSelect>
         <MudSpacer />
     </MudStack>
 </MudPaper>
@@ -53,8 +66,7 @@
              Hover="true"
              Striped="true"
              Dense="true"
-             RowsPerPage="25"
-             Loading="@_dataGridLoading">
+             RowsPerPage="25">
     <Columns>
         <TemplateColumn Title="Номер" SortBy="x => x.Number">
             <CellTemplate>
@@ -64,17 +76,17 @@
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
         <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
-        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />
+        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />        
+        <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <TemplateColumn Title="1C" Sortable="false">
             <CellTemplate>
-                <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "")">
+                <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "Синхронизирован с 1С")">
                     <MudIcon Icon="@(context.Item.ExternalChangeDetected ? Icons.Material.Filled.Warning : Icons.Material.Filled.CheckCircle)"
                              Color="@(context.Item.ExternalChangeDetected ? Color.Warning : Color.Success)" />
                 </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
             <CellTemplate>
                 <MudTooltip Text="Детали">

@@ -4,7 +4,6 @@ using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
-using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ShippingOrderPages;
 
@@ -35,6 +34,9 @@ public partial class Details
         _shippingLocation = _order?.ShippingLocation;
         _isLoading = false;
     }
+
+    private static string FormatDateTime(DateTime? value) =>
+        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
     private async Task<IEnumerable<Zone>> SearchShippingZonesAsync(string? searchText, CancellationToken ct)
     {

@@ -40,7 +40,7 @@ else
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">План отгрузки</MudText><MudText>@_order.PlannedShippingDate.ToString("dd.MM.yyyy")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">План отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Зона отгрузки</MudText>

@@ -10,55 +10,41 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
 public partial class Index : IAsyncDisposable
 {
-    [Inject]
-    private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
 
-    [Inject]
-    private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
-
-    [Inject]
-    private IOptions<WmsSettings> Options { get; set; } = null!;
+    [Inject] private IOptions<WmsSettings> Options { get; set; } = null!;
 
     private MudDataGrid<ReceivingOrder> _dataGrid = null!;
-    private bool _dataGridLoading = true;
     private string? _searchString;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private ReceivingOrderStatus? _status;
+    private ReceivingOrderQueue? _queue;
     private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
 
-    private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(
-        GridState<ReceivingOrder> state,
-        CancellationToken cancellationToken)
+    private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(GridState<ReceivingOrder> state, CancellationToken cancellationToken)
     {
         var sortDefinition = state.SortDefinitions.FirstOrDefault();
-        var query = new ReceivingOrderListQuery
+
+        var result = await OrderQueryService.ListOrdersAsync(new ReceivingOrderListQuery
         {
             SearchString = _searchString,
             DateFrom = _dateFrom,
             DateTo = _dateTo,
             Status = _status,
+            Queue = _queue,
             SortBy = sortDefinition?.SortBy,
             SortDescending = sortDefinition?.Descending ?? true,
             Skip = state.Page * state.PageSize,
             Take = state.PageSize
+        }, cancellationToken);
+
+        return new GridData<ReceivingOrder>
+        {
+            Items = result.Items,
+            TotalItems = result.TotalItems
         };
-
-        try
-        {
-            var result = await OrderQueryService.ListOrdersAsync(query, cancellationToken);
-
-            return new GridData<ReceivingOrder>
-            {
-                Items = result.Items,
-                TotalItems = result.TotalItems
-            };
-        }
-        finally
-        {
-            _dataGridLoading = false;
-        }
     }
 
     private Task OnSearchChangedAsync(string searchString)
@@ -82,6 +68,12 @@ public partial class Index : IAsyncDisposable
     private Task OnStatusChangedAsync(ReceivingOrderStatus? status)
     {
         _status = status;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private Task OnQueueChangedAsync(ReceivingOrderQueue? queue)
+    {
+        _queue = queue;
         return _dataGrid.ReloadServerData();
     }
 
