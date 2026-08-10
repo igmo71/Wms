@@ -90,7 +90,7 @@ public partial class Index : IAsyncDisposable
 
     private async Task RefreshLoopAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_wmsSettings?.ReceivingRefreshLoop ?? 5));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_wmsSettings?.OrdersRefreshLoop ?? 5));
 
         try
         {

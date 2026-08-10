@@ -4,5 +4,5 @@ public class WmsSettings
 {
     public int ImportDelay { get; set; }
 
-    public int ReceivingRefreshLoop { get; set; }
+    public int OrdersRefreshLoop { get; set; }
 }
