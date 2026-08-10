@@ -16,7 +16,7 @@ public class InventoryBalance
     public double Quantity { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
-    public DateTimeOffset UpdatedAtUtc { get; set; }
+    public DateTimeOffset? UpdatedAtUtc { get; set; }
 
     public byte[] RowVersion { get; set; } = [];
 }

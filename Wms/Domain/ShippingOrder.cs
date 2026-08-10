@@ -27,7 +27,7 @@ public class ShippingOrder
     public WarehouseOperation WarehouseOperation { get; set; }
 
 
-    public DateTimeOffset? CreatedAtUtc { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? PickingStartedAtUtc { get; set; }
     public DateTimeOffset? ReadyForShipmentAtUtc { get; set; }

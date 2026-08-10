@@ -24,7 +24,7 @@ public class ReceivingOrder
     public WarehouseOperation WarehouseOperation { get; set; }
     public BusinessOperation BusinessOperation { get; set; }
 
-    public DateTimeOffset? CreatedAtUtc { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? StartedAtUtc { get; set; }
     public DateTimeOffset? CompletedAtUtc { get; set; }

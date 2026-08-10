@@ -233,46 +233,4 @@ internal class ShippingOrderCommandService(
 
         return ServiceResult.Success();
     }
-
-    public async Task<ServiceResult> UpdateOrderItemFactQuantityAsync(
-        Guid shippingOrderId,
-        int lineNumber,
-        double factQuantity,
-        string? comment,
-        CancellationToken ct = default)
-    {
-        if (factQuantity < 0)
-            return ServiceError.Invalid<ShippingOrderItem>("Fact quantity cannot be negative.");
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingOrder = await dbContext.ShippingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == shippingOrderId, ct);
-
-        if (existingOrder is null)
-            return ServiceError.NotFound<ShippingOrder>();
-
-        var canEditFactQuantity = existingOrder.Status is ShippingOrderStatus.ReadyForPicking
-            or ShippingOrderStatus.ReadyForVerification
-            or ShippingOrderStatus.InVerification
-            or ShippingOrderStatus.Verified;
-
-        if (!canEditFactQuantity)
-        {
-            return ServiceError.Invalid<ShippingOrderItem>("Fact quantity can be edited only while the shipping order is being picked or verified.");
-        }
-
-        var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
-
-        if (existingItem is null)
-            return ServiceError.NotFound<ShippingOrderItem>();
-
-        existingItem.FactQuantity = factQuantity;
-        existingItem.Comment = comment;
-
-        await dbContext.SaveChangesAsync(ct);
-
-        return ServiceResult.Success();
-    }
 }

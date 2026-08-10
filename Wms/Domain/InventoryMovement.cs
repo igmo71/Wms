@@ -21,7 +21,7 @@ public class InventoryMovement
     public double Quantity { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
-    public DateTimeOffset UpdatedAtUtc { get; set; }
+    public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? PostedAtUtc { get; set; }
 
 

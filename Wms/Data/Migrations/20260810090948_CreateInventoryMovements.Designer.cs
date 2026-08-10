@@ -12,8 +12,8 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260810071441_RefactorInventoryTurnoverToInventoryMovement")]
-    partial class RefactorInventoryTurnoverToInventoryMovement
+    [Migration("20260810090948_CreateInventoryMovements")]
+    partial class CreateInventoryMovements
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -297,7 +297,7 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("StorageLocationId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("WarehouseId")
@@ -348,7 +348,7 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("WarehouseId")
@@ -437,7 +437,7 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateTime>("Date")
@@ -535,7 +535,7 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateTime>("Date")
