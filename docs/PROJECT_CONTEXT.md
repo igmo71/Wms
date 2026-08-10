@@ -19,6 +19,8 @@ Only receiving is currently being implemented. The other processes are roadmap i
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Inventory balances and turnovers are changed only when the order is shipped.
 
+Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. Draft picking movements do not change inventory balances or turnovers.
+
 ## MVP implementation principles
 
 The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.
