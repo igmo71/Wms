@@ -1,0 +1,109 @@
+@page "/shipping-orders/{Id:guid}/picking"
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Отбор расходного ордера</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_order is null)
+{
+    <MudAlert Severity="Severity.Warning">Расходный ордер не найден.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h4">Отбор расходного ордера @_order.Number</MudText>
+            <MudSpacer />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isCompleting || !IsPickingEditable)" StartIcon="@Icons.Material.Filled.Check" OnClick="SetReadyForShipmentAsync">
+                Готов к отгрузке
+            </MudButton>
+            <MudButton Href="@($"/shipping-orders/{Id}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К деталям</MudButton>
+        </MudStack>
+
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudGrid Spacing="6">
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Номер</MudText><MudText>@_order.Number</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место отгрузки</MudText><MudText>@_order.ShippingLocation?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">План отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (!IsPickingEditable)
+        {
+            <MudAlert Severity="Severity.Warning">Отбор доступен только для ордера в статусе отбора или проверки.</MudAlert>
+        }
+
+        @if (_operationFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (IsPickingEditable)
+        {
+            <MudDataGrid T="ShippingOrderItem" Items="_order.Items" Hover="true" Striped="true" Dense="true">
+                <Columns>
+                    <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
+                    <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                    <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
+                    <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                    <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+                    <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+                        <CellTemplate>
+                            <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" OnClick="@(() => SelectLineAsync(context.Item))">Отобрать</MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+
+            @if (_selectedLine is not null)
+            {
+                <MudText Typo="Typo.h6">Отбор: @_selectedLine.StockKeepingUnit?.Name</MudText>
+
+                <MudDataGrid T="InventoryMovement" Items="_movements" Hover="true" Striped="true" Dense="true">
+                    <Columns>
+                        <PropertyColumn Property="x => x.SourceStorageLocation == null ? string.Empty : x.SourceStorageLocation.Name" Title="Ячейка-источник" />
+                        <PropertyColumn Property="x => x.Quantity" Title="Количество" />
+                        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" />
+                        <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" />
+                        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => BeginEditing(context.Item))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteMovementAsync(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle1">@(_editingMovement is null ? "Добавить отбор" : "Изменить отбор")</MudText>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="StorageLocation" Label="Ячейка-источник" @bind-Value="_selectedSourceLocation" Clearable="true">
+                                @foreach (var location in _availableSourceLocations)
+                                {
+                                    <MudSelectItem Value="@location">@location.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3"><MudNumericField T="double" Label="Количество" @bind-Value="_movementQuantity" Min="0" HideSpinButtons="true" /></MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_selectedSourceLocation is null)" OnClick="SaveMovementAsync">@(_editingMovement is null ? "Добавить" : "Сохранить")</MudButton>
+                            @if (_editingMovement is not null)
+                            {
+                                <MudButton Variant="Variant.Text" OnClick="CancelEditing">Отмена</MudButton>
+                            }
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        }
+    </MudStack>
+}

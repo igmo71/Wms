@@ -23,7 +23,7 @@ Picking records draft `InventoryMovement` rows from source storage locations to 
 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. They do not reserve stock or subtract quantities already picked from the reported availability.
 
-The initial shipping UI has a filtered, paged list of shipping orders and a details page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking work page itself is not implemented yet.
+The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
 ## MVP implementation principles
 

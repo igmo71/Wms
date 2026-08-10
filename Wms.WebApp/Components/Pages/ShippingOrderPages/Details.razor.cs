@@ -118,7 +118,7 @@ public partial class Details
                 return;
             }
 
-            NavigationManager.NavigateTo($"shipping-orders/{Id}", forceLoad: true);
+            NavigationManager.NavigateTo($"/shipping-orders/{Id}/picking");
         }
         catch
         {

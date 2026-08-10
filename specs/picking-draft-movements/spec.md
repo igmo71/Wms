@@ -13,9 +13,11 @@ was picked from before inventory is posted.
   movements.
 - Post the draft movements when the order is set ready for shipment.
 - Read draft movements and physical source-location balances for a shipping line.
+- Provide a shipping-order picking page where an operator can select a line and
+  add, edit, or delete its draft movements.
 
 ## Non-goals
 
-- Picking endpoints or UI.
+- Picking endpoints.
 - Any other ready-for-shipment workflow behavior beyond posting its existing draft movements.
 - Reservations or availability calculations that deduct draft picked quantities.
