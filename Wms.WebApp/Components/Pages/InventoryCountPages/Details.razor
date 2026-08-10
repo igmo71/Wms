@@ -1,0 +1,157 @@
+@page "/inventory-counts/{Id:guid}"
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Инвентаризация</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_inventoryCount is null)
+{
+    <MudAlert Severity="Severity.Warning">Инвентаризация не найдена.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h4">Инвентаризация</MudText>
+            <MudSpacer />
+            @if (IsDraft)
+            {
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Disabled="@_isPosting"
+                           StartIcon="@Icons.Material.Filled.Check"
+                           OnClick="PostAsync">
+                    Провести
+                </MudButton>
+            }
+            <MudButton Href="inventory-counts" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
+                К списку
+            </MudButton>
+        </MudStack>
+
+        @if (_operationFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption">Склад</MudText>
+                    <MudText>@_inventoryCount.Warehouse?.Name</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption">Статус</MudText>
+                    <MudText>@_inventoryCount.Status.GetDisplayName()</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Создана</MudText>
+                    <MudText>@FormatDateTimeOffset(_inventoryCount.CreatedAtUtc)</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Изменена</MudText>
+                    <MudText>@FormatDateTimeOffset(_inventoryCount.UpdatedAtUtc)</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Проведена</MudText>
+                    <MudText>@FormatDateTimeOffset(_inventoryCount.PostedAtUtc)</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (IsDraft)
+        {
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Outlined"
+                       Disabled="@_isAddingItem"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddItemAsync">
+                Добавить строку
+            </MudButton>
+        }
+
+        <MudTable Items="_inventoryCount.Items" Hover="true" Striped="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Строка</MudTh>
+                <MudTh>Ячейка</MudTh>
+                <MudTh>Номенклатура</MudTh>
+                <MudTh>Ожидается</MudTh>
+                <MudTh>Фактически</MudTh>
+                <MudTh>Разница</MudTh>
+                @if (IsDraft)
+                {
+                    <MudTh></MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Строка">@context.LineNumber</MudTd>
+                <MudTd DataLabel="Ячейка">
+                    @if (IsDraft)
+                    {
+                        <MudAutocomplete T="StorageLocation"
+                                         Value="context.StorageLocation"
+                                         ValueChanged="location => UpdateStorageLocationAsync(context, location)"
+                                         SearchFunc="SearchStorageLocationsAsync"
+                                         ToStringFunc="location => location?.Name ?? string.Empty"
+                                         Variant="Variant.Text"
+                                         Dense="true"
+                                         Clearable="true" />
+                    }
+                    else
+                    {
+                        @context.StorageLocation?.Name
+                    }
+                </MudTd>
+                <MudTd DataLabel="Номенклатура">
+                    @if (IsDraft)
+                    {
+                        <MudAutocomplete T="StockKeepingUnit"
+                                         Value="context.StockKeepingUnit"
+                                         ValueChanged="sku => UpdateStockKeepingUnitAsync(context, sku)"
+                                         SearchFunc="SearchStockKeepingUnitsAsync"
+                                         ToStringFunc="sku => sku?.Name ?? string.Empty"
+                                         Variant="Variant.Text"
+                                         Dense="true"
+                                         Clearable="true" />
+                    }
+                    else
+                    {
+                        @context.StockKeepingUnit?.Name
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ожидается">@context.ExpectedQuantity</MudTd>
+                <MudTd DataLabel="Фактически">
+                    @if (IsDraft)
+                    {
+                        <MudNumericField T="double"
+                                         Value="context.CountedQuantity"
+                                         ValueChanged="quantity => UpdateCountedQuantityAsync(context, quantity)"
+                                         Min="0"
+                                         Variant="Variant.Text"
+                                         HideSpinButtons="true" />
+                    }
+                    else
+                    {
+                        @context.CountedQuantity
+                    }
+                </MudTd>
+                <MudTd DataLabel="Разница">@context.DifferenceQuantity</MudTd>
+                @if (IsDraft)
+                {
+                    <MudTd>
+                        <MudTooltip Text="Удалить строку">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteItemAsync(context))" />
+                        </MudTooltip>
+                    </MudTd>
+                }
+            </RowTemplate>
+        </MudTable>
+    </MudStack>
+}

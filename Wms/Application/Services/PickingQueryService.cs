@@ -44,7 +44,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         if (orderItem is null)
             return [];
 
-        return await dbContext.InventoryBalances
+        var result = await dbContext.InventoryBalances
             .AsNoTracking()
             .Where(x =>
                 x.WarehouseId == order.WarehouseId &&
@@ -54,5 +54,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .OrderBy(x => x.StorageLocation!.Name)
             .Select(x => x.StorageLocation!)
             .ToListAsync(ct);
+
+        return result;
     }
 }

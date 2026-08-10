@@ -13,8 +13,9 @@ location and SKU, and post the resulting inventory differences.
 - Posting differences through `InventoryMovement` and the common balance/turnover
   posting service.
 - Read queries for a count and a paged count list.
+- Direct web UI for creating counts and editing or posting their draft rows.
 
 ## Non-goals
 
-- Inventory-count UI, endpoints, approvals, recounts, reservations, or tasks.
+- Endpoints, approvals, recounts, reservations, or tasks.
 - A database uniqueness constraint for a location-and-SKU pair within a count.

@@ -1,0 +1,61 @@
+@page "/inventory-counts"
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Инвентаризации</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Инвентаризации</MudText>
+    <MudSpacer />
+    <MudAutocomplete T="Warehouse"
+                     Value="_warehouse"
+                     ValueChanged="OnWarehouseChanged"
+                     SearchFunc="SearchWarehousesAsync"
+                     ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                     Label="Склад"
+                     Clearable="true"
+                     Class="mr-2" />
+    <MudButton Color="Color.Primary"
+               Variant="Variant.Filled"
+               Disabled="@(_isCreating || _warehouse is null)"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="CreateAsync">
+        Создать инвентаризацию
+    </MudButton>
+</MudStack>
+
+@if (_createFailed)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+<MudDataGrid T="InventoryCount"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
+        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
+        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создана" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменена" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.PostedAtUtc" Title="Проведена" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudTooltip Text="Детали">
+                    <MudIconButton Href="@($"inventory-counts/{context.Item.Id}")"
+                                   Icon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Primary" />
+                </MudTooltip>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="InventoryCount" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+</MudDataGrid>

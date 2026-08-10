@@ -25,7 +25,7 @@ Picking reads expose draft movements by order line and source locations with a p
 
 The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
-Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. Inventory-count UI, recounts, reservations, and inventory tasks are not implemented.
+Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 
 ## MVP implementation principles
 
@@ -112,6 +112,10 @@ For `Document_ПриходныйОрдерНаТовары`:
 ## Working conventions
 
 Read this file before making project changes. Update it when a lasting rule, integration boundary, process flow, or architecture convention changes.
+
+Intentional MVP limitations, pilot-readiness work, and deferred 1C decisions are
+kept in `docs/ROADMAP.md`. They are not accidental omissions and should not be
+implemented as incidental cleanup during unrelated feature work.
 
 For substantial issue-level work, create `specs/<issue-id-or-short-slug>/` and keep a concise specification there. Recommended contents:
 

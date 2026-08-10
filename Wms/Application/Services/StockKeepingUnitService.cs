@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application.Services;
 
-internal class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
