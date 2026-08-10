@@ -21,6 +21,8 @@ Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, t
 
 Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. They change inventory balances and create turnovers only when `SetReadyForShipmentAsync` posts them.
 
+Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. They do not reserve stock or subtract quantities already picked from the reported availability.
+
 ## MVP implementation principles
 
 The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.

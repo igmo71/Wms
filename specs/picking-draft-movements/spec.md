@@ -12,8 +12,10 @@ was picked from before inventory is posted.
 - Recalculate each shipping line's actual quantity from its unposted draft
   movements.
 - Post the draft movements when the order is set ready for shipment.
+- Read draft movements and physical source-location balances for a shipping line.
 
 ## Non-goals
 
 - Picking endpoints or UI.
 - Any other ready-for-shipment workflow behavior beyond posting its existing draft movements.
+- Reservations or availability calculations that deduct draft picked quantities.
