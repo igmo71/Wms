@@ -292,6 +292,10 @@ public class ShippingOrder
     {
         Status = ShippingOrderStatus.Prepared;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
+        PickingStartedAtUtc = null;
+        ReadyForShipmentAtUtc = null;
+        PickingStartedBy = null;
+        ReadyForShipmentBy = null;
         RolledBackAtUtc = UpdatedAtUtc;
         RolledBackBy = userId;
         RollbackReason = reason;

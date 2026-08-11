@@ -57,9 +57,14 @@ public class PickingCommandService(
         var draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == order.Id
-                && x.RecorderLineNumber == lineNumber)
+                && x.RecorderId == order.Id)
             .ToListAsync(ct);
+
+        var limitsValidationResult = await ValidateDraftQuantityLimitsAsync(
+            dbContext, order, orderItem, sourceStorageLocationId, quantity, draftMovements, null, ct);
+
+        if (!limitsValidationResult.IsSuccess)
+            return limitsValidationResult;
 
         var now = DateTimeOffset.UtcNow;
         var movement = new InventoryMovement
@@ -76,7 +81,9 @@ public class PickingCommandService(
         };
 
         dbContext.InventoryMovements.Add(movement);
-        orderItem.FactQuantity = draftMovements.Sum(x => x.Quantity) + movement.Quantity;
+        orderItem.FactQuantity = draftMovements
+            .Where(x => x.RecorderLineNumber == lineNumber)
+            .Sum(x => x.Quantity) + movement.Quantity;
 
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();
@@ -139,15 +146,22 @@ public class PickingCommandService(
         var draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == order.Id
-                && x.RecorderLineNumber == movement.RecorderLineNumber)
+                && x.RecorderId == order.Id)
             .ToListAsync(ct);
+
+        var limitsValidationResult = await ValidateDraftQuantityLimitsAsync(
+            dbContext, order, orderItem, sourceStorageLocationId, quantity, draftMovements, movement.Id, ct);
+
+        if (!limitsValidationResult.IsSuccess)
+            return limitsValidationResult;
 
         movement.SourceStorageLocationId = sourceStorageLocationId;
         movement.Quantity = quantity;
         movement.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        orderItem.FactQuantity = draftMovements.Sum(x => x.Quantity);
+        orderItem.FactQuantity = draftMovements
+            .Where(x => x.RecorderLineNumber == movement.RecorderLineNumber && x.Id != movement.Id)
+            .Sum(x => x.Quantity) + quantity;
 
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();
@@ -216,6 +230,41 @@ public class PickingCommandService(
 
         if (order.ShippingLocationId is null)
             return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before changing picking movements.");
+
+        return ServiceResult.Success();
+    }
+
+    private static async Task<ServiceResult> ValidateDraftQuantityLimitsAsync(
+        ApplicationDbContext dbContext,
+        ShippingOrder order,
+        ShippingOrderItem orderItem,
+        Guid sourceStorageLocationId,
+        double quantity,
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        Guid? excludedMovementId,
+        CancellationToken ct)
+    {
+        var lineQuantity = draftMovements
+            .Where(x => x.Id != excludedMovementId && x.RecorderLineNumber == orderItem.LineNumber)
+            .Sum(x => x.Quantity) + quantity;
+
+        if (lineQuantity > orderItem.PlanQuantity)
+            return ServiceError.Invalid<InventoryMovement>("Picking quantity exceeds the planned quantity for the shipping order line.");
+
+        var sourceBalance = await dbContext.InventoryBalances
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.WarehouseId == order.WarehouseId
+                && x.StorageLocationId == sourceStorageLocationId
+                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId, ct);
+
+        var sourceQuantity = draftMovements
+            .Where(x => x.Id != excludedMovementId
+                && x.SourceStorageLocationId == sourceStorageLocationId
+                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId)
+            .Sum(x => x.Quantity) + quantity;
+
+        if (sourceBalance is null || sourceQuantity > sourceBalance.Quantity)
+            return ServiceError.Invalid<InventoryMovement>("Picking quantity exceeds the available inventory balance in the source storage location.");
 
         return ServiceResult.Success();
     }

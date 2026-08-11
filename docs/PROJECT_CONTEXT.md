@@ -21,9 +21,9 @@ Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, t
 
 Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. They change inventory balances and create turnovers only when `SetReadyForShipmentAsync` posts them.
 
-An unfinished shipping order may be rolled back locally to `Prepared`. Draft picking movements are deleted; posted movements created in the current picking cycle are offset by new reverse movements through the common posting service, preserving turnover history. Rollback is forbidden for `Prepared` and `Shipped`, does not call 1C, and does not change `DeletionMark` or `Posted`.
+An unfinished shipping order may be rolled back locally to `Prepared`. Draft picking movements are deleted; posted movements created in the current picking cycle are offset by new reverse movements through the common posting service, preserving turnover history. The cancelled cycle's picking and ready-for-shipment timestamps and users are cleared, while rollback audit fields remain. Rollback is forbidden for `Prepared` and `Shipped`, does not call 1C, and does not change `DeletionMark` or `Posted`.
 
-Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. They do not reserve stock or subtract quantities already picked from the reported availability.
+Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. The picking UI and command service prevent the current shipping order's draft movements from exceeding either the line plan or a source location's physical balance for the SKU; drafts of other orders are not reservations and remain subject to the final posting check.
 
 The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 

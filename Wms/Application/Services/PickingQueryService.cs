@@ -24,10 +24,10 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .OrderBy(x => x.CreatedAtUtc)
             .ToListAsync(ct);
     }
-    public async Task<List<StorageLocation>> GetAvailableSourceLocationsAsync(
-    Guid orderId,
-    int lineNumber,
-    CancellationToken ct = default)
+    public async Task<List<PickingSourceLocationAvailability>> GetAvailableSourceLocationsAsync(
+        Guid orderId,
+        int lineNumber,
+        CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -44,17 +44,35 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         if (orderItem is null)
             return [];
 
-        var result = await dbContext.InventoryBalances
+        var draftQuantities = await dbContext.InventoryMovements
             .AsNoTracking()
+            .Where(x => x.PostedAtUtc == null
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == orderId
+                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId
+                && x.SourceStorageLocationId != null)
+            .GroupBy(x => x.SourceStorageLocationId!.Value)
+            .Select(x => new { StorageLocationId = x.Key, Quantity = x.Sum(movement => movement.Quantity) })
+            .ToDictionaryAsync(x => x.StorageLocationId, x => x.Quantity, ct);
+
+        var balances = await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Include(x => x.StorageLocation)
             .Where(x =>
                 x.WarehouseId == order.WarehouseId &&
                 x.StockKeepingUnitId == orderItem.StockKeepingUnitId &&
                 x.StorageLocationId != order.ShippingLocationId &&
                 x.Quantity > 0)
             .OrderBy(x => x.StorageLocation!.Name)
-            .Select(x => x.StorageLocation!)
             .ToListAsync(ct);
 
-        return result;
+        return balances
+            .Select(x => new PickingSourceLocationAvailability
+            {
+                StorageLocation = x.StorageLocation!,
+                PhysicalQuantity = x.Quantity,
+                DraftQuantity = draftQuantities.GetValueOrDefault(x.StorageLocationId)
+            })
+            .ToList();
     }
 }

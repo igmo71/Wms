@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
 using MudBlazor;
+using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -16,6 +16,7 @@ public partial class Picking
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject] private PickingQueryService PickingQueryService { get; set; } = null!;
     [Inject] private PickingCommandService PickingCommandService { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
@@ -24,12 +25,13 @@ public partial class Picking
     private ShippingOrderItem? _selectedLine;
     private int? _expandedLineNumber;
     private List<InventoryMovement> _movements = [];
-    private List<StorageLocation> _availableSourceLocations = [];
+    private List<PickingSourceLocationAvailability> _availableSourceLocations = [];
     private InventoryMovement? _editingMovement;
     private StorageLocation? _selectedSourceLocation;
     private double _movementQuantity;
     private bool _isLoading = true;
     private bool _isCompleting;
+    private bool _isRollingBack;
     private bool _operationFailed;
     private string? _errorMessage;
 
@@ -37,6 +39,32 @@ public partial class Picking
         or ShippingOrderStatus.ReadyForVerification
         or ShippingOrderStatus.InVerification
         or ShippingOrderStatus.Verified;
+
+    private bool CanRollback => _order?.Status is ShippingOrderStatus.ReadyForPicking
+        or ShippingOrderStatus.ReadyForVerification
+        or ShippingOrderStatus.InVerification
+        or ShippingOrderStatus.Verified
+        or ShippingOrderStatus.ReadyForShipment;
+
+    private PickingSourceLocationAvailability? SelectedSourceLocationAvailability => _selectedSourceLocation is null
+        ? null
+        : _availableSourceLocations.FirstOrDefault(x => x.StorageLocation.Id == _selectedSourceLocation.Id);
+
+    private double SelectedSourcePhysicalQuantity => SelectedSourceLocationAvailability?.PhysicalQuantity ?? 0;
+
+    private double SelectedSourceAvailableQuantity => Math.Max(0,
+        (SelectedSourceLocationAvailability?.PhysicalQuantity ?? 0)
+        - (SelectedSourceLocationAvailability?.DraftQuantity ?? 0)
+        + GetEditedMovementQuantityForSelectedSource());
+
+    private double RemainingPlanQuantity => Math.Max(0,
+        (_selectedLine?.RemainingQuantity ?? 0) + (_editingMovement?.Quantity ?? 0));
+
+    private double MaximumPickingQuantity => Math.Min(SelectedSourceAvailableQuantity, RemainingPlanQuantity);
+
+    private bool CanSaveMovement => _selectedSourceLocation is not null
+        && _movementQuantity > 0
+        && _movementQuantity <= MaximumPickingQuantity;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -97,6 +125,20 @@ public partial class Picking
         _selectedSourceLocation = movement.SourceStorageLocation;
         _movementQuantity = movement.Quantity;
     }
+
+    private double GetEditedMovementQuantityForSelectedSource()
+    {
+        var editingMovement = _editingMovement;
+
+        return editingMovement is not null && editingMovement.SourceStorageLocationId == _selectedSourceLocation?.Id
+            ? editingMovement.Quantity
+            : 0;
+    }
+
+    private static string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation) =>
+        $"{sourceLocation.StorageLocation.Name} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))}";
+
+    private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
 
     private void CancelEditing()
     {
@@ -180,6 +222,45 @@ public partial class Picking
         finally
         {
             _isCompleting = false;
+        }
+    }
+
+    private async Task ShowRollbackDialogAsync()
+    {
+        var dialog = await DialogService.ShowAsync<RollbackDialog>("Откатить расходный ордер");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not string reason)
+            return;
+
+        _isRollingBack = true;
+        _operationFailed = false;
+
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null)
+            {
+                SetError("Не удалось определить текущего пользователя.");
+                return;
+            }
+
+            var result = await OrderCommandService.RollbackAsync(Id, reason, userId);
+            if (!result.IsSuccess)
+            {
+                SetError(result.Error?.Message ?? "Не удалось откатить расходный ордер.");
+                return;
+            }
+
+            NavigationManager.NavigateTo("/shipping-orders");
+        }
+        catch
+        {
+            SetError("Не удалось откатить расходный ордер.");
+        }
+        finally
+        {
+            _isRollingBack = false;
         }
     }
 
