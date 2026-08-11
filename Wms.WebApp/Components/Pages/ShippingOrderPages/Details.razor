@@ -38,6 +38,16 @@ else
                     Отбор
                 </MudButton>
             }
+            @if (CanRollback)
+            {
+                <MudButton Color="Color.Error"
+                           Variant="Variant.Outlined"
+                           Disabled="_isRollingBack"
+                           StartIcon="@Icons.Material.Filled.Undo"
+                           OnClick="ShowRollbackDialogAsync">
+                    Откатить
+                </MudButton>
+            }
             <MudButton Href="shipping-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
         </MudStack>
 
@@ -68,6 +78,9 @@ else
                                      Variant="Variant.Text" Dense="true" Clearable="true" />
                 </MudItem>
                 <MudItem xs="12" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Последний откат</MudText><MudText>@FormatDateTimeOffset(_order.RolledBackAtUtc)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Откатил</MudText><MudText>@_order.RolledBackBy</MudText></MudItem>
+                <MudItem xs="12"><MudText Typo="Typo.caption">Причина отката</MudText><MudText>@_order.RollbackReason</MudText></MudItem>
             </MudGrid>
         </MudPaper>
 

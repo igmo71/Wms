@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
+using MudBlazor;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ShippingOrderPages;
 
@@ -15,6 +17,7 @@ public partial class Details
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
     [Inject] private ZoneService ZoneService { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
@@ -23,10 +26,22 @@ public partial class Details
     private StorageLocation? _shippingLocation;
     private bool _isLoading = true;
     private bool _isStarting;
+    private bool _isRollingBack;
     private bool _startOrderFailed;
     private string? _errorMessage;
 
+    private bool CanRollback => _order?.Status is ShippingOrderStatus.ReadyForPicking
+        or ShippingOrderStatus.ReadyForVerification
+        or ShippingOrderStatus.InVerification
+        or ShippingOrderStatus.Verified
+        or ShippingOrderStatus.ReadyForShipment;
+
     protected override async Task OnParametersSetAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
     {
         _isLoading = true;
         _order = await OrderQueryService.GetOrderAsync(Id);
@@ -36,6 +51,9 @@ public partial class Details
     }
 
     private static string FormatDateTime(DateTime? value) =>
+        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+
+    private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
     private async Task<IEnumerable<Zone>> SearchShippingZonesAsync(string? searchText, CancellationToken ct)
@@ -128,6 +146,48 @@ public partial class Details
         finally
         {
             _isStarting = false;
+        }
+    }
+
+    private async Task ShowRollbackDialogAsync()
+    {
+        var dialog = await DialogService.ShowAsync<RollbackDialog>("Откатить расходный ордер");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not string reason)
+            return;
+
+        _isRollingBack = true;
+        _startOrderFailed = false;
+
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null)
+            {
+                _startOrderFailed = true;
+                _errorMessage = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            var result = await OrderCommandService.RollbackAsync(Id, reason, userId);
+            if (!result.IsSuccess)
+            {
+                _startOrderFailed = true;
+                _errorMessage = result.Error?.Message ?? "Не удалось откатить расходный ордер.";
+                return;
+            }
+
+            await ReloadAsync();
+        }
+        catch
+        {
+            _startOrderFailed = true;
+            _errorMessage = "Не удалось откатить расходный ордер.";
+        }
+        finally
+        {
+            _isRollingBack = false;
         }
     }
 

@@ -1,0 +1,23 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Черновые движения будут удалены, а проведенные движения текущего отбора будут компенсированы.
+        </MudText>
+        <MudTextField @bind-Value="_reason"
+                      Label="Причина отката"
+                      Required="true"
+                      RequiredError="Укажите причину отката."
+                      Lines="3"
+                      Immediate="true"
+                      AutoFocus="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   Disabled="@string.IsNullOrWhiteSpace(_reason)"
+                   OnClick="Confirm">
+            Откатить
+        </MudButton>
+    </DialogActions>
+</MudDialog>

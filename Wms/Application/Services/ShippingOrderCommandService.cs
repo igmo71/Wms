@@ -251,4 +251,100 @@ public class ShippingOrderCommandService(
 
         return ServiceResult.Success();
     }
+
+    public async Task<ServiceResult> RollbackAsync(
+        Guid orderId,
+        string reason,
+        string userId,
+        CancellationToken ct = default)
+    {
+        using var scope = logger.BeginScope("ShippingOrder Rollback {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity("ShippingOrder.Rollback", nameof(ShippingOrderCommandService));
+
+        if (string.IsNullOrWhiteSpace(reason))
+            return ServiceError.Invalid<ShippingOrder>("Rollback reason must be specified.");
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<ShippingOrder>("Rollback user must be specified.");
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var order = await dbContext.ShippingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+
+        if (order is null)
+        {
+            logger.LogError("Shipping order not found");
+            return ServiceError.NotFound<ShippingOrder>();
+        }
+
+        var validationResult = order.ValidateToRollback();
+        if (!validationResult.IsSuccess)
+        {
+            logger.LogError("Shipping order rollback validation failed: {ErrorMessage}", validationResult.Error?.Message);
+            return validationResult;
+        }
+
+        var draftMovements = await dbContext.InventoryMovements
+            .Where(x => x.PostedAtUtc == null
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == order.Id)
+            .ToListAsync(ct);
+
+        var postedMovements = await dbContext.InventoryMovements
+            .Where(x => x.PostedAtUtc != null
+                && x.CreatedAtUtc >= order.PickingStartedAtUtc!.Value
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == order.Id)
+            .ToListAsync(ct);
+
+        if (postedMovements.Any(x => x.SourceStorageLocationId is null
+            || x.DestinationStorageLocationId != order.ShippingLocationId))
+        {
+            logger.LogError("Shipping order rollback found an unexpected posted movement");
+            return ServiceError.Failure<ShippingOrder>(
+                "Shipping order contains movements that cannot be rolled back safely.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var compensationMovements = postedMovements
+            .OrderByDescending(x => x.PostedAtUtc)
+            .Select(x => new InventoryMovement
+            {
+                WarehouseId = x.WarehouseId,
+                SourceStorageLocationId = x.DestinationStorageLocationId,
+                DestinationStorageLocationId = x.SourceStorageLocationId,
+                StockKeepingUnitId = x.StockKeepingUnitId,
+                Quantity = x.Quantity,
+                CreatedAtUtc = now,
+                RecorderId = order.Id,
+                RecorderLineNumber = x.RecorderLineNumber,
+                RecorderType = RecorderType.ShippingOrder
+            })
+            .ToList();
+
+        dbContext.InventoryMovements.RemoveRange(draftMovements);
+
+        if (compensationMovements.Count > 0)
+        {
+            dbContext.InventoryMovements.AddRange(compensationMovements);
+
+            var postingResult = await balanceAndTurnoverService
+                .PostInventoryMovementsAsync(compensationMovements, dbContext, ct);
+
+            if (!postingResult.IsSuccess)
+            {
+                logger.LogError("Shipping order rollback failed to compensate movements: {ErrorMessage}", postingResult.Error?.Message);
+                return postingResult;
+            }
+        }
+
+        order.Rollback(reason.Trim(), userId);
+
+        await dbContext.SaveChangesAsync(ct);
+
+        logger.LogInformation("Shipping order rolled back by {UserId}. Reason: {Reason}", userId, reason.Trim());
+        return ServiceResult.Success();
+    }
 }

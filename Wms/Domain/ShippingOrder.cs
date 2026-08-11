@@ -33,9 +33,13 @@ public class ShippingOrder
     public DateTimeOffset? ReadyForShipmentAtUtc { get; set; }
     public DateTimeOffset? ShippedAtUtc { get; set; }
 
+    public DateTimeOffset? RolledBackAtUtc { get; set; }
+
     public string? PickingStartedBy { get; set; }
     public string? ReadyForShipmentBy { get; set; }
     public string? ShippedBy { get; set; }
+    public string? RolledBackBy { get; set; }
+    public string? RollbackReason { get; set; }
 
     public bool ExternalChangeDetected { get; set; }
 
@@ -265,5 +269,34 @@ public class ShippingOrder
         ShippedAtUtc = DateTimeOffset.UtcNow;
 
         ShippedBy = userId;
+    }
+
+    public ServiceResult ValidateToRollback()
+    {
+        if (Status is ShippingOrderStatus.Prepared or ShippingOrderStatus.Shipped)
+        {
+            return ServiceError.Invalid<ShippingOrder>(
+                "Only a shipping order in progress or ready for shipment can be rolled back.");
+        }
+
+        if (PickingStartedAtUtc is null)
+        {
+            return ServiceError.Failure<ShippingOrder>(
+                "Shipping order has no picking start time and cannot be rolled back safely.");
+        }
+
+        return ServiceResult.Success();
+    }
+
+    public void Rollback(string reason, string userId)
+    {
+        Status = ShippingOrderStatus.Prepared;
+        UpdatedAtUtc = DateTimeOffset.UtcNow;
+        RolledBackAtUtc = UpdatedAtUtc;
+        RolledBackBy = userId;
+        RollbackReason = reason;
+
+        foreach (var item in Items)
+            item.FactQuantity = 0;
     }
 }
