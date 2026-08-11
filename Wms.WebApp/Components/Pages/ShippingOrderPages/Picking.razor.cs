@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
+using MudBlazor;
 using Wms.Application.Services;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -19,7 +20,9 @@ public partial class Picking
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private ShippingOrder? _order;
+    private MudDataGrid<ShippingOrderItem> _orderItemsGrid = null!;
     private ShippingOrderItem? _selectedLine;
+    private int? _expandedLineNumber;
     private List<InventoryMovement> _movements = [];
     private List<StorageLocation> _availableSourceLocations = [];
     private InventoryMovement? _editingMovement;
@@ -40,6 +43,7 @@ public partial class Picking
         _isLoading = true;
         _order = await OrderQueryService.GetOrderAsync(Id);
         _selectedLine = null;
+        _expandedLineNumber = null;
         _movements = [];
         _availableSourceLocations = [];
         CancelEditing();
@@ -49,12 +53,33 @@ public partial class Picking
     private static string FormatDateTime(DateTime? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
-    private async Task SelectLineAsync(ShippingOrderItem line)
+    private async Task ToggleLinePickingAsync(ShippingOrderItem line)
     {
+        if (_expandedLineNumber == line.LineNumber)
+        {
+            await _orderItemsGrid.ToggleHierarchyVisibilityAsync(line);
+            ClearSelectedLine();
+            return;
+        }
+
+        if (_expandedLineNumber is not null)
+            await _orderItemsGrid.CollapseAllHierarchy();
+
         _operationFailed = false;
         _selectedLine = line;
+        _expandedLineNumber = line.LineNumber;
         CancelEditing();
         await LoadSelectedLineDataAsync();
+        await _orderItemsGrid.ToggleHierarchyVisibilityAsync(line);
+    }
+
+    private void ClearSelectedLine()
+    {
+        _selectedLine = null;
+        _expandedLineNumber = null;
+        _movements = [];
+        _availableSourceLocations = [];
+        CancelEditing();
     }
 
     private async Task LoadSelectedLineDataAsync()
@@ -97,7 +122,7 @@ public partial class Picking
         }
 
         CancelEditing();
-        await ReloadOrderAndSelectedLineAsync();
+        await ReloadSelectedLineDataAsync();
     }
 
     private async Task DeleteMovementAsync(InventoryMovement movement)
@@ -113,23 +138,16 @@ public partial class Picking
         if (_editingMovement?.Id == movement.Id)
             CancelEditing();
 
-        await ReloadOrderAndSelectedLineAsync();
+        await ReloadSelectedLineDataAsync();
     }
 
-    private async Task ReloadOrderAndSelectedLineAsync()
+    private async Task ReloadSelectedLineDataAsync()
     {
-        var lineNumber = _selectedLine?.LineNumber;
-        _order = await OrderQueryService.GetOrderAsync(Id);
-        _selectedLine = lineNumber is null ? null : _order?.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
-
         if (_selectedLine is null)
-        {
-            _movements = [];
-            _availableSourceLocations = [];
             return;
-        }
 
         await LoadSelectedLineDataAsync();
+        _selectedLine.FactQuantity = _movements.Sum(x => x.Quantity);
     }
 
     private async Task SetReadyForShipmentAsync()

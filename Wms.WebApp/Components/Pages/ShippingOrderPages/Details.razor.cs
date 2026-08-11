@@ -56,6 +56,16 @@ public partial class Details
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
+    private string GetRollbackSummary() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_order?.RolledBackBy ?? "—"} · {Truncate(_order?.RollbackReason, 140)}";
+
+    private string GetRollbackDescription() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_order?.RolledBackBy ?? "—"} · {_order?.RollbackReason ?? "—"}";
+
+    private static string Truncate(string? value, int maximumLength) => string.IsNullOrWhiteSpace(value)
+        ? "—"
+        : value.Length <= maximumLength
+            ? value
+            : $"{value[..maximumLength]}…";
+
     private async Task<IEnumerable<Zone>> SearchShippingZonesAsync(string? searchText, CancellationToken ct)
     {
         if (_order is null)
