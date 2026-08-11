@@ -25,6 +25,8 @@ Picking reads expose draft movements by order line and source locations with a p
 
 The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
+The operator UI exposes a paged inventory-balance list. It shows the current SKU quantity in each storage location and supports filtering by warehouse, storage location, and SKU; it does not aggregate balances or account for reservations.
+
 Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 
 ## MVP implementation principles

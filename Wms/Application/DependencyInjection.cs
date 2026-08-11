@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<DeliveryDirectionService>();
         services.AddScoped<InventoryCountCommandService>();
         services.AddScoped<InventoryCountQueryService>();
+        services.AddScoped<InventoryBalanceService>();
         services.AddScoped<PickingCommandService>();
         services.AddScoped<PickingQueryService>();
         services.AddScoped<ReceivingOrderCommandService>();
