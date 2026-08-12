@@ -69,6 +69,8 @@ The operator UI exposes configuration screens under the `Конфигураци�
 - `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C. The UI calls `WarehouseImportService`, which delegates to the 1C warehouse catalog importer.
 - `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
+- `Номенклатура`, `Штрихкоды` and `Единицы измерения` are read-only 1C-synchronized catalogs with server-side search, sorting, pagination, and an option to include deactivated records.
+- `Направления доставки` is a read-only 1C-synchronized hierarchical catalog. It is displayed as a tree built from `ParentId`; search includes a matching node's parent chain, and the tree is not paginated.
 
 ## Receiving
 

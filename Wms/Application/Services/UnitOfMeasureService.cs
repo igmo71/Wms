@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application.Services;
 
-internal class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     public async Task CreateOrUpdateAsync(UnitOfMeasure item, CancellationToken ct = default)
     {
@@ -74,8 +74,13 @@ internal class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCo
     {
         return sortBy switch
         {
+            "Code" => sortDescending ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
+            "Abbreviation" => sortDescending ? query.OrderByDescending(x => x.Abbreviation) : query.OrderBy(x => x.Abbreviation),
+            "Description" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
+            "Numerator" => sortDescending ? query.OrderByDescending(x => x.Numerator) : query.OrderBy(x => x.Numerator),
+            "Denominator" => sortDescending ? query.OrderByDescending(x => x.Denominator) : query.OrderBy(x => x.Denominator),
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
-            _ => query.OrderByDescending(x => x.Name),
+            _ => query.OrderBy(x => x.Name),
         };
     }
 }

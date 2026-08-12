@@ -1,0 +1,32 @@
+@page "/delivery-directions"
+@using Wms.Domain
+
+<PageTitle>Направления доставки</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">Направления доставки</MudText>
+<MudPaper Class="pa-3 mb-4" Elevation="1"><MudStack Row="true" AlignItems="AlignItems.Center"><MudTextField T="string" Value="_searchString" ValueChanged="OnSearchChangedAsync" Label="Поиск по наименованию" Immediate="true" DebounceInterval="300" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" /><MudSwitch T="bool" Value="_includeDeleted" ValueChanged="OnIncludeDeletedChangedAsync" Color="Color.Primary" Label="Показать деактивированные" Class="ml-4" /></MudStack></MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTreeView T="DeliveryDirection" Items="_treeItems" Hover="true" Dense="true">
+        <ItemTemplate Context="item">
+            @if (item.Value is DeliveryDirection direction)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudText>@direction.Description</MudText>
+                    @if (!string.IsNullOrWhiteSpace(direction.Comment))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@direction.Comment</MudText>
+                    }
+                    @if (direction.DeletionMark)
+                    {
+                        <MudChip T="string" Size="Size.Small">Деактивировано</MudChip>
+                    }
+                </MudStack>
+            }
+        </ItemTemplate>
+    </MudTreeView>
+}

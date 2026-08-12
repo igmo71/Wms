@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application.Services;
 
-internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     internal async Task CreateOrUpdateAsync(DeliveryDirection item, CancellationToken ct)
     {
@@ -60,6 +60,34 @@ internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> 
         };
     }
 
+    public async Task<List<DeliveryDirection>> ListTreeAsync(string? searchString, bool includeDeleted, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var items = await dbContext.DeliveryDirections
+            .AsNoTracking()
+            .Where(x => includeDeleted || !x.DeletionMark)
+            .ToListAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(searchString))
+            return items;
+
+        var matchingIds = items
+            .Where(x => x.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+            .Select(x => x.Id)
+            .ToHashSet();
+        var itemsById = items.ToDictionary(x => x.Id);
+
+        foreach (var matchingId in matchingIds.ToArray())
+        {
+            var parentId = itemsById[matchingId].ParentId;
+            while (parentId is Guid id && itemsById.TryGetValue(id, out var parent) && matchingIds.Add(id))
+                parentId = parent.ParentId;
+        }
+
+        return items.Where(x => matchingIds.Contains(x.Id)).ToList();
+    }
+
     private static IQueryable<DeliveryDirection> ApplySearch(IQueryable<DeliveryDirection> query, string? searchString)
     {
         if (!string.IsNullOrWhiteSpace(searchString))
@@ -74,8 +102,9 @@ internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> 
     {
         return sortBy switch
         {
-            "Name" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
-            _ => query.OrderByDescending(x => x.Description),
+            "Description" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
+            "Comment" => sortDescending ? query.OrderByDescending(x => x.Comment) : query.OrderBy(x => x.Comment),
+            _ => query.OrderBy(x => x.Description),
         };
     }
 }
