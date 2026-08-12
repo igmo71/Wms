@@ -60,7 +60,7 @@ public class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> db
         };
     }
 
-    public async Task<List<DeliveryDirection>> ListTreeAsync(string? searchString, bool includeDeleted, CancellationToken ct = default)
+    public async Task<List<DeliveryDirection>> ListTreeAsync(bool includeDeleted, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -69,23 +69,7 @@ public class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> db
             .Where(x => includeDeleted || !x.DeletionMark)
             .ToListAsync(ct);
 
-        if (string.IsNullOrWhiteSpace(searchString))
-            return items;
-
-        var matchingIds = items
-            .Where(x => x.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
-            .Select(x => x.Id)
-            .ToHashSet();
-        var itemsById = items.ToDictionary(x => x.Id);
-
-        foreach (var matchingId in matchingIds.ToArray())
-        {
-            var parentId = itemsById[matchingId].ParentId;
-            while (parentId is Guid id && itemsById.TryGetValue(id, out var parent) && matchingIds.Add(id))
-                parentId = parent.ParentId;
-        }
-
-        return items.Where(x => matchingIds.Contains(x.Id)).ToList();
+        return items;
     }
 
     private static IQueryable<DeliveryDirection> ApplySearch(IQueryable<DeliveryDirection> query, string? searchString)
