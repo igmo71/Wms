@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
@@ -49,26 +50,173 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         return await oneCClient.PostValueAsync(postUri, ct);
     }
 
-    // TODO: Выяснить как в 1С работает с товарами по распоряжениям и отгружаемыми товарами (Отгружать - НеОтгружать)
-    // Вероятно нужно добавить строку с НеОтгружать на разницу между План и Факт
     internal async Task<ServiceResult> UpdateDocumentItemsAsync(ShippingOrder shippingOrder, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
         using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));
 
-        var patchItems = ;
-        var patchBaseItems = ;
-        var patchBody = new PatchBody
-        {
-            ОтгружаемыеТовары = patchItems,
-            ТоварыПоРаспоряжениям = patchBaseItems
-        };
+        var freshDocumentResult = await oneCClient.GetValueAsync<RootObject<Document>>(
+            Document.GetUri(shippingOrder.Id.ToString()), ct);
+
+        if (!freshDocumentResult.IsSuccess)
+            return freshDocumentResult;
+
+        var freshDocument = freshDocumentResult.Value?.Value?.SingleOrDefault();
+        if (freshDocument is null)
+            return ServiceError.NotFound("Shipping order was not found in 1C.");
+
+        var patchBodyResult = CreatePatchBody(shippingOrder, freshDocument);
+        if (!patchBodyResult.IsSuccess)
+            return patchBodyResult;
 
         var patchUri = Document.PatchUri(shippingOrder.Id.ToString());
-        var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
+        var patchResult = await oneCClient.PatchValueAsync<PatchBody, object>(patchUri, patchBodyResult.Value!, ct);
 
         return patchResult.IsSuccess ? ServiceResult.Success() : patchResult;
     }
+
+    private static ServiceResult<PatchBody> CreatePatchBody(ShippingOrder shippingOrder, Document freshDocument)
+    {
+        if (shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
+            || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
+        {
+            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
+                "Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
+        }
+
+        var freshBaseItemsByLine = freshDocument.ТоварыПоРаспоряжениям.ToDictionary(x => x.LineNumber);
+        var freshItemsByLine = freshDocument.ОтгружаемыеТовары.ToDictionary(x => x.LineNumber);
+
+        if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
+            || freshItemsByLine.Count(x => !x.Value.ЭтоУпаковочныйЛист && x.Value.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста == 0) != shippingOrder.Items.Count)
+        {
+            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
+                "Shipping order plan in 1C differs from the WMS plan.");
+        }
+
+        foreach (var localBaseItem in shippingOrder.BaseItems)
+        {
+            if (!freshBaseItemsByLine.TryGetValue(localBaseItem.LineNumber, out var freshBaseItem)
+                || freshBaseItem.Номенклатура_Key != localBaseItem.StockKeepingUnitId
+                || freshBaseItem.Количество != localBaseItem.PlanQuantity)
+            {
+                return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
+                    "Shipping order plan in 1C differs from the WMS plan.");
+            }
+        }
+
+        foreach (var localItem in shippingOrder.Items)
+        {
+            if (!freshItemsByLine.TryGetValue(localItem.LineNumber, out var freshItem)
+                || freshItem.Номенклатура_Key != localItem.StockKeepingUnitId
+                || freshItem.КоличествоУпаковок != localItem.PlanQuantity
+                || ODataEnumMapper.Parse<ShippingOrderAction>(freshItem.Действие) != ShippingOrderAction.PickUp)
+            {
+                return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
+                    "Shipping order plan in 1C differs from the WMS plan.");
+            }
+        }
+
+        var baseItemStockKeepingUnitIds = shippingOrder.BaseItems
+            .Select(x => x.StockKeepingUnitId)
+            .Order()
+            .ToList();
+        var itemStockKeepingUnitIds = shippingOrder.Items
+            .Select(x => x.StockKeepingUnitId)
+            .Order()
+            .ToList();
+
+        if (!baseItemStockKeepingUnitIds.SequenceEqual(itemStockKeepingUnitIds))
+        {
+            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
+                "Shipping order base lines and shipping lines in WMS cannot be matched safely.");
+        }
+
+        var localItemsByStockKeepingUnit = shippingOrder.Items.ToDictionary(x => x.StockKeepingUnitId);
+        var patchBaseItems = freshDocument.ТоварыПоРаспоряжениям
+            .Where(x => localItemsByStockKeepingUnit.TryGetValue(x.Номенклатура_Key, out var localItem)
+                && localItem.FactQuantity > 0)
+            .Select(x =>
+            {
+                var result = Copy(x);
+                result.Количество = localItemsByStockKeepingUnit[x.Номенклатура_Key].FactQuantity;
+                return result;
+            })
+            .ToList();
+
+        var patchItems = freshDocument.ОтгружаемыеТовары.Select(Copy).ToList();
+        var nextLineNumber = patchItems.Count == 0 ? 1 : patchItems.Max(x => x.LineNumber) + 1;
+
+        foreach (var localItem in shippingOrder.Items)
+        {
+            var patchItem = patchItems.Single(x => x.LineNumber == localItem.LineNumber);
+
+            if (localItem.FactQuantity > 0)
+            {
+                patchItem.Количество = localItem.FactQuantity;
+                patchItem.КоличествоУпаковок = localItem.FactQuantity;
+                patchItem.Действие = ODataEnumMapper.ToODataValue(ShippingOrderAction.Ship);
+            }
+            else
+            {
+                patchItem.Количество = localItem.PlanQuantity;
+                patchItem.КоличествоУпаковок = localItem.PlanQuantity;
+                patchItem.Действие = ODataEnumMapper.ToODataValue(ShippingOrderAction.DoNotShip);
+            }
+
+            var notShippedQuantity = localItem.PlanQuantity - localItem.FactQuantity;
+            if (localItem.FactQuantity > 0 && notShippedQuantity > 0)
+            {
+                var notShippedItem = Copy(patchItem);
+                notShippedItem.LineNumber = nextLineNumber++;
+                notShippedItem.Количество = notShippedQuantity;
+                notShippedItem.КоличествоУпаковок = notShippedQuantity;
+                notShippedItem.Действие = ODataEnumMapper.ToODataValue(ShippingOrderAction.DoNotShip);
+                patchItems.Add(notShippedItem);
+            }
+        }
+
+        return new PatchBody
+        {
+            ТоварыПоРаспоряжениям = patchBaseItems,
+            ОтгружаемыеТовары = patchItems
+        };
+    }
+
+    private static Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям Copy(
+        Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям source) => new()
+    {
+        Ref_Key = source.Ref_Key,
+        LineNumber = source.LineNumber,
+        Номенклатура_Key = source.Номенклатура_Key,
+        Количество = source.Количество,
+        Распоряжение = source.Распоряжение,
+        Распоряжение_Type = source.Распоряжение_Type,
+        Характеристика_Key = source.Характеристика_Key,
+        Назначение_Key = source.Назначение_Key,
+        Серия_Key = source.Серия_Key,
+        СтатусУказанияСерий = source.СтатусУказанияСерий
+    };
+
+    private static Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары Copy(
+        Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары source) => new()
+    {
+        Ref_Key = source.Ref_Key,
+        LineNumber = source.LineNumber,
+        Номенклатура_Key = source.Номенклатура_Key,
+        Количество = source.Количество,
+        КоличествоУпаковок = source.КоличествоУпаковок,
+        Действие = source.Действие,
+        Характеристика_Key = source.Характеристика_Key,
+        Назначение_Key = source.Назначение_Key,
+        Серия_Key = source.Серия_Key,
+        СтатусУказанияСерий = source.СтатусУказанияСерий,
+        ЭтоУпаковочныйЛист = source.ЭтоУпаковочныйЛист,
+        Упаковка_Key = source.Упаковка_Key,
+        УпаковочныйЛист_Key = source.УпаковочныйЛист_Key,
+        УпаковочныйЛистРодитель_Key = source.УпаковочныйЛистРодитель_Key,
+        ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста = source.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста
+    };
 
     private class PatchBody
     {

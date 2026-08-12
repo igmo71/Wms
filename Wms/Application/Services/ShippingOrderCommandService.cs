@@ -28,6 +28,20 @@ public class ShippingOrderCommandService(
 
         var now = DateTimeOffset.UtcNow;
 
+        if (externalOrder.Status == ShippingOrderStatus.Prepared
+            && externalOrder.Items.Any(x => x.Action != ShippingOrderAction.PickUp))
+        {
+            logger.LogWarning("Prepared external shipping order contains items with unexpected actions");
+
+            if (existingOrder is not null)
+            {
+                existingOrder.ExternalChangeDetected = true;
+                await dbContext.SaveChangesAsync(ct);
+            }
+
+            return;
+        }
+
         if (existingOrder is null)
         {
             if (externalOrder.Status != ShippingOrderStatus.Prepared)

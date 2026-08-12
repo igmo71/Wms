@@ -21,6 +21,8 @@ Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, t
 
 Picking records draft `InventoryMovement` rows from source storage locations to the shipping location. While the order is in picking or verification, their unposted quantity is the line's shipping fact. They change inventory balances and create turnovers only when `SetReadyForShipmentAsync` posts them.
 
+When a shipping fact differs from the plan, WMS reads a fresh external shipping order before updating its 1C table sections. A mismatch between the fresh 1C plan and the local WMS plan blocks the update as a conflict. The full 1C table sections are patched: shipped quantities become `Отгрузить`, unshipped quantities become `НеОтгружать`, and zero-fact base-order lines are omitted. WMS preserves 1C-specific row fields from the fresh document and does not store them in its domain model. The MVP supports one line per SKU in each shipping table section for this update.
+
 An unfinished shipping order may be rolled back locally to `Prepared`. Draft picking movements are deleted; posted movements created in the current picking cycle are offset by new reverse movements through the common posting service, preserving turnover history. The cancelled cycle's picking and ready-for-shipment timestamps and users are cleared, while rollback audit fields remain. Rollback is forbidden for `Prepared` and `Shipped`, does not call 1C, and does not change `DeletionMark` or `Posted`.
 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. The picking UI and command service prevent the current shipping order's draft movements from exceeding either the line plan or a source location's physical balance for the SKU; drafts of other orders are not reservations and remain subject to the final posting check.
@@ -28,6 +30,10 @@ Picking reads expose draft movements by order line and source locations with a p
 The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
 The operator UI exposes a paged inventory-balance list. It shows the current SKU quantity in each storage location and supports filtering by warehouse, storage location, and SKU; it does not aggregate balances or account for reservations.
+
+The operator UI also exposes a paged inventory-turnover history. It shows each posted change in a location balance with the quantity delta, balances before and after, and a link to its source document when known. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving or shipping order; the default period is the current day.
+
+The operator UI exposes a separate paged list of posted inventory movements. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving or shipping order, with the current day as default. It shows source and destination storage locations and links a movement to its receiving order, shipping order, or inventory count when the recorder is known. Draft movements are deliberately excluded.
 
 Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 

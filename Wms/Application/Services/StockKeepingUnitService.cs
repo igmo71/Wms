@@ -80,9 +80,9 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
         query = ApplySorting(query, listQuery.SortBy, listQuery.SortDescending);
 
         var items = await query
-            .Skip(listQuery.Skip)
-            .Take(listQuery.Take)
-            .ToListAsync(ct);
+               .Skip(listQuery.Skip)
+               .Take(listQuery.Take)
+               .ToListAsync(ct);
 
         return new ListResult<StockKeepingUnit>
         {

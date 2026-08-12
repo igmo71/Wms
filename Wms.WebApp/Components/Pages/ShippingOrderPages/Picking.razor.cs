@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
 using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.Services;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -19,6 +21,7 @@ public partial class Picking
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private UserManager<ApplicationUser> UserManager { get; set; } = null!;
 
     private ShippingOrder? _order;
     private MudDataGrid<ShippingOrderItem> _orderItemsGrid = null!;
@@ -34,6 +37,7 @@ public partial class Picking
     private bool _isRollingBack;
     private bool _operationFailed;
     private string? _errorMessage;
+    private string? _rolledBackByUsername;
 
     private bool IsPickingEditable => _order?.Status is ShippingOrderStatus.ReadyForPicking
         or ShippingOrderStatus.ReadyForVerification
@@ -70,6 +74,7 @@ public partial class Picking
     {
         _isLoading = true;
         _order = await OrderQueryService.GetOrderAsync(Id);
+        _rolledBackByUsername = await GetRollbackUsernameAsync(_order?.RolledBackBy);
         _selectedLine = null;
         _expandedLineNumber = null;
         _movements = [];
@@ -80,6 +85,28 @@ public partial class Picking
 
     private static string FormatDateTime(DateTime? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+
+    private static string FormatDateTimeOffset(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+
+    private string GetRollbackSummary() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_rolledBackByUsername ?? "Пользователь не найден"} · {Truncate(_order?.RollbackReason, 140)}";
+
+    private string GetRollbackDescription() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_rolledBackByUsername ?? "Пользователь не найден"} · {_order?.RollbackReason ?? "—"}";
+
+    private static string Truncate(string? value, int maximumLength) => string.IsNullOrWhiteSpace(value)
+        ? "—"
+        : value.Length <= maximumLength
+            ? value
+            : $"{value[..maximumLength]}…";
+
+    private async Task<string?> GetRollbackUsernameAsync(string? userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return null;
+
+        var user = await UserManager.FindByIdAsync(userId);
+        return user?.UserName;
+    }
 
     private async Task ToggleLinePickingAsync(ShippingOrderItem line)
     {

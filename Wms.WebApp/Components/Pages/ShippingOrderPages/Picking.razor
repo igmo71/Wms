@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Отбор расходного ордера @_order.Number</MudText>
+            <MudText Typo="Typo.h4">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isCompleting || !IsPickingEditable)" StartIcon="@Icons.Material.Filled.Check" OnClick="SetReadyForShipmentAsync">
                 Готов к отгрузке
@@ -36,13 +36,26 @@ else
         </MudStack>
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-            <MudGrid Spacing="6">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Номер</MudText><MudText>@_order.Number</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Очередь</MudText><MudText>@_order.Queue.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона отгрузки</MudText><MudText>@_order.ShippingLocation?.Zone?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место отгрузки</MudText><MudText>@_order.ShippingLocation?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">План отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+                @if (_order.RolledBackAtUtc is not null)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption">Последний откат</MudText>
+                        <MudTooltip Text="@GetRollbackDescription()">
+                            <MudText Typo="Typo.caption" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                @GetRollbackSummary()
+                            </MudText>
+                        </MudTooltip>
+                    </MudItem>
+                }
             </MudGrid>
         </MudPaper>
 

@@ -1,0 +1,93 @@
+@page "/inventory-turnovers"
+@using Wms.Application.Services
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Обороты</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Обороты</MudText>
+</MudStack>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudTextField T="string"
+                      Value="_documentSearchString"
+                      ValueChanged="OnDocumentSearchChangedAsync"
+                      Label="Документ"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Clearable="true" />
+        <MudDatePicker Label="Дата с"
+                       Date="_dateFrom"
+                       DateChanged="OnDateFromChangedAsync"
+                       Clearable="true" />
+        <MudDatePicker Label="Дата по"
+                       Date="_dateTo"
+                       DateChanged="OnDateToChangedAsync"
+                       Clearable="true"
+                       Class="ml-4" />
+        <MudAutocomplete T="Warehouse"
+                         Value="_warehouse"
+                         ValueChanged="OnWarehouseChangedAsync"
+                         SearchFunc="SearchWarehousesAsync"
+                         ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                         Label="Склад"
+                         Clearable="true"
+                         Class="ml-4" />
+        <MudAutocomplete T="StorageLocation"
+                         Value="_storageLocation"
+                         ValueChanged="OnStorageLocationChangedAsync"
+                         SearchFunc="SearchStorageLocationsAsync"
+                         ToStringFunc="storageLocation => storageLocation?.Name ?? string.Empty"
+                         Label="Ячейка хранения"
+                         Clearable="true"
+                         Class="ml-4" />
+        <MudAutocomplete T="StockKeepingUnit"
+                         Value="_stockKeepingUnit"
+                         ValueChanged="OnStockKeepingUnitChangedAsync"
+                         SearchFunc="SearchStockKeepingUnitsAsync"
+                         ToStringFunc="stockKeepingUnit => stockKeepingUnit?.Name ?? string.Empty"
+                         Label="Номенклатура"
+                         Clearable="true"
+                         Class="ml-4" />
+    </MudStack>
+</MudPaper>
+
+<MudDataGrid T="InventoryTurnoverListItem"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
+        <PropertyColumn Property="x => x.StorageLocation!.Name" Title="Ячейка хранения" Sortable="true" />
+        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
+        <PropertyColumn Property="x => x.QuantityDelta" Title="Изменение" Sortable="true" />
+        <PropertyColumn Property="x => x.BalanceBefore" Title="Остаток до" Sortable="true" />
+        <PropertyColumn Property="x => x.BalanceAfter" Title="Остаток после" Sortable="true" />
+        <TemplateColumn Title="Основание" Sortable="false">
+            <CellTemplate>
+                @if (GetRecorderHref(context.Item) is string href)
+                {
+                    <MudLink Href="@href">@GetRecorderText(context.Item)</MudLink>
+                }
+                else
+                {
+                    @context.Item.RecorderType.GetDisplayName()
+                }
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="InventoryTurnoverListItem" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+</MudDataGrid>
