@@ -19,6 +19,10 @@
 {
     <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить склады из 1С.</MudAlert>
 }
+@if (_isImporting)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row="true" AlignItems="AlignItems.Center">

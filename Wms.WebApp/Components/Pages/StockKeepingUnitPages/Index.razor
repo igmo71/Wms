@@ -3,7 +3,22 @@
 @using Wms.Domain
 
 <PageTitle>Номенклатура</PageTitle>
-<MudText Typo="Typo.h4" GutterBottom="true">Номенклатура</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Номенклатура</MudText>
+    <MudSpacer />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">
+        @(_isImporting ? "Обновление..." : "Обновить из 1С")
+    </MudButton>
+</MudStack>
+
+@if (_isImporting)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+@if (_importFailed)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить номенклатуру из 1С.</MudAlert>
+}
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row="true" AlignItems="AlignItems.Center">

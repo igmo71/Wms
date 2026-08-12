@@ -66,11 +66,11 @@ Core domain concepts:
 
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
-- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C. The UI calls `WarehouseImportService`, which delegates to the 1C warehouse catalog importer.
+- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
 - `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
-- `Номенклатура`, `Штрихкоды` and `Единицы измерения` are read-only 1C-synchronized catalogs with server-side search, sorting, pagination, and an option to include deactivated records.
-- `Направления доставки` is a read-only 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible.
+- `Номенклатура`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
 ## Receiving
 

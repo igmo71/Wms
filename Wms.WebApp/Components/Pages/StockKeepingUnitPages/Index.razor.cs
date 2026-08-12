@@ -9,9 +9,12 @@ namespace Wms.WebApp.Components.Pages.StockKeepingUnitPages;
 public partial class Index
 {
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
+    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
     private MudDataGrid<StockKeepingUnit> _dataGrid = null!;
     private string? _searchString;
     private bool _includeDeleted;
+    private bool _isImporting;
+    private bool _importFailed;
 
     private async Task<GridData<StockKeepingUnit>> LoadServerDataAsync(GridState<StockKeepingUnit> state, CancellationToken ct)
     {
@@ -22,4 +25,23 @@ public partial class Index
 
     private Task OnSearchChangedAsync(string? value) { _searchString = value; return _dataGrid.ReloadServerData(); }
     private Task OnIncludeDeletedChangedAsync(bool value) { _includeDeleted = value; return _dataGrid.ReloadServerData(); }
+
+    private async Task RefreshFromOneCAsync()
+    {
+        _isImporting = true;
+        _importFailed = false;
+        try
+        {
+            await SynchronizedCatalogImportService.RefreshStockKeepingUnitsAsync();
+            await _dataGrid.ReloadServerData();
+        }
+        catch
+        {
+            _importFailed = true;
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
 }

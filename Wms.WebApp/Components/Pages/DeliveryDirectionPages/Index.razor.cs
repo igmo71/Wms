@@ -7,9 +7,12 @@ namespace Wms.WebApp.Components.Pages.DeliveryDirectionPages;
 public partial class Index
 {
     [Inject] private DeliveryDirectionService DeliveryDirectionService { get; set; } = null!;
+    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
     private List<DeliveryDirection> _items = [];
     private bool _includeDeleted;
     private bool _isLoading = true;
+    private bool _isImporting;
+    private bool _importFailed;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -24,4 +27,23 @@ public partial class Index
         finally { _isLoading = false; }
     }
     private async Task OnIncludeDeletedChangedAsync(bool value) { _includeDeleted = value; await LoadAsync(); }
+
+    private async Task RefreshFromOneCAsync()
+    {
+        _isImporting = true;
+        _importFailed = false;
+        try
+        {
+            await SynchronizedCatalogImportService.RefreshDeliveryDirectionsAsync();
+            await LoadAsync();
+        }
+        catch
+        {
+            _importFailed = true;
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
 }

@@ -9,9 +9,12 @@ namespace Wms.WebApp.Components.Pages.UnitOfMeasurePages;
 public partial class Index
 {
     [Inject] private UnitOfMeasureService UnitOfMeasureService { get; set; } = null!;
+    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
     private MudDataGrid<UnitOfMeasure> _dataGrid = null!;
     private string? _searchString;
     private bool _includeDeleted;
+    private bool _isImporting;
+    private bool _importFailed;
     private async Task<GridData<UnitOfMeasure>> LoadServerDataAsync(GridState<UnitOfMeasure> state, CancellationToken ct)
     {
         var sort = state.SortDefinitions.FirstOrDefault();
@@ -20,4 +23,23 @@ public partial class Index
     }
     private Task OnSearchChangedAsync(string? value) { _searchString = value; return _dataGrid.ReloadServerData(); }
     private Task OnIncludeDeletedChangedAsync(bool value) { _includeDeleted = value; return _dataGrid.ReloadServerData(); }
+
+    private async Task RefreshFromOneCAsync()
+    {
+        _isImporting = true;
+        _importFailed = false;
+        try
+        {
+            await SynchronizedCatalogImportService.RefreshUnitsOfMeasureAsync();
+            await _dataGrid.ReloadServerData();
+        }
+        catch
+        {
+            _importFailed = true;
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
 }

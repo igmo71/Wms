@@ -8,8 +8,8 @@ public class Catalog_УпаковкиЕдиницыИзмерения
     public string? Description { get; set; }
     public string? НаименованиеПолное { get; set; }
     public string? МеждународноеСокращение { get; set; }
-    public int Числитель { get; set; }
-    public int Знаменатель { get; set; }
+    public double Числитель { get; set; }
+    public double Знаменатель { get; set; }
 
     public static string GetListUri => $"Catalog_УпаковкиЕдиницыИзмерения" +
         $"?$format=json" +
