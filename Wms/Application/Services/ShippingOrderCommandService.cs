@@ -116,6 +116,7 @@ public class ShippingOrderCommandService(
 
         var existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
+            .Include(x => x.BaseItems)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (existingOrder is null)

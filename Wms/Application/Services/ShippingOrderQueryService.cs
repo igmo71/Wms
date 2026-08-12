@@ -71,6 +71,9 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
         if (listQuery.IncludePostedOnly)
             query = query.Where(x => x.Posted == true);
 
+        if (listQuery.WarehouseId is Guid warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
+
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
             query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
 
@@ -95,6 +98,9 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
         {
             "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
             "Date" => listQuery.SortDescending ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date),
+            "Warehouse" or "Warehouse.Name" => listQuery.SortDescending ? query.OrderByDescending(x => x.Warehouse!.Name) : query.OrderBy(x => x.Warehouse!.Name),
+            "Status" => listQuery.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
+            "Queue" => listQuery.SortDescending ? query.OrderByDescending(x => x.Queue) : query.OrderBy(x => x.Queue),
             "PickingStartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.PickingStartedAtUtc) : query.OrderBy(x => x.PickingStartedAtUtc),
             "ReadyForShipmentAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.ReadyForShipmentAtUtc) : query.OrderBy(x => x.ReadyForShipmentAtUtc),
             "ShippedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.ShippedAtUtc) : query.OrderBy(x => x.ShippedAtUtc),

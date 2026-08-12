@@ -28,6 +28,14 @@
                        DateChanged="OnDateToChangedAsync"
                        Clearable="true"
                        Class="ml-4" />
+        <MudAutocomplete T="Warehouse"
+                         Value="_warehouse"
+                         ValueChanged="OnWarehouseChangedAsync"
+                         SearchFunc="SearchWarehousesAsync"
+                         ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                         Label="Склад"
+                         Clearable="true"
+                         Class="ml-4" />
         <MudSelect T="ShippingOrderStatus?"
                    Label="Статус"
                    Value="_status"
@@ -68,15 +76,19 @@
              Dense="true"
              RowsPerPage="25">
     <Columns>
-        <TemplateColumn Title="Номер" SortBy="x => x.Number">
+        <PropertyColumn Property="x => x.Number" Title=" Номер" Sortable="true">
             <CellTemplate>
                 <MudLink Href="@GetOrderHref(context.Item)">@context.Item.Number</MudLink>
             </CellTemplate>
-        </TemplateColumn>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
-        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
-        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь" />
+        <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
+        <PropertyColumn Property="x => x.Status" Title="Статус" Sortable="true">
+            <CellTemplate>@context.Item.Status.GetDisplayName()</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.Queue" Title="Очередь" Sortable="true">
+            <CellTemplate>@context.Item.Queue.GetDisplayName()</CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.PlannedShippingDate" Title="План отгрузки" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.PickingStartedAtUtc" Title="В отборе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.ReadyForShipmentAtUtc" Title="Готов к отгрузке" Format="dd.MM.yyyy HH:mm" Sortable="true" />

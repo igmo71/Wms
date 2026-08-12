@@ -13,6 +13,8 @@ internal class Document_РасходныйОрдерНаТовары_Товар�
     public double Количество { get; set; }
     public Guid Распоряжение { get; set; }
     public string? Распоряжение_Type { get; set; }
-
-    //public Guid? Характеристика_Key { get; set; }
+    public Guid? Характеристика_Key { get; set; }
+    public Guid? Назначение_Key { get; set; }
+    public Guid? Серия_Key { get; set; }
+    public int СтатусУказанияСерий { get; set; }
 }

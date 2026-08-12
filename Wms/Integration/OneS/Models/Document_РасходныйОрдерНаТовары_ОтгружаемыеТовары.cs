@@ -13,6 +13,13 @@ internal class Document_РасходныйОрдерНаТовары_Отгру�
     public double Количество { get; set; }
     public double КоличествоУпаковок { get; set; }
     public string? Действие { get; set; }
-
-    //public Guid? Характеристика_Key { get; set; }
+    public Guid? Характеристика_Key { get; set; }
+    public Guid? Назначение_Key { get; set; }
+    public Guid? Серия_Key { get; set; }
+    public int СтатусУказанияСерий { get; set; }
+    public bool ЭтоУпаковочныйЛист { get; set; }
+    public Guid? Упаковка_Key { get; set; }
+    public Guid? УпаковочныйЛист_Key { get; set; }
+    public Guid? УпаковочныйЛистРодитель_Key { get; set; }
+    public int ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста { get; set; }
 }

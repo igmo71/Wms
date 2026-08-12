@@ -11,6 +11,7 @@ namespace Wms.WebApp.Components.Pages.ShippingOrderPages;
 public partial class Index : IAsyncDisposable
 {
     [Inject] private ShippingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject] private IOptions<WmsSettings> Options { get; set; } = null!;
 
@@ -18,6 +19,7 @@ public partial class Index : IAsyncDisposable
     private string? _searchString;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
+    private Warehouse? _warehouse;
     private ShippingOrderStatus? _status;
     private ShippingOrderQueue? _queue;
     private WmsSettings? _wmsSettings;
@@ -39,6 +41,7 @@ public partial class Index : IAsyncDisposable
             SearchString = _searchString,
             DateFrom = _dateFrom,
             DateTo = _dateTo,
+            WarehouseId = _warehouse?.Id,
             Status = _status,
             Queue = _queue,
             SortBy = sortDefinition?.SortBy,
@@ -69,6 +72,24 @@ public partial class Index : IAsyncDisposable
     private Task OnDateToChangedAsync(DateTime? dateTo)
     {
         _dateTo = dateTo;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
+    {
+        var result = await WarehouseService.ListAsync(new ListQuery
+        {
+            SearchString = searchText,
+            SortBy = "Name",
+            Take = 10
+        }, ct);
+
+        return result.Items;
+    }
+
+    private Task OnWarehouseChangedAsync(Warehouse? warehouse)
+    {
+        _warehouse = warehouse;
         return _dataGrid.ReloadServerData();
     }
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
@@ -55,8 +56,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
         using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));
 
-        var patchItems = shippingOrder.Items.Select(PatchItem.From).ToList();
-        var patchBaseItems = shippingOrder.BaseItems.Select(PatchBaseItem.From).ToList();
+        var patchItems = ;
+        var patchBaseItems = ;
         var patchBody = new PatchBody
         {
             ОтгружаемыеТовары = patchItems,
@@ -71,45 +72,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
     private class PatchBody
     {
-        public List<PatchBaseItem> ТоварыПоРаспоряжениям { get; set; } = [];
-        public List<PatchItem> ОтгружаемыеТовары { get; set; } = [];
-    }
-
-    private class PatchBaseItem
-    {
-        public Guid Ref_Key { get; set; }
-        public int LineNumber { get; set; }
-        public Guid Номенклатура_Key { get; set; }
-        public double Количество { get; set; }
-
-        public static PatchBaseItem From(ShippingOrderBaseItem orderBaseItem) => new()
-        {
-            Ref_Key = orderBaseItem.ShippingOrderId,
-            LineNumber = orderBaseItem.LineNumber,
-            Номенклатура_Key = orderBaseItem.StockKeepingUnitId,
-            Количество = orderBaseItem.PlanQuantity
-            // Verify whether 1C PATCH of table section requires
-            // Распоряжение / Распоряжение_Type to be sent back.
-        };
-    }
-
-    private class PatchItem
-    {
-        public Guid Ref_Key { get; set; }
-        public int LineNumber { get; set; }
-        public Guid Номенклатура_Key { get; set; }
-        public double Количество { get; set; }
-        public double КоличествоУпаковок { get; set; }
-        public string? Действие { get; set; }
-
-        public static PatchItem From(ShippingOrderItem orderItem) => new()
-        {
-            Ref_Key = orderItem.ShippingOrderId,
-            LineNumber = orderItem.LineNumber,
-            Номенклатура_Key = orderItem.StockKeepingUnitId,
-            Количество = orderItem.FactQuantity, // Отгружать - НеОтгружать
-            КоличествоУпаковок = orderItem.FactQuantity, // Отгружать - НеОтгружать
-            Действие = ODataEnumMapper.ToODataValue(orderItem.Action) // Отгружать - НеОтгружать
-        };
+        public List<Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям> ТоварыПоРаспоряжениям { get; set; } = [];
+        public List<Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары> ОтгружаемыеТовары { get; set; } = [];
     }
 }
