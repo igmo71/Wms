@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
 using MudBlazor;
 using Wms.Application.Services;
+using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

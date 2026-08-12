@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.Services;
+using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;

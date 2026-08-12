@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor;
 using System.Security.Claims;
-using Wms.Application.Services;
+using Wms.Application.Services.ShippingOrders;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;

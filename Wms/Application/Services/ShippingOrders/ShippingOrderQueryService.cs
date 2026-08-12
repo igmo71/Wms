@@ -3,7 +3,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.ShippingOrders;
 
 public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
