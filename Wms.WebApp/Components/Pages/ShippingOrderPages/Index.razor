@@ -58,7 +58,10 @@
             @foreach (var queue in Enum.GetValues<ShippingOrderQueue>())
             {
                 <MudSelectItem T="ShippingOrderQueue?" Value="@((ShippingOrderQueue?)queue)">
-                    @queue.GetDisplayName()
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@queue.GetIcon()" Size="Size.Small" />
+                        <MudText>@queue.GetDisplayName()</MudText>
+                    </MudStack>
                 </MudSelectItem>
             }
         </MudSelect>
@@ -87,7 +90,12 @@
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.Queue" Title="Очередь" Sortable="true">
-            <CellTemplate>@context.Item.Queue.GetDisplayName()</CellTemplate>
+            <CellTemplate>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@context.Item.Queue.GetIcon()" Size="Size.Small" />
+                    <MudText>@context.Item.Queue.GetDisplayName()</MudText>
+                </MudStack>
+            </CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.PlannedShippingDate" Title="План отгрузки" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.PickingStartedAtUtc" Title="В отборе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />

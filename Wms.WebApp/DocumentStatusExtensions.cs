@@ -5,6 +5,22 @@ namespace Wms.WebApp;
 
 public static class DocumentStatusExtensions
 {
+    public static string GetIcon(this ReceivingOrderQueue queue) => queue switch
+    {
+        ReceivingOrderQueue.ForClient => Icons.Material.Filled.Person,
+        ReceivingOrderQueue.UrgentlyOnSale => Icons.Material.Filled.Bolt,
+        ReceivingOrderQueue.Expired => Icons.Material.Filled.EventBusy,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    public static string GetIcon(this ShippingOrderQueue queue) => queue switch
+    {
+        ShippingOrderQueue.LiveQueue => Icons.Material.Filled.Bolt,
+        ShippingOrderQueue.CollectByDate => Icons.Material.Filled.Event,
+        ShippingOrderQueue.OwnDelivery => Icons.Material.Filled.LocalShipping,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
     public static Color GetChipColor(this ReceivingOrderStatus status) => status switch
     {
         ReceivingOrderStatus.InReceiving => Color.Primary,
