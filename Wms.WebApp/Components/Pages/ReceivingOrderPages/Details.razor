@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Приходный ордер @_order.Number</MudText>
+            <MudText Typo="Typo.h4">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
             {
@@ -51,8 +51,6 @@ else
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Номер</MudText><MudText>@_order.Number</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">В работе с</MudText><MudText>@FormatDateTimeOffset(_order.StartedAtUtc)</MudText></MudItem>

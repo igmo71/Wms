@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Приёмка приходного ордера @_order.Number</MudText>
+            <MudText Typo="Typo.h4">Приёмка приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
@@ -43,15 +43,7 @@ else
         }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-            <MudGrid Spacing="6">
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Номер</MudText>
-                    <MudText>@_order.Number</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Дата</MudText>
-                    <MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
-                </MudItem>
+            <MudGrid Spacing="6">               
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Склад</MudText>
                     <MudText>@_order.Warehouse?.Name</MudText>
