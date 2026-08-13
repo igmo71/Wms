@@ -15,4 +15,7 @@ public enum RecorderType
 
     [Display(Name = "Инвентаризация")]
     InventoryCount = 3,
+
+    [Display(Name = "Перемещение")]
+    TransferOrder = 4,
 }
