@@ -8,21 +8,21 @@ prematurely.
 
 ### Changes
 
-- Add the `ZoneType` enum with `Storage` and `Transit` values.
-- Add `Zone.Type`, its EF configuration, and a migration that assigns `Storage`
-  to all existing zones.
+- Add the `ZoneType` enum with `Storage`, `Transit`, `Receiving`, and `Shipping`
+  values.
+- Add `Zone.Type`, its EF configuration, and a schema migration. The development
+  database is recreated and zones are configured explicitly with their types.
 - Extend zone list, filtering where useful, and zone create/edit UI to display
   and edit the type.
 - Ensure storage-location selection can be limited by zone type without adding
   a second location hierarchy.
-- Prevent changing a zone type when existing inventory or an active warehouse
-  process would make the new meaning invalid. The initial implementation may
-  conservatively reject a type change for any zone whose locations have positive
-  inventory.
+- Filter and validate receiving and shipping locations by their respective zone
+  types, and keep picking and inventory-count source locations in `Storage`
+  zones.
 
 ### Verification
 
-- Existing zones remain ordinary storage zones after migration.
+- New zones require an explicit type and all four types can be configured.
 - A transit zone and locations in it can be configured.
 - Existing receiving, shipping, inventory, balance, and turnover screens retain
   their current behavior.

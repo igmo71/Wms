@@ -58,10 +58,12 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         var balances = await dbContext.InventoryBalances
             .AsNoTracking()
             .Include(x => x.StorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Where(x =>
                 x.WarehouseId == order.WarehouseId &&
                 x.StockKeepingUnitId == orderItem.StockKeepingUnitId &&
                 x.StorageLocationId != order.ShippingLocationId &&
+                x.StorageLocation!.Zone!.Type == ZoneType.Storage &&
                 x.Quantity > 0)
             .OrderBy(x => x.StorageLocation!.Name)
             .ToListAsync(ct);

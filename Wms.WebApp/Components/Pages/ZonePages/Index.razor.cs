@@ -3,6 +3,7 @@ using MudBlazor;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ZonePages;
 
@@ -20,6 +21,7 @@ public partial class Index
     private MudDataGrid<Zone> _dataGrid = null!;
     private string? _searchString;
     private Warehouse? _warehouse;
+    private ZoneType? _zoneType;
     private bool _includeDeleted;
 
     private async Task<GridData<Zone>> LoadServerDataAsync(
@@ -31,6 +33,7 @@ public partial class Index
         {
             SearchString = _searchString,
             WarehouseId = _warehouse?.Id,
+            Type = _zoneType,
             ExcludeDeleted = !_includeDeleted,
             SortBy = sortDefinition?.SortBy,
             SortDescending = sortDefinition?.Descending ?? false,
@@ -68,6 +71,12 @@ public partial class Index
     private Task OnWarehouseChangedAsync(Warehouse? warehouse)
     {
         _warehouse = warehouse;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private Task OnZoneTypeChangedAsync(ZoneType? zoneType)
+    {
+        _zoneType = zoneType;
         return _dataGrid.ReloadServerData();
     }
 

@@ -70,9 +70,13 @@ transit location. Direct and transit movements may be mixed in one order.
 A zone has an explicit type. The MVP supports:
 
 - `Storage` for ordinary warehouse storage;
-- `Transit` for temporary inventory locations such as trolleys.
+- `Transit` for temporary inventory locations such as trolleys;
+- `Receiving` for inbound receiving locations;
+- `Shipping` for outbound shipping locations.
 
-Existing zones migrate as `Storage`. A transfer order's transit location must
+Zones are created with an explicit type. The active receiving and shipping
+workflows filter locations by their respective zone types and validate the type
+on the server. A transfer order's transit location must
 belong to a `Transit` zone in the order warehouse. Ordinary pick and put
 locations used by the transfer flow must belong to `Storage` zones. Direct
 movement into or out of a transit location is not allowed; transit inventory is

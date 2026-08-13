@@ -38,6 +38,7 @@ public class PickingCommandService(
             return validationResult;
 
         var sourceLocation = await dbContext.StorageLocations
+            .Include(x => x.Zone)
             .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
 
         if (sourceLocation is null)
@@ -45,6 +46,9 @@ public class PickingCommandService(
 
         if (sourceLocation.WarehouseId != order.WarehouseId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
+
+        if (sourceLocation.Zone?.Type != ZoneType.Storage)
+            return ServiceError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
 
         if (sourceStorageLocationId == order.ShippingLocationId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
@@ -127,6 +131,7 @@ public class PickingCommandService(
             return validationResult;
 
         var sourceLocation = await dbContext.StorageLocations
+            .Include(x => x.Zone)
             .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
 
         if (sourceLocation is null)
@@ -134,6 +139,9 @@ public class PickingCommandService(
 
         if (sourceLocation.WarehouseId != order.WarehouseId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
+
+        if (sourceLocation.Zone?.Type != ZoneType.Storage)
+            return ServiceError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
 
         if (sourceStorageLocationId == order.ShippingLocationId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");

@@ -225,6 +225,22 @@ public class ReceivingOrderCommandService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
+        var orderWarehouseId = await dbContext.ReceivingOrders
+            .Where(x => x.Id == receivingOrderId)
+            .Select(x => (Guid?)x.WarehouseId)
+            .FirstOrDefaultAsync(ct);
+
+        if (orderWarehouseId is null)
+            return ServiceError.NotFound<ReceivingOrder>();
+
+        var validLocation = await dbContext.StorageLocations
+            .AnyAsync(x => x.Id == receivingLocationId
+                && x.WarehouseId == orderWarehouseId
+                && x.Zone!.Type == ZoneType.Receiving, ct);
+
+        if (!validLocation)
+            return ServiceError.Invalid<StorageLocation>("Receiving location must belong to a receiving zone in the order warehouse.");
+
         var affected = await dbContext.ReceivingOrders
             .Where(x => x.Id == receivingOrderId)
             .ExecuteUpdateAsync(x => x

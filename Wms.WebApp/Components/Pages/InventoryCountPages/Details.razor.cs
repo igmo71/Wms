@@ -46,6 +46,7 @@ public partial class Details
         {
             SearchString = searchText,
             WarehouseId = _inventoryCount.WarehouseId,
+            ZoneType = ZoneType.Storage,
             SortBy = "Name",
             Take = 10
         }, ct);

@@ -96,6 +96,9 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         if (listQuery.ZoneId is Guid zoneId)
             query = query.Where(x => x.ZoneId == zoneId);
 
+        if (listQuery.ZoneType is Domain.Enums.ZoneType zoneType)
+            query = query.Where(x => x.Zone!.Type == zoneType);
+
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
         {
             query = query.Where(x => x.Name!.Contains(listQuery.SearchString));

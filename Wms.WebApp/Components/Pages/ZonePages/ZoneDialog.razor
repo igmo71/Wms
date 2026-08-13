@@ -1,4 +1,6 @@
+@using Wms.Common
 @using Wms.Domain
+@using Wms.Domain.Enums
 
 <MudDialog>
     <DialogContent>
@@ -16,13 +18,28 @@
                           Label="Наименование"
                           Required="true"
                           Immediate="true" />
+            <MudSelect T="ZoneType?"
+                       @bind-Value="_zoneType"
+                       Label="Тип"
+                       Required="true">
+                @foreach (var zoneType in Enum.GetValues<ZoneType>())
+                {
+                    <MudSelectItem T="ZoneType?" Value="zoneType">
+                        @zoneType.GetDisplayName()
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Отмена</MudButton>
         <MudButton Color="Color.Primary"
                    Variant="Variant.Filled"
-                   Disabled="@(_warehouse is null || string.IsNullOrWhiteSpace(_zone.Name))"
+                   Disabled="@(_isSaving || _warehouse is null || _zoneType is null || string.IsNullOrWhiteSpace(_zone.Name))"
                    OnClick="SaveAsync">
             Сохранить
         </MudButton>

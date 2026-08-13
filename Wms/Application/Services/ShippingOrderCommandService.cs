@@ -256,6 +256,22 @@ public class ShippingOrderCommandService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
+        var orderWarehouseId = await dbContext.ShippingOrders
+            .Where(x => x.Id == shippingOrderId)
+            .Select(x => (Guid?)x.WarehouseId)
+            .FirstOrDefaultAsync(ct);
+
+        if (orderWarehouseId is null)
+            return ServiceError.NotFound<ShippingOrder>();
+
+        var validLocation = await dbContext.StorageLocations
+            .AnyAsync(x => x.Id == shippingLocationId
+                && x.WarehouseId == orderWarehouseId
+                && x.Zone!.Type == ZoneType.Shipping, ct);
+
+        if (!validLocation)
+            return ServiceError.Invalid<StorageLocation>("Shipping location must belong to a shipping zone in the order warehouse.");
+
         var affected = await dbContext.ShippingOrders
             .Where(x => x.Id == shippingOrderId)
             .ExecuteUpdateAsync(x => x

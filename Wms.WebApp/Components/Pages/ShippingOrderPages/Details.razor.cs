@@ -90,6 +90,7 @@ public partial class Details
         {
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,
+            Type = ZoneType.Shipping,
             SortBy = "Name",
             Take = 10
         }, ct);
@@ -107,6 +108,7 @@ public partial class Details
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,
             ZoneId = _shippingZone.Id,
+            ZoneType = ZoneType.Shipping,
             SortBy = "Name",
             Take = 10
         }, ct);

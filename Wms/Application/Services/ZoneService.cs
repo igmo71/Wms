@@ -7,18 +7,28 @@ namespace Wms.Application.Services;
 
 public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
+    public async Task<ServiceResult> CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var exists = await dbContext.Zones.AnyAsync(x => x.Id == item.Id, ct);
+        if (!Enum.IsDefined(item.Type))
+            return ServiceError.Invalid<Zone>("Zone type is invalid.");
 
-        if (exists)
-            dbContext.Zones.Update(item);
+        var existing = await dbContext.Zones
+            .FirstOrDefaultAsync(x => x.Id == item.Id, ct);
+
+        if (existing is not null)
+        {
+            existing.Name = item.Name;
+            existing.DeletionMark = item.DeletionMark;
+            existing.WarehouseId = item.WarehouseId;
+            existing.Type = item.Type;
+        }
         else
             dbContext.Zones.Add(item);
 
         await dbContext.SaveChangesAsync(ct);
+        return ServiceResult.Success();
     }
 
     public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
@@ -93,6 +103,9 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
         if (listQuery.WarehouseId is Guid warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);
 
+        if (listQuery.Type is Domain.Enums.ZoneType type)
+            query = query.Where(x => x.Type == type);
+
         return query;
     }
 
@@ -101,6 +114,7 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
         return sortBy switch
         {
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
+            "Type" => sortDescending ? query.OrderByDescending(x => x.Type) : query.OrderBy(x => x.Type),
             _ => query.OrderByDescending(x => x.Name),
         };
     }

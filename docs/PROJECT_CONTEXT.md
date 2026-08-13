@@ -80,7 +80,11 @@ Core domain concepts:
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
 - `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
-- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse and has an explicit type. The initial types are ordinary storage and transit.
+- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse and has an explicit type.
+- Zone types distinguish ordinary storage, transit, receiving, and shipping.
+  Receiving and shipping location selectors and command services accept only
+  their corresponding zone types; picking and inventory counts use ordinary
+  storage zones.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
 
 ## Receiving

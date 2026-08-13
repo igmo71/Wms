@@ -88,6 +88,7 @@ public class InventoryCountCommandService(
         if (storageLocationId is Guid locationId)
         {
             var storageLocation = await dbContext.StorageLocations
+                .Include(x => x.Zone)
                 .FirstOrDefaultAsync(x => x.Id == locationId, ct);
 
             if (storageLocation is null)
@@ -95,6 +96,9 @@ public class InventoryCountCommandService(
 
             if (storageLocation.WarehouseId != inventoryCount.WarehouseId)
                 return ServiceError.Invalid<StorageLocation>("Storage location must belong to the inventory count warehouse.");
+
+            if (storageLocation.Zone?.Type != ZoneType.Storage)
+                return ServiceError.Invalid<StorageLocation>("Inventory count location must belong to a storage zone.");
         }
 
         if (stockKeepingUnitId is Guid skuId

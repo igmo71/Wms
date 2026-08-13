@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -53,6 +54,7 @@ public partial class InProcess
         {
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,
+            Type = ZoneType.Receiving,
             SortBy = "Name",
             Take = 10
         }, ct);
@@ -70,6 +72,7 @@ public partial class InProcess
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,
             ZoneId = _receivingZone.Id,
+            ZoneType = ZoneType.Receiving,
             SortBy = "Name",
             Take = 10
         }, ct);
