@@ -136,6 +136,7 @@ public partial class Index
             RecorderType.ReceivingOrder => $"receiving-orders/{recorderId}",
             RecorderType.ShippingOrder => $"shipping-orders/{recorderId}",
             RecorderType.InventoryCount => $"inventory-counts/{recorderId}",
+            RecorderType.InventoryTransfer => $"inventory-transfers/{recorderId}",
             _ => null
         };
     }

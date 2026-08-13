@@ -93,7 +93,7 @@ prematurely.
   the transfer automatically.
 - A completed transfer rejects all further mutations.
 
-## Stage 4: operator web UI
+## Stage 4: operator web UI (completed)
 
 ### Pages
 

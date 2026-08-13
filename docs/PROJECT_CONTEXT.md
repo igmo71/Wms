@@ -58,8 +58,13 @@ together with balance and turnover changes in one `SaveChangesAsync` call,
 allocate a chronological movement line, and start a draft on its first
 movement. Transfer numbers use local creation time in `yyMMdd-HHmmss` format.
 Each transfer movement stores the confirming application user. The
-command and query backend is implemented; the operator web UI remains the next
-delivery stage.
+command and query backend and the operator web UI are implemented. The UI has a
+filtered, paged transfer list and one work page for both initialization and
+continued work. Before warehouse confirmation, movement controls are visible
+but disabled. After confirmation, the warehouse is fixed, the transit location
+is kept as document context, and pick, put, and direct movement remain separate
+freely interleaved actions. The page shows current transit contents and posted
+movement history; completed transfers are read-only.
 
 ## MVP implementation principles
 
