@@ -47,8 +47,10 @@ implement every item before completing the current warehouse processes.
 - Confirm 1C quantity semantics: `Количество` versus `КоличествоУпаковок`.
 - Confirm shipping table-section behavior for `Отгружать` / `НеОтгружать`, then
   implement line splitting only after that business decision.
-- Implement putaway, internal transfers, recounts, reservations, and inventory
-  tasks when their business rules are agreed.
+- Implement putaway, recounts, reservations, and inventory tasks when their
+  business rules are agreed.
+- Implement intra-warehouse transfers according to
+  `specs/intra-warehouse-transfers/spec.md`.
 
 ## Technical maintenance
 
