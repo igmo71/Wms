@@ -20,6 +20,10 @@ public partial class Index
     private Warehouse? _warehouse;
     private InventoryTransferStatus? _status;
 
+    private static string GetTransferHref(InventoryTransfer transfer) => transfer.Status == InventoryTransferStatus.Completed
+        ? $"inventory-transfers/{transfer.Id}"
+        : $"inventory-transfers/{transfer.Id}/work";
+
     private async Task<GridData<InventoryTransfer>> LoadServerDataAsync(
         GridState<InventoryTransfer> state,
         CancellationToken ct)

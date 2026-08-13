@@ -17,7 +17,6 @@ public partial class Work
     [Inject] private InventoryTransferCommandService InventoryTransferCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
-    [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
@@ -28,32 +27,42 @@ public partial class Work
     private List<InventoryMovement> _movements = [];
 
     private StorageLocation? _pickSource;
-    private StockKeepingUnit? _pickSku;
+    private List<InventoryTransferStorageLocationBalance> _pickSourceBalances = [];
+    private Guid? _pickSkuId;
     private double _pickQuantity;
     private Guid? _putSkuId;
     private StorageLocation? _putDestination;
     private double _putQuantity;
     private StorageLocation? _directSource;
+    private List<InventoryTransferStorageLocationBalance> _directSourceBalances = [];
     private StorageLocation? _directDestination;
-    private StockKeepingUnit? _directSku;
+    private Guid? _directSkuId;
     private double _directQuantity;
 
     private bool _isLoading = true;
     private bool _isSaving;
     private bool _operationFailed;
+    private bool _noAvailableTransitStorageLocations;
     private string? _errorMessage;
 
     private string Title => _transfer is null ? "Новое перемещение" : $"Перемещение №{_transfer.Number}";
     private bool IsStarted => _transfer is not null;
+    private bool HasTransit => _transitStorageLocation is not null;
     private bool CanEdit => _transfer is not null && _transfer.Status != InventoryTransferStatus.Completed;
     private bool CanUseTransit => CanEdit && _transfer!.TransitStorageLocationId.HasValue;
     private bool CanPutAnything => CanUseTransit && _transitBalances.Count > 0;
     private bool CanDelete => _transfer?.Status == InventoryTransferStatus.Draft;
     private bool CanComplete => _transfer?.Status == InventoryTransferStatus.InProgress && _transitBalances.Count == 0;
-    private bool CanPick => CanUseTransit && _pickSource is not null && _pickSku is not null && _pickQuantity > 0;
+    private bool ShowComplete => _transfer is not null && _transfer.Status != InventoryTransferStatus.Completed;
+    private string CompleteTooltip => _transfer?.Status == InventoryTransferStatus.Draft
+        ? "Сначала выполните хотя бы одно перемещение."
+        : HasTransit && _transitBalances.Count > 0
+            ? "Чтобы завершить, освободите тележку."
+            : "Завершить перемещение.";
+    private bool CanPick => CanUseTransit && _pickSource is not null && _pickSkuId.HasValue && _pickQuantity > 0;
     private bool CanPut => CanPutAnything && _putSkuId.HasValue && _putDestination is not null && _putQuantity > 0;
     private bool CanMoveDirect => CanEdit && _directSource is not null && _directDestination is not null
-        && _directSource.Id != _directDestination.Id && _directSku is not null && _directQuantity > 0;
+        && _directSource.Id != _directDestination.Id && _directSkuId.HasValue && _directQuantity > 0;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -72,6 +81,12 @@ public partial class Work
             _movements = _transfer is null ? [] : await InventoryTransferQueryService.GetMovementsAsync(id);
             _transitBalances = _transfer is null ? [] : await InventoryTransferQueryService.GetTransitBalancesAsync(id);
 
+            if (_transfer?.Status == InventoryTransferStatus.Completed)
+            {
+                NavigationManager.NavigateTo($"inventory-transfers/{id}");
+                return;
+            }
+
             if (_putSkuId.HasValue && _transitBalances.All(x => x.StockKeepingUnit.Id != _putSkuId.Value))
                 _putSkuId = null;
         }
@@ -82,6 +97,8 @@ public partial class Work
             _transitStorageLocation = null;
             _movements = [];
             _transitBalances = [];
+            _pickSourceBalances = [];
+            _directSourceBalances = [];
         }
 
         _isLoading = false;
@@ -100,18 +117,14 @@ public partial class Work
 
     private async Task<IEnumerable<StorageLocation>> SearchTransitStorageLocationsAsync(string? searchText, CancellationToken ct)
     {
-        if (_transfer is null)
+        if (_warehouse is null)
             return [];
 
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
-        {
-            SearchString = searchText,
-            WarehouseId = _transfer.WarehouseId,
-            ZoneType = ZoneType.Transit,
-            SortBy = "Name",
-            Take = 10
-        }, ct);
-        return result.Items;
+        var items = await InventoryTransferQueryService.GetAvailableTransitStorageLocationsAsync(
+            _warehouse.Id, searchText, ct);
+
+        _noAvailableTransitStorageLocations = items.Count == 0 && string.IsNullOrWhiteSpace(searchText);
+        return items;
     }
 
     private async Task<IEnumerable<StorageLocation>> SearchStorageLocationsAsync(string? searchText, CancellationToken ct)
@@ -130,15 +143,36 @@ public partial class Work
         return result.Items;
     }
 
-    private async Task<IEnumerable<StockKeepingUnit>> SearchStockKeepingUnitsAsync(string? searchText, CancellationToken ct)
+    private async Task SetPickSourceAsync(StorageLocation? location)
     {
-        var result = await StockKeepingUnitService.ListAsync(new ListQuery
+        _pickSource = location;
+        _pickSkuId = null;
+        _pickSourceBalances = location is null
+            ? []
+            : await InventoryTransferQueryService.GetStorageLocationBalancesAsync(location.Id);
+    }
+
+    private async Task SetWarehouseAsync(Warehouse? warehouse)
+    {
+        _warehouse = warehouse;
+        _transitStorageLocation = null;
+        _noAvailableTransitStorageLocations = false;
+
+        if (warehouse is not null)
         {
-            SearchString = searchText,
-            SortBy = "Name",
-            Take = 10
-        }, ct);
-        return result.Items;
+            var transitStorageLocations = await InventoryTransferQueryService
+                .GetAvailableTransitStorageLocationsAsync(warehouse.Id, null);
+            _noAvailableTransitStorageLocations = transitStorageLocations.Count == 0;
+        }
+    }
+
+    private async Task SetDirectSourceAsync(StorageLocation? location)
+    {
+        _directSource = location;
+        _directSkuId = null;
+        _directSourceBalances = location is null
+            ? []
+            : await InventoryTransferQueryService.GetStorageLocationBalancesAsync(location.Id);
     }
 
     private async Task StartAsync()
@@ -148,48 +182,29 @@ public partial class Work
 
         await RunAsync(async userId =>
         {
-            var result = await InventoryTransferCommandService.CreateAsync(_warehouse.Id, userId);
+            var result = await InventoryTransferCommandService.CreateAsync(
+                _warehouse.Id, _transitStorageLocation?.Id, userId);
             if (!result.IsSuccess || result.Value is null)
             {
                 SetError(result.Error?.Message ?? "Не удалось создать перемещение.");
                 return;
             }
 
-            NavigationManager.NavigateTo($"inventory-transfers/{result.Value.Id}");
+            NavigationManager.NavigateTo($"inventory-transfers/{result.Value.Id}/work");
         });
-    }
-
-    private async Task SetTransitStorageLocationAsync(StorageLocation? location)
-    {
-        if (_transfer is null)
-            return;
-
-        var previous = _transitStorageLocation;
-        _transitStorageLocation = location;
-        await RunAsync(async _ =>
-        {
-            var result = await InventoryTransferCommandService.SetTransitStorageLocationAsync(_transfer.Id, location?.Id);
-            if (!result.IsSuccess)
-            {
-                _transitStorageLocation = previous;
-                SetError(result.Error?.Message ?? "Не удалось выбрать тележку.");
-                return;
-            }
-            await ReloadAsync();
-        }, requiresUser: false);
     }
 
     private Task PickAsync() => RunAsync(async userId =>
     {
         var result = await InventoryTransferCommandService.PickAsync(
-            _transfer!.Id, _pickSource!.Id, _pickSku!.Id, _pickQuantity, userId);
+            _transfer!.Id, _pickSource!.Id, _pickSkuId!.Value, _pickQuantity, userId);
         if (!result.IsSuccess)
         {
             SetError(result.Error?.Message ?? "Не удалось выполнить отбор.");
             return;
         }
-        _pickSource = null;
-        _pickSku = null;
+        _pickSkuId = null;
+        _pickSourceBalances = await InventoryTransferQueryService.GetStorageLocationBalancesAsync(_pickSource.Id);
         _pickQuantity = 0;
         await ReloadAsync();
     });
@@ -211,15 +226,15 @@ public partial class Work
     private Task MoveDirectAsync() => RunAsync(async userId =>
     {
         var result = await InventoryTransferCommandService.MoveDirectAsync(
-            _transfer!.Id, _directSource!.Id, _directDestination!.Id, _directSku!.Id, _directQuantity, userId);
+            _transfer!.Id, _directSource!.Id, _directDestination!.Id, _directSkuId!.Value, _directQuantity, userId);
         if (!result.IsSuccess)
         {
             SetError(result.Error?.Message ?? "Не удалось выполнить прямое перемещение.");
             return;
         }
-        _directSource = null;
         _directDestination = null;
-        _directSku = null;
+        _directSkuId = null;
+        _directSourceBalances = await InventoryTransferQueryService.GetStorageLocationBalancesAsync(_directSource.Id);
         _directQuantity = 0;
         await ReloadAsync();
     });
@@ -232,7 +247,7 @@ public partial class Work
             SetError(result.Error?.Message ?? "Не удалось завершить перемещение.");
             return;
         }
-        await ReloadAsync();
+        NavigationManager.NavigateTo($"inventory-transfers/{_transfer.Id}");
     });
 
     private async Task DeleteAsync()

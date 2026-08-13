@@ -1,0 +1,51 @@
+@page "/inventory-transfers/{Id:guid}"
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<PageTitle>Детали перемещения</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_transfer is null)
+{
+    <MudAlert Severity="Severity.Warning">Перемещение не найдено.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h4">Перемещение №@_transfer.Number</MudText>
+            <MudSpacer />
+            <MudButton Href="inventory-transfers" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
+        </MudStack>
+
+        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_transfer.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_transfer.Warehouse?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Тележка</MudText><MudText>@(_transfer.TransitStorageLocation?.Name ?? "—")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Создано</MudText><MudText>@FormatDateTimeOffset(_transfer.CreatedAtUtc)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Завершено</MudText><MudText>@FormatDateTimeOffset(_transfer.CompletedAtUtc)</MudText></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6" GutterBottom="true">История движений</MudText>
+            <MudTable Items="_movements" Dense="true" Hover="true" Striped="true">
+                <HeaderContent><MudTh>№</MudTh><MudTh>Время</MudTh><MudTh>Из ячейки</MudTh><MudTh>В ячейку</MudTh><MudTh>Номенклатура</MudTh><MudTh>Количество</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
+                    <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
+                    <MudTd DataLabel="Из ячейки">@context.SourceStorageLocation?.Name</MudTd>
+                    <MudTd DataLabel="В ячейку">@context.DestinationStorageLocation?.Name</MudTd>
+                    <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name</MudTd>
+                    <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Class="pa-3">Движений нет.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    </MudStack>
+}

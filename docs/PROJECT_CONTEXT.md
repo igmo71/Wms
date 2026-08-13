@@ -60,11 +60,16 @@ movement. Transfer numbers use local creation time in `yyMMdd-HHmmss` format.
 Each transfer movement stores the confirming application user. The
 command and query backend and the operator web UI are implemented. The UI has a
 filtered, paged transfer list and one work page for both initialization and
-continued work. Before warehouse confirmation, movement controls are visible
-but disabled. After confirmation, the warehouse is fixed, the transit location
-is kept as document context, and pick, put, and direct movement remain separate
-freely interleaved actions. The page shows current transit contents and posted
-movement history; completed transfers are read-only.
+continued work. At start, the operator selects a warehouse and, when needed, an
+empty transit location from that warehouse; both are then fixed for the
+document. The transit selector offers only empty, unassigned transit locations
+and states when none are available. Before confirmation, movement controls are visible but disabled.
+Pick, put, and direct movement remain separate freely interleaved actions.
+Draft and in-progress documents open on the work page; completed documents open
+on a separate read-only details page with their movement history.
+The work page always shows the completion action for an unfinished document;
+it is enabled only after a movement has started the transfer and, when a
+transit location is used, only after it is empty.
 
 ## MVP implementation principles
 

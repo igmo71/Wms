@@ -1,5 +1,5 @@
 @page "/inventory-transfers/new"
-@page "/inventory-transfers/{Id:guid}"
+@page "/inventory-transfers/{Id:guid}/work"
 @using Wms.Common
 @using Wms.Domain
 @using Wms.Domain.Enums
@@ -10,15 +10,17 @@
     <MudStack Row="true" AlignItems="AlignItems.Center">
         <MudText Typo="Typo.h4">@Title</MudText>
         <MudSpacer />
-        @if (CanComplete)
+        @if (ShowComplete)
         {
-            <MudButton Color="Color.Success"
-                       Variant="Variant.Filled"
-                       Disabled="@_isSaving"
-                       StartIcon="@Icons.Material.Filled.Check"
-                       OnClick="CompleteAsync">
-                Завершить
-            </MudButton>
+            <MudTooltip Text="@CompleteTooltip">
+                <MudButton Color="Color.Success"
+                           Variant="Variant.Filled"
+                           Disabled="@(!CanComplete || _isSaving)"
+                           StartIcon="@Icons.Material.Filled.Check"
+                           OnClick="CompleteAsync">
+                    Завершить
+                </MudButton>
+            </MudTooltip>
         }
         @if (CanDelete)
         {
@@ -50,26 +52,50 @@
     }
     else
     {
-        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-            <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="4">
+        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
+            <MudGrid Spacing="1">
+                <MudItem xs="12" sm="3" md="2">
+                    <MudText Typo="Typo.caption">Номер</MudText>
+                    <MudText>@(_transfer?.Number ?? "Будет присвоен")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="3" md="2">
+                    <MudText Typo="Typo.caption">Создано</MudText>
+                    <MudText>@FormatDateTimeOffset(_transfer?.CreatedAtUtc)</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
                     <MudAutocomplete T="Warehouse"
                                      Value="_warehouse"
-                                     ValueChanged="warehouse => _warehouse = warehouse"
+                                     ValueChanged="SetWarehouseAsync"
                                      SearchFunc="SearchWarehousesAsync"
                                      ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
                                      Label="Склад"
                                      Clearable="true"
+                                     Margin="Margin.Dense"
                                      Disabled="@IsStarted"
                                      Required="true" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
+                    <MudAutocomplete T="StorageLocation"
+                                     @bind-Value="_transitStorageLocation"
+                                     SearchFunc="SearchTransitStorageLocationsAsync"
+                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                     Label="Тележка"
+                                     Clearable="true"
+                                     Margin="Margin.Dense"
+                                     Disabled="@(IsStarted || _warehouse is null)" />
+                    @if (!IsStarted && _noAvailableTransitStorageLocations)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">Свободных пустых тележек нет.</MudText>
+                    }
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
                     @if (!IsStarted)
                     {
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
                                    Disabled="@(_warehouse is null || _isSaving)"
                                    StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   Size="Size.Small"
                                    OnClick="StartAsync">
                             Начать
                         </MudButton>
@@ -80,129 +106,170 @@
                         <MudText>@_transfer!.Status.GetDisplayName()</MudText>
                     }
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Номер</MudText>
-                    <MudText>@(_transfer?.Number ?? "Будет присвоен при старте")</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Создано</MudText>
-                    <MudText>@FormatDateTimeOffset(_transfer?.CreatedAtUtc)</MudText>
-                </MudItem>
             </MudGrid>
         </MudPaper>
 
-        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-            <MudText Typo="Typo.h6" GutterBottom="true">Тележка</MudText>
-            <MudGrid Spacing="2">
-                <MudItem xs="12" sm="8" md="5">
-                    <MudAutocomplete T="StorageLocation"
-                                     Value="_transitStorageLocation"
-                                     ValueChanged="SetTransitStorageLocationAsync"
-                                     SearchFunc="SearchTransitStorageLocationsAsync"
-                                     ToStringFunc="location => location?.Name ?? string.Empty"
-                                     Label="Транзитная ячейка"
-                                     Clearable="true"
-                                     Disabled="@(!CanEdit || _isSaving)" />
-                </MudItem>
-                <MudItem xs="12" sm="4" md="7">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Выбирается один раз для отбора и размещения; в действиях повторно не указывается.
-                    </MudText>
+        @if (HasTransit)
+        {
+            <MudTabs Elevation="0" Outlined="true" Rounded="true">
+                <MudTabPanel Text="С тележкой">
+                    <MudGrid Spacing="3" Class="pa-3">
+                        <MudItem xs="12" lg="4">
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudText Typo="Typo.h6">Отобрать на тележку</MudText>
+                                <MudStack Spacing="2" Class="mt-3">
+                                    <MudAutocomplete T="StorageLocation"
+                                                     Value="_pickSource"
+                                                     ValueChanged="SetPickSourceAsync"
+                                                     SearchFunc="SearchStorageLocationsAsync"
+                                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                                     Label="Из ячейки"
+                                                     Clearable="true"
+                                                     Margin="Margin.Dense"
+                                                     Disabled="@(!CanUseTransit || _isSaving)" />
+                                    <MudSelect T="Guid?" @bind-Value="_pickSkuId" Label="Номенклатура"
+                                               Disabled="@(!CanUseTransit || _isSaving || _pickSource is null)" Clearable="true" Margin="Margin.Dense">
+                                        @foreach (var balance in _pickSourceBalances)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
+                                                @balance.StockKeepingUnit.Name
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                    <MudNumericField T="double" @bind-Value="_pickQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                                     Disabled="@(!CanUseTransit || _isSaving)" Margin="Margin.Dense" />
+                                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                               Disabled="@(!CanPick || _isSaving)" OnClick="PickAsync">
+                                        Отобрать
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" lg="4">
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudText Typo="Typo.h6">Разместить с тележки</MudText>
+                                <MudStack Spacing="2" Class="mt-3">
+                                    <MudSelect T="Guid?" @bind-Value="_putSkuId" Label="Номенклатура"
+                                               Disabled="@(!CanPutAnything || _isSaving)" Clearable="true" Margin="Margin.Dense">
+                                        @foreach (var balance in _transitBalances)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
+                                                @balance.StockKeepingUnit.Name
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                    <MudAutocomplete T="StorageLocation"
+                                                     @bind-Value="_putDestination"
+                                                     SearchFunc="SearchStorageLocationsAsync"
+                                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                                     Label="В ячейку"
+                                                     Clearable="true"
+                                                     Margin="Margin.Dense"
+                                                     Disabled="@(!CanPutAnything || _isSaving)" />
+                                    <MudNumericField T="double" @bind-Value="_putQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                                     Disabled="@(!CanPutAnything || _isSaving)" Margin="Margin.Dense" />
+                                    <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Unarchive"
+                                               Disabled="@(!CanPut || _isSaving)" OnClick="PutAsync">
+                                        Разместить
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" lg="4">
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudText Typo="Typo.h6" GutterBottom="true">Остаток на тележке</MudText>
+                                <MudTable Items="_transitBalances" Dense="true" Hover="true">
+                                    <HeaderContent>
+                                        <MudTh>Номенклатура</MudTh>
+                                        <MudTh>Количество</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit.Name</MudTd>
+                                        <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent><MudText Class="pa-3">Тележка пуста.</MudText></NoRecordsContent>
+                                </MudTable>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+                <MudTabPanel Text="Прямое перемещение">
+                    <MudGrid Class="pa-3">
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudText Typo="Typo.h6">Прямое перемещение</MudText>
+                                <MudStack Spacing="2" Class="mt-3">
+                                    <MudAutocomplete T="StorageLocation" Value="_directSource" ValueChanged="SetDirectSourceAsync" SearchFunc="SearchStorageLocationsAsync"
+                                                     ToStringFunc="location => location?.Name ?? string.Empty" Label="Из ячейки"
+                                                     Clearable="true" Margin="Margin.Dense"
+                                                     Disabled="@(!CanEdit || _isSaving)" />
+                                    <MudAutocomplete T="StorageLocation" @bind-Value="_directDestination" SearchFunc="SearchStorageLocationsAsync"
+                                                     ToStringFunc="location => location?.Name ?? string.Empty" Label="В ячейку"
+                                                     Clearable="true" Margin="Margin.Dense"
+                                                     Disabled="@(!CanEdit || _isSaving)" />
+                                    <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
+                                               Disabled="@(!CanEdit || _isSaving || _directSource is null)" Clearable="true" Margin="Margin.Dense">
+                                        @foreach (var balance in _directSourceBalances)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
+                                                @balance.StockKeepingUnit.Name
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                    <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                                     Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
+                                    <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                               Disabled="@(!CanMoveDirect || _isSaving)" OnClick="MoveDirectAsync">
+                                        Переместить
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6" lg="4">
+                    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                        <MudText Typo="Typo.h6">Прямое перемещение</MudText>
+                        <MudStack Spacing="2" Class="mt-3">
+                            <MudAutocomplete T="StorageLocation" Value="_directSource" ValueChanged="SetDirectSourceAsync" SearchFunc="SearchStorageLocationsAsync"
+                                             ToStringFunc="location => location?.Name ?? string.Empty" Label="Из ячейки"
+                                             Clearable="true" Margin="Margin.Dense"
+                                             Disabled="@(!CanEdit || _isSaving)" />
+                            <MudAutocomplete T="StorageLocation" @bind-Value="_directDestination" SearchFunc="SearchStorageLocationsAsync"
+                                             ToStringFunc="location => location?.Name ?? string.Empty" Label="В ячейку"
+                                             Clearable="true" Margin="Margin.Dense"
+                                             Disabled="@(!CanEdit || _isSaving)" />
+                            <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
+                                       Disabled="@(!CanEdit || _isSaving || _directSource is null)" Clearable="true" Margin="Margin.Dense">
+                                @foreach (var balance in _directSourceBalances)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
+                                        @balance.StockKeepingUnit.Name
+                                        <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                             Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
+                            <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                       Disabled="@(!CanMoveDirect || _isSaving)" OnClick="MoveDirectAsync">
+                                Переместить
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
                 </MudItem>
             </MudGrid>
-
-            <MudTable Items="_transitBalances" Dense="true" Hover="true" Class="mt-3">
-                <HeaderContent>
-                    <MudTh>Номенклатура на тележке</MudTh>
-                    <MudTh>Количество</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit.Name</MudTd>
-                    <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
-                </RowTemplate>
-                <NoRecordsContent><MudText Class="pa-3">Тележка пуста.</MudText></NoRecordsContent>
-            </MudTable>
-        </MudPaper>
-
-        <MudGrid Spacing="3">
-            <MudItem xs="12" lg="4">
-                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                    <MudText Typo="Typo.h6">Отобрать на тележку</MudText>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <MudAutocomplete T="StorageLocation"
-                                         @bind-Value="_pickSource"
-                                         SearchFunc="SearchStorageLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty"
-                                         Label="Из ячейки"
-                                         Disabled="@(!CanUseTransit || _isSaving)" />
-                        <MudAutocomplete T="StockKeepingUnit"
-                                         @bind-Value="_pickSku"
-                                         SearchFunc="SearchStockKeepingUnitsAsync"
-                                         ToStringFunc="sku => sku?.Name ?? string.Empty"
-                                         Label="Номенклатура"
-                                         Disabled="@(!CanUseTransit || _isSaving)" />
-                        <MudNumericField T="double" @bind-Value="_pickQuantity" Label="Количество" Min="0" HideSpinButtons="true"
-                                         Disabled="@(!CanUseTransit || _isSaving)" />
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AddShoppingCart"
-                                   Disabled="@(!CanPick || _isSaving)" OnClick="PickAsync">
-                            Отобрать
-                        </MudButton>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" lg="4">
-                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                    <MudText Typo="Typo.h6">Разместить с тележки</MudText>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <MudSelect T="Guid?" @bind-Value="_putSkuId" Label="Номенклатура"
-                                   Disabled="@(!CanPutAnything || _isSaving)" Clearable="true">
-                            @foreach (var balance in _transitBalances)
-                            {
-                                <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
-                                    @balance.StockKeepingUnit.Name (@FormatQuantity(balance.Quantity))
-                                </MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudAutocomplete T="StorageLocation"
-                                         @bind-Value="_putDestination"
-                                         SearchFunc="SearchStorageLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty"
-                                         Label="В ячейку"
-                                         Disabled="@(!CanPutAnything || _isSaving)" />
-                        <MudNumericField T="double" @bind-Value="_putQuantity" Label="Количество" Min="0" HideSpinButtons="true"
-                                         Disabled="@(!CanPutAnything || _isSaving)" />
-                        <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Unarchive"
-                                   Disabled="@(!CanPut || _isSaving)" OnClick="PutAsync">
-                            Разместить
-                        </MudButton>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" lg="4">
-                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                    <MudText Typo="Typo.h6">Прямое перемещение</MudText>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <MudAutocomplete T="StorageLocation" @bind-Value="_directSource" SearchFunc="SearchStorageLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty" Label="Из ячейки"
-                                         Disabled="@(!CanEdit || _isSaving)" />
-                        <MudAutocomplete T="StorageLocation" @bind-Value="_directDestination" SearchFunc="SearchStorageLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty" Label="В ячейку"
-                                         Disabled="@(!CanEdit || _isSaving)" />
-                        <MudAutocomplete T="StockKeepingUnit" @bind-Value="_directSku" SearchFunc="SearchStockKeepingUnitsAsync"
-                                         ToStringFunc="sku => sku?.Name ?? string.Empty" Label="Номенклатура"
-                                         Disabled="@(!CanEdit || _isSaving)" />
-                        <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
-                                         Disabled="@(!CanEdit || _isSaving)" />
-                        <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
-                                   Disabled="@(!CanMoveDirect || _isSaving)" OnClick="MoveDirectAsync">
-                            Переместить
-                        </MudButton>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+        }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudText Typo="Typo.h6" GutterBottom="true">История движений</MudText>

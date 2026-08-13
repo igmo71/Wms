@@ -127,4 +127,53 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             })
             .ToListAsync(ct);
     }
+
+    public async Task<List<InventoryTransferStorageLocationBalance>> GetStorageLocationBalancesAsync(
+        Guid storageLocationId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        return await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Include(x => x.StockKeepingUnit)
+            .Where(x => x.StorageLocationId == storageLocationId && x.Quantity > 0)
+            .OrderBy(x => x.StockKeepingUnit!.Name)
+            .Select(x => new InventoryTransferStorageLocationBalance
+            {
+                StockKeepingUnit = x.StockKeepingUnit!,
+                Quantity = x.Quantity
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<StorageLocation>> GetAvailableTransitStorageLocationsAsync(
+        Guid warehouseId,
+        string? searchText,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var activeTransitStorageLocationIds = dbContext.InventoryTransfers
+            .Where(x => x.Status != InventoryTransferStatus.Completed
+                && x.TransitStorageLocationId.HasValue)
+            .Select(x => x.TransitStorageLocationId!.Value);
+
+        IQueryable<StorageLocation> query = dbContext.StorageLocations
+            .AsNoTracking()
+            .Include(x => x.Zone)
+            .Where(x => x.WarehouseId == warehouseId
+                && !x.DeletionMark
+                && x.Zone!.Type == ZoneType.Transit
+                && !activeTransitStorageLocationIds.Contains(x.Id)
+                && !dbContext.InventoryBalances.Any(balance => balance.StorageLocationId == x.Id && balance.Quantity > 0));
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+            query = query.Where(x => x.Name!.Contains(searchText));
+
+        return await query
+            .OrderBy(x => x.Name)
+            .Take(10)
+            .ToListAsync(ct);
+    }
 }

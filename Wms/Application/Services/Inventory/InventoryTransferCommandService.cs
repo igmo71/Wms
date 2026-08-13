@@ -12,6 +12,7 @@ public class InventoryTransferCommandService(
 {
     public async Task<ServiceResult<InventoryTransfer>> CreateAsync(
         Guid warehouseId,
+        Guid? transitStorageLocationId,
         string userId,
         CancellationToken ct = default)
     {
@@ -35,6 +36,35 @@ public class InventoryTransferCommandService(
             CreatedBy = userId
         };
 
+        if (transitStorageLocationId is Guid locationId)
+        {
+            var transitLocation = await dbContext.StorageLocations
+                .Include(x => x.Zone)
+                .FirstOrDefaultAsync(x => x.Id == locationId, ct);
+
+            if (transitLocation is null)
+                return ServiceError.NotFound<StorageLocation>();
+
+            if (transitLocation.DeletionMark
+                || transitLocation.WarehouseId != warehouseId
+                || transitLocation.Zone?.Type != ZoneType.Transit)
+            {
+                return ServiceError.Invalid<StorageLocation>(
+                    "Transit location must be active and belong to a transit zone in the transfer warehouse.");
+            }
+
+            if (await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == locationId && x.Quantity > 0, ct))
+                return ServiceError.Invalid<StorageLocation>("Transit location must be empty before assignment.");
+
+            if (await dbContext.InventoryTransfers.AnyAsync(x => x.TransitStorageLocationId == locationId
+                && x.Status != InventoryTransferStatus.Completed, ct))
+            {
+                return ServiceError.Invalid<StorageLocation>("Transit location is already assigned to an active inventory transfer.");
+            }
+
+            transfer.TransitStorageLocationId = locationId;
+        }
+
         dbContext.InventoryTransfers.Add(transfer);
         await dbContext.SaveChangesAsync(ct);
 
@@ -53,67 +83,6 @@ public class InventoryTransferCommandService(
             return ServiceError.Invalid<InventoryTransfer>("Only a draft inventory transfer can be deleted.");
 
         dbContext.InventoryTransfers.Remove(transfer);
-        await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
-    }
-
-    public async Task<ServiceResult> SetTransitStorageLocationAsync(
-        Guid transferId,
-        Guid? transitStorageLocationId,
-        CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
-        if (transfer is null)
-            return ServiceError.NotFound<InventoryTransfer>();
-
-        if (transfer.Status == InventoryTransferStatus.Completed)
-            return ServiceError.Invalid<InventoryTransfer>("A completed inventory transfer cannot be changed.");
-
-        if (transfer.TransitStorageLocationId == transitStorageLocationId)
-            return ServiceResult.Success();
-
-        if (transfer.TransitStorageLocationId is Guid currentTransitLocationId
-            && await dbContext.InventoryMovements.AnyAsync(x => x.RecorderType == RecorderType.InventoryTransfer
-                && x.RecorderId == transfer.Id
-                && (x.SourceStorageLocationId == currentTransitLocationId
-                    || x.DestinationStorageLocationId == currentTransitLocationId), ct))
-        {
-            return ServiceError.Invalid<InventoryTransfer>("A transit location cannot be changed after it has been used.");
-        }
-
-        if (transitStorageLocationId is Guid locationId)
-        {
-            var transitLocation = await dbContext.StorageLocations
-                .Include(x => x.Zone)
-                .FirstOrDefaultAsync(x => x.Id == locationId, ct);
-
-            if (transitLocation is null)
-                return ServiceError.NotFound<StorageLocation>();
-
-            if (transitLocation.DeletionMark
-                || transitLocation.WarehouseId != transfer.WarehouseId
-                || transitLocation.Zone?.Type != ZoneType.Transit)
-            {
-                return ServiceError.Invalid<StorageLocation>(
-                    "Transit location must be active and belong to a transit zone in the transfer warehouse.");
-            }
-
-            if (await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == locationId && x.Quantity > 0, ct))
-                return ServiceError.Invalid<StorageLocation>("Transit location must be empty before assignment.");
-
-            if (await dbContext.InventoryTransfers.AnyAsync(x => x.Id != transfer.Id
-                && x.TransitStorageLocationId == locationId
-                && x.Status != InventoryTransferStatus.Completed, ct))
-            {
-                return ServiceError.Invalid<StorageLocation>("Transit location is already assigned to an active inventory transfer.");
-            }
-        }
-
-        transfer.TransitStorageLocationId = transitStorageLocationId;
-        transfer.UpdatedAtUtc = DateTimeOffset.UtcNow;
-
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }

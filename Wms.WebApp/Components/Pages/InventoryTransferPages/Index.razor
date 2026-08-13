@@ -72,7 +72,7 @@
              RowsPerPage="25">
     <Columns>
         <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true">
-            <CellTemplate><MudLink Href="@($"inventory-transfers/{context.Item.Id}")">@context.Item.Number</MudLink></CellTemplate>
+            <CellTemplate><MudLink Href="@GetTransferHref(context.Item)">@context.Item.Number</MudLink></CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
@@ -86,7 +86,7 @@
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
             <CellTemplate>
                 <MudTooltip Text="Открыть перемещение">
-                    <MudIconButton Href="@($"inventory-transfers/{context.Item.Id}")"
+                    <MudIconButton Href="@GetTransferHref(context.Item)"
                                    Icon="@Icons.Material.Filled.OpenInNew"
                                    Color="Color.Primary" />
                 </MudTooltip>
