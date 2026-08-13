@@ -15,7 +15,7 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Receiving, the initial shipping/picking flow, and inventory-count backend are currently being implemented. Putaway and intra-warehouse transfers remain roadmap items. Outgoing orders are imported from 1C and use their own shipping workflow.
+Receiving, the initial shipping/picking flow, and inventory-count backend are currently being implemented. Putaway remains a roadmap item. The agreed intra-warehouse transfer process is specified but not yet implemented. Outgoing orders are imported from 1C and use their own shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
@@ -37,6 +37,18 @@ The operator UI exposes a separate paged list of posted inventory movements. It 
 
 Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 
+Intra-warehouse transfers are local WMS documents without planned item lines or
+1C synchronization. They group an unrestricted chronological sequence of direct
+storage-location movements and movements through one optional transit location,
+such as a trolley. Each operator-confirmed physical action is immediately posted
+through the common inventory service; pick, put, and direct actions may be freely
+interleaved. A transit location is selected once as document context, starts
+empty, and belongs exclusively to one active transfer document. Draft documents
+without movements may be deleted, the first movement starts the document, and a
+document may be completed explicitly only after its transit location is empty.
+Posted movements and completed documents are immutable. The detailed process is
+defined in `specs/intra-warehouse-transfers/spec.md`.
+
 ## MVP implementation principles
 
 The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.
@@ -56,7 +68,8 @@ These principles can change as the product and its constraints mature.
 
 Core domain concepts:
 
-- warehouse, zone, and storage location;
+- warehouse, typed zone, and storage location; zone types distinguish ordinary
+  storage from transit locations such as trolleys;
 - SKU, unit of measure, and SKU barcode;
 - inventory balance: current quantity of an SKU in a warehouse storage location;
 - inventory movement: an editable draft of a warehouse movement, which becomes historical when posted;
@@ -66,8 +79,8 @@ Core domain concepts:
 
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
-- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C. The UI calls `WarehouseImportService`, which delegates to the 1C warehouse catalog importer.
-- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse.
+- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse and has an explicit type. The initial types are ordinary storage and transit.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
 
 ## Receiving
