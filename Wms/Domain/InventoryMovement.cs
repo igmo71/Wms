@@ -23,7 +23,7 @@ public class InventoryMovement
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }
     public DateTimeOffset? PostedAtUtc { get; set; }
-
+    public string? ConfirmedBy { get; set; }
 
     public Guid? RecorderId { get; set; }
     public int? RecorderLineNumber { get; set; }

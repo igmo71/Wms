@@ -28,7 +28,8 @@ internal class TransferOrderConfiguration : IEntityTypeConfiguration<TransferOrd
             .HasForeignKey(x => x.TransitStorageLocationId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => x.Number);
+        builder.HasIndex(x => x.SequenceNumber).IsUnique();
+        builder.HasIndex(x => x.Number).IsUnique();
         builder.HasIndex(x => new { x.WarehouseId, x.Date });
         builder.HasIndex(x => x.TransitStorageLocationId)
             .IsUnique()

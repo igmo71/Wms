@@ -9,6 +9,7 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
     public void Configure(EntityTypeBuilder<InventoryMovement> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.ConfirmedBy).HasMaxLength(DefaultConfiguration.Guid);
 
         builder.HasOne(x => x.Warehouse)
             .WithMany()
@@ -31,5 +32,9 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
             .HasForeignKey(x => x.StockKeepingUnitId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        builder.HasIndex(x => new { x.RecorderType, x.RecorderId, x.RecorderLineNumber })
+            .IsUnique()
+            .HasFilter($"[RecorderType] = {(int)Domain.Enums.RecorderType.TransferOrder} AND [RecorderId] IS NOT NULL AND [RecorderLineNumber] IS NOT NULL");
     }
 }

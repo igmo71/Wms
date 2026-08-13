@@ -72,11 +72,11 @@ prematurely.
 - Record the confirming operator on every movement using the application's
   established identity representation.
 - Strengthen concurrent balance consumption so that two commands cannot both
-  spend the same available quantity. Verify the chosen EF/database mechanism
-  with competing command executions.
-- Add focused automated coverage. If no test project exists when this stage
-  begins, introduce the smallest suitable integration-test project rather than
-  testing the rules through UI components.
+  spend the same available quantity. Use serializable command transactions,
+  row-version checks, and unique database constraints for competing writes.
+- Automated transfer tests are intentionally deferred; do not introduce a test
+  project during this stage. Verify the implementation through compilation,
+  EF model checks, migration inspection, and later manual process scenarios.
 
 ### Verification scenarios
 
@@ -145,7 +145,7 @@ web application.
 
 ## Stage 5: end-to-end stabilization
 
-- Run the complete build and all automated tests.
+- Run the complete build and any automated tests that exist at that time.
 - Apply the migration to a representative development database.
 - Recheck inventory balances, turnovers, and movement-history links for every
   transfer action.

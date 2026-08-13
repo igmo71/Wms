@@ -231,17 +231,20 @@ collapse posted movements.
 12. The movement history identifies the actual source, destination, SKU,
     quantity, time, sequence, and confirming operator.
 
-## Open technical decisions
+## Technical decisions
 
-- Exact entity and field names, numbering implementation, and UI page layout
-  should follow the conventions present when implementation begins.
-- The database concurrency mechanism must be selected during implementation and
-  verified with competing postings; the business rule is that only one consumer
-  may successfully spend the same available quantity.
-- The exact representation of application identity in audit fields should
-  follow the identity conventions present when implementation begins. The
-  movement-level confirming operator remains required, and the domain model
-  must not assume that the document has only one operator.
+- A transfer has a globally increasing numeric `SequenceNumber`; its visible
+  `Number` is the same value formatted with nine digits. Both values are unique,
+  and allocation occurs in a serializable transaction.
+- Mutating commands use serializable database transactions together with the
+  existing row-version concurrency tokens. Filtered unique indexes protect
+  active transit-location ownership and transfer movement sequence numbers.
+  A concurrency conflict rejects the entire command without partial changes.
+- Application identity continues to use the existing string user identifier.
+  Each movement stores it in `ConfirmedBy`; order creation, start, and completion
+  retain their corresponding audit users and timestamps.
+- The exact web page component layout remains a Stage 4 decision within the
+  operator-experience rules above.
 
 The staged implementation plan is defined in `implementation-plan.md` in this
 specification directory.

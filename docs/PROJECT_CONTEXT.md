@@ -15,7 +15,10 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Receiving, the initial shipping/picking flow, and inventory-count backend are currently being implemented. Putaway remains a roadmap item. The agreed intra-warehouse transfer process is specified but not yet implemented. Outgoing orders are imported from 1C and use their own shipping workflow.
+Receiving, the initial shipping/picking flow, inventory-count backend, and the
+intra-warehouse transfer backend are currently being implemented. Putaway
+remains a roadmap item. Outgoing orders are imported from 1C and use their own
+shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
@@ -48,6 +51,14 @@ without movements may be deleted, the first movement starts the document, and a
 document may be completed explicitly only after its transit location is empty.
 Posted movements and completed documents are immutable. The detailed process is
 defined in `specs/intra-warehouse-transfers/spec.md`.
+
+Transfer commands run in serializable database transactions. They immediately
+post every confirmed direct, pick, or put action together with balance and
+turnover changes, allocate a unique chronological movement line, and start a
+draft on its first movement. Transfer numbers use a unique global numeric
+sequence displayed as nine digits. Each transfer movement stores the confirming
+application user. The command and query backend is implemented; the operator
+web UI remains the next delivery stage.
 
 ## MVP implementation principles
 

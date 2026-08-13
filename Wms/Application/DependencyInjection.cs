@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<SkuBarcodeService>();
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<TransferOrderQueryService>();
+        services.AddScoped<TransferOrderCommandService>();
         services.AddScoped<SynchronizedCatalogImportService>();
         services.AddScoped<StorageLocationService>();
         services.AddScoped<UnitOfMeasureService>();

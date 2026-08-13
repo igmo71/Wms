@@ -81,4 +81,49 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             TotalItems = totalItems
         };
     }
+
+    public async Task<List<InventoryMovement>> GetMovementsAsync(
+        Guid orderId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        return await dbContext.InventoryMovements
+            .AsNoTracking()
+            .Include(x => x.SourceStorageLocation)
+            .Include(x => x.DestinationStorageLocation)
+            .Include(x => x.StockKeepingUnit)
+            .Where(x => x.RecorderType == Domain.Enums.RecorderType.TransferOrder
+                && x.RecorderId == orderId)
+            .OrderBy(x => x.RecorderLineNumber)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<TransferOrderTransitBalance>> GetTransitBalancesAsync(
+        Guid orderId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var transitStorageLocationId = await dbContext.TransferOrders
+            .AsNoTracking()
+            .Where(x => x.Id == orderId)
+            .Select(x => x.TransitStorageLocationId)
+            .FirstOrDefaultAsync(ct);
+
+        if (transitStorageLocationId is null)
+            return [];
+
+        return await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Include(x => x.StockKeepingUnit)
+            .Where(x => x.StorageLocationId == transitStorageLocationId && x.Quantity > 0)
+            .OrderBy(x => x.StockKeepingUnit!.Name)
+            .Select(x => new TransferOrderTransitBalance
+            {
+                StockKeepingUnit = x.StockKeepingUnit!,
+                Quantity = x.Quantity
+            })
+            .ToListAsync(ct);
+    }
 }

@@ -5,6 +5,7 @@ namespace Wms.Domain;
 public class TransferOrder
 {
     public Guid Id { get; set; }
+    public long SequenceNumber { get; set; }
     public string Number { get; set; } = string.Empty;
     public DateTime Date { get; set; }
 
