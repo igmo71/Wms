@@ -148,7 +148,14 @@ dimensions are introduced.
 
 ## Operator experience
 
-The initial web UI exposes separate, explicit commands:
+The initial web UI uses one full transfer work page for both initialization and
+subsequent work. Before the warehouse is confirmed, the page already shows the
+recognizable work layout, but only warehouse selection and the explicit start
+action are enabled. Confirming the warehouse creates the draft and locks the
+warehouse; merely changing the selected value does not create a document. A
+separate creation dialog or warehouse-only page is not used.
+
+After warehouse confirmation, the web UI exposes separate, explicit commands:
 
 - pick to trolley;
 - put from trolley;
@@ -158,6 +165,11 @@ When a transit location is assigned, it remains visible as order context and is
 filled automatically for pick and put actions. The work page shows the current
 transit inventory by SKU and the immutable movement history in execution order.
 It permits pick and put actions to be freely interleaved.
+
+Without a transit location, direct movement and transit selection are available,
+while pick and put are disabled. The layout and process vocabulary should remain
+recognizable for a future mobile client without copying a mobile layout into the
+web application.
 
 A future mobile client may scan a transit location to open its active order or
 offer to create a new order when the location is free. That shortcut is not
@@ -226,3 +238,6 @@ collapse posted movements.
   follow the identity conventions present when implementation begins. The
   movement-level confirming operator remains required, and the domain model
   must not assume that the document has only one operator.
+
+The staged implementation plan is defined in `implementation-plan.md` in this
+specification directory.
