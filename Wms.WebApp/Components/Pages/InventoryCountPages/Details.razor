@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Инвентаризация</MudText>
+            <MudText Typo="Typo.h4">Инвентаризация №@_inventoryCount.Number</MudText>
             <MudSpacer />
             @if (IsDraft)
             {
@@ -41,6 +41,14 @@ else
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Номер</MudText>
+                    <MudText>@_inventoryCount.Number</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudText Typo="Typo.caption">Дата</MudText>
+                    <MudText>@_inventoryCount.Date.ToString("dd.MM.yyyy")</MudText>
+                </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Склад</MudText>
                     <MudText>@_inventoryCount.Warehouse?.Name</MudText>
@@ -49,17 +57,17 @@ else
                     <MudText Typo="Typo.caption">Статус</MudText>
                     <MudText>@_inventoryCount.Status.GetDisplayName()</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2">
+                <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Создана</MudText>
-                    <MudText>@FormatDateTimeOffset(_inventoryCount.CreatedAtUtc)</MudText>
+                    <MudText>@FormatOperation(_inventoryCount.CreatedAtUtc, _inventoryCount.CreatedBy)</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2">
+                <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Изменена</MudText>
-                    <MudText>@FormatDateTimeOffset(_inventoryCount.UpdatedAtUtc)</MudText>
+                    <MudText>@FormatOperation(_inventoryCount.UpdatedAtUtc, _inventoryCount.UpdatedBy)</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2">
+                <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Проведена</MudText>
-                    <MudText>@FormatDateTimeOffset(_inventoryCount.PostedAtUtc)</MudText>
+                    <MudText>@FormatOperation(_inventoryCount.PostedAtUtc, _inventoryCount.PostedBy)</MudText>
                 </MudItem>
             </MudGrid>
         </MudPaper>
@@ -89,7 +97,11 @@ else
                 }
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Строка">@context.LineNumber</MudTd>
+                <MudTd DataLabel="Строка">
+                    <MudTooltip Text="@GetItemAuditTooltip(context)">
+                        <span>@context.LineNumber</span>
+                    </MudTooltip>
+                </MudTd>
                 <MudTd DataLabel="Ячейка">
                     @if (IsDraft)
                     {
@@ -121,7 +133,9 @@ else
                     }
                     else
                     {
-                        @context.StockKeepingUnit?.Name
+                        <MudTooltip Text="@context.StockKeepingUnit?.Name">
+                            <span>@context.StockKeepingUnit?.Name</span>
+                        </MudTooltip>
                     }
                 </MudTd>
                 <MudTd DataLabel="Ожидается">@context.ExpectedQuantity</MudTd>

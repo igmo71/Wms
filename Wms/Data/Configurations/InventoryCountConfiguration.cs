@@ -10,10 +10,18 @@ internal class InventoryCountConfiguration : IEntityTypeConfiguration<InventoryC
     {
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code).IsRequired();
+        builder.Property(x => x.CreatedBy).HasMaxLength(DefaultConfiguration.Guid).IsRequired();
+        builder.Property(x => x.UpdatedBy).HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.PostedBy).HasMaxLength(DefaultConfiguration.Guid);
+
         builder.HasOne(x => x.Warehouse)
             .WithMany()
             .HasForeignKey(x => x.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        builder.HasIndex(x => x.Number);
+        builder.HasIndex(x => new { x.WarehouseId, x.Date });
     }
 }

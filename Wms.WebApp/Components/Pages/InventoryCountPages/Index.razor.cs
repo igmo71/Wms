@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
+using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.Inventory;
 using Wms.Common;
@@ -13,6 +15,7 @@ public partial class Index
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private MudDataGrid<InventoryCount> _dataGrid = null!;
     private Warehouse? _warehouse;
@@ -68,7 +71,15 @@ public partial class Index
 
         try
         {
-            var result = await InventoryCountCommandService.CreateAsync(warehouse.Id);
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null)
+            {
+                _createFailed = true;
+                _errorMessage = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            var result = await InventoryCountCommandService.CreateAsync(warehouse.Id, userId);
             if (!result.IsSuccess || result.Value is null)
             {
                 _createFailed = true;
@@ -87,5 +98,11 @@ public partial class Index
         {
             _isCreating = false;
         }
+    }
+
+    private async Task<string?> GetCurrentUserIdAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
     }
 }

@@ -10,19 +10,29 @@ public class InventoryCountCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     BalanceAndTurnoverService balanceAndTurnoverService)
 {
-    public async Task<ServiceResult<InventoryCount>> CreateAsync(Guid warehouseId, CancellationToken ct = default)
+    public async Task<ServiceResult<InventoryCount>> CreateAsync(
+        Guid warehouseId,
+        string userId,
+        CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<InventoryCount>("Creating user must be specified.");
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId, ct))
             return ServiceError.NotFound<Warehouse>();
 
+        var now = DateTimeOffset.UtcNow;
         var inventoryCount = new InventoryCount
         {
             Id = Guid.NewGuid(),
+            Number = now.LocalDateTime.ToString("yyMMdd-HHmmss"),
+            Date = now.LocalDateTime.Date,
             WarehouseId = warehouseId,
             Status = InventoryCountStatus.Draft,
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAtUtc = now,
+            CreatedBy = userId
         };
 
         dbContext.InventoryCounts.Add(inventoryCount);
@@ -31,8 +41,14 @@ public class InventoryCountCommandService(
         return inventoryCount;
     }
 
-    public async Task<ServiceResult> AddItemAsync(Guid inventoryCountId, CancellationToken ct = default)
+    public async Task<ServiceResult> AddItemAsync(
+        Guid inventoryCountId,
+        string userId,
+        CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<InventoryCountItem>("Creating user must be specified.");
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var inventoryCount = await dbContext.InventoryCounts
@@ -49,14 +65,18 @@ public class InventoryCountCommandService(
             .Select(x => (int?)x.LineNumber)
             .MaxAsync(ct) ?? 0;
 
+        var now = DateTimeOffset.UtcNow;
         dbContext.InventoryCountItems.Add(new InventoryCountItem
         {
             Id = Guid.NewGuid(),
             InventoryCountId = inventoryCount.Id,
-            LineNumber = lastLineNumber + 1
+            LineNumber = lastLineNumber + 1,
+            CreatedAtUtc = now,
+            CreatedBy = userId
         });
 
-        inventoryCount.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        inventoryCount.UpdatedAtUtc = now;
+        inventoryCount.UpdatedBy = userId;
         await dbContext.SaveChangesAsync(ct);
 
         return ServiceResult.Success();
@@ -67,10 +87,14 @@ public class InventoryCountCommandService(
         Guid? storageLocationId,
         Guid? stockKeepingUnitId,
         double countedQuantity,
+        string userId,
         CancellationToken ct = default)
     {
         if (countedQuantity < 0)
             return ServiceError.Invalid<InventoryCountItem>("Counted quantity cannot be negative.");
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<InventoryCountItem>("Updating user must be specified.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -136,14 +160,22 @@ public class InventoryCountCommandService(
 
         var now = DateTimeOffset.UtcNow;
         item.UpdatedAtUtc = now;
+        item.UpdatedBy = userId;
         inventoryCount.UpdatedAtUtc = now;
+        inventoryCount.UpdatedBy = userId;
 
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> DeleteItemAsync(Guid itemId, CancellationToken ct = default)
+    public async Task<ServiceResult> DeleteItemAsync(
+        Guid itemId,
+        string userId,
+        CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<InventoryCountItem>("Deleting user must be specified.");
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var item = await dbContext.InventoryCountItems
@@ -159,13 +191,20 @@ public class InventoryCountCommandService(
 
         dbContext.InventoryCountItems.Remove(item);
         inventoryCount.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        inventoryCount.UpdatedBy = userId;
 
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult> PostAsync(Guid inventoryCountId, CancellationToken ct = default)
+    public async Task<ServiceResult> PostAsync(
+        Guid inventoryCountId,
+        string userId,
+        CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return ServiceError.Invalid<InventoryCount>("Posting user must be specified.");
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var inventoryCount = await dbContext.InventoryCounts
@@ -200,6 +239,7 @@ public class InventoryCountCommandService(
                 StockKeepingUnitId = x.StockKeepingUnitId!.Value,
                 Quantity = Math.Abs(x.DifferenceQuantity),
                 CreatedAtUtc = now,
+                ConfirmedBy = userId,
                 RecorderType = RecorderType.InventoryCount,
                 RecorderId = inventoryCount.Id,
                 RecorderLineNumber = x.LineNumber
@@ -219,7 +259,9 @@ public class InventoryCountCommandService(
 
         inventoryCount.Status = InventoryCountStatus.Posted;
         inventoryCount.PostedAtUtc = now;
+        inventoryCount.PostedBy = userId;
         inventoryCount.UpdatedAtUtc = now;
+        inventoryCount.UpdatedBy = userId;
 
         await dbContext.SaveChangesAsync(ct);
         return ServiceResult.Success();

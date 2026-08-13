@@ -11,6 +11,8 @@ internal class InventoryCountItemConfiguration : IEntityTypeConfiguration<Invent
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.LineNumber).IsRequired();
+        builder.Property(x => x.CreatedBy).HasMaxLength(DefaultConfiguration.Guid).IsRequired();
+        builder.Property(x => x.UpdatedBy).HasMaxLength(DefaultConfiguration.Guid);
 
         builder.HasOne(x => x.InventoryCount)
             .WithMany(x => x.Items)

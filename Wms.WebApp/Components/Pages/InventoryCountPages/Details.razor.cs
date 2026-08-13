@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.Inventory;
 using Wms.Common;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -16,6 +20,8 @@ public partial class Details
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] private UserManager<ApplicationUser> UserManager { get; set; } = null!;
 
     private InventoryCount? _inventoryCount;
     private bool _isLoading = true;
@@ -23,6 +29,7 @@ public partial class Details
     private bool _isPosting;
     private bool _operationFailed;
     private string? _errorMessage;
+    private readonly Dictionary<string, string> _userNames = [];
 
     private bool IsDraft => _inventoryCount?.Status == InventoryCountStatus.Draft;
 
@@ -35,6 +42,7 @@ public partial class Details
     {
         _isLoading = true;
         _inventoryCount = await InventoryCountQueryService.GetAsync(Id);
+        await LoadUserNamesAsync();
         _isLoading = false;
     }
 
@@ -92,11 +100,8 @@ public partial class Details
 
         try
         {
-            var result = await InventoryCountCommandService.UpdateItemAsync(
-                item.Id,
-                storageLocationId,
-                stockKeepingUnitId,
-                countedQuantity);
+            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.UpdateItemAsync(
+                item.Id, storageLocationId, stockKeepingUnitId, countedQuantity, userId));
 
             if (!result.IsSuccess)
             {
@@ -121,7 +126,7 @@ public partial class Details
 
         try
         {
-            var result = await InventoryCountCommandService.AddItemAsync(Id);
+            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.AddItemAsync(Id, userId));
             if (!result.IsSuccess)
             {
                 _operationFailed = true;
@@ -148,7 +153,7 @@ public partial class Details
 
         try
         {
-            var result = await InventoryCountCommandService.DeleteItemAsync(item.Id);
+            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.DeleteItemAsync(item.Id, userId));
             if (!result.IsSuccess)
             {
                 _operationFailed = true;
@@ -172,7 +177,7 @@ public partial class Details
 
         try
         {
-            var result = await InventoryCountCommandService.PostAsync(Id);
+            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.PostAsync(Id, userId));
             if (!result.IsSuccess)
             {
                 _operationFailed = true;
@@ -195,4 +200,49 @@ public partial class Details
 
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+
+    private string FormatOperation(DateTimeOffset? timestamp, string? userId)
+    {
+        var time = FormatDateTimeOffset(timestamp);
+        return userId is null ? time : $"{time} · {GetUserName(userId)}";
+    }
+
+    private async Task LoadUserNamesAsync()
+    {
+        _userNames.Clear();
+
+        if (_inventoryCount is null)
+            return;
+
+        var userIds = new[]
+        {
+            _inventoryCount.CreatedBy,
+            _inventoryCount.UpdatedBy,
+            _inventoryCount.PostedBy
+        }
+        .Concat(_inventoryCount.Items.SelectMany(x => new[] { x.CreatedBy, x.UpdatedBy }))
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct();
+
+        foreach (var userId in userIds)
+        {
+            var user = await UserManager.FindByIdAsync(userId!);
+            _userNames[userId!] = user?.UserName ?? "Пользователь не найден";
+        }
+    }
+
+    private string GetUserName(string userId) =>
+        _userNames.GetValueOrDefault(userId, "Пользователь не найден");
+
+    private string GetItemAuditTooltip(InventoryCountItem item) =>
+        $"Создана: {FormatOperation(item.CreatedAtUtc, item.CreatedBy)}\nИзменена: {FormatOperation(item.UpdatedAtUtc, item.UpdatedBy)}";
+
+    private async Task<ServiceResult> RunAsCurrentUserAsync(Func<string, Task<ServiceResult>> action)
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return userId is null
+            ? ServiceError.Invalid<InventoryCount>("Current user cannot be determined.")
+            : await action(userId);
+    }
 }

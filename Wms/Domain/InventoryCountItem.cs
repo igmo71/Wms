@@ -17,7 +17,10 @@ public class InventoryCountItem
 
     public double ExpectedQuantity { get; set; }
     public double CountedQuantity { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
     public DateTimeOffset? UpdatedAtUtc { get; set; }
+    public string? UpdatedBy { get; set; }
 
     public double DifferenceQuantity => CountedQuantity - ExpectedQuantity;
 }

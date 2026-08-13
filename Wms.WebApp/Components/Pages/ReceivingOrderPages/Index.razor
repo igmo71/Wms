@@ -91,7 +91,7 @@
             <CellTemplate>
                 <MudTooltip Text="Детали">
                     <MudIconButton Href="@($"receiving-orders/{context.Item.Id}")"
-                                   Icon="@Icons.Material.Filled.Visibility"
+                                   Icon="@Icons.Material.Filled.OpenInNew"
                                    Color="Color.Primary" />
                 </MudTooltip>
                 @if (context.Item.Status == ReceivingOrderStatus.InReceiving)

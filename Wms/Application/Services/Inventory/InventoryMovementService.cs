@@ -43,6 +43,11 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
             .Select(x => x.RecorderId!.Value)
             .Distinct()
             .ToArray();
+        var inventoryCountIds = items
+            .Where(x => x.RecorderType == RecorderType.InventoryCount && x.RecorderId is not null)
+            .Select(x => x.RecorderId!.Value)
+            .Distinct()
+            .ToArray();
         var transferIds = items
             .Where(x => x.RecorderType == RecorderType.InventoryTransfer && x.RecorderId is not null)
             .Select(x => x.RecorderId!.Value)
@@ -56,6 +61,10 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
         var shippingOrders = await dbContext.ShippingOrders
             .AsNoTracking()
             .Where(x => shippingOrderIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+        var inventoryCounts = await dbContext.InventoryCounts
+            .AsNoTracking()
+            .Where(x => inventoryCountIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
         var transfers = await dbContext.InventoryTransfers
             .AsNoTracking()
@@ -73,6 +82,8 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.Number,
                     Domain.Enums.RecorderType.ShippingOrder when movement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Number,
+                    RecorderType.InventoryCount when movement.RecorderId is Guid recorderId
+                        && inventoryCounts.TryGetValue(recorderId, out var count) => count.Number,
                     RecorderType.InventoryTransfer when movement.RecorderId is Guid recorderId
                         && transfers.TryGetValue(recorderId, out var transfer) => transfer.Number,
                     _ => null
@@ -83,6 +94,8 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.Date,
                     Domain.Enums.RecorderType.ShippingOrder when movement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Date,
+                    RecorderType.InventoryCount when movement.RecorderId is Guid recorderId
+                        && inventoryCounts.TryGetValue(recorderId, out var count) => count.Date,
                     RecorderType.InventoryTransfer when movement.RecorderId is Guid recorderId
                         && transfers.TryGetValue(recorderId, out var transfer) => transfer.Date,
                     _ => null
@@ -125,6 +138,10 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
                 .ToArrayAsync(ct);
+            var inventoryCountIds = await dbContext.InventoryCounts
+                .Where(x => x.Number.Contains(searchString))
+                .Select(x => x.Id)
+                .ToArrayAsync(ct);
             var transferIds = await dbContext.InventoryTransfers
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
@@ -135,6 +152,8 @@ public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrderIds.Contains(x.RecorderId.Value))
                     || (x.RecorderType == RecorderType.ShippingOrder
                         && shippingOrderIds.Contains(x.RecorderId.Value))
+                    || (x.RecorderType == RecorderType.InventoryCount
+                        && inventoryCountIds.Contains(x.RecorderId.Value))
                     || (x.RecorderType == RecorderType.InventoryTransfer
                         && transferIds.Contains(x.RecorderId.Value))));
         }

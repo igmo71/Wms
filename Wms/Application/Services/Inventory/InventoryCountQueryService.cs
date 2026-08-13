@@ -14,7 +14,7 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
         return await dbContext.InventoryCounts
             .AsNoTracking()
             .Include(x => x.Warehouse)
-            .Include(x => x.Items)
+            .Include(x => x.Items.OrderBy(x => x.LineNumber))
                 .ThenInclude(x => x.StorageLocation)
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
@@ -34,6 +34,8 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
         query = listQuery.SortBy switch
         {
             "CreatedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.CreatedAtUtc) : query.OrderBy(x => x.CreatedAtUtc),
+            "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
+            "Date" => listQuery.SortDescending ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date),
             "PostedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.PostedAtUtc) : query.OrderBy(x => x.PostedAtUtc),
             "Status" => listQuery.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
             _ => query.OrderByDescending(x => x.CreatedAtUtc)
