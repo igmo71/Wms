@@ -1,0 +1,25 @@
+@page "/sku-barcodes"
+@using Wms.Common
+@using Wms.Domain
+
+<PageTitle>Штрихкоды</PageTitle>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Штрихкоды номенклатуры</MudText>
+    <MudSpacer />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">
+        @(_isImporting ? "Обновление..." : "Обновить из 1С")
+    </MudButton>
+</MudStack>
+@if (_isImporting)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+@if (_importFailed)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить штрихкоды из 1С.</MudAlert>
+}
+<MudPaper Class="pa-3 mb-4" Elevation="1"><MudStack Row="true" AlignItems="AlignItems.Center"><MudTextField T="string" Value="_searchString" ValueChanged="OnSearchChangedAsync" Label="Поиск по штрихкоду или номенклатуре" Immediate="true" DebounceInterval="300" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" /><MudSwitch T="bool" Value="_includeDeleted" ValueChanged="OnIncludeDeletedChangedAsync" Color="Color.Primary" Label="Показать деактивированную номенклатуру" Class="ml-4" /></MudStack></MudPaper>
+<MudDataGrid T="SkuBarcode" @ref="_dataGrid" ServerData="LoadServerDataAsync" SortMode="SortMode.Single" Filterable="false" Hover="true" Striped="true" Dense="true" RowsPerPage="25">
+    <Columns><PropertyColumn Property="x => x.Value" Title="Штрихкод" Sortable="true" /><PropertyColumn Property="x => x.Sku!.Name" Title="Номенклатура" Sortable="true" /></Columns>
+    <PagerContent><MudDataGridPager T="SkuBarcode" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>
+</MudDataGrid>

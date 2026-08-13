@@ -68,7 +68,8 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<StockKeepingUnit> query = dbContext.StockKeepingUnits
-                .AsNoTracking();
+                .AsNoTracking()
+                .Include(x => x.BaseUnitOfMeasure);
 
         if (listQuery.ExcludeDeleted)
             query = query.Where(x => x.DeletionMark == false);
@@ -105,6 +106,11 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
     {
         return sortBy switch
         {
+            "Code" => sortDescending ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
+            "BaseUnitOfMeasure.Name" => sortDescending
+                ? query.OrderByDescending(x => x.BaseUnitOfMeasure!.Name)
+                : query.OrderBy(x => x.BaseUnitOfMeasure!.Name),
+            "WeightKg" => sortDescending ? query.OrderByDescending(x => x.WeightKg) : query.OrderBy(x => x.WeightKg),
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
             _ => query.OrderBy(x => x.Name),
         };

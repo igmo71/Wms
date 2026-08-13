@@ -1,0 +1,11 @@
+@using Wms.Domain
+
+<MudTreeViewItem T="DeliveryDirection"
+                 Value="Direction"
+                 Text="@Text"
+                 Icon="@Icon">
+    @foreach (var child in Children)
+    {
+        <DeliveryDirectionTreeItem Direction="child" Directions="Directions" />
+    }
+</MudTreeViewItem>

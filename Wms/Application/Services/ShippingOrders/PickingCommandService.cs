@@ -5,7 +5,7 @@ using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.ShippingOrders;
 
 public class PickingCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,

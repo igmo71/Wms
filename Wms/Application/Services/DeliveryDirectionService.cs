@@ -5,7 +5,7 @@ using Wms.Domain;
 
 namespace Wms.Application.Services;
 
-internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
     internal async Task CreateOrUpdateAsync(DeliveryDirection item, CancellationToken ct)
     {
@@ -60,6 +60,18 @@ internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> 
         };
     }
 
+    public async Task<List<DeliveryDirection>> ListTreeAsync(bool includeDeleted, CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var items = await dbContext.DeliveryDirections
+            .AsNoTracking()
+            .Where(x => includeDeleted || !x.DeletionMark)
+            .ToListAsync(ct);
+
+        return items;
+    }
+
     private static IQueryable<DeliveryDirection> ApplySearch(IQueryable<DeliveryDirection> query, string? searchString)
     {
         if (!string.IsNullOrWhiteSpace(searchString))
@@ -74,8 +86,9 @@ internal class DeliveryDirectionService(IDbContextFactory<ApplicationDbContext> 
     {
         return sortBy switch
         {
-            "Name" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
-            _ => query.OrderByDescending(x => x.Description),
+            "Description" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
+            "Comment" => sortDescending ? query.OrderByDescending(x => x.Comment) : query.OrderBy(x => x.Comment),
+            _ => query.OrderBy(x => x.Description),
         };
     }
 }

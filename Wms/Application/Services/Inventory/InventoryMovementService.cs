@@ -4,7 +4,7 @@ using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.Inventory;
 
 public class InventoryMovementService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {

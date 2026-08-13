@@ -86,6 +86,8 @@ The operator UI exposes configuration screens under the `Конфигураци�
   their corresponding zone types; picking and inventory counts use ordinary
   storage zones.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
+- `Номенклатура`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
 ## Receiving
 

@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Wms.Application.Services;
+using Wms.Application.Services.ReceivingOrders;
 
 namespace Wms.Endpoints;
 

@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Wms.Application.Services;
+using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;

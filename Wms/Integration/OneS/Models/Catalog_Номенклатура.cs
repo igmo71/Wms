@@ -12,8 +12,8 @@ public class Catalog_Номенклатура
     public Guid? ЕдиницаИзмерения_Key { get; set; }
     public bool ВесИспользовать { get; set; }
     public Guid ВесЕдиницаИзмерения_Key { get; set; }
-    public long ВесЧислитель { get; set; }
-    public long ВесЗнаменатель { get; set; }
+    public double ВесЧислитель { get; set; }
+    public double ВесЗнаменатель { get; set; }
 
 
     public const int BatchSize = 1000;

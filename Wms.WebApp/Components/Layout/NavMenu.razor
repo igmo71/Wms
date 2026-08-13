@@ -7,13 +7,19 @@
     <MudNavLink Href="receiving-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assignment">Приемка</MudNavLink>
     <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
     <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
-    <MudNavLink Href="inventory-balances" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Остатки</MudNavLink>
-    <MudNavLink Href="inventory-movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Движения</MudNavLink>
-    <MudNavLink Href="inventory-turnovers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Обороты</MudNavLink>
+    <MudNavGroup Title="Остатки и Обороты" Icon="@Icons.Material.Filled.Inventory">
+        <MudNavLink Href="inventory-balances" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Остатки</MudNavLink>
+        <MudNavLink Href="inventory-movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Движения</MudNavLink>
+        <MudNavLink Href="inventory-turnovers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Обороты</MudNavLink>
+    </MudNavGroup>
     <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">
         <MudNavLink Href="warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Склады</MudNavLink>
         <MudNavLink Href="zones" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Зоны</MudNavLink>
         <MudNavLink Href="storage-locations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Ячейки хранения</MudNavLink>
+        <MudNavLink Href="stock-keeping-units" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Номенклатура</MudNavLink>
+        <MudNavLink Href="sku-barcodes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.QrCode">Штрихкоды</MudNavLink>
+        <MudNavLink Href="units-of-measure" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Единицы измерения</MudNavLink>
+        <MudNavLink Href="delivery-directions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Направления доставки</MudNavLink>
     </MudNavGroup>
     <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink>
     <AuthorizeView>

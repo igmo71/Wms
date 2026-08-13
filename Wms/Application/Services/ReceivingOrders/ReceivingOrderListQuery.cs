@@ -1,6 +1,6 @@
 ﻿using Wms.Common;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.ReceivingOrders;
 
 using Wms.Domain.Enums;
 

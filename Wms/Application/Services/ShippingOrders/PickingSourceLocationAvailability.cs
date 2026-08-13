@@ -1,6 +1,6 @@
 using Wms.Domain;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.ShippingOrders;
 
 public sealed class PickingSourceLocationAvailability
 {

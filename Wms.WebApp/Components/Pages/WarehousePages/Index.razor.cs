@@ -12,7 +12,7 @@ public partial class Index
     private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject]
-    private WarehouseImportService WarehouseImportService { get; set; } = null!;
+    private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
 
     private MudDataGrid<Warehouse> _dataGrid = null!;
     private string? _searchString;
@@ -63,7 +63,7 @@ public partial class Index
 
         try
         {
-            await WarehouseImportService.RefreshFromOneCAsync();
+            await SynchronizedCatalogImportService.RefreshWarehousesAsync();
             await _dataGrid.ReloadServerData();
         }
         catch

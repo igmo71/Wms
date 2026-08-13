@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Wms.Application.Services;
+using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

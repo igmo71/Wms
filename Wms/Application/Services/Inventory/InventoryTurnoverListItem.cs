@@ -1,7 +1,7 @@
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.Inventory;
 
 public class InventoryTurnoverListItem
 {

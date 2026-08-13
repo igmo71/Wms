@@ -8,6 +8,6 @@ public class UnitOfMeasure
     public string? Description { get; set; }
     public string? Abbreviation { get; set; }
     public bool DeletionMark { get; set; }
-    public long Numerator { get; set; }
-    public long Denominator { get; set; }
+    public double Numerator { get; set; }
+    public double Denominator { get; set; }
 }

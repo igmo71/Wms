@@ -4,7 +4,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.Inventory;
 
 public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger)
 {

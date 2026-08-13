@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Application.Services.Inventory;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 using Wms.Integration.OneS.Services;
 
-namespace Wms.Application.Services;
+namespace Wms.Application.Services.ShippingOrders;
 
 public class ShippingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
