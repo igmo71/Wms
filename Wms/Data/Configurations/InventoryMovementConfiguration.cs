@@ -32,9 +32,5 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
             .HasForeignKey(x => x.StockKeepingUnitId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
-
-        builder.HasIndex(x => new { x.RecorderType, x.RecorderId, x.RecorderLineNumber })
-            .IsUnique()
-            .HasFilter($"[RecorderType] = {(int)Domain.Enums.RecorderType.TransferOrder} AND [RecorderId] IS NOT NULL AND [RecorderLineNumber] IS NOT NULL");
     }
 }

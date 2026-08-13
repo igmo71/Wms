@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Wms.Domain.Enums;
 
-public enum TransferOrderStatus
+public enum InventoryTransferStatus
 {
     [Display(Name = "Черновик")]
     Draft = 0,

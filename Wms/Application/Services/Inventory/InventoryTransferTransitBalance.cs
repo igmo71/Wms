@@ -1,8 +1,8 @@
 using Wms.Domain;
 
-namespace Wms.Application.Services.Transfers;
+namespace Wms.Application.Services.Inventory;
 
-public class TransferOrderTransitBalance
+public class InventoryTransferTransitBalance
 {
     public StockKeepingUnit StockKeepingUnit { get; init; } = null!;
     public double Quantity { get; init; }

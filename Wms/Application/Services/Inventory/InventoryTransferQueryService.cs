@@ -2,16 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
-namespace Wms.Application.Services.Transfers;
+namespace Wms.Application.Services.Inventory;
 
-public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task<TransferOrder?> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<InventoryTransfer?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        return await dbContext.TransferOrders
+        return await dbContext.InventoryTransfers
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.TransitStorageLocation)
@@ -19,13 +20,13 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .FirstOrDefaultAsync(x => x.Id == id, ct);
     }
 
-    public async Task<ListResult<TransferOrder>> ListAsync(
-        TransferOrderListQuery listQuery,
+    public async Task<ListResult<InventoryTransfer>> ListAsync(
+        InventoryTransferListQuery listQuery,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        IQueryable<TransferOrder> query = dbContext.TransferOrders
+        IQueryable<InventoryTransfer> query = dbContext.InventoryTransfers
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.TransitStorageLocation);
@@ -36,7 +37,7 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
         if (listQuery.WarehouseId is Guid warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);
 
-        if (listQuery.Status is Domain.Enums.TransferOrderStatus status)
+        if (listQuery.Status is InventoryTransferStatus status)
             query = query.Where(x => x.Status == status);
 
         if (listQuery.DateFrom is DateTime dateFrom)
@@ -75,7 +76,7 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
-        return new ListResult<TransferOrder>
+        return new ListResult<InventoryTransfer>
         {
             Items = items,
             TotalItems = totalItems
@@ -83,7 +84,7 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
     }
 
     public async Task<List<InventoryMovement>> GetMovementsAsync(
-        Guid orderId,
+        Guid transferId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -93,21 +94,21 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .Include(x => x.SourceStorageLocation)
             .Include(x => x.DestinationStorageLocation)
             .Include(x => x.StockKeepingUnit)
-            .Where(x => x.RecorderType == Domain.Enums.RecorderType.TransferOrder
-                && x.RecorderId == orderId)
+            .Where(x => x.RecorderType == RecorderType.InventoryTransfer
+                && x.RecorderId == transferId)
             .OrderBy(x => x.RecorderLineNumber)
             .ToListAsync(ct);
     }
 
-    public async Task<List<TransferOrderTransitBalance>> GetTransitBalancesAsync(
-        Guid orderId,
+    public async Task<List<InventoryTransferTransitBalance>> GetTransitBalancesAsync(
+        Guid transferId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var transitStorageLocationId = await dbContext.TransferOrders
+        var transitStorageLocationId = await dbContext.InventoryTransfers
             .AsNoTracking()
-            .Where(x => x.Id == orderId)
+            .Where(x => x.Id == transferId)
             .Select(x => x.TransitStorageLocationId)
             .FirstOrDefaultAsync(ct);
 
@@ -119,7 +120,7 @@ public class TransferOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .Include(x => x.StockKeepingUnit)
             .Where(x => x.StorageLocationId == transitStorageLocationId && x.Quantity > 0)
             .OrderBy(x => x.StockKeepingUnit!.Name)
-            .Select(x => new TransferOrderTransitBalance
+            .Select(x => new InventoryTransferTransitBalance
             {
                 StockKeepingUnit = x.StockKeepingUnit!,
                 Quantity = x.Quantity

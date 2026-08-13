@@ -12,8 +12,8 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260813110325_AddTransferCommandFields")]
-    partial class AddTransferCommandFields
+    [Migration("20260813122620_AddZoneTypesAndInventoryTransfers")]
+    partial class AddZoneTypesAndInventoryTransfers
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -434,11 +434,68 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.HasIndex("RecorderType", "RecorderId", "RecorderLineNumber")
-                        .IsUnique()
-                        .HasFilter("[RecorderType] = 4 AND [RecorderId] IS NOT NULL AND [RecorderLineNumber] IS NOT NULL");
-
                     b.ToTable("InventoryMovements");
+                });
+
+            modelBuilder.Entity("Wms.Domain.InventoryTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CompletedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("StartedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("TransitStorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number");
+
+                    b.HasIndex("TransitStorageLocationId")
+                        .IsUnique()
+                        .HasFilter("[TransitStorageLocationId] IS NOT NULL AND [Status] IN (0, 1)");
+
+                    b.HasIndex("WarehouseId", "Date");
+
+                    b.ToTable("InventoryTransfers");
                 });
 
             modelBuilder.Entity("Wms.Domain.InventoryTurnover", b =>
@@ -833,80 +890,6 @@ namespace Wms.Data.Migrations
                     b.ToTable("StorageLocations");
                 });
 
-            modelBuilder.Entity("Wms.Domain.TransferOrder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("CompletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CompletedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Number")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<long>("SequenceNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset?>("StartedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("StartedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("TransitStorageLocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Number")
-                        .IsUnique();
-
-                    b.HasIndex("SequenceNumber")
-                        .IsUnique();
-
-                    b.HasIndex("TransitStorageLocationId")
-                        .IsUnique()
-                        .HasFilter("[TransitStorageLocationId] IS NOT NULL AND [Status] IN (0, 1)");
-
-                    b.HasIndex("WarehouseId", "Date");
-
-                    b.ToTable("TransferOrders");
-                });
-
             modelBuilder.Entity("Wms.Domain.UnitOfMeasure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1185,6 +1168,24 @@ namespace Wms.Data.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("Wms.Domain.InventoryTransfer", b =>
+                {
+                    b.HasOne("Wms.Domain.StorageLocation", "TransitStorageLocation")
+                        .WithMany()
+                        .HasForeignKey("TransitStorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TransitStorageLocation");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("Wms.Domain.InventoryTurnover", b =>
                 {
                     b.HasOne("Wms.Domain.InventoryMovement", "InventoryMovement")
@@ -1358,24 +1359,6 @@ namespace Wms.Data.Migrations
                     b.Navigation("Warehouse");
 
                     b.Navigation("Zone");
-                });
-
-            modelBuilder.Entity("Wms.Domain.TransferOrder", b =>
-                {
-                    b.HasOne("Wms.Domain.StorageLocation", "TransitStorageLocation")
-                        .WithMany()
-                        .HasForeignKey("TransitStorageLocationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("TransitStorageLocation");
-
-                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Wms.Domain.Zone", b =>

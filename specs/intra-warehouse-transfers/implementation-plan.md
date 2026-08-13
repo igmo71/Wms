@@ -28,21 +28,21 @@ prematurely.
   their current behavior.
 - The solution builds and the migration model is consistent.
 
-## Stage 2: transfer document persistence
+## Stage 2: inventory-transfer persistence
 
 ### Changes
 
-- Add `TransferOrder` and `TransferOrderStatus` (`Draft`, `InProgress`,
+- Add `InventoryTransfer` and `InventoryTransferStatus` (`Draft`, `InProgress`,
   `Completed`) following existing document conventions for identifiers,
-  numbering, timestamps, users, and optimistic concurrency.
-- Store one warehouse and one optional transit storage location on the order.
-- Add `RecorderType.TransferOrder` and expose the recorder in inventory movement
+  numbering, timestamps, and users.
+- Store one warehouse and one optional transit storage location on the transfer.
+- Add `RecorderType.InventoryTransfer` and expose the recorder in inventory movement
   and turnover history.
 - Add EF configurations, `DbSet`, relationships, indexes, and migration.
-- Enforce one non-completed transfer order per transit location. Use a database
+- Enforce one non-completed inventory transfer per transit location. Use a database
   constraint or index where the provider supports the rule, with application
   validation retained for useful error messages.
-- Add basic queries for an order and a paged order list.
+- Add basic queries for a transfer and a paged transfer list.
 
 ### Verification
 
@@ -57,23 +57,23 @@ prematurely.
 
 - Implement commands to create a draft after warehouse confirmation, delete an
   empty draft, assign or change a transit location while allowed, pick to
-  transit, put from transit, move directly, and complete an order.
+  transit, put from transit, move directly, and complete a transfer.
 - Validate warehouse ownership, zone types, positive quantity, distinct source
-  and destination, current source balance, order status, and exclusive transit
+  and destination, current source balance, transfer status, and exclusive transit
   ownership.
 - Post every confirmed action immediately through the common balance-and-turnover
   service.
-- Make movement creation, posting, history sequence allocation, and the first
-  `Draft -> InProgress` transition one database transaction.
-- Make completion explicit and reject it when the order has no movements or its
-  transit location has positive inventory.
+- Persist movement creation, posting, history sequence allocation, and the
+  first `Draft -> InProgress` transition with one `SaveChangesAsync` call.
+- Make completion explicit and reject it when the transfer has no movements or
+  its transit location has positive inventory.
 - Keep posted movements immutable and prohibit deletion after the first posted
   movement.
 - Record the confirming operator on every movement using the application's
   established identity representation.
-- Strengthen concurrent balance consumption so that two commands cannot both
-  spend the same available quantity. Use serializable command transactions,
-  row-version checks, and unique database constraints for competing writes.
+- Follow the existing MVP persistence approach without introducing explicit
+  transactions or special concurrent-command handling before a real case
+  requires it.
 - Automated transfer tests are intentionally deferred; do not introduce a test
   project during this stage. Verify the implementation through compilation,
   EF model checks, migration inspection, and later manual process scenarios.
@@ -87,18 +87,17 @@ prematurely.
 - Putting inventory back into an earlier source is an ordinary put.
 - Insufficient source or transit balance fails without partial changes.
 - Invalid warehouse or zone use fails without partial changes.
-- The first movement starts the order atomically.
+- The first movement starts the transfer atomically.
 - A used transit location cannot be changed.
 - A non-empty transit location prevents completion; emptying it does not complete
-  the order automatically.
-- A completed order rejects all further mutations.
-- Under competing postings, at most the available balance is successfully spent.
+  the transfer automatically.
+- A completed transfer rejects all further mutations.
 
 ## Stage 4: operator web UI
 
 ### Pages
 
-- Add a filtered, paged transfer-order list following current operator UI
+- Add a filtered, paged inventory-transfer list following current operator UI
   conventions.
 - Use one full transfer work page for both initialization and subsequent work.
   Do not add a creation dialog or a separate warehouse-only page.
@@ -111,7 +110,7 @@ selection, movement actions, completion, transit contents, and history are
 visible but disabled or empty.
 
 Confirming the warehouse on that page creates the draft, navigates the page to
-the persisted order address if necessary, and locks warehouse selection. An
+  the persisted transfer address if necessary, and locks warehouse selection. An
 accidental warehouse choice therefore does not create a document until the
 operator explicitly starts the transfer.
 
@@ -119,13 +118,13 @@ After warehouse confirmation:
 
 - transit-location selection and direct movement are enabled;
 - pick and put remain disabled until a transit location is assigned;
-- the transit location is displayed as persistent order context and is never
+- the transit location is displayed as persistent transfer context and is never
   entered on individual pick or put forms;
 - pick, put, and direct movement are three explicit, visually distinct actions;
 - put is disabled when the transit location has no available inventory;
 - completion is enabled only after at least one movement and while the transit
   location is empty;
-- completed orders are displayed read-only;
+- completed transfers are displayed read-only;
 - an empty draft can be deleted from the work page.
 
 The page shows current transit contents aggregated by SKU and immutable movement
@@ -149,8 +148,6 @@ web application.
 - Apply the migration to a representative development database.
 - Recheck inventory balances, turnovers, and movement-history links for every
   transfer action.
-- Exercise two concurrent sessions against the same source balance and transit
-  location.
 - Review Russian labels, validation messages, loading states, and duplicate
   submission protection.
 - Update `docs/PROJECT_CONTEXT.md`, `docs/ROADMAP.md`, and this specification if

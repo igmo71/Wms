@@ -10,9 +10,10 @@ interleaved workflow.
 
 ## Core model
 
-`TransferOrder` is a local WMS document that groups a chronological sequence of
-completed inventory movements. It is an execution journal, not a plan: it has
-no planned item lines and is not imported from or synchronized with 1C.
+`InventoryTransfer` is a local WMS document that groups a chronological
+sequence of completed inventory movements. It is an execution journal, not a
+plan: it has no planned item lines and is not imported from or synchronized
+with 1C.
 
 Each operator-confirmed action creates and immediately posts one
 `InventoryMovement` through the common balance-and-turnover posting service.
@@ -24,18 +25,18 @@ Posted movements are immutable. A physical return is recorded as an ordinary
 new movement in the opposite direction; the original movement is not edited or
 deleted.
 
-All movements and locations of a transfer order belong to its warehouse.
+All movements and locations of an inventory transfer belong to its warehouse.
 Inter-warehouse transfers are outside this process.
 
 ## Supported movement modes
 
-The operator may freely alternate the following actions in one order. There is
+The operator may freely alternate the following actions in one transfer. There is
 no mandatory pick phase followed by a put phase.
 
 ### Pick to transit location
 
 The operator enters the source location, SKU, and quantity. WMS supplies the
-order's transit location as the destination and posts:
+transfer's transit location as the destination and posts:
 
 ```text
 source storage location -> transit location
@@ -44,7 +45,7 @@ source storage location -> transit location
 ### Put from transit location
 
 The operator enters the destination location, SKU, and quantity. WMS supplies
-the order's transit location as the source and posts:
+the transfer's transit location as the source and posts:
 
 ```text
 transit location -> destination storage location
@@ -63,7 +64,7 @@ source storage location -> destination storage location
 ```
 
 A direct movement must not be expanded into artificial movements through a
-transit location. Direct and transit movements may be mixed in one order.
+transit location. Direct and transit movements may be mixed in one transfer.
 
 ## Transit locations and zone types
 
@@ -76,27 +77,27 @@ A zone has an explicit type. The MVP supports:
 
 Zones are created with an explicit type. The active receiving and shipping
 workflows filter locations by their respective zone types and validate the type
-on the server. A transfer order's transit location must
-belong to a `Transit` zone in the order warehouse. Ordinary pick and put
+on the server. An inventory transfer's transit location must
+belong to a `Transit` zone in the transfer warehouse. Ordinary pick and put
 locations used by the transfer flow must belong to `Storage` zones. Direct
 movement into or out of a transit location is not allowed; transit inventory is
-handled only by the pick and put actions of the active order that owns it.
+handled only by the pick and put actions of the active transfer that owns it.
 
-The transit location is optional because an order may contain direct movements
-only. If it is needed, it is selected once and becomes order context:
+The transit location is optional because a transfer may contain direct movements
+only. If it is needed, it is selected once and becomes transfer context:
 
 - the operator does not select it again for every pick or put;
 - it must have no positive inventory balance when assigned;
-- it can belong to only one non-completed transfer order at a time;
-- an order can use at most one transit location;
+- it can belong to only one non-completed inventory transfer at a time;
+- a transfer can use at most one transit location;
 - after the first movement through it, it cannot be changed or removed.
 
 These restrictions make the physical inventory in a transit location
-unambiguously attributable to one active transfer order. Multiple trolleys per
-order, preloaded trolleys, and sharing a trolley between active orders are not
-supported by the MVP.
+unambiguously attributable to one active inventory transfer. Multiple trolleys
+per transfer, preloaded trolleys, and sharing a trolley between active transfers
+are not supported by the MVP.
 
-## Order lifecycle
+## Transfer lifecycle
 
 The statuses are:
 
@@ -104,45 +105,45 @@ The statuses are:
 Draft -> InProgress -> Completed
 ```
 
-- `Draft`: the order exists but has no posted movements.
+- `Draft`: the transfer exists but has no posted movements.
 - `InProgress`: set automatically when the first movement is posted.
 - `Completed`: set explicitly by the operator after the work is finished.
 
 A draft with no movements may be physically deleted. There is no cancelled
-status. Once the first movement has been posted, the order can never be deleted.
-Pausing a work session does not change status: the order remains `InProgress`,
+status. Once the first movement has been posted, the transfer can never be deleted.
+Pausing a work session does not change status: the transfer remains `InProgress`,
 the inventory remains recorded in its current locations, and any authorized
 operator may continue it later.
 
-Completing an order requires:
+Completing a transfer requires:
 
 - at least one posted movement;
 - if a transit location was used, no positive inventory balance of any SKU in
   that location.
 
 Completion is always explicit. An empty transit location does not automatically
-complete the order because the operator may intend to pick more inventory.
-After completion, the order is read-only and its transit location is available
-for another order.
+complete the transfer because the operator may intend to pick more inventory.
+After completion, the transfer is read-only and its transit location is
+available for another transfer.
 
 ## Validation and consistency
 
 For every action WMS validates at the time of posting that:
 
-- the order is not completed;
+- the transfer is not completed;
 - the quantity is greater than zero;
 - source and destination are different;
-- all locations belong to the order warehouse and have the zone types required
+- all locations belong to the transfer warehouse and have the zone types required
   by the selected action;
 - the source has sufficient current physical balance for the SKU;
 - for a put, the transit location has sufficient current physical balance for
   the SKU;
-- the transit location still belongs exclusively to this active order.
+- the transit location still belongs exclusively to this active transfer.
 
 Movement creation, balance updates, turnover creation, the automatic first
-status transition, and persistence are one atomic database operation. The final
-balance check must protect against concurrent operators consuming the same
-inventory. Preliminary UI checks are advisory only.
+status transition, and persistence are performed by one EF Core
+`SaveChangesAsync` call. Preliminary UI checks are advisory only; the command
+service repeats the business validations before saving.
 
 The transit balance is aggregated by SKU. Inventory of the same SKU picked from
 different source locations loses its source attribution while on the trolley
@@ -165,7 +166,7 @@ After warehouse confirmation, the web UI exposes separate, explicit commands:
 - put from trolley;
 - move directly.
 
-When a transit location is assigned, it remains visible as order context and is
+When a transit location is assigned, it remains visible as transfer context and is
 filled automatically for pick and put actions. The work page shows the current
 transit inventory by SKU and the immutable movement history in execution order.
 It permits pick and put actions to be freely interleaved.
@@ -175,19 +176,19 @@ while pick and put are disabled. The layout and process vocabulary should remain
 recognizable for a future mobile client without copying a mobile layout into the
 web application.
 
-A future mobile client may scan a transit location to open its active order or
-offer to create a new order when the location is free. That shortcut is not
+A future mobile client may scan a transit location to open its active transfer or
+offer to create a new transfer when the location is free. That shortcut is not
 required for the initial web UI.
 
 ## Audit
 
-Each movement is recorded with the transfer order as recorder, its chronological
-order line or sequence number, posting time, and the operator who confirmed the
-action. The order records its number, warehouse, status, creation time,
+Each movement is recorded with the inventory transfer as recorder, its chronological
+transfer line or sequence number, posting time, and the operator who confirmed the
+action. The transfer records its number, warehouse, status, creation time,
 completion time, creator, and completing user where the application's available
 identity model permits it.
 
-The order history must show the real movement route and must not synthesize or
+The transfer history must show the real movement route and must not synthesize or
 collapse posted movements.
 
 ## Non-goals
@@ -196,7 +197,7 @@ collapse posted movements.
 - Integration or synchronization with 1C.
 - Inter-warehouse transfers.
 - Reservations or long-lived inventory locks before confirmation.
-- Multiple transit locations in one order.
+- Multiple transit locations in one transfer.
 - Shared, preloaded, or concurrently used transit locations.
 - Lot, serial, expiry-date, pallet, or container tracking.
 - Editing or deleting posted movements.
@@ -207,10 +208,10 @@ collapse posted movements.
 
 ## Acceptance criteria
 
-1. An operator can create a transfer order for one warehouse without selecting
-   a transit location.
-2. A movement-free draft can be deleted; an order with a posted movement cannot.
-3. The first successfully posted action changes the order from `Draft` to
+1. An operator can create an inventory transfer for one warehouse without
+   selecting a transit location.
+2. A movement-free draft can be deleted; a transfer with a posted movement cannot.
+3. The first successfully posted action changes the transfer from `Draft` to
    `InProgress`.
 4. An operator can directly move an available SKU quantity between two ordinary
    locations, and balances and turnovers change immediately.
@@ -221,28 +222,28 @@ collapse posted movements.
 7. The same SKU can be picked from multiple locations, put in partial quantities,
    and distributed among multiple locations without exceeding its current
    transit balance.
-8. A second active order cannot use the same transit location.
+8. A second active transfer cannot use the same transit location.
 9. Insufficient source balance, cross-warehouse movement, invalid zone usage,
    and same-source-and-destination movement are rejected without partial balance
    or turnover changes.
-10. An order using transit inventory cannot be completed until the transit
+10. A transfer using transit inventory cannot be completed until the transit
     location is empty; an empty location does not complete it automatically.
-11. A completed order and all its posted movements are read-only.
+11. A completed transfer and all its posted movements are read-only.
 12. The movement history identifies the actual source, destination, SKU,
     quantity, time, sequence, and confirming operator.
 
 ## Technical decisions
 
-- A transfer has a globally increasing numeric `SequenceNumber`; its visible
-  `Number` is the same value formatted with nine digits. Both values are unique,
-  and allocation occurs in a serializable transaction.
-- Mutating commands use serializable database transactions together with the
-  existing row-version concurrency tokens. Filtered unique indexes protect
-  active transit-location ownership and transfer movement sequence numbers.
-  A concurrency conflict rejects the entire command without partial changes.
+- Transfer commands follow the existing MVP application-service style: read
+  the required data, validate the business rules, change tracked entities, and
+  call `SaveChangesAsync` once. Explicit transactions and special concurrency
+  handling are deferred until an observed case requires them.
+- Transfer numbers use the local creation time in `yyMMdd-HHmmss` format. A
+  dedicated numbering subsystem is outside the MVP until numbering gains
+  additional business requirements.
 - Application identity continues to use the existing string user identifier.
-  Each movement stores it in `ConfirmedBy`; order creation, start, and completion
-  retain their corresponding audit users and timestamps.
+  Each movement stores it in `ConfirmedBy`; transfer creation, start, and
+  completion retain their corresponding audit users and timestamps.
 - The exact web page component layout remains a Stage 4 decision within the
   operator-experience rules above.
 

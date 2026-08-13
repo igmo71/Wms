@@ -40,25 +40,26 @@ The operator UI exposes a separate paged list of posted inventory movements. It 
 
 Inventory counts are local WMS documents. A draft may contain incomplete rows while an operator records the count. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 
-Intra-warehouse transfers are local WMS documents without planned item lines or
-1C synchronization. They group an unrestricted chronological sequence of direct
-storage-location movements and movements through one optional transit location,
-such as a trolley. Each operator-confirmed physical action is immediately posted
-through the common inventory service; pick, put, and direct actions may be freely
-interleaved. A transit location is selected once as document context, starts
-empty, and belongs exclusively to one active transfer document. Draft documents
-without movements may be deleted, the first movement starts the document, and a
-document may be completed explicitly only after its transit location is empty.
+`InventoryTransfer` is a local WMS inventory document without planned item lines
+or 1C synchronization. It groups an unrestricted chronological sequence of
+direct storage-location movements and movements through one optional transit
+location, such as a trolley. Each operator-confirmed physical action is
+immediately posted through the common inventory service; pick, put, and direct
+actions may be freely interleaved. A transit location is selected once as
+transfer context, starts empty, and belongs exclusively to one active transfer.
+A draft without movements may be deleted, the first movement starts the
+transfer, and it may be completed explicitly only after its transit location is
+empty.
 Posted movements and completed documents are immutable. The detailed process is
 defined in `specs/intra-warehouse-transfers/spec.md`.
 
-Transfer commands run in serializable database transactions. They immediately
-post every confirmed direct, pick, or put action together with balance and
-turnover changes, allocate a unique chronological movement line, and start a
-draft on its first movement. Transfer numbers use a unique global numeric
-sequence displayed as nine digits. Each transfer movement stores the confirming
-application user. The command and query backend is implemented; the operator
-web UI remains the next delivery stage.
+Inventory-transfer commands immediately post every confirmed direct, pick, or put action
+together with balance and turnover changes in one `SaveChangesAsync` call,
+allocate a chronological movement line, and start a draft on its first
+movement. Transfer numbers use local creation time in `yyMMdd-HHmmss` format.
+Each transfer movement stores the confirming application user. The
+command and query backend is implemented; the operator web UI remains the next
+delivery stage.
 
 ## MVP implementation principles
 

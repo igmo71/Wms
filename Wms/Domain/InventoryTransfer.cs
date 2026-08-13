@@ -2,10 +2,9 @@ using Wms.Domain.Enums;
 
 namespace Wms.Domain;
 
-public class TransferOrder
+public class InventoryTransfer
 {
     public Guid Id { get; set; }
-    public long SequenceNumber { get; set; }
     public string Number { get; set; } = string.Empty;
     public DateTime Date { get; set; }
 
@@ -15,7 +14,7 @@ public class TransferOrder
     public Guid? TransitStorageLocationId { get; set; }
     public StorageLocation? TransitStorageLocation { get; set; }
 
-    public TransferOrderStatus Status { get; set; }
+    public InventoryTransferStatus Status { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }
@@ -25,6 +24,4 @@ public class TransferOrder
     public string CreatedBy { get; set; } = string.Empty;
     public string? StartedBy { get; set; }
     public string? CompletedBy { get; set; }
-
-    public byte[] RowVersion { get; set; } = [];
 }

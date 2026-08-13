@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Wms.Domain.Enums;
 
@@ -17,5 +17,5 @@ public enum RecorderType
     InventoryCount = 3,
 
     [Display(Name = "Перемещение")]
-    TransferOrder = 4,
+    InventoryTransfer = 4,
 }

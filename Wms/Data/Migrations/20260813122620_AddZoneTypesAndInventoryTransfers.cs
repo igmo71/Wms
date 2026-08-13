@@ -6,13 +6,27 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Wms.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class CreateTransferOrders : Migration
+    public partial class AddZoneTypesAndInventoryTransfers : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<int>(
+                name: "Type",
+                table: "Zones",
+                type: "int",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AddColumn<string>(
+                name: "ConfirmedBy",
+                table: "InventoryMovements",
+                type: "nvarchar(36)",
+                maxLength: 36,
+                nullable: true);
+
             migrationBuilder.CreateTable(
-                name: "TransferOrders",
+                name: "InventoryTransfers",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -27,20 +41,19 @@ namespace Wms.Data.Migrations
                     CompletedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
                     StartedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
-                    CompletedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
+                    CompletedBy = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TransferOrders", x => x.Id);
+                    table.PrimaryKey("PK_InventoryTransfers", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_TransferOrders_StorageLocations_TransitStorageLocationId",
+                        name: "FK_InventoryTransfers_StorageLocations_TransitStorageLocationId",
                         column: x => x.TransitStorageLocationId,
                         principalTable: "StorageLocations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_TransferOrders_Warehouses_WarehouseId",
+                        name: "FK_InventoryTransfers_Warehouses_WarehouseId",
                         column: x => x.WarehouseId,
                         principalTable: "Warehouses",
                         principalColumn: "Id",
@@ -48,20 +61,20 @@ namespace Wms.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_TransferOrders_Number",
-                table: "TransferOrders",
+                name: "IX_InventoryTransfers_Number",
+                table: "InventoryTransfers",
                 column: "Number");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TransferOrders_TransitStorageLocationId",
-                table: "TransferOrders",
+                name: "IX_InventoryTransfers_TransitStorageLocationId",
+                table: "InventoryTransfers",
                 column: "TransitStorageLocationId",
                 unique: true,
                 filter: "[TransitStorageLocationId] IS NOT NULL AND [Status] IN (0, 1)");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TransferOrders_WarehouseId_Date",
-                table: "TransferOrders",
+                name: "IX_InventoryTransfers_WarehouseId_Date",
+                table: "InventoryTransfers",
                 columns: new[] { "WarehouseId", "Date" });
         }
 
@@ -69,8 +82,15 @@ namespace Wms.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "TransferOrders");
+                name: "InventoryTransfers");
 
+            migrationBuilder.DropColumn(
+                name: "Type",
+                table: "Zones");
+
+            migrationBuilder.DropColumn(
+                name: "ConfirmedBy",
+                table: "InventoryMovements");
         }
     }
 }

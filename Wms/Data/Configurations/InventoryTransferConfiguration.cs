@@ -5,9 +5,9 @@ using Wms.Domain.Enums;
 
 namespace Wms.Data.Configurations;
 
-internal class TransferOrderConfiguration : IEntityTypeConfiguration<TransferOrder>
+internal class InventoryTransferConfiguration : IEntityTypeConfiguration<InventoryTransfer>
 {
-    public void Configure(EntityTypeBuilder<TransferOrder> builder)
+    public void Configure(EntityTypeBuilder<InventoryTransfer> builder)
     {
         builder.HasKey(x => x.Id);
 
@@ -15,7 +15,6 @@ internal class TransferOrderConfiguration : IEntityTypeConfiguration<TransferOrd
         builder.Property(x => x.CreatedBy).HasMaxLength(DefaultConfiguration.Guid).IsRequired();
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.RowVersion).IsRowVersion();
 
         builder.HasOne(x => x.Warehouse)
             .WithMany()
@@ -28,11 +27,10 @@ internal class TransferOrderConfiguration : IEntityTypeConfiguration<TransferOrd
             .HasForeignKey(x => x.TransitStorageLocationId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => x.SequenceNumber).IsUnique();
-        builder.HasIndex(x => x.Number).IsUnique();
+        builder.HasIndex(x => x.Number);
         builder.HasIndex(x => new { x.WarehouseId, x.Date });
         builder.HasIndex(x => x.TransitStorageLocationId)
             .IsUnique()
-            .HasFilter($"[TransitStorageLocationId] IS NOT NULL AND [Status] IN ({(int)TransferOrderStatus.Draft}, {(int)TransferOrderStatus.InProgress})");
+            .HasFilter($"[TransitStorageLocationId] IS NOT NULL AND [Status] IN ({(int)InventoryTransferStatus.Draft}, {(int)InventoryTransferStatus.InProgress})");
     }
 }

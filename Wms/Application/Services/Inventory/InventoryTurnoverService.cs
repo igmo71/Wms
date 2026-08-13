@@ -44,8 +44,8 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
             .Select(x => x.InventoryMovement!.RecorderId!.Value)
             .Distinct()
             .ToArray();
-        var transferOrderIds = items
-            .Where(x => x.InventoryMovement?.RecorderType == RecorderType.TransferOrder
+        var transferIds = items
+            .Where(x => x.InventoryMovement?.RecorderType == RecorderType.InventoryTransfer
                 && x.InventoryMovement.RecorderId is not null)
             .Select(x => x.InventoryMovement!.RecorderId!.Value)
             .Distinct()
@@ -59,9 +59,9 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
             .AsNoTracking()
             .Where(x => shippingOrderIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
-        var transferOrders = await dbContext.TransferOrders
+        var transfers = await dbContext.InventoryTransfers
             .AsNoTracking()
-            .Where(x => transferOrderIds.Contains(x.Id))
+            .Where(x => transferIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
 
         return new ListResult<InventoryTurnoverListItem>
@@ -75,8 +75,8 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.Number,
                     RecorderType.ShippingOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Number,
-                    RecorderType.TransferOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
-                        && transferOrders.TryGetValue(recorderId, out var order) => order.Number,
+                    RecorderType.InventoryTransfer when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && transfers.TryGetValue(recorderId, out var transfer) => transfer.Number,
                     _ => null
                 },
                 RecorderDate = turnover.InventoryMovement?.RecorderType switch
@@ -85,8 +85,8 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.Date,
                     RecorderType.ShippingOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Date,
-                    RecorderType.TransferOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
-                        && transferOrders.TryGetValue(recorderId, out var order) => order.Date,
+                    RecorderType.InventoryTransfer when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && transfers.TryGetValue(recorderId, out var transfer) => transfer.Date,
                     _ => null
                 }
             }).ToList(),
@@ -126,7 +126,7 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
                 .ToArrayAsync(ct);
-            var transferOrderIds = await dbContext.TransferOrders
+            var transferIds = await dbContext.InventoryTransfers
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
                 .ToArrayAsync(ct);
@@ -136,8 +136,8 @@ public class InventoryTurnoverService(IDbContextFactory<ApplicationDbContext> db
                         && receivingOrderIds.Contains(x.InventoryMovement.RecorderId.Value))
                     || (x.InventoryMovement.RecorderType == RecorderType.ShippingOrder
                         && shippingOrderIds.Contains(x.InventoryMovement.RecorderId.Value))
-                    || (x.InventoryMovement.RecorderType == RecorderType.TransferOrder
-                        && transferOrderIds.Contains(x.InventoryMovement.RecorderId.Value))));
+                    || (x.InventoryMovement.RecorderType == RecorderType.InventoryTransfer
+                        && transferIds.Contains(x.InventoryMovement.RecorderId.Value))));
         }
 
         return query;
