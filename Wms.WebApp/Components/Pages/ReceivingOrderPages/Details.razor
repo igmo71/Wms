@@ -21,13 +21,17 @@ else
             <MudSpacer />
             @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
             {
-                <MudButton Color="Color.Primary"
-                           Variant="Variant.Filled"
-                           Disabled="@(_isStarting || _receivingLocation is null)"
-                           StartIcon="@Icons.Material.Filled.PlayArrow"
-                           OnClick="SetInReceivingAsync">
-                    Взять в работу
-                </MudButton>
+                <MudTooltip Text="Чтобы взять ордер в работу, выберите зону и место приёмки.">
+                    <span>
+                        <MudButton Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   Disabled="@(_isStarting || _receivingLocation is null)"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="SetInReceivingAsync">
+                            Взять в работу
+                        </MudButton>
+                    </span>
+                </MudTooltip>
             }
             <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
                 К списку
@@ -37,6 +41,12 @@ else
         @if (_startOrderFailed)
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_isStarting)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
         }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">

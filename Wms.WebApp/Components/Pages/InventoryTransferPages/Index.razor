@@ -76,13 +76,14 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
-        <PropertyColumn Property="x => x.TransitStorageLocation!.Name" Title="Тележка" Sortable="true">
-            <CellTemplate>@(context.Item.TransitStorageLocation?.Name ?? "—")</CellTemplate>
-        </PropertyColumn>
         <PropertyColumn Property="x => x.Status" Title="Статус" Sortable="true">
             <CellTemplate>@context.Item.Status.GetDisplayName()</CellTemplate>
         </PropertyColumn>
+        <PropertyColumn Property="x => x.TransitStorageLocation!.Name" Title="Тележка" Sortable="true">
+            <CellTemplate>@(context.Item.TransitStorageLocation?.Name ?? "—")</CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Завершено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
             <CellTemplate>
                 <MudTooltip Text="Открыть перемещение">

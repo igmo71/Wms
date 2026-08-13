@@ -3,7 +3,7 @@
 @inject NavigationManager NavigationManager
 
 <MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
     <MudNavLink Href="receiving-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assignment">Приемка</MudNavLink>
     <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
     <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
@@ -22,7 +22,7 @@
         <MudNavLink Href="units-of-measure" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Единицы измерения</MudNavLink>
         <MudNavLink Href="delivery-directions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Направления доставки</MudNavLink>
     </MudNavGroup>
-    <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink>
+    @* <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink> *@
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="Account/Manage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>

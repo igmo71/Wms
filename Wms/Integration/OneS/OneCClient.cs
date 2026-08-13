@@ -96,7 +96,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             {
                 _logger.LogError(ex, "1C request failed: {Method} {Uri}", request.Method, request.RequestUri);
 
-                return ServiceError.Failure<TResponse>(ex.Message);
+                return ServiceError.Failure<TResponse>($"1C request failed: {ex.Message}");
             }
         }
 

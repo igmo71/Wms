@@ -1,59 +1,253 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>WMS</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Hello, world!</MudText>
-<MudText Class="mb-8">Welcome to your new app, powered by MudBlazor and the .NET 10 Template!</MudText>
+<MudContainer MaxWidth="MaxWidth.Large">
 
-<MudAlert Severity="Severity.Normal" ContentAlignment="HorizontalAlignment.Start">
-    You can find documentation and examples on our website here:
-    <MudLink Href="https://mudblazor.com" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        <b>www.mudblazor.com</b>
-    </MudLink>
-</MudAlert>
+    @* Hero *@
+    <MudPaper Elevation="0" Class="pa-8 mb-6">
+        <MudGrid AlignItems="AlignItems.Center">
+            <MudItem xs="12" md="8">
+                <MudText Typo="Typo.h3" GutterBottom="true">
+                    Warehouse Management System
+                </MudText>
 
-<br />
-<MudText Typo="Typo.h5" GutterBottom="true">Interactivity in this Template</MudText>
-<br />
-<MudText Typo="Typo.body2">
-    When you opt for the "Global" Interactivity Location, <br />
-    the render modes are defined in App.razor and consequently apply to all child components.<br />
-    In this case, providers are globally set in the MainLayout.<br />
-    <br />
-    On the other hand, if you choose the "Per page/component" Interactivity Location,<br />
-    it is necessary to include the <br />
-    <br />
-    &lt;MudPopoverProvider /&gt; <br />
-    &lt;MudDialogProvider /&gt; <br />
-    &lt;MudSnackbarProvider /&gt; <br />
-    <br />
-    components on every interactive page.<br />
-    <br />
-    If a render mode is not specified for a page, it defaults to Server-Side Rendering (SSR),<br />
-    similar to this page. While MudBlazor allows pages to be rendered in SSR,<br />
-    please note that interactive features, such as buttons and dropdown menus, will not be functional.
-</MudText>
+                <MudText Typo="Typo.h5"
+                         Color="Color.Secondary"
+                         GutterBottom="true">
+                    Управление складскими операциями и товарными запасами
+                </MudText>
 
-<br />
-<MudText Typo="Typo.h5" GutterBottom="true">What's New in Blazor with the Release of .NET 10</MudText>
-<br />
+                <MudText Typo="Typo.body1" Class="mt-4">
+                    WMS — информационная система для управления основными процессами склада:
+                    от приёмки товара и размещения на хранение до перемещения,
+                    инвентаризации, комплектации и отгрузки.
+                </MudText>
 
-<MudText Typo="Typo.h6" GutterBottom="true">Prerendering</MudText>
-<MudText Typo="Typo.body2" GutterBottom="true">
-    If you're exploring the features of .NET 10 Blazor,<br /> you might be pleasantly surprised to learn that each page is prerendered on the server,<br /> regardless of the selected render mode.<br /><br />
-    This means that you'll need to inject all necessary services on the server,<br /> even when opting for the wasm (WebAssembly) render mode.<br /><br />
-    This prerendering functionality is crucial to ensuring that WebAssembly mode feels fast and responsive,<br /> especially when it comes to initial page load times.<br /><br />
-    For more information on how to detect prerendering and leverage the RenderContext, you can refer to the following link:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issuecomment-1783568121" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+                <MudText Typo="Typo.body1" Class="mt-3">
+                    Система объединяет складскую топологию, номенклатуру,
+                    оперативные документы и учёт товарных остатков в единой модели
+                    и интегрируется с корпоративными информационными системами.
+                </MudText>
+            </MudItem>
 
-<br />
-<MudText Typo="Typo.h6" GutterBottom="true">InteractiveAuto</MudText>
-<MudText Typo="Typo.body2">
-    A discussion on how to achieve this can be found here:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issue-1950424116" Target="_blank" Typo="Typo.body2" Color="Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+            <MudItem xs="12" md="4" Class="d-flex justify-center">
+                <MudIcon Icon="@Icons.Material.Filled.Warehouse"
+                         Size="Size.Large"
+                         Color="Color.Primary"
+                         Style="font-size: 9rem;" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        Основные возможности
+    </MudText>
+
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+        В текущей версии реализованы основные справочные и складские операции,
+        необходимые для ведения оперативного учёта.
+    </MudText>
+
+    <MudGrid>
+
+        @* Receiving *@
+        <MudItem xs="12" sm="6" lg="3">
+            <MudCard Style="height: 100%;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.Assignment"
+                             Size="Size.Large"
+                             Color="Color.Primary"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        Приёмка
+                    </MudText>
+
+                    <MudText Typo="Typo.body2">
+                        Работа с приходными ордерами, контроль планового
+                        и фактически принятого количества товара,
+                        оформление поступления на склад.
+                    </MudText>
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton Href="receiving-orders"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Перейти
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* Shipping *@
+        <MudItem xs="12" sm="6" lg="3">
+            <MudCard Style="height: 100%;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping"
+                             Size="Size.Large"
+                             Color="Color.Primary"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        Отгрузка
+                    </MudText>
+
+                    <MudText Typo="Typo.body2">
+                        Расходные ордера, подготовка товара к отгрузке,
+                        контроль исполнения заказа и движения товара
+                        со склада.
+                    </MudText>
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton Href="shipping-orders"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Перейти
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* Inventory *@
+        <MudItem xs="12" sm="6" lg="3">
+            <MudCard Style="height: 100%;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory"
+                             Size="Size.Large"
+                             Color="Color.Primary"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        Запасы
+                    </MudText>
+
+                    <MudText Typo="Typo.body2">
+                        Остатки по складам и ячейкам, история движений,
+                        складские перемещения, обороты и проведение
+                        инвентаризаций.
+                    </MudText>
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton Href="inventory-balances"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Остатки
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* Topology *@
+        <MudItem xs="12" sm="6" lg="3">
+            <MudCard Style="height: 100%;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree"
+                             Size="Size.Large"
+                             Color="Color.Primary"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        Структура склада
+                    </MudText>
+
+                    <MudText Typo="Typo.body2">
+                        Справочники складов, зон и ячеек хранения,
+                        номенклатура, единицы измерения, штрихкоды
+                        и направления доставки.
+                    </MudText>
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton Href="storage-locations"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Ячейки
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+    </MudGrid>
+
+    @* Additional capabilities *@
+    <MudGrid Class="mt-4">
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-5" Style="height: 100%;">
+                <div class="d-flex align-center mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Sync"
+                             Color="Color.Primary"
+                             Class="mr-3" />
+                    <MudText Typo="Typo.h6">
+                        Интеграция с учётными системами
+                    </MudText>
+                </div>
+
+                <MudText Typo="Typo.body2">
+                    WMS взаимодействует с внешней учётной системой 1С,
+                    получая необходимые справочные данные и складские документы.
+                    Архитектура приложения разделяет складскую бизнес-логику
+                    и интеграционные механизмы.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-5" Style="height: 100%;">
+                <div class="d-flex align-center mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Devices"
+                             Color="Color.Primary"
+                             Class="mr-3" />
+                    <MudText Typo="Typo.h6">
+                        Единое рабочее пространство
+                    </MudText>
+                </div>
+
+                <MudText Typo="Typo.body2">
+                    Веб-интерфейс объединяет операции склада,
+                    справочную информацию и контроль товарных запасов,
+                    предоставляя сотрудникам единый интерфейс
+                    для выполнения повседневных задач.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    @* Dobroga *@
+    <MudPaper Elevation="0"
+              Outlined="true"
+              Class="pa-5 mt-6">
+
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Business"
+                     Color="Color.Primary"
+                     Size="Size.Large"
+                     Class="mr-4" />
+
+            <div>
+                <MudText Typo="Typo.h6" GutterBottom="true">
+                    Развитие на основе реальных складских процессов
+                </MudText>
+
+                <MudText Typo="Typo.body2">
+                    Система развивается с учётом практических задач складской логистики.
+                    Предприятие «Доброга» выбрано в качестве первой площадки внедрения WMS.
+                </MudText>
+            </div>
+        </div>
+
+    </MudPaper>
+
+    <MudText Typo="Typo.caption"
+             Color="Color.Secondary"
+             Align="Align.Center"
+             Class="mt-6 mb-2">
+        WMS · Warehouse Management System
+    </MudText>
+
+</MudContainer>

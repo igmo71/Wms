@@ -24,16 +24,26 @@ else
             </MudButton>
             @if (CanRollback)
             {
-                <MudButton Color="Color.Error"
-                           Variant="Variant.Outlined"
-                           Disabled="_isRollingBack"
-                           StartIcon="@Icons.Material.Filled.Undo"
-                           OnClick="ShowRollbackDialogAsync">
-                    Откатить
-                </MudButton>
+                <MudTooltip Text="Ордер вернётся в статус «Подготовлено», а фактическое количество будет сброшено.">
+                    <span>
+                        <MudButton Color="Color.Error"
+                                   Variant="Variant.Outlined"
+                                   Disabled="_isRollingBack"
+                                   StartIcon="@Icons.Material.Filled.Undo"
+                                   OnClick="ShowRollbackDialogAsync">
+                            Откатить
+                        </MudButton>
+                    </span>
+                </MudTooltip>
             }
             <MudButton Href="shipping-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
         </MudStack>
+
+        @if (_isCompleting)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+        }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
@@ -67,6 +77,12 @@ else
         @if (_operationFailed)
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_isRollingBack)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Выполняется откат ордера…</MudText>
         }
 
         @if (IsPickingEditable)

@@ -31,6 +31,12 @@ else
             </MudButton>
         </MudStack>
 
+        @if (_isCompleting)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+        }
+
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="6">
                 <MudItem xs="12" sm="6" md="2">

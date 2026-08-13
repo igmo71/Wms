@@ -21,10 +21,14 @@ else
             <MudSpacer />
             @if (_order.Status == ShippingOrderStatus.Prepared)
             {
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isStarting || _shippingLocation is null)"
-                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="SetReadyForPickingAsync">
-                    Взять в отбор
-                </MudButton>
+                <MudTooltip Text="Чтобы взять ордер в отбор, выберите зону и место отгрузки.">
+                    <span>
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isStarting || _shippingLocation is null)"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="SetReadyForPickingAsync">
+                            Взять в отбор
+                        </MudButton>
+                    </span>
+                </MudTooltip>
             }
             else if (_order.Status is ShippingOrderStatus.ReadyForPicking
                 or ShippingOrderStatus.ReadyForVerification
@@ -50,13 +54,17 @@ else
             }
             @if (CanRollback)
             {
-                <MudButton Color="Color.Error"
-                           Variant="Variant.Outlined"
-                           Disabled="_isRollingBack"
-                           StartIcon="@Icons.Material.Filled.Undo"
-                           OnClick="ShowRollbackDialogAsync">
-                    Откатить
-                </MudButton>
+                <MudTooltip Text="Ордер вернётся в статус «Подготовлено», а фактическое количество будет сброшено.">
+                    <span>
+                        <MudButton Color="Color.Error"
+                                   Variant="Variant.Outlined"
+                                   Disabled="_isRollingBack"
+                                   StartIcon="@Icons.Material.Filled.Undo"
+                                   OnClick="ShowRollbackDialogAsync">
+                            Откатить
+                        </MudButton>
+                    </span>
+                </MudTooltip>
             }
             <MudButton Href="shipping-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
         </MudStack>
@@ -64,6 +72,18 @@ else
         @if (_startOrderFailed)
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_isRollingBack)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Выполняется откат ордера…</MudText>
+        }
+
+        @if (_isStarting || _isShipping)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
         }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
