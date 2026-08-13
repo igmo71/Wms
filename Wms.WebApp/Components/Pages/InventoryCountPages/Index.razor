@@ -49,7 +49,9 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
-        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус" />
+        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус">
+            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.PostedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" Sortable="true" />

@@ -45,10 +45,26 @@ else
             <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
         }
 
+        @if (_operationFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_isRollingBack)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.caption">Выполняется откат ордера…</MudText>
+        }
+
+        @if (!IsPickingEditable)
+        {
+            <MudAlert Severity="Severity.Warning">Отбор доступен только для ордера в статусе отбора или проверки.</MudAlert>
+        }
+
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Очередь</MudText><MudText>@_order.Queue.GetDisplayName()</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
@@ -68,22 +84,6 @@ else
                 }
             </MudGrid>
         </MudPaper>
-
-        @if (!IsPickingEditable)
-        {
-            <MudAlert Severity="Severity.Warning">Отбор доступен только для ордера в статусе отбора или проверки.</MudAlert>
-        }
-
-        @if (_operationFailed)
-        {
-            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-        }
-
-        @if (_isRollingBack)
-        {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">Выполняется откат ордера…</MudText>
-        }
 
         @if (IsPickingEditable)
         {

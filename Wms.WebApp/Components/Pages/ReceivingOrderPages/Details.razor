@@ -38,15 +38,15 @@ else
             </MudButton>
         </MudStack>
 
-        @if (_startOrderFailed)
-        {
-            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-        }
-
         @if (_isStarting)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
             <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+        }
+
+        @if (_startOrderFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
@@ -54,7 +54,7 @@ else
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Номер</MudText><MudText>@_order.Number</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Дата</MudText><MudText>@_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudText>@_order.Status.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">В работе с</MudText><MudText>@FormatDateTimeOffset(_order.StartedAtUtc)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Принят</MudText><MudText>@FormatDateTimeOffset(_order.CompletedAtUtc)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2">

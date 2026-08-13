@@ -55,7 +55,7 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Статус</MudText>
-                    <MudText>@_inventoryCount.Status.GetDisplayName()</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@_inventoryCount.Status.GetChipColor()">@_inventoryCount.Status.GetDisplayName()</MudChip>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudText Typo="Typo.caption">Создана</MudText>

@@ -103,7 +103,7 @@
                     else
                     {
                         <MudText Typo="Typo.caption">Статус</MudText>
-                        <MudText>@_transfer!.Status.GetDisplayName()</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@_transfer!.Status.GetChipColor()">@_transfer.Status.GetDisplayName()</MudChip>
                     }
                 </MudItem>
             </MudGrid>

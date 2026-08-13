@@ -77,7 +77,7 @@
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
         <PropertyColumn Property="x => x.Status" Title="Статус" Sortable="true">
-            <CellTemplate>@context.Item.Status.GetDisplayName()</CellTemplate>
+            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.TransitStorageLocation!.Name" Title="Тележка" Sortable="true">
             <CellTemplate>@(context.Item.TransitStorageLocation?.Name ?? "—")</CellTemplate>
