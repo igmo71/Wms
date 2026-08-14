@@ -32,6 +32,12 @@ public class ReceivingOrder
     public string? StartedBy { get; set; }
     public string? CompletedBy { get; set; }
 
+    public PutawayStatus PutawayStatus { get; set; }
+    public DateTimeOffset? PutawayStartedAtUtc { get; set; }
+    public DateTimeOffset? PutawayCompletedAtUtc { get; set; }
+    public string? PutawayStartedBy { get; set; }
+    public string? PutawayCompletedBy { get; set; }
+
     public bool ExternalChangeDetected { get; set; }
 
     public Guid SenderId { get; set; }
@@ -186,5 +192,39 @@ public class ReceivingOrder
         CompletedAtUtc = DateTimeOffset.UtcNow;
 
         CompletedBy = userId;
+
+        if (Items.Any(x => x.FactQuantity > 0))
+            PutawayStatus = PutawayStatus.Pending;
+    }
+
+    public ServiceResult ValidateToStartPutaway()
+    {
+        if (Status != ReceivingOrderStatus.Received)
+            return ServiceError.Invalid<ReceivingOrder>("Only a received order can be put away.");
+
+        if (PutawayStatus != PutawayStatus.Pending)
+            return ServiceError.Invalid<ReceivingOrder>("Only pending putaway can be started.");
+
+        if (ReceivingLocationId is null)
+            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting putaway.");
+
+        if (!Items.Any(x => x.FactQuantity > 0))
+            return ServiceError.Invalid<ReceivingOrder>("Putaway requires a positive received quantity.");
+
+        return ServiceResult.Success();
+    }
+
+    public void StartPutaway(string userId)
+    {
+        PutawayStatus = PutawayStatus.InProgress;
+        PutawayStartedAtUtc = DateTimeOffset.UtcNow;
+        PutawayStartedBy = userId;
+    }
+
+    public void CompletePutaway(string userId)
+    {
+        PutawayStatus = PutawayStatus.Completed;
+        PutawayCompletedAtUtc = DateTimeOffset.UtcNow;
+        PutawayCompletedBy = userId;
     }
 }

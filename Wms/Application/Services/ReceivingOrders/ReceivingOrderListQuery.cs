@@ -10,6 +10,7 @@ public class ReceivingOrderListQuery : ListQuery
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
     public ReceivingOrderStatus? Status { get; set; }
+    public PutawayStatus? PutawayStatus { get; set; }
     public ReceivingOrderQueue? Queue { get; set; }
     public WarehouseOperation? WarehouseOperation { get; set; }
     public bool IncludePostedOnly { get; set; } = true;

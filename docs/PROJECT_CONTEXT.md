@@ -15,9 +15,9 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Receiving, the initial shipping/picking flow, inventory-count backend, and the
-intra-warehouse transfer backend are currently being implemented. Putaway
-remains a roadmap item. Outgoing orders are imported from 1C and use their own
+Receiving, receiving putaway, the initial shipping/picking flow,
+inventory-count backend, and the intra-warehouse transfer backend are currently
+being implemented. Outgoing orders are imported from 1C and use their own
 shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
@@ -134,6 +134,28 @@ The active business flow is:
 
 The receiving location belongs to the whole order. At the current stage the operator selects a receiving zone and then a storage location from that zone on the order details page before the order can be started. Both choices are limited to the order's warehouse; the UI does not enable "Взять в работу" until a location is selected. The selected location is saved immediately before starting. A default receiving location/zone may be introduced later.
 
+Receiving and putaway have separate statuses. Completing a receiving order with
+any positive fact keeps its 1C-backed receiving status `Received` and sets its
+local WMS putaway status to `Pending`; a zero-total fact leaves putaway
+`Inactive` as an exceptional outcome. The receiving location cannot be changed
+after the order is received.
+
+The operator explicitly starts pending putaway, which records its starting user
+and time and changes it to `InProgress`. While in progress, editable draft
+`InventoryMovement` rows move quantities from the order's receiving location to
+active locations in active ordinary storage zones of the same warehouse. Draft
+limits and completion are evaluated separately by receiving-order line, even
+when multiple lines contain the same SKU. A line may be split across multiple
+storage locations.
+
+Putaway completion requires every receiving-order line's draft total to equal
+its fact quantity. All drafts are then posted through the common inventory
+service in one save operation and putaway becomes immutable `Completed`.
+Putaway is local to WMS and does not call or update 1C. Completed mistakes are
+corrected through an ordinary inventory transfer. Direct putaway to a shipping
+location, location recommendations, capacity constraints, tasks, and rollback
+are not implemented.
+
 `ProcessingRequired` is currently only passed through from 1C's `ТребуетсяОбработка`. It is not part of the active operational flow, which is `ReadyForReceiving -> InReceiving -> Received`. Actual quantities are immutable after `Received` and are preserved when an inbound document is reconciled.
 
 ### Receiving UI
@@ -141,12 +163,19 @@ The receiving location belongs to the whole order. At the current stage the oper
 - `Index` lists receiving orders.
 - `Details` shows one order and offers "Взять в работу" for a pending order when it can be started.
 - `InProcess` lets the operator edit actual quantities and comments, then set the order received through `SetReceivedAsync`.
+- `Putaway` lets the operator distribute each received line across storage
+  locations, edit drafts while putaway is in progress, complete and post the
+  full allocation, and inspect completed placement read-only.
 
 ### Receiving application services
 
 - `ReceivingOrderCommandService` imports and reconciles orders, sets orders in receiving or received, and updates item actual quantities.
 - `ReceivingOrderQueryService` reads order details and paged, filtered lists.
-- `BalanceAndTurnoverService` records inventory movements and updates balances when a receiving order is completed.
+- `PutawayCommandService` starts and completes putaway and manages its draft
+  movements; `PutawayQueryService` reads putaway movements and valid storage
+  destinations.
+- `BalanceAndTurnoverService` records inventory movements and updates balances
+  when receiving or putaway is completed.
 
 Inbound synchronization may create and reconcile receiving orders only in `ReadyForReceiving` and shipping orders only in `Prepared`. Once WMS work has started, any inbound difference leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Receiving facts are editable only in `InReceiving` or `ProcessingRequired`; shipping facts are editable only while picking or verification is in progress.
 

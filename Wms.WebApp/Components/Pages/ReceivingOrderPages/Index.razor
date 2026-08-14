@@ -78,6 +78,19 @@
                 </MudSelectItem>
             }
         </MudSelect>
+        <MudSelect T="PutawayStatus?"
+                   Label="Статус размещения"
+                   Value="_putawayStatus"
+                   ValueChanged="OnPutawayStatusChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
+            @foreach (var status in Enum.GetValues<PutawayStatus>())
+            {
+                <MudSelectItem T="PutawayStatus?" Value="@((PutawayStatus?)status)">
+                    @status.GetDisplayName()
+                </MudSelectItem>
+            }
+        </MudSelect>
         <MudSpacer />
     </MudStack>
 </MudPaper>
@@ -104,6 +117,9 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.PutawayStatus.GetDisplayName()" Title="Размещение">
+            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь">
             <CellTemplate>

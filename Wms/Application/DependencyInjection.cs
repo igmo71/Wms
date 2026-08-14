@@ -21,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<InventoryTurnoverService>();
         services.AddScoped<PickingCommandService>();
         services.AddScoped<PickingQueryService>();
+        services.AddScoped<PutawayCommandService>();
+        services.AddScoped<PutawayQueryService>();
         services.AddScoped<ReceivingOrderCommandService>();
         services.AddScoped<ReceivingOrderQueryService>();
         services.AddScoped<ShippingOrderCommandService>();

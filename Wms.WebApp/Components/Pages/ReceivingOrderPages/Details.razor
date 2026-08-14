@@ -33,15 +33,43 @@ else
                     </span>
                 </MudTooltip>
             }
+            @if (_order.PutawayStatus == PutawayStatus.Pending)
+            {
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Disabled="_isStartingPutaway"
+                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                           OnClick="StartPutawayAsync">
+                    Начать размещение
+                </MudButton>
+            }
+            else if (_order.PutawayStatus == PutawayStatus.InProgress)
+            {
+                <MudButton Href="@($"receiving-orders/{Id}/putaway")"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Inventory">
+                    Открыть размещение
+                </MudButton>
+            }
+            else if (_order.PutawayStatus == PutawayStatus.Completed)
+            {
+                <MudButton Href="@($"receiving-orders/{Id}/putaway")"
+                           Color="Color.Primary"
+                           Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.Visibility">
+                    Посмотреть размещение
+                </MudButton>
+            }
             <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
                 К списку
             </MudButton>
         </MudStack>
 
-        @if (_isStarting)
+        @if (_isStarting || _isStartingPutaway)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+            <MudText Typo="Typo.caption">@(_isStartingPutaway ? "Начинается размещение…" : "Отправляется запрос в 1С…")</MudText>
         }
 
         @if (_startOrderFailed)
@@ -53,7 +81,8 @@ else
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус приемки</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Очередь</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
@@ -90,6 +119,13 @@ else
                 <MudItem xs="12" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
             </MudGrid>
         </MudPaper>
+
+        @if (_order.Status == ReceivingOrderStatus.Received
+            && _order.PutawayStatus == PutawayStatus.Inactive
+            && !_order.Items.Any(x => x.FactQuantity > 0))
+        {
+            <MudAlert Severity="Severity.Warning">Размещение недоступно: в ордере отсутствует фактически принятое количество.</MudAlert>
+        }
 
         <MudDataGrid T="ReceivingOrderItem"
                      Items="_order.Items"

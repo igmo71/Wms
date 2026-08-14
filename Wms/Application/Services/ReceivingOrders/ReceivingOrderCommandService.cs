@@ -226,17 +226,27 @@ public class ReceivingOrderCommandService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var orderWarehouseId = await dbContext.ReceivingOrders
+        var orderInfo = await dbContext.ReceivingOrders
             .Where(x => x.Id == receivingOrderId)
-            .Select(x => (Guid?)x.WarehouseId)
+            .Select(x => new { x.WarehouseId, x.Status })
             .FirstOrDefaultAsync(ct);
 
-        if (orderWarehouseId is null)
+        if (orderInfo is null)
             return ServiceError.NotFound<ReceivingOrder>();
+
+        if (orderInfo.Status is not (ReceivingOrderStatus.ReadyForReceiving
+            or ReceivingOrderStatus.InReceiving
+            or ReceivingOrderStatus.ProcessingRequired))
+        {
+            return ServiceError.Invalid<ReceivingOrder>(
+                "Receiving location can be changed only before the order is received.");
+        }
 
         var validLocation = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == receivingLocationId
-                && x.WarehouseId == orderWarehouseId
+                && x.WarehouseId == orderInfo.WarehouseId
+                && !x.DeletionMark
+                && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Receiving, ct);
 
         if (!validLocation)

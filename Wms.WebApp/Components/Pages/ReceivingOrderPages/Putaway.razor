@@ -1,0 +1,148 @@
+@page "/receiving-orders/{Id:guid}/putaway"
+@using Wms.Domain
+@using Wms.Domain.Enums
+@using Wms.Common
+
+<PageTitle>Размещение приходного ордера</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_order is null)
+{
+    <MudAlert Severity="Severity.Warning">Приходный ордер не найден.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h4">Размещение приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+            <MudSpacer />
+            @if (IsEditable)
+            {
+                <MudTooltip Text="Размещение можно завершить после распределения всего фактически принятого количества.">
+                    <span>
+                        <MudButton Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   Disabled="@(_isCompleting || !CanComplete)"
+                                   StartIcon="@Icons.Material.Filled.Check"
+                                   OnClick="CompleteAsync">
+                            Завершить размещение
+                        </MudButton>
+                    </span>
+                </MudTooltip>
+            }
+            <MudButton Href="@($"receiving-orders/{Id}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
+                К ордеру
+            </MudButton>
+        </MudStack>
+
+        @if (_isCompleting)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+
+        @if (_operationFailed)
+        {
+            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_order.PutawayStatus == PutawayStatus.Completed)
+        {
+            <MudAlert Severity="Severity.Success">Размещение завершено. Движения проведены и доступны только для просмотра.</MudAlert>
+        }
+        else if (!IsEditable)
+        {
+            <MudAlert Severity="Severity.Warning">Размещение доступно только после явного начала процесса.</MudAlert>
+        }
+
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус приемки</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона приемки</MudText><MudText>@_order.ReceivingLocation?.Zone?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место приемки</MudText><MudText>@_order.ReceivingLocation?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Размещение начато</MudText><MudText>@FormatDateTimeOffset(_order.PutawayStartedAtUtc)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Размещение завершено</MudText><MudText>@FormatDateTimeOffset(_order.PutawayCompletedAtUtc)</MudText></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudDataGrid T="ReceivingOrderItem"
+                     @ref="_orderItemsGrid"
+                     Items="_order.Items"
+                     Hover="true"
+                     Striped="true"
+                     Dense="true"
+                     ExpandSingleRow="false">
+            <Columns>
+                <HierarchyColumn T="ReceivingOrderItem">
+                    <CellTemplate Context="lineContext">
+                        <MudIconButton Icon="@(_expandedLineNumber == lineContext.Item.LineNumber
+                                                    ? Icons.Material.Filled.ExpandMore
+                                                    : Icons.Material.Filled.ChevronRight)"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ToggleLineAsync(lineContext.Item))" />
+                    </CellTemplate>
+                </HierarchyColumn>
+                <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
+                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                <PropertyColumn Property="x => x.FactQuantity" Title="Принято" />
+                <TemplateColumn Title="Размещено"><CellTemplate>@FormatQuantity(GetAllocatedQuantity(context.Item.LineNumber))</CellTemplate></TemplateColumn>
+                <TemplateColumn Title="Осталось"><CellTemplate>@FormatQuantity(GetRemainingQuantity(context.Item))</CellTemplate></TemplateColumn>
+            </Columns>
+            <ChildRowContent>
+                @if (_selectedLine?.LineNumber == context.Item.LineNumber)
+                {
+                    <MudPaper Class="pa-3 ma-2" Elevation="0" Outlined="true">
+                        <MudDataGrid T="InventoryMovement" Items="SelectedLineMovements" Hover="true" Striped="true" Dense="true">
+                            <Columns>
+                                <TemplateColumn Title="Ячейка назначения">
+                                    <CellTemplate Context="destinationContext">@FormatDestination(destinationContext.Item.DestinationStorageLocation)</CellTemplate>
+                                </TemplateColumn>
+                                <PropertyColumn Property="x => x.Quantity" Title="Количество" />
+                                <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" />
+                                <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" />
+                                @if (IsEditable)
+                                {
+                                    <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+                                        <CellTemplate Context="movementContext">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => BeginEditing(movementContext.Item))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteMovementAsync(movementContext.Item))" />
+                                        </CellTemplate>
+                                    </TemplateColumn>
+                                }
+                            </Columns>
+                        </MudDataGrid>
+
+                        @if (IsEditable)
+                        {
+                            <MudGrid Spacing="4" Class="mt-1">
+                                <MudItem xs="12" md="6">
+                                    <MudAutocomplete T="StorageLocation"
+                                                     Label="Ячейка назначения"
+                                                     @bind-Value="_selectedDestination"
+                                                     SearchFunc="SearchDestinationsAsync"
+                                                     ToStringFunc="FormatDestination"
+                                                     Clearable="true" />
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudNumericField T="double" Label="Количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumQuantity" HideSpinButtons="true" />
+                                    <MudText Typo="Typo.caption">Можно разместить: @FormatQuantity(MaximumQuantity)</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!CanSaveMovement)" OnClick="SaveMovementAsync">@(_editingMovement is null ? "Добавить" : "Сохранить")</MudButton>
+                                    @if (_editingMovement is not null)
+                                    {
+                                        <MudButton Variant="Variant.Text" OnClick="CancelEditing">Отмена</MudButton>
+                                    }
+                                </MudItem>
+                            </MudGrid>
+                        }
+                    </MudPaper>
+                }
+            </ChildRowContent>
+        </MudDataGrid>
+    </MudStack>
+}

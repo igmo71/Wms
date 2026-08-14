@@ -79,6 +79,9 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         if (listQuery.Status is not null)
             query = query.Where(x => x.Status == listQuery.Status);
 
+        if (listQuery.PutawayStatus is not null)
+            query = query.Where(x => x.PutawayStatus == listQuery.PutawayStatus);
+
         if (listQuery.Queue is not null)
             query = query.Where(x => x.Queue == listQuery.Queue);
 

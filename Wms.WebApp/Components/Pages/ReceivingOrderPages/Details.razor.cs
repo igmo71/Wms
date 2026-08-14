@@ -19,6 +19,8 @@ public partial class Details
     [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject]
+    private PutawayCommandService PutawayCommandService { get; set; } = null!;
+    [Inject]
     private StorageLocationService StorageLocationService { get; set; } = null!;
     [Inject]
     private ZoneService ZoneService { get; set; } = null!;
@@ -32,6 +34,7 @@ public partial class Details
     private StorageLocation? _receivingLocation;
     private bool _isLoading = true;
     private bool _isStarting;
+    private bool _isStartingPutaway;
     private bool _startOrderFailed;
     private string? _errorMessage;
 
@@ -140,6 +143,42 @@ public partial class Details
         finally
         {
             _isStarting = false;
+        }
+    }
+
+    private async Task StartPutawayAsync()
+    {
+        _isStartingPutaway = true;
+        _startOrderFailed = false;
+
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null)
+            {
+                _startOrderFailed = true;
+                _errorMessage = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            var result = await PutawayCommandService.StartAsync(Id, userId);
+            if (!result.IsSuccess)
+            {
+                _startOrderFailed = true;
+                _errorMessage = result.Error?.Message ?? "Не удалось начать размещение.";
+                return;
+            }
+
+            NavigationManager.NavigateTo($"receiving-orders/{Id}/putaway");
+        }
+        catch
+        {
+            _startOrderFailed = true;
+            _errorMessage = "Не удалось начать размещение.";
+        }
+        finally
+        {
+            _isStartingPutaway = false;
         }
     }
 

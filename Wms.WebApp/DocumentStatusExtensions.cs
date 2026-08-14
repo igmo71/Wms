@@ -28,6 +28,14 @@ public static class DocumentStatusExtensions
         _ => Color.Default
     };
 
+    public static Color GetChipColor(this PutawayStatus status) => status switch
+    {
+        PutawayStatus.Pending => Color.Info,
+        PutawayStatus.InProgress => Color.Primary,
+        PutawayStatus.Completed => Color.Success,
+        _ => Color.Default
+    };
+
     public static Color GetChipColor(this ShippingOrderStatus status) => status switch
     {
         ShippingOrderStatus.ReadyForPicking => Color.Info,

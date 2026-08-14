@@ -46,7 +46,8 @@ else
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус приемки</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Очередь</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
