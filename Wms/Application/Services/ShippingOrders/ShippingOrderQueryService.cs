@@ -89,6 +89,9 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
         if (listQuery.Queue is not null)
             query = query.Where(x => x.Queue == listQuery.Queue);
 
+        if (listQuery.WarehouseOperation is not null)
+            query = query.Where(x => x.WarehouseOperation == listQuery.WarehouseOperation);
+
         return query;
     }
 

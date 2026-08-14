@@ -36,6 +36,19 @@
                          Label="Склад"
                          Clearable="true"
                          Class="ml-4" />
+        <MudSelect T="WarehouseOperation?"
+                   Label="Складская операция"
+                   Value="_warehouseOperation"
+                   ValueChanged="OnWarehouseOperationChangedAsync"
+                   Clearable="true"
+                   Class="ml-4">
+            @foreach (var warehouseOperation in Enum.GetValues<WarehouseOperation>())
+            {
+                <MudSelectItem T="WarehouseOperation?" Value="@((WarehouseOperation?)warehouseOperation)">
+                    @warehouseOperation.GetDisplayName()
+                </MudSelectItem>
+            }
+        </MudSelect>
         <MudSelect T="ShippingOrderStatus?"
                    Label="Статус"
                    Value="_status"

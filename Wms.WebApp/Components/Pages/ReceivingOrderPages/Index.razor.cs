@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
 using MudBlazor;
 using Wms.Application.Services.ReceivingOrders;
+using Wms.Application.Services;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -11,6 +12,7 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 public partial class Index : IAsyncDisposable
 {
     [Inject] private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject] private IOptions<WmsSettings> Options { get; set; } = null!;
 
@@ -20,6 +22,8 @@ public partial class Index : IAsyncDisposable
     private DateTime? _dateTo;
     private ReceivingOrderStatus? _status;
     private ReceivingOrderQueue? _queue;
+    private WarehouseOperation? _warehouseOperation;
+    private Warehouse? _warehouse;
     private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
 
@@ -37,8 +41,10 @@ public partial class Index : IAsyncDisposable
             SearchString = _searchString,
             DateFrom = _dateFrom,
             DateTo = _dateTo,
+            WarehouseId = _warehouse?.Id,
             Status = _status,
             Queue = _queue,
+            WarehouseOperation = _warehouseOperation,
             SortBy = sortDefinition?.SortBy,
             SortDescending = sortDefinition?.Descending ?? true,
             Skip = state.Page * state.PageSize,
@@ -79,6 +85,30 @@ public partial class Index : IAsyncDisposable
     private Task OnQueueChangedAsync(ReceivingOrderQueue? queue)
     {
         _queue = queue;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
+    {
+        var result = await WarehouseService.ListAsync(new ListQuery
+        {
+            SearchString = searchText,
+            SortBy = "Name",
+            Take = 10
+        }, ct);
+
+        return result.Items;
+    }
+
+    private Task OnWarehouseChangedAsync(Warehouse? warehouse)
+    {
+        _warehouse = warehouse;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private Task OnWarehouseOperationChangedAsync(WarehouseOperation? warehouseOperation)
+    {
+        _warehouseOperation = warehouseOperation;
         return _dataGrid.ReloadServerData();
     }
 

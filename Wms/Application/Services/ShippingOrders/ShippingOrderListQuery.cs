@@ -11,5 +11,6 @@ public class ShippingOrderListQuery : ListQuery
     public DateTime? DateTo { get; set; }
     public ShippingOrderStatus? Status { get; set; }
     public ShippingOrderQueue? Queue { get; set; }
+    public WarehouseOperation? WarehouseOperation { get; set; }
     public bool IncludePostedOnly { get; set; } = true;
 }

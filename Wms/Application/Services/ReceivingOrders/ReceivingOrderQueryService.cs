@@ -64,6 +64,9 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
         if (listQuery.IncludePostedOnly)
             query = query.Where(x => x.Posted == true);
 
+        if (listQuery.WarehouseId is Guid warehouseId)
+            query = query.Where(x => x.WarehouseId == warehouseId);
+
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
             query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
 
@@ -78,6 +81,9 @@ public class ReceivingOrderQueryService(IDbContextFactory<ApplicationDbContext> 
 
         if (listQuery.Queue is not null)
             query = query.Where(x => x.Queue == listQuery.Queue);
+
+        if (listQuery.WarehouseOperation is not null)
+            query = query.Where(x => x.WarehouseOperation == listQuery.WarehouseOperation);
 
         return query;
     }

@@ -23,6 +23,7 @@ public partial class Index : IAsyncDisposable
     private Warehouse? _warehouse;
     private ShippingOrderStatus? _status;
     private ShippingOrderQueue? _queue;
+    private WarehouseOperation? _warehouseOperation;
     private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
 
@@ -45,6 +46,7 @@ public partial class Index : IAsyncDisposable
             WarehouseId = _warehouse?.Id,
             Status = _status,
             Queue = _queue,
+            WarehouseOperation = _warehouseOperation,
             SortBy = sortDefinition?.SortBy,
             SortDescending = sortDefinition?.Descending ?? true,
             Skip = state.Page * state.PageSize,
@@ -103,6 +105,12 @@ public partial class Index : IAsyncDisposable
     private Task OnQueueChangedAsync(ShippingOrderQueue? queue)
     {
         _queue = queue;
+        return _dataGrid.ReloadServerData();
+    }
+
+    private Task OnWarehouseOperationChangedAsync(WarehouseOperation? warehouseOperation)
+    {
+        _warehouseOperation = warehouseOperation;
         return _dataGrid.ReloadServerData();
     }
 
