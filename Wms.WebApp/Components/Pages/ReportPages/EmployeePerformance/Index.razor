@@ -1,0 +1,85 @@
+@page "/reports/employee-performance"
+@using Microsoft.AspNetCore.Authorization
+@using Wms.Application.Reports.EmployeePerformance
+@using Wms.Domain
+@attribute [Authorize]
+
+<PageTitle>Производительность сотрудников</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Производительность сотрудников</MudText>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6" md="3">
+            <MudAutocomplete T="Warehouse"
+                             Value="_warehouse"
+                             ValueChanged="OnWarehouseChangedAsync"
+                             SearchFunc="SearchWarehousesAsync"
+                             ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                             Label="Склад"
+                             Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudAutocomplete T="EmployeePerformanceUserOption"
+                             Value="_user"
+                             ValueChanged="OnUserChangedAsync"
+                             SearchFunc="SearchUsersAsync"
+                             ToStringFunc="user => user?.Name ?? string.Empty"
+                             Label="Сотрудник"
+                             Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDatePicker Label="Дата завершения с"
+                           Date="_dateFrom"
+                           DateChanged="OnDateFromChangedAsync"
+                           Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDatePicker Label="Дата завершения по"
+                           Date="_dateTo"
+                           DateChanged="OnDateToChangedAsync"
+                           Clearable="true" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudDataGrid T="EmployeePerformanceSummaryItem"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.WarehouseName" Title="Склад" Sortable="true">
+            <FooterTemplate><MudText Typo="Typo.subtitle2">Итого по фильтру</MudText></FooterTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.UserName" Title="Сотрудник" Sortable="true">
+            <CellTemplate>
+                <MudLink Href="@GetDetailsHref(context.Item)">@context.Item.UserName</MudLink>
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.DocumentCount" Title="Документов" Sortable="true">
+            <FooterTemplate><MudText><b>@_totals.DocumentCount</b></MudText></FooterTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.PositiveLineCount" Title="Строк" Sortable="true">
+            <FooterTemplate><MudText><b>@_totals.PositiveLineCount</b></MudText></FooterTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.KnownFactWeightKg" Title="Фактический вес" Sortable="true">
+            <CellTemplate>
+                @WeightDisplay.FormatTotal(context.Item.KnownFactWeightKg, context.Item.IsFactWeightComplete)
+            </CellTemplate>
+            <FooterTemplate>
+                <MudText><b>@WeightDisplay.FormatTotal(_totals.KnownFactWeightKg, _totals.IsFactWeightComplete)</b></MudText>
+            </FooterTemplate>
+        </PropertyColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="EmployeePerformanceSummaryItem" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+    <NoRecordsContent>
+        <MudText Class="pa-4">За выбранный период завершенных операций нет.</MudText>
+    </NoRecordsContent>
+</MudDataGrid>

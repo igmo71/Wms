@@ -82,7 +82,12 @@ else
                                      Dense="true"
                                      Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" md="6"><MudText Typo="Typo.caption">Комментарий</MudText><MudTooltip Text="@(_order.Comment ?? "—")"><MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText></MudTooltip></MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTooltip Text="@(_order.Comment ?? "—")">
+                        <MudText Typo="Typo.caption">Комментарий</MudText>
+                        <MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText>
+                    </MudTooltip>
+                </MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(_order.KnownFactWeightKg, _order.IsFactWeightComplete)</MudText></MudItem>
             </MudGrid>
             <MudDivider Class="my-1" />

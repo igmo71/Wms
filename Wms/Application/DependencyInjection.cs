@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Wms.Application.Reports.EmployeePerformance;
 using Wms.Application.Services;
 using Wms.Application.Services.Inventory;
 using Wms.Application.Services.ReceivingOrders;
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<ApplicationUserQueryService>();
         services.AddScoped<BalanceAndTurnoverService>();
         services.AddScoped<DeliveryDirectionService>();
+        services.AddScoped<EmployeePerformanceReportService>();
         services.AddScoped<InventoryCountCommandService>();
         services.AddScoped<InventoryCountQueryService>();
         services.AddScoped<InventoryBalanceService>();

@@ -1,0 +1,106 @@
+@page "/reports/employee-performance/{UserId}"
+@using Microsoft.AspNetCore.Authorization
+@using Wms.Application.Reports.EmployeePerformance
+@using Wms.Domain
+@attribute [Authorize]
+
+<PageTitle>Производительность: @_userName</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="@GetSummaryHref()" />
+    <MudText Typo="Typo.h5">Производительность: @_userName</MudText>
+</MudStack>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6" md="3">
+            <MudTextField T="string"
+                          @bind-Value="_searchString"
+                          Label="Поиск по номеру"
+                          Immediate="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="OnSearchChangedAsync"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudAutocomplete T="Warehouse"
+                             Value="_warehouse"
+                             ValueChanged="OnWarehouseChangedAsync"
+                             SearchFunc="SearchWarehousesAsync"
+                             ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                             Label="Склад"
+                             Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudDatePicker Label="Завершено с"
+                           Date="_dateFrom"
+                           DateChanged="OnDateFromChangedAsync"
+                           Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudDatePicker Label="Завершено по"
+                           Date="_dateTo"
+                           DateChanged="OnDateToChangedAsync"
+                           Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudSelect T="EmployeePerformanceDocumentType?"
+                       Label="Тип операции"
+                       Value="_documentType"
+                       ValueChanged="OnDocumentTypeChangedAsync"
+                       Clearable="true">
+                @foreach (var documentType in Enum.GetValues<EmployeePerformanceDocumentType>())
+                {
+                    <MudSelectItem T="EmployeePerformanceDocumentType?"
+                                   Value="@((EmployeePerformanceDocumentType?)documentType)">
+                        @GetDocumentTypeName(documentType)
+                    </MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudDataGrid T="EmployeePerformanceDocumentItem"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             SortMode="SortMode.Single"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.DocumentType" Title="Тип" Sortable="true">
+            <CellTemplate>@GetDocumentTypeName(context.Item.DocumentType)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true">
+            <CellTemplate>
+                <MudLink Href="@GetDocumentHref(context.Item)">@(context.Item.Number ?? "—")</MudLink>
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.DocumentDate" Title="Дата документа" Format="dd.MM.yyyy" Sortable="true" />
+        <PropertyColumn Property="x => x.WarehouseName" Title="Склад" Sortable="true" />
+        <PropertyColumn Property="x => x.PositiveLineCount" Title="Строк" Sortable="true" />
+        <PropertyColumn Property="x => x.KnownFactWeightKg" Title="Фактический вес" Sortable="true">
+            <CellTemplate>
+                @WeightDisplay.FormatTotal(context.Item.KnownFactWeightKg, context.Item.IsFactWeightComplete)
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.StartedAtUtc" Title="Начало" Sortable="true">
+            <CellTemplate>@FormatTimestamp(context.Item.StartedAtUtc)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Завершение" Sortable="true">
+            <CellTemplate>@FormatTimestamp(context.Item.CompletedAtUtc)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.DurationMinutes" Title="Минут" Sortable="true" Format="N1" />
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="EmployeePerformanceDocumentItem" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+    <NoRecordsContent>
+        <MudText Class="pa-4">Документы по выбранным фильтрам не найдены.</MudText>
+    </NoRecordsContent>
+</MudDataGrid>

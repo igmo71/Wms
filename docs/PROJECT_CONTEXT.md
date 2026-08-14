@@ -106,6 +106,38 @@ text, comments stay on one ellipsized line with their full value in a tooltip,
 and each audit item keeps its user and timestamp on one line.
 Page-level headings in the operator UI use MudBlazor `Typo.h5`.
 
+## Reports
+
+The operator UI has a separate reports navigation group. Its first report is
+warehouse employee performance, available to every authenticated user. The
+summary has one row per warehouse and completing user with the number of
+completed documents, positive factual document lines, and factual weight. It
+supports server-side warehouse, user, and completion-date filtering, sorting,
+pagination, and totals over the complete filtered result rather than the
+current page. The default period is the current local calendar month.
+
+Receiving performance is attributed to `CompletedBy` and measured from
+`StartedAtUtc` to `CompletedAtUtc`. Shipping-order performance covers picking,
+is attributed to `ReadyForShipmentBy`, and is measured from
+`PickingStartedAtUtc` to `ReadyForShipmentAtUtc`; the later transition to
+`Shipped` is not part of this KPI. Attribution is to the completing user even
+when a different user started the operation, so this report measures completed
+results rather than exact personal working time.
+
+The employee detail report carries the warehouse and period from the selected
+summary row and lists its receiving and picking documents with positive factual
+line count, factual weight, start and completion timestamps, and duration. It
+supports partial document-number search, operation-type and completion-date
+filters, sorting, and pagination. Document numbers link to their operational
+details.
+
+Report weight uses current SKU weights and marks documents and totals as
+incomplete when a positive factual line has no weight. Deleted Identity users
+remain attributable by their stored identifier. Operations without a completing
+user, complete timestamps, or a nonnegative duration are excluded as invalid
+audit data. The detailed rules are defined in
+`specs/employee-performance-report/spec.md`.
+
 ## MVP implementation principles
 
 The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.
