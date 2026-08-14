@@ -86,6 +86,9 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
+        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
+            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.Status" Title="Статус" Sortable="true">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
