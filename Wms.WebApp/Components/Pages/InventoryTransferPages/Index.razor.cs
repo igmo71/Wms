@@ -11,6 +11,7 @@ namespace Wms.WebApp.Components.Pages.InventoryTransferPages;
 public partial class Index
 {
     [Inject] private InventoryTransferQueryService InventoryTransferQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
 
     private MudDataGrid<InventoryTransfer> _dataGrid = null!;
@@ -19,6 +20,7 @@ public partial class Index
     private DateTime? _dateTo;
     private Warehouse? _warehouse;
     private InventoryTransferStatus? _status;
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private static string GetTransferHref(InventoryTransfer transfer) => transfer.Status == InventoryTransferStatus.Completed
         ? $"inventory-transfers/{transfer.Id}"
@@ -42,12 +44,21 @@ public partial class Index
             Take = state.PageSize
         }, ct);
 
+        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(
+            result.Items.Select(x => x.CompletedBy), ct);
+
         return new GridData<InventoryTransfer>
         {
             Items = result.Items,
             TotalItems = result.TotalItems
         };
     }
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
 
     private Task OnSearchChangedAsync(string searchString)
     {

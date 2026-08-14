@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Инвентаризация №@_inventoryCount.Number</MudText>
+            <MudText Typo="Typo.h5">Инвентаризация №@_inventoryCount.Number от @_inventoryCount.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             @if (IsDraft)
             {
@@ -41,34 +41,20 @@ else
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Номер</MudText>
-                    <MudText>@_inventoryCount.Number</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Дата</MudText>
-                    <MudText>@_inventoryCount.Date.ToString("dd.MM.yyyy")</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="4">
                     <MudText Typo="Typo.caption">Склад</MudText>
                     <MudText>@_inventoryCount.Warehouse?.Name</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
+                <MudItem xs="12" sm="6" md="4">
                     <MudText Typo="Typo.caption">Статус</MudText>
                     <MudChip T="string" Size="Size.Small" Color="@_inventoryCount.Status.GetChipColor()">@_inventoryCount.Status.GetDisplayName()</MudChip>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Создана</MudText>
-                    <MudText>@FormatOperation(_inventoryCount.CreatedAtUtc, _inventoryCount.CreatedBy)</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Изменена</MudText>
-                    <MudText>@FormatOperation(_inventoryCount.UpdatedAtUtc, _inventoryCount.UpdatedBy)</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudText Typo="Typo.caption">Проведена</MudText>
-                    <MudText>@FormatOperation(_inventoryCount.PostedAtUtc, _inventoryCount.PostedBy)</MudText>
-                </MudItem>
+            </MudGrid>
+            <MudDivider Class="my-3" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Создал" UserName="@GetUserName(_inventoryCount.CreatedBy)" Timestamp="_inventoryCount.CreatedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Изменил" UserName="@GetUserName(_inventoryCount.UpdatedBy)" Timestamp="_inventoryCount.UpdatedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Провёл" UserName="@GetUserName(_inventoryCount.PostedBy)" Timestamp="_inventoryCount.PostedAtUtc" Md="4" />
             </MudGrid>
         </MudPaper>
 
@@ -90,6 +76,7 @@ else
                 <MudTh>Номенклатура</MudTh>
                 <MudTh>Ожидается</MudTh>
                 <MudTh>Фактически</MudTh>
+                <MudTh>Фактический вес</MudTh>
                 <MudTh>Разница</MudTh>
                 @if (IsDraft)
                 {
@@ -154,6 +141,7 @@ else
                         @context.CountedQuantity
                     }
                 </MudTd>
+                <MudTd DataLabel="Фактический вес">@WeightDisplay.Format(context.CountedWeightKg)</MudTd>
                 <MudTd DataLabel="Разница">@context.DifferenceQuantity</MudTd>
                 @if (IsDraft)
                 {

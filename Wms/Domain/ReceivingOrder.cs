@@ -50,6 +50,8 @@ public class ReceivingOrder
 
     public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
+    public double KnownFactWeightKg => Items.Sum(x => x.FactWeightKg ?? 0);
+    public bool IsFactWeightComplete => Items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
 
     public bool HasExternalChanges(ReceivingOrder externalOrder)
     {

@@ -16,6 +16,9 @@ public class InventoryTurnoverListItem
     public double QuantityDelta => Turnover.QuantityDelta;
     public double BalanceBefore => Turnover.BalanceBefore;
     public double BalanceAfter => Turnover.BalanceAfter;
+    public double? WeightDeltaKg => Turnover.WeightDeltaKg;
+    public double? WeightBeforeKg => Turnover.WeightBeforeKg;
+    public double? WeightAfterKg => Turnover.WeightAfterKg;
     public RecorderType RecorderType => Turnover.InventoryMovement?.RecorderType ?? RecorderType.Unknown;
     public Guid? RecorderId => Turnover.InventoryMovement?.RecorderId;
 }

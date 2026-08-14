@@ -15,9 +15,9 @@ else if (_order is null)
 }
 else
 {
-    <MudStack Spacing="3">
+    <MudStack Spacing="2">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+            <MudText Typo="Typo.h5">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
             {
@@ -77,12 +77,11 @@ else
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
-        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус приемки</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Очередь</MudText>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
@@ -90,33 +89,58 @@ else
                         <MudText>@_order.Queue.GetDisplayName()</MudText>
                     </MudStack>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">В работе с</MudText><MudText>@FormatDateTimeOffset(_order.StartedAtUtc)</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Принят</MudText><MudText>@FormatDateTimeOffset(_order.CompletedAtUtc)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Зона приёмки</MudText>
-                    <MudAutocomplete T="Zone"
-                                     Value="_receivingZone"
-                                     ValueChanged="OnReceivingZoneChanged"
-                                     SearchFunc="SearchReceivingZonesAsync"
-                                     ToStringFunc="zone => zone?.Name ?? string.Empty"
-                                     Disabled="@(_order.Status != ReceivingOrderStatus.ReadyForReceiving)"
-                                     Variant="Variant.Text"
-                                     Dense="true"
-                                     Clearable="true" />
+                    @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
+                    {
+                        <MudAutocomplete T="Zone"
+                                         Value="_receivingZone"
+                                         ValueChanged="OnReceivingZoneChanged"
+                                         SearchFunc="SearchReceivingZonesAsync"
+                                         ToStringFunc="zone => zone?.Name ?? string.Empty"
+                                         Variant="Variant.Text"
+                                         Dense="true"
+                                         Margin="Margin.Dense"
+                                         Clearable="true" />
+                    }
+                    else
+                    {
+                        <MudText>@(_receivingZone?.Name ?? "—")</MudText>
+                    }
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    <MudAutocomplete T="StorageLocation"
-                                     Value="_receivingLocation"
-                                     ValueChanged="OnReceivingLocationChanged"
-                                     SearchFunc="SearchReceivingLocationsAsync"
-                                     ToStringFunc="location => location?.Name ?? string.Empty"
-                                     Disabled="@(_order.Status != ReceivingOrderStatus.ReadyForReceiving || _receivingZone is null)"
-                                     Variant="Variant.Text"
-                                     Dense="true"
-                                     Clearable="true" />
+                    @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
+                    {
+                        <MudAutocomplete T="StorageLocation"
+                                         Value="_receivingLocation"
+                                         ValueChanged="OnReceivingLocationChanged"
+                                         SearchFunc="SearchReceivingLocationsAsync"
+                                         ToStringFunc="location => location?.Name ?? string.Empty"
+                                         Disabled="@(_receivingZone is null)"
+                                         Variant="Variant.Text"
+                                         Dense="true"
+                                         Margin="Margin.Dense"
+                                         Clearable="true" />
+                    }
+                    else
+                    {
+                        <MudText>@(_receivingLocation?.Name ?? "—")</MudText>
+                    }
                 </MudItem>
-                <MudItem xs="12" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+                <MudItem xs="12" md="6"><MudText Typo="Typo.caption">Комментарий</MudText><MudTooltip Text="@(_order.Comment ?? "—")"><MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText></MudTooltip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(_order.KnownFactWeightKg, _order.IsFactWeightComplete)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Взял в работу" UserName="@GetUserName(_order.StartedBy)" Timestamp="_order.StartedAtUtc" />
+                <DocumentOperationInfo Title="Принял" UserName="@GetUserName(_order.CompletedBy)" Timestamp="_order.CompletedAtUtc" />
+                <DocumentOperationInfo Title="Начал размещение" UserName="@GetUserName(_order.PutawayStartedBy)" Timestamp="_order.PutawayStartedAtUtc" />
+                <DocumentOperationInfo Title="Разместил" UserName="@GetUserName(_order.PutawayCompletedBy)" Timestamp="_order.PutawayCompletedAtUtc" />
             </MudGrid>
         </MudPaper>
 
@@ -137,6 +161,7 @@ else
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
                 <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
                 <PropertyColumn Property="x => x.Comment" Title="Комментарий" />
             </Columns>

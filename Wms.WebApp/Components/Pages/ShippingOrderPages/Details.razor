@@ -15,9 +15,9 @@ else if (_order is null)
 }
 else
 {
-    <MudStack Spacing="3">
+    <MudStack Spacing="2">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+            <MudText Typo="Typo.h5">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             @if (_order.Status == ShippingOrderStatus.Prepared)
             {
@@ -86,7 +86,7 @@ else
             <MudText Typo="Typo.caption">Выполняется откат ордера…</MudText>
         }
 
-        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
@@ -100,30 +100,45 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Зона отгрузки</MudText>
-                    <MudAutocomplete T="Zone" Value="_shippingZone" ValueChanged="OnShippingZoneChanged" SearchFunc="SearchShippingZonesAsync"
-                                     ToStringFunc="zone => zone?.Name ?? string.Empty" Disabled="@(_order.Status != ShippingOrderStatus.Prepared)"
-                                     Variant="Variant.Text" Dense="true" Clearable="true" />
+                    @if (_order.Status == ShippingOrderStatus.Prepared)
+                    {
+                        <MudAutocomplete T="Zone" Value="_shippingZone" ValueChanged="OnShippingZoneChanged" SearchFunc="SearchShippingZonesAsync"
+                                         ToStringFunc="zone => zone?.Name ?? string.Empty" Variant="Variant.Text" Dense="true" Clearable="true" Margin="Margin.Dense" />
+                    }
+                    else
+                    {
+                        <MudText>@(_shippingZone?.Name ?? "—")</MudText>
+                    }
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Место отгрузки</MudText>
-                    <MudAutocomplete T="StorageLocation" Value="_shippingLocation" ValueChanged="OnShippingLocationChanged" SearchFunc="SearchShippingLocationsAsync"
-                                     ToStringFunc="location => location?.Name ?? string.Empty"
-                                     Disabled="@(_order.Status != ShippingOrderStatus.Prepared || _shippingZone is null)"
-                                     Variant="Variant.Text" Dense="true" Clearable="true" />
+                    @if (_order.Status == ShippingOrderStatus.Prepared)
+                    {
+                        <MudAutocomplete T="StorageLocation" Value="_shippingLocation" ValueChanged="OnShippingLocationChanged" SearchFunc="SearchShippingLocationsAsync"
+                                         ToStringFunc="location => location?.Name ?? string.Empty" Disabled="@(_shippingZone is null)"
+                                         Variant="Variant.Text" Dense="true" Clearable="true" Margin="Margin.Dense" />
+                    }
+                    else
+                    {
+                        <MudText>@(_shippingLocation?.Name ?? "—")</MudText>
+                    }
                 </MudItem>
-                <MudItem xs="12" sm="6" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="6"><MudText Typo="Typo.caption">Комментарий</MudText><MudTooltip Text="@(_order.Comment ?? "—")"><MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText></MudTooltip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(_order.KnownFactWeightKg, _order.IsFactWeightComplete)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Начал сборку" UserName="@GetUserName(_order.PickingStartedBy)" Timestamp="_order.PickingStartedAtUtc" />
+                <DocumentOperationInfo Title="Собрал" UserName="@GetUserName(_order.ReadyForShipmentBy)" Timestamp="_order.ReadyForShipmentAtUtc" />
+                <DocumentOperationInfo Title="Отгрузил" UserName="@GetUserName(_order.ShippedBy)" Timestamp="_order.ShippedAtUtc" />
                 @if (_order.RolledBackAtUtc is not null)
                 {
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption">Последний откат</MudText>
-                        <MudTooltip Text="@GetRollbackDescription()">
-                            <MudText Typo="Typo.caption" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                @GetRollbackSummary()
-                            </MudText>
-                        </MudTooltip>
-                    </MudItem>
+                    <DocumentOperationInfo Title="Последний откат" UserName="@GetUserName(_order.RolledBackBy)" Timestamp="_order.RolledBackAtUtc" Detail="@_order.RollbackReason" />
                 }
             </MudGrid>
         </MudPaper>
@@ -134,6 +149,7 @@ else
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
                 <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
             </Columns>
         </MudDataGrid>

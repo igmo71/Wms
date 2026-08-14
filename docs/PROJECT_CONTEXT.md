@@ -36,6 +36,14 @@ The operator UI exposes a paged inventory-balance list. It shows the current SKU
 
 The operator UI also exposes a paged inventory-turnover history. It shows each posted change in a location balance with the quantity delta, balances before and after, and a link to its source document when known. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving or shipping order; the default period is the current day.
 
+Operational screens that show an SKU quantity also show its dynamically
+calculated weight in kilograms using the current `StockKeepingUnit.WeightKg`.
+Receiving and shipping orders show only factual line weights and a factual total;
+if a nonzero line has no unit weight, its weight is shown as unavailable and the
+known document total is marked as incomplete. Weight is not snapshotted in
+documents or inventory history, so catalog weight changes affect historical
+display.
+
 The operator UI exposes a separate paged list of posted inventory movements. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving order, shipping order, inventory count, or transfer, with the current day as default. It shows source and destination storage locations and links a movement to its source document with its number and date when known. Draft movements are deliberately excluded.
 
 Inventory counts are local WMS documents. They use a local `yyMMdd-HHmmss` number and the creation date. A draft may contain incomplete rows while an operator records the count. Each document and row timestamp is accompanied by the user who performed that operation. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation, and records the posting user as the movement confirmer. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
@@ -70,6 +78,33 @@ on a separate read-only details page with their movement history.
 The work page always shows the completion action for an unfinished document;
 it is enabled only after a movement has started the transfer and, when a
 transit location is used, only after it is empty.
+
+## Document list UI convention
+
+Document lists start with number, date, warehouse, and status. Order lists then
+show queue and warehouse operation, followed by process-specific fields.
+Receiving orders show putaway status; shipping orders show delivery direction;
+transfers show their transit location. Separate action columns are omitted
+because document numbers are links. Lists omit creation, update, and process
+start timestamps and end with the current user name and timestamp for each
+relevant completed process. Receiving orders show receiving and putaway
+completion, shipping orders show picking completion (ready for shipment) and
+shipping, while counts and transfers show their single completion event.
+
+Document detail and work pages use row-based information headers. Order headers
+have separate rows for core properties, operational location/comment/actual
+weight, and action audit. Receiving audit covers starting and completing both
+receiving and putaway; shipping audit covers starting and completing picking,
+shipping, and the latest rollback when present. Inventory-count and transfer
+headers put their number and creation timestamp in the page title, then show
+core properties and action audit in separate rows. Counts have no document-level
+weight. A transfer header shows the dynamic weight of movements whose
+destination is an ordinary storage location; movements onto a transit location
+are excluded so trolley workflows do not count the same goods twice.
+Order headers favor vertical compactness: completed locations render as plain
+text, comments stay on one ellipsized line with their full value in a tooltip,
+and each audit item keeps its user and timestamp on one line.
+Page-level headings in the operator UI use MudBlazor `Typo.h5`.
 
 ## MVP implementation principles
 

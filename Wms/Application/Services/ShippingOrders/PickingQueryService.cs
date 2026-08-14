@@ -17,6 +17,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         return await dbContext.InventoryMovements
             .AsNoTracking()
             .Include(x => x.SourceStorageLocation)
+            .Include(x => x.StockKeepingUnit)
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder
                 && x.RecorderId == orderId
@@ -34,6 +35,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         var order = await dbContext.ShippingOrders
             .AsNoTracking()
             .Include(x => x.Items)
+                .ThenInclude(x => x.StockKeepingUnit)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (order is null)
@@ -72,6 +74,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .Select(x => new PickingSourceLocationAvailability
             {
                 StorageLocation = x.StorageLocation!,
+                StockKeepingUnit = orderItem.StockKeepingUnit!,
                 PhysicalQuantity = x.Quantity,
                 DraftQuantity = draftQuantities.GetValueOrDefault(x.StorageLocationId)
             })

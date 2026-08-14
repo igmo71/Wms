@@ -12,6 +12,7 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 public partial class Index : IAsyncDisposable
 {
     [Inject] private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject] private IOptions<WmsSettings> Options { get; set; } = null!;
@@ -27,6 +28,7 @@ public partial class Index : IAsyncDisposable
     private Warehouse? _warehouse;
     private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private static string GetOrderHref(ReceivingOrder order) => order.Status is ReceivingOrderStatus.InReceiving
         or ReceivingOrderStatus.ProcessingRequired
@@ -53,12 +55,25 @@ public partial class Index : IAsyncDisposable
             Take = state.PageSize
         }, cancellationToken);
 
+        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(
+            result.Items.SelectMany(x => new[] { x.CompletedBy, x.PutawayCompletedBy }),
+            cancellationToken);
+
         return new GridData<ReceivingOrder>
         {
             Items = result.Items,
             TotalItems = result.TotalItems
         };
     }
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
+
+    private static string FormatCompletionTime(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
     private Task OnSearchChangedAsync(string searchString)
     {

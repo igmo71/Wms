@@ -5,7 +5,7 @@
 
 <PageTitle>Расходные ордера</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Расходные ордера</MudText>
+<MudText Typo="Typo.h5" GutterBottom="true">Расходные ордера</MudText>
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row>
@@ -92,16 +92,13 @@
              Dense="true"
              RowsPerPage="25">
     <Columns>
-        <PropertyColumn Property="x => x.Number" Title=" Номер" Sortable="true">
+        <PropertyColumn Property="x => x.Number" Title="Номер" Sortable="true">
             <CellTemplate>
                 <MudLink Href="@GetOrderHref(context.Item)">@context.Item.Number</MudLink>
             </CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
-        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
-            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
-        </PropertyColumn>
         <PropertyColumn Property="x => x.Status" Title="Статус" Sortable="true">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
@@ -113,10 +110,10 @@
                 </MudStack>
             </CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.PlannedShippingDate" Title="План отгрузки" Format="dd.MM.yyyy" Sortable="true" />
-        <PropertyColumn Property="x => x.PickingStartedAtUtc" Title="В отборе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.ReadyForShipmentAtUtc" Title="Готов к отгрузке" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.ShippedAtUtc" Title="Отгружен" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
+            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.DeliveryDirection == null ? string.Empty : x.DeliveryDirection.Description" Title="Направление доставки" Sortable="true" />
         <TemplateColumn Title="1C" Sortable="false">
             <CellTemplate>
                 <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "Синхронизирован с 1С")">
@@ -125,13 +122,16 @@
                 </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+        <TemplateColumn Title="Собрано" SortBy="x => x.ReadyForShipmentAtUtc">
             <CellTemplate>
-                <MudTooltip Text="Открыть ордер">
-                    <MudIconButton Href="@GetOrderHref(context.Item)"
-                                   Icon="@Icons.Material.Filled.OpenInNew"
-                                   Color="Color.Primary" />
-                </MudTooltip>
+                <MudText Typo="Typo.body2">@GetUserName(context.Item.ReadyForShipmentBy)</MudText>
+                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.ReadyForShipmentAtUtc)</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Отгружено" SortBy="x => x.ShippedAtUtc">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@GetUserName(context.Item.ShippedBy)</MudText>
+                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.ShippedAtUtc)</MudText>
             </CellTemplate>
         </TemplateColumn>
     </Columns>

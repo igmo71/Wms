@@ -8,7 +8,7 @@
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center">
-        <MudText Typo="Typo.h4">@Title</MudText>
+        <MudText Typo="Typo.h5">@Title</MudText>
         <MudSpacer />
         @if (ShowComplete)
         {
@@ -52,16 +52,8 @@
     }
     else
     {
-        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
-            <MudGrid Spacing="1">
-                <MudItem xs="12" sm="3" md="2">
-                    <MudText Typo="Typo.caption">Номер</MudText>
-                    <MudText>@(_transfer?.Number ?? "Будет присвоен")</MudText>
-                </MudItem>
-                <MudItem xs="12" sm="3" md="2">
-                    <MudText Typo="Typo.caption">Создано</MudText>
-                    <MudText>@FormatDateTimeOffset(_transfer?.CreatedAtUtc)</MudText>
-                </MudItem>
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="3">
                     <MudAutocomplete T="Warehouse"
                                      Value="_warehouse"
@@ -88,9 +80,11 @@
                         <MudText Typo="Typo.caption" Color="Color.Warning">Свободных пустых тележек нет.</MudText>
                     }
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption">Статус</MudText>
                     @if (!IsStarted)
                     {
+                        <MudText>Новый</MudText>
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
                                    Disabled="@(_warehouse is null || _isSaving)"
@@ -102,10 +96,19 @@
                     }
                     else
                     {
-                        <MudText Typo="Typo.caption">Статус</MudText>
                         <MudChip T="string" Size="Size.Small" Color="@_transfer!.Status.GetChipColor()">@_transfer.Status.GetDisplayName()</MudChip>
                     }
                 </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption">Вес размещённого</MudText>
+                    <MudText>@WeightDisplay.FormatTotal(KnownPlacedWeightKg, IsPlacedWeightComplete)</MudText>
+                </MudItem>
+            </MudGrid>
+            <MudDivider Class="my-3" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Создал" UserName="@GetUserName(_transfer?.CreatedBy)" Timestamp="_transfer?.CreatedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Начал" UserName="@GetUserName(_transfer?.StartedBy)" Timestamp="_transfer?.StartedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Завершил" UserName="@GetUserName(_transfer?.CompletedBy)" Timestamp="_transfer?.CompletedAtUtc" Md="4" />
             </MudGrid>
         </MudPaper>
 
@@ -133,12 +136,13 @@
                                         {
                                             <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
                                                 @balance.StockKeepingUnit.Name
-                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity) · вес: @WeightDisplay.Format(balance.WeightKg)</MudText>
                                             </MudSelectItem>
                                         }
                                     </MudSelect>
                                     <MudNumericField T="double" @bind-Value="_pickQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanUseTransit || _isSaving)" Margin="Margin.Dense" />
+                                    <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetPickWeightKg())</MudText>
                                     <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AddShoppingCart"
                                                Disabled="@(!CanPick || _isSaving)" OnClick="PickAsync">
                                         Отобрать
@@ -157,7 +161,7 @@
                                         {
                                             <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
                                                 @balance.StockKeepingUnit.Name
-                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity) · вес: @WeightDisplay.Format(balance.WeightKg)</MudText>
                                             </MudSelectItem>
                                         }
                                     </MudSelect>
@@ -171,6 +175,7 @@
                                                      Disabled="@(!CanPutAnything || _isSaving)" />
                                     <MudNumericField T="double" @bind-Value="_putQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanPutAnything || _isSaving)" Margin="Margin.Dense" />
+                                    <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetPutWeightKg())</MudText>
                                     <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Unarchive"
                                                Disabled="@(!CanPut || _isSaving)" OnClick="PutAsync">
                                         Разместить
@@ -186,10 +191,12 @@
                                     <HeaderContent>
                                         <MudTh>Номенклатура</MudTh>
                                         <MudTh>Количество</MudTh>
+                                        <MudTh>Вес</MudTh>
                                     </HeaderContent>
                                     <RowTemplate>
                                         <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit.Name</MudTd>
                                         <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
+                                        <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                                     </RowTemplate>
                                     <NoRecordsContent><MudText Class="pa-3">Тележка пуста.</MudText></NoRecordsContent>
                                 </MudTable>
@@ -217,12 +224,13 @@
                                         {
                                             <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
                                                 @balance.StockKeepingUnit.Name
-                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                                <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity) · вес: @WeightDisplay.Format(balance.WeightKg)</MudText>
                                             </MudSelectItem>
                                         }
                                     </MudSelect>
                                     <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
+                                    <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetDirectWeightKg())</MudText>
                                     <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
                                                Disabled="@(!CanMoveDirect || _isSaving)" OnClick="MoveDirectAsync">
                                         Переместить
@@ -255,12 +263,13 @@
                                 {
                                     <MudSelectItem T="Guid?" Value="@((Guid?)balance.StockKeepingUnit.Id)">
                                         @balance.StockKeepingUnit.Name
-                                        <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity)</MudText>
+                                        <MudText Typo="Typo.caption"> Остаток: @FormatQuantity(balance.Quantity) · вес: @WeightDisplay.Format(balance.WeightKg)</MudText>
                                     </MudSelectItem>
                                 }
                             </MudSelect>
                             <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                              Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
+                            <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetDirectWeightKg())</MudText>
                             <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
                                        Disabled="@(!CanMoveDirect || _isSaving)" OnClick="MoveDirectAsync">
                                 Переместить
@@ -281,6 +290,7 @@
                     <MudTh>В ячейку</MudTh>
                     <MudTh>Номенклатура</MudTh>
                     <MudTh>Количество</MudTh>
+                    <MudTh>Вес</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
@@ -289,6 +299,7 @@
                     <MudTd DataLabel="В ячейку">@context.DestinationStorageLocation?.Name</MudTd>
                     <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
+                    <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                 </RowTemplate>
                 <NoRecordsContent><MudText Class="pa-3">Движений пока нет.</MudText></NoRecordsContent>
             </MudTable>

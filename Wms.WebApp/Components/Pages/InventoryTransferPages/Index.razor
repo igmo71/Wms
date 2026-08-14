@@ -6,7 +6,7 @@
 <PageTitle>Перемещения</PageTitle>
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Перемещения</MudText>
+    <MudText Typo="Typo.h5">Перемещения</MudText>
     <MudSpacer />
     <MudButton Href="inventory-transfers/new"
                Color="Color.Primary"
@@ -82,17 +82,8 @@
         <PropertyColumn Property="x => x.TransitStorageLocation!.Name" Title="Тележка" Sortable="true">
             <CellTemplate>@(context.Item.TransitStorageLocation?.Name ?? "—")</CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <TemplateColumn Title="Завершил" Sortable="false"><CellTemplate>@GetUserName(context.Item.CompletedBy)</CellTemplate></TemplateColumn>
         <PropertyColumn Property="x => x.CompletedAtUtc" Title="Завершено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudTooltip Text="Открыть перемещение">
-                    <MudIconButton Href="@GetTransferHref(context.Item)"
-                                   Icon="@Icons.Material.Filled.OpenInNew"
-                                   Color="Color.Primary" />
-                </MudTooltip>
-            </CellTemplate>
-        </TemplateColumn>
     </Columns>
     <PagerContent>
         <MudDataGridPager T="InventoryTransfer" PageSizeOptions="new[] { 10, 25, 50 }" />

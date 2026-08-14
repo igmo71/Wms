@@ -15,6 +15,7 @@ public class InventoryMovementListItem
     public StorageLocation? DestinationStorageLocation => Movement.DestinationStorageLocation;
     public StockKeepingUnit? StockKeepingUnit => Movement.StockKeepingUnit;
     public double Quantity => Movement.Quantity;
+    public double? WeightKg => Movement.WeightKg;
     public RecorderType RecorderType => Movement.RecorderType;
     public Guid? RecorderId => Movement.RecorderId;
 }

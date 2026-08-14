@@ -37,6 +37,7 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
             "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
             "Date" => listQuery.SortDescending ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date),
             "PostedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.PostedAtUtc) : query.OrderBy(x => x.PostedAtUtc),
+            "Warehouse" or "Warehouse.Name" => listQuery.SortDescending ? query.OrderByDescending(x => x.Warehouse!.Name) : query.OrderBy(x => x.Warehouse!.Name),
             "Status" => listQuery.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
             _ => query.OrderByDescending(x => x.CreatedAtUtc)
         };

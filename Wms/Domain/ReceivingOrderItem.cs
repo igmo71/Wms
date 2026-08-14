@@ -16,6 +16,7 @@ public class ReceivingOrderItem
     public string? Comment { get; set; }
 
     public double RemainingQuantity => PlanQuantity - FactQuantity;
+    public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
     public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

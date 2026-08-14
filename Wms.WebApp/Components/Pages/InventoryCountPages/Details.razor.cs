@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.Inventory;
 using Wms.Common;
-using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -17,11 +15,11 @@ public partial class Details
     public Guid Id { get; set; }
 
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
-    [Inject] private UserManager<ApplicationUser> UserManager { get; set; } = null!;
 
     private InventoryCount? _inventoryCount;
     private bool _isLoading = true;
@@ -29,7 +27,7 @@ public partial class Details
     private bool _isPosting;
     private bool _operationFailed;
     private string? _errorMessage;
-    private readonly Dictionary<string, string> _userNames = [];
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool IsDraft => _inventoryCount?.Status == InventoryCountStatus.Draft;
 
@@ -209,10 +207,11 @@ public partial class Details
 
     private async Task LoadUserNamesAsync()
     {
-        _userNames.Clear();
-
         if (_inventoryCount is null)
+        {
+            _userNames = new Dictionary<string, string>();
             return;
+        }
 
         var userIds = new[]
         {
@@ -224,15 +223,14 @@ public partial class Details
         .Where(x => !string.IsNullOrWhiteSpace(x))
         .Distinct();
 
-        foreach (var userId in userIds)
-        {
-            var user = await UserManager.FindByIdAsync(userId!);
-            _userNames[userId!] = user?.UserName ?? "Пользователь не найден";
-        }
+        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(userIds);
     }
 
-    private string GetUserName(string userId) =>
-        _userNames.GetValueOrDefault(userId, "Пользователь не найден");
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
 
     private string GetItemAuditTooltip(InventoryCountItem item) =>
         $"Создана: {FormatOperation(item.CreatedAtUtc, item.CreatedBy)}\nИзменена: {FormatOperation(item.UpdatedAtUtc, item.UpdatedBy)}";

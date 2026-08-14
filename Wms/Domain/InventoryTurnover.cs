@@ -16,6 +16,9 @@ public class InventoryTurnover
     public double QuantityDelta { get; set; }
     public double BalanceBefore { get; set; }
     public double BalanceAfter { get; set; }
+    public double? WeightDeltaKg => WeightCalculation.CalculateKg(QuantityDelta, StockKeepingUnit);
+    public double? WeightBeforeKg => WeightCalculation.CalculateKg(BalanceBefore, StockKeepingUnit);
+    public double? WeightAfterKg => WeightCalculation.CalculateKg(BalanceAfter, StockKeepingUnit);
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 

@@ -20,6 +20,7 @@ public class ShippingOrderItem
     public ShippingOrderAction Action { get; set; }
 
     public double RemainingQuantity => PlanQuantity - FactQuantity;
+    public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
     public bool IsFullyShipped => FactQuantity == PlanQuantity;
     public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

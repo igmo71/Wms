@@ -19,6 +19,7 @@ public class InventoryMovement
     public StockKeepingUnit? StockKeepingUnit { get; set; }
 
     public double Quantity { get; set; }
+    public double? WeightKg => WeightCalculation.CalculateKg(Quantity, StockKeepingUnit);
 
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? UpdatedAtUtc { get; set; }

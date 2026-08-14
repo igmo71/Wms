@@ -18,6 +18,9 @@ public partial class InProcess
     private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
 
     [Inject]
+    private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
+
+    [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject]
     private StorageLocationService StorageLocationService { get; set; } = null!;
@@ -36,15 +39,29 @@ public partial class InProcess
     private bool _isCompleting;
     private bool _completeFailed;
     private string? _errorMessage;
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
         _order = await OrderQueryService.GetOrderAsync(Id);
+        _userNames = _order is null
+            ? new Dictionary<string, string>()
+            : await ApplicationUserQueryService.GetUserNamesAsync([
+                _order.StartedBy,
+                _order.CompletedBy,
+                _order.PutawayStartedBy,
+                _order.PutawayCompletedBy]);
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;
         _isLoading = false;
     }
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
 
     private async Task<IEnumerable<Zone>> SearchReceivingZonesAsync(string? searchText, CancellationToken ct)
     {
@@ -176,9 +193,6 @@ public partial class InProcess
             _isCompleting = false;
         }
     }
-
-    private static string FormatDateTimeOffset(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
     private async Task<string?> GetCurrentUserIdAsync()
     {

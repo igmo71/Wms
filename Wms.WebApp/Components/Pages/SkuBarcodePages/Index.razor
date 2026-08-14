@@ -4,7 +4,7 @@
 
 <PageTitle>Штрихкоды</PageTitle>
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Штрихкоды номенклатуры</MudText>
+    <MudText Typo="Typo.h5">Штрихкоды номенклатуры</MudText>
     <MudSpacer />
     <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">
         @(_isImporting ? "Обновление..." : "Обновить из 1С")

@@ -15,9 +15,9 @@ else if (_order is null)
 }
 else
 {
-    <MudStack Spacing="3">
+    <MudStack Spacing="2">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+            <MudText Typo="Typo.h5">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isCompleting || !IsPickingEditable)" StartIcon="@Icons.Material.Filled.Check" OnClick="SetReadyForShipmentAsync">
                 Готов к отгрузке
@@ -61,7 +61,7 @@ else
             <MudAlert Severity="Severity.Warning">Отбор доступен только для ордера в статусе отбора или проверки.</MudAlert>
         }
 
-        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
@@ -75,19 +75,22 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона отгрузки</MudText><MudText>@_order.ShippingLocation?.Zone?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место отгрузки</MudText><MudText>@_order.ShippingLocation?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="8"><MudText Typo="Typo.caption">Комментарий</MudText><MudText>@_order.Comment</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="6"><MudText Typo="Typo.caption">Комментарий</MudText><MudTooltip Text="@(_order.Comment ?? "—")"><MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText></MudTooltip></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(_order.KnownFactWeightKg, _order.IsFactWeightComplete)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-1" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Начал сборку" UserName="@GetUserName(_order.PickingStartedBy)" Timestamp="_order.PickingStartedAtUtc" />
+                <DocumentOperationInfo Title="Собрал" UserName="@GetUserName(_order.ReadyForShipmentBy)" Timestamp="_order.ReadyForShipmentAtUtc" />
+                <DocumentOperationInfo Title="Отгрузил" UserName="@GetUserName(_order.ShippedBy)" Timestamp="_order.ShippedAtUtc" />
                 @if (_order.RolledBackAtUtc is not null)
                 {
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.caption">Последний откат</MudText>
-                        <MudTooltip Text="@GetRollbackDescription()">
-                            <MudText Typo="Typo.caption" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                @GetRollbackSummary()
-                            </MudText>
-                        </MudTooltip>
-                    </MudItem>
+                    <DocumentOperationInfo Title="Последний откат" UserName="@GetUserName(_order.RolledBackBy)" Timestamp="_order.RolledBackAtUtc" Detail="@_order.RollbackReason" />
                 }
             </MudGrid>
         </MudPaper>
@@ -115,6 +118,7 @@ else
                     <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                     <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                     <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                    <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
                     <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
 
                 </Columns>
@@ -126,6 +130,7 @@ else
                                 <Columns>
                                     <PropertyColumn Property="x => x.SourceStorageLocation == null ? string.Empty : x.SourceStorageLocation.Name" Title="Ячейка-источник" />
                                     <PropertyColumn Property="x => x.Quantity" Title="Количество" />
+                                    <TemplateColumn Title="Вес"><CellTemplate Context="weightContext">@WeightDisplay.Format(weightContext.Item.WeightKg)</CellTemplate></TemplateColumn>
                                     <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" />
                                     <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" />
                                     <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
@@ -151,12 +156,13 @@ else
                                     </MudSelect>
                                     @if (_selectedSourceLocation is not null)
                                     {
-                                        <MudText Typo="Typo.caption">Фактический остаток: @FormatQuantity(SelectedSourcePhysicalQuantity) · Доступно к отбору: @FormatQuantity(SelectedSourceAvailableQuantity)</MudText>
+                                        <MudText Typo="Typo.caption">Фактический остаток: @FormatQuantity(SelectedSourcePhysicalQuantity) / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourcePhysicalQuantity, _selectedLine.StockKeepingUnit)) · Доступно к отбору: @FormatQuantity(SelectedSourceAvailableQuantity) / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourceAvailableQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                     }
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudNumericField T="double" Label="Фактическое количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumPickingQuantity" HideSpinButtons="true" />
                                     <MudText Typo="Typo.caption">Можно отобрать: @FormatQuantity(MaximumPickingQuantity)</MudText>
+                                    <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(WeightCalculation.CalculateKg(_movementQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!CanSaveMovement)" OnClick="SaveMovementAsync">@(_editingMovement is null ? "Добавить" : "Сохранить")</MudButton>

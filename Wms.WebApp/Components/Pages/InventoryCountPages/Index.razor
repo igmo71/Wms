@@ -6,7 +6,7 @@
 <PageTitle>Инвентаризации</PageTitle>
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Инвентаризации</MudText>
+    <MudText Typo="Typo.h5">Инвентаризации</MudText>
     <MudSpacer />
     <MudAutocomplete T="Warehouse"
                      Value="_warehouse"
@@ -49,21 +49,11 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
-        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус">
+        <PropertyColumn Property="x => x.Status" Title="Статус">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <TemplateColumn Title="Провёл" Sortable="false"><CellTemplate>@GetUserName(context.Item.PostedBy)</CellTemplate></TemplateColumn>
         <PropertyColumn Property="x => x.PostedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudTooltip Text="Детали">
-                    <MudIconButton Href="@($"inventory-counts/{context.Item.Id}")"
-                                   Icon="@Icons.Material.Filled.OpenInNew"
-                                   Color="Color.Primary" />
-                </MudTooltip>
-            </CellTemplate>
-        </TemplateColumn>
     </Columns>
     <PagerContent>
         <MudDataGridPager T="InventoryCount" PageSizeOptions="new[] { 10, 25, 50 }" />

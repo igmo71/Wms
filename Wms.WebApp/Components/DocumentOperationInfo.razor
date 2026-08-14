@@ -1,0 +1,24 @@
+<MudItem xs="12" sm="6" md="@Md">
+    <MudText Typo="Typo.caption">@Title</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+        <MudText Typo="Typo.body2">@UserName</MudText>
+        <MudText Typo="Typo.caption">· @FormatTimestamp(Timestamp)</MudText>
+    </MudStack>
+    @if (!string.IsNullOrWhiteSpace(Detail))
+    {
+        <MudTooltip Text="@Detail">
+            <MudText Typo="Typo.caption" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@Detail</MudText>
+        </MudTooltip>
+    }
+</MudItem>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string UserName { get; set; } = "—";
+    [Parameter] public DateTimeOffset? Timestamp { get; set; }
+    [Parameter] public string? Detail { get; set; }
+    [Parameter] public int Md { get; set; } = 3;
+
+    private static string FormatTimestamp(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
+}

@@ -17,25 +17,30 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h4">Перемещение №@_transfer.Number</MudText>
+            <MudText Typo="Typo.h5">Перемещение №@_transfer.Number от @_transfer.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Href="inventory-transfers" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
         </MudStack>
 
-        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_transfer.Status.GetChipColor()">@_transfer.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_transfer.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Тележка</MudText><MudText>@(_transfer.TransitStorageLocation?.Name ?? "—")</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Создано</MudText><MudText>@FormatDateTimeOffset(_transfer.CreatedAtUtc)</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Завершено</MudText><MudText>@FormatDateTimeOffset(_transfer.CompletedAtUtc)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_transfer.Status.GetChipColor()">@_transfer.Status.GetDisplayName()</MudChip></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Вес размещённого</MudText><MudText>@WeightDisplay.FormatTotal(KnownPlacedWeightKg, IsPlacedWeightComplete)</MudText></MudItem>
+            </MudGrid>
+            <MudDivider Class="my-3" />
+            <MudGrid Spacing="2">
+                <DocumentOperationInfo Title="Создал" UserName="@GetUserName(_transfer.CreatedBy)" Timestamp="_transfer.CreatedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Начал" UserName="@GetUserName(_transfer.StartedBy)" Timestamp="_transfer.StartedAtUtc" Md="4" />
+                <DocumentOperationInfo Title="Завершил" UserName="@GetUserName(_transfer.CompletedBy)" Timestamp="_transfer.CompletedAtUtc" Md="4" />
             </MudGrid>
         </MudPaper>
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudText Typo="Typo.h6" GutterBottom="true">История движений</MudText>
             <MudTable Items="_movements" Dense="true" Hover="true" Striped="true">
-                <HeaderContent><MudTh>№</MudTh><MudTh>Время</MudTh><MudTh>Из ячейки</MudTh><MudTh>В ячейку</MudTh><MudTh>Номенклатура</MudTh><MudTh>Количество</MudTh></HeaderContent>
+                <HeaderContent><MudTh>№</MudTh><MudTh>Время</MudTh><MudTh>Из ячейки</MudTh><MudTh>В ячейку</MudTh><MudTh>Номенклатура</MudTh><MudTh>Количество</MudTh><MudTh>Вес</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
                     <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
@@ -43,6 +48,7 @@ else
                     <MudTd DataLabel="В ячейку">@context.DestinationStorageLocation?.Name</MudTd>
                     <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
+                    <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                 </RowTemplate>
                 <NoRecordsContent><MudText Class="pa-3">Движений нет.</MudText></NoRecordsContent>
             </MudTable>

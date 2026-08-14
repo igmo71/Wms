@@ -12,6 +12,7 @@ namespace Wms.WebApp.Components.Pages.InventoryCountPages;
 public partial class Index
 {
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
@@ -22,6 +23,7 @@ public partial class Index
     private bool _isCreating;
     private bool _createFailed;
     private string? _errorMessage;
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private async Task<GridData<InventoryCount>> LoadServerDataAsync(
         GridState<InventoryCount> state,
@@ -36,12 +38,21 @@ public partial class Index
             Take = state.PageSize
         }, cancellationToken);
 
+        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(
+            result.Items.Select(x => x.PostedBy), cancellationToken);
+
         return new GridData<InventoryCount>
         {
             Items = result.Items,
             TotalItems = result.TotalItems
         };
     }
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
 
     private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
     {

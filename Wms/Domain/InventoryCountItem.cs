@@ -23,4 +23,5 @@ public class InventoryCountItem
     public string? UpdatedBy { get; set; }
 
     public double DifferenceQuantity => CountedQuantity - ExpectedQuantity;
+    public double? CountedWeightKg => WeightCalculation.CalculateKg(CountedQuantity, StockKeepingUnit);
 }

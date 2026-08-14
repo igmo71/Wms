@@ -14,6 +14,7 @@ public partial class Work
     [Parameter] public Guid? Id { get; set; }
 
     [Inject] private InventoryTransferQueryService InventoryTransferQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryTransferCommandService InventoryTransferCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
@@ -44,8 +45,11 @@ public partial class Work
     private bool _operationFailed;
     private bool _noAvailableTransitStorageLocations;
     private string? _errorMessage;
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
-    private string Title => _transfer is null ? "Новое перемещение" : $"Перемещение №{_transfer.Number}";
+    private string Title => _transfer is null
+        ? "Новое перемещение"
+        : $"Перемещение №{_transfer.Number} от {_transfer.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}";
     private bool IsStarted => _transfer is not null;
     private bool HasTransit => _transitStorageLocation is not null;
     private bool CanEdit => _transfer is not null && _transfer.Status != InventoryTransferStatus.Completed;
@@ -80,6 +84,12 @@ public partial class Work
             _transitStorageLocation = _transfer?.TransitStorageLocation;
             _movements = _transfer is null ? [] : await InventoryTransferQueryService.GetMovementsAsync(id);
             _transitBalances = _transfer is null ? [] : await InventoryTransferQueryService.GetTransitBalancesAsync(id);
+            _userNames = _transfer is null
+                ? new Dictionary<string, string>()
+                : await ApplicationUserQueryService.GetUserNamesAsync([
+                    _transfer.CreatedBy,
+                    _transfer.StartedBy,
+                    _transfer.CompletedBy]);
 
             if (_transfer?.Status == InventoryTransferStatus.Completed)
             {
@@ -99,6 +109,7 @@ public partial class Work
             _transitBalances = [];
             _pickSourceBalances = [];
             _directSourceBalances = [];
+            _userNames = new Dictionary<string, string>();
         }
 
         _isLoading = false;
@@ -308,4 +319,33 @@ public partial class Work
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
     private static string FormatQuantity(double value) => value.ToString("0.###");
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
+
+    private double KnownPlacedWeightKg => _movements
+        .Where(IsPlacedInStorage)
+        .Sum(x => x.WeightKg ?? 0);
+
+    private bool IsPlacedWeightComplete => _movements
+        .Where(IsPlacedInStorage)
+        .All(x => x.Quantity == 0 || x.WeightKg.HasValue);
+
+    private static bool IsPlacedInStorage(InventoryMovement movement) =>
+        movement.DestinationStorageLocation?.Zone?.Type == ZoneType.Storage;
+
+    private double? GetPickWeightKg() => WeightCalculation.CalculateKg(
+        _pickQuantity,
+        _pickSourceBalances.FirstOrDefault(x => x.StockKeepingUnit.Id == _pickSkuId)?.StockKeepingUnit);
+
+    private double? GetPutWeightKg() => WeightCalculation.CalculateKg(
+        _putQuantity,
+        _transitBalances.FirstOrDefault(x => x.StockKeepingUnit.Id == _putSkuId)?.StockKeepingUnit);
+
+    private double? GetDirectWeightKg() => WeightCalculation.CalculateKg(
+        _directQuantity,
+        _directSourceBalances.FirstOrDefault(x => x.StockKeepingUnit.Id == _directSkuId)?.StockKeepingUnit);
 }

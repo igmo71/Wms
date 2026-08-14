@@ -17,6 +17,7 @@ public class PutawayQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .AsNoTracking()
             .Include(x => x.DestinationStorageLocation)
                 .ThenInclude(x => x!.Zone)
+            .Include(x => x.StockKeepingUnit)
             .Where(x => x.RecorderType == RecorderType.ReceivingOrder
                 && x.RecorderId == orderId
                 && x.SourceStorageLocationId != null

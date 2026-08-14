@@ -43,7 +43,8 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
 
         IQueryable<ShippingOrder> query = dbContext.ShippingOrders
             .AsNoTracking()
-            .Include(x => x.Warehouse);
+            .Include(x => x.Warehouse)
+            .Include(x => x.DeliveryDirection);
 
         query = ApplySearch(query, listQuery);
 
@@ -102,6 +103,7 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             "Number" => listQuery.SortDescending ? query.OrderByDescending(x => x.Number) : query.OrderBy(x => x.Number),
             "Date" => listQuery.SortDescending ? query.OrderByDescending(x => x.Date) : query.OrderBy(x => x.Date),
             "Warehouse" or "Warehouse.Name" => listQuery.SortDescending ? query.OrderByDescending(x => x.Warehouse!.Name) : query.OrderBy(x => x.Warehouse!.Name),
+            "DeliveryDirection" or "DeliveryDirection.Description" => listQuery.SortDescending ? query.OrderByDescending(x => x.DeliveryDirection!.Description) : query.OrderBy(x => x.DeliveryDirection!.Description),
             "Status" => listQuery.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
             "Queue" => listQuery.SortDescending ? query.OrderByDescending(x => x.Queue) : query.OrderBy(x => x.Queue),
             "PickingStartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.PickingStartedAtUtc) : query.OrderBy(x => x.PickingStartedAtUtc),

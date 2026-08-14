@@ -5,7 +5,7 @@
 
 <PageTitle>Приходные ордера</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Приходные ордера</MudText>
+<MudText Typo="Typo.h5" GutterBottom="true">Приходные ордера</MudText>
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row>
@@ -112,16 +112,10 @@
         </TemplateColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
-        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
-            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="x => x.Status.GetDisplayName()" Title="Статус">
+        <PropertyColumn Property="x => x.Status" Title="Статус">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.PutawayStatus.GetDisplayName()" Title="Размещение">
-            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="x => x.Queue.GetDisplayName()" Title="Очередь">
+        <PropertyColumn Property="x => x.Queue" Title="Очередь">
             <CellTemplate>
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                     <MudIcon Icon="@context.Item.Queue.GetIcon()" Size="Size.Small" />
@@ -129,8 +123,12 @@
                 </MudStack>
             </CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.StartedAtUtc" Title="В работе с" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.CompletedAtUtc" Title="Принят" Format="dd.MM.yyyy HH:mm" Sortable="true" />
+        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
+            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.PutawayStatus" Title="Размещение">
+            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
+        </PropertyColumn>
         <TemplateColumn Title="1C" Sortable="false">
             <CellTemplate>
                 <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "Синхронизирован с 1С")">
@@ -139,13 +137,16 @@
                 </MudTooltip>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
+        <TemplateColumn Title="Принято" SortBy="x => x.CompletedAtUtc">
             <CellTemplate>
-                <MudTooltip Text="Открыть ордер">
-                    <MudIconButton Href="@GetOrderHref(context.Item)"
-                                   Icon="@Icons.Material.Filled.OpenInNew"
-                                   Color="Color.Primary" />
-                </MudTooltip>
+                <MudText Typo="Typo.body2">@GetUserName(context.Item.CompletedBy)</MudText>
+                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.CompletedAtUtc)</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Размещено" SortBy="x => x.PutawayCompletedAtUtc">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@GetUserName(context.Item.PutawayCompletedBy)</MudText>
+                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.PutawayCompletedAtUtc)</MudText>
             </CellTemplate>
         </TemplateColumn>
     </Columns>

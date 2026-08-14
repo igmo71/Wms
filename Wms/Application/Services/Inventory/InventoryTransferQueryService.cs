@@ -68,6 +68,9 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             "CreatedAtUtc" => listQuery.SortDescending
                 ? query.OrderByDescending(x => x.CreatedAtUtc)
                 : query.OrderBy(x => x.CreatedAtUtc),
+            "CompletedAtUtc" => listQuery.SortDescending
+                ? query.OrderByDescending(x => x.CompletedAtUtc)
+                : query.OrderBy(x => x.CompletedAtUtc),
             _ => query.OrderByDescending(x => x.CreatedAtUtc)
         };
 
@@ -93,6 +96,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .AsNoTracking()
             .Include(x => x.SourceStorageLocation)
             .Include(x => x.DestinationStorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
             .Where(x => x.RecorderType == RecorderType.InventoryTransfer
                 && x.RecorderId == transferId)

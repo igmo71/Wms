@@ -51,6 +51,8 @@ public class ShippingOrder
 
     public bool IsFullyShipped => Items.All(x => x.IsFullyShipped);
     public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
+    public double KnownFactWeightKg => Items.Sum(x => x.FactWeightKg ?? 0);
+    public bool IsFactWeightComplete => Items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
 
     internal bool HasExternalChanges(ShippingOrder externalOrder)
     {

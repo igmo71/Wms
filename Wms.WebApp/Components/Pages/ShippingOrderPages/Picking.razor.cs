@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
 using MudBlazor;
 using System.Security.Claims;
+using Wms.Application.Services;
 using Wms.Application.Services.ShippingOrders;
-using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -15,13 +14,13 @@ public partial class Picking
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private ShippingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject] private PickingQueryService PickingQueryService { get; set; } = null!;
     [Inject] private PickingCommandService PickingCommandService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
-    [Inject] private UserManager<ApplicationUser> UserManager { get; set; } = null!;
 
     private ShippingOrder? _order;
     private MudDataGrid<ShippingOrderItem> _orderItemsGrid = null!;
@@ -37,7 +36,7 @@ public partial class Picking
     private bool _isRollingBack;
     private bool _operationFailed;
     private string? _errorMessage;
-    private string? _rolledBackByUsername;
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool IsPickingEditable => _order?.Status is ShippingOrderStatus.ReadyForPicking
         or ShippingOrderStatus.ReadyForVerification
@@ -74,7 +73,13 @@ public partial class Picking
     {
         _isLoading = true;
         _order = await OrderQueryService.GetOrderAsync(Id);
-        _rolledBackByUsername = await GetRollbackUsernameAsync(_order?.RolledBackBy);
+        _userNames = _order is null
+            ? new Dictionary<string, string>()
+            : await ApplicationUserQueryService.GetUserNamesAsync([
+                _order.PickingStartedBy,
+                _order.ReadyForShipmentBy,
+                _order.ShippedBy,
+                _order.RolledBackBy]);
         _selectedLine = null;
         _expandedLineNumber = null;
         _movements = [];
@@ -86,27 +91,11 @@ public partial class Picking
     private static string FormatDateTime(DateTime? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
-    private static string FormatDateTimeOffset(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
-
-    private string GetRollbackSummary() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_rolledBackByUsername ?? "Пользователь не найден"} · {Truncate(_order?.RollbackReason, 140)}";
-
-    private string GetRollbackDescription() => $"{FormatDateTimeOffset(_order?.RolledBackAtUtc)} · {_rolledBackByUsername ?? "Пользователь не найден"} · {_order?.RollbackReason ?? "—"}";
-
-    private static string Truncate(string? value, int maximumLength) => string.IsNullOrWhiteSpace(value)
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"
-        : value.Length <= maximumLength
-            ? value
-            : $"{value[..maximumLength]}…";
-
-    private async Task<string?> GetRollbackUsernameAsync(string? userId)
-    {
-        if (string.IsNullOrWhiteSpace(userId))
-            return null;
-
-        var user = await UserManager.FindByIdAsync(userId);
-        return user?.UserName;
-    }
+        : _userNames.TryGetValue(userId, out var userName)
+            ? userName
+            : "Пользователь не найден";
 
     private async Task ToggleLinePickingAsync(ShippingOrderItem line)
     {
@@ -163,7 +152,7 @@ public partial class Picking
     }
 
     private static string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation) =>
-        $"{sourceLocation.StorageLocation.Name} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))}";
+        $"{sourceLocation.StorageLocation.Name} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
 
     private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
 
