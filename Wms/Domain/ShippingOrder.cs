@@ -122,6 +122,7 @@ public class ShippingOrder
         Number = externalOrder.Number;
         Date = externalOrder.Date;
         WarehouseId = externalOrder.WarehouseId;
+        WarehouseOperation = externalOrder.WarehouseOperation;
         Comment = externalOrder.Comment;
         Status = externalOrder.Status;
         Queue = externalOrder.Queue;

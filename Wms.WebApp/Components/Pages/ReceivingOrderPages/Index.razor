@@ -73,7 +73,7 @@
     <Columns>
         <TemplateColumn Title="Номер" SortBy="x => x.Number">
             <CellTemplate>
-                <MudLink Href="@($"receiving-orders/{context.Item.Id}")">@context.Item.Number</MudLink>
+                <MudLink Href="@GetOrderHref(context.Item)">@context.Item.Number</MudLink>
             </CellTemplate>
         </TemplateColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
@@ -104,19 +104,11 @@
         </TemplateColumn>
         <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
             <CellTemplate>
-                <MudTooltip Text="Детали">
-                    <MudIconButton Href="@($"receiving-orders/{context.Item.Id}")"
+                <MudTooltip Text="Открыть ордер">
+                    <MudIconButton Href="@GetOrderHref(context.Item)"
                                    Icon="@Icons.Material.Filled.OpenInNew"
                                    Color="Color.Primary" />
                 </MudTooltip>
-                @if (context.Item.Status == ReceivingOrderStatus.InReceiving)
-                {
-                    <MudTooltip Text="Приёмка">
-                        <MudIconButton Href="@($"receiving-orders/{context.Item.Id}/in-process")"
-                                       Icon="@Icons.Material.Filled.Edit"
-                                       Color="Color.Primary" />
-                    </MudTooltip>
-                }
             </CellTemplate>
         </TemplateColumn>
     </Columns>

@@ -15,7 +15,7 @@ public static class DocumentStatusExtensions
 
     public static string GetIcon(this ShippingOrderQueue queue) => queue switch
     {
-        ShippingOrderQueue.LiveQueue => Icons.Material.Filled.Bolt,
+        ShippingOrderQueue.LiveQueue => Icons.Material.Filled.People,
         ShippingOrderQueue.CollectByDate => Icons.Material.Filled.Event,
         ShippingOrderQueue.OwnDelivery => Icons.Material.Filled.LocalShipping,
         _ => Icons.Material.Filled.HelpOutline

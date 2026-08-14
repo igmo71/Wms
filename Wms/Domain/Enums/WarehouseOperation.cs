@@ -8,6 +8,7 @@ public enum WarehouseOperation
     [Display(Name = "Неизвестная операция")]
     Unknown = 0,
 
+
     [EnumMember(Value = "ПриемкаКомплектующихПослеРазборки")]
     [Display(Name = "Приемка комплектующих после разборки")]
     DisassemblyReceipt = 1,
@@ -26,5 +27,30 @@ public enum WarehouseOperation
 
     [EnumMember(Value = "ПриемкаСобранныхКомплектов")]
     [Display(Name = "Приемка собранных комплектов")]
-    AssemblyReceipt = 5
+    AssemblyReceipt = 5,
+
+
+    [EnumMember(Value = "ОтгрузкаКлиенту")]
+    [Display(Name = "Отгрузка клиенту")]
+    CustomerShipment = 6,
+
+    [EnumMember(Value = "ОтгрузкаКомплектовДляРазборки")]
+    [Display(Name = "Отгрузка комплектов для разборки")]
+    ShipmentOfKitsForDisassembly = 7,
+
+    [EnumMember(Value = "ОтгрузкаКомплектующихДляСборки")]
+    [Display(Name = "Отгрузка комплектующих для сборки")]
+    ShipmentOfComponentsForAssembly = 8,
+
+    [EnumMember(Value = "ОтгрузкаНаВнутренниеНужды")]
+    [Display(Name = "Отгрузка на внутренние нужды")]
+    InternalShipment = 9,
+
+    [EnumMember(Value = "ОтгрузкаПоВозвратуПоставщику")]
+    [Display(Name = "Отгрузка по возврату поставщику")]
+    VendorReturnShipment = 10,
+
+    [EnumMember(Value = "ОтгрузкаПоПеремещению")]
+    [Display(Name = "Отгрузка по перемещению")]
+    TransferShipment = 11
 }

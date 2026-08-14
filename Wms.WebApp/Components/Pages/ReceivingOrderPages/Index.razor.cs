@@ -23,6 +23,11 @@ public partial class Index : IAsyncDisposable
     private WmsSettings? _wmsSettings;
     private readonly CancellationTokenSource _refreshCts = new();
 
+    private static string GetOrderHref(ReceivingOrder order) => order.Status is ReceivingOrderStatus.InReceiving
+        or ReceivingOrderStatus.ProcessingRequired
+            ? $"receiving-orders/{order.Id}/in-process"
+            : $"receiving-orders/{order.Id}";
+
     private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(GridState<ReceivingOrder> state, CancellationToken cancellationToken)
     {
         var sortDefinition = state.SortDefinitions.FirstOrDefault();
