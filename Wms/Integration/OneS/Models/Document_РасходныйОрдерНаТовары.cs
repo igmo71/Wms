@@ -107,7 +107,7 @@ internal class Document_РасходныйОрдерНаТовары
             PlannedShippingDate = fetchedDocument.Доброга_ПланируемаяДатаОтгрузки?.Date == DateTime.MinValue.Date ? null : fetchedDocument.Доброга_ПланируемаяДатаОтгрузки,
             DeliveryDirectionId = fetchedDocument.Доброга_НаправлениеДоставки_Key == Guid.Empty ? null : fetchedDocument.Доброга_НаправлениеДоставки_Key,
             ReceiverId = fetchedDocument.Получатель,
-            ReceiverType = fetchedDocument.Получатель_Type.TrimODataPrefix(),
+            ReceiverType = ODataEnumMapper.Parse<PartyType>(fetchedDocument.Получатель_Type),
             Items = items,
             BaseItems = baseItems
         };

@@ -41,7 +41,7 @@ public class ReceivingOrder
     public bool ExternalChangeDetected { get; set; }
 
     public Guid ShipperId { get; set; }
-    public string? ShipperType { get; set; }
+    public PartyType ShipperType { get; set; }
 
     public Guid BaseOrderId { get; set; }
     public string? BaseOrderType { get; set; }

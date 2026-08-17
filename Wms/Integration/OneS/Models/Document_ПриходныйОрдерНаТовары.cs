@@ -82,7 +82,7 @@ internal class Document_ПриходныйОрдерНаТовары
             Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
             BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedDocument.ХозяйственнаяОперация),
             ShipperId = fetchedDocument.Отправитель,
-            ShipperType = fetchedDocument.Отправитель_Type.TrimODataPrefix(),
+            ShipperType = ODataEnumMapper.Parse<PartyType>(fetchedDocument.Отправитель_Type),
             BaseOrderId = fetchedDocument.Распоряжение,
             BaseOrderType = fetchedDocument.Распоряжение_Type.TrimODataPrefix(),
             Items = items
