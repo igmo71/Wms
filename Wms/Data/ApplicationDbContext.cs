@@ -13,6 +13,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
+    public DbSet<Partner> Partners => Set<Partner>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();
     public DbSet<ReceivingOrderItem> ReceivingOrderItems => Set<ReceivingOrderItem>();
     public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();

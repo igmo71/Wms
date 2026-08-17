@@ -50,6 +50,13 @@ public class NotifyBackgroundService(
                         await service.ImportAsync(notifyRecord.Ref_Key, ct);
                     break;
                 }
+            case nameof(Catalog_Партнеры):
+                {
+                    var service = scope.ServiceProvider.GetService<Catalog_Партнеры_Service>();
+                    if (service is not null)
+                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
+                    break;
+                }
             case nameof(Catalog_УпаковкиЕдиницыИзмерения):
                 {
                     var service = scope.ServiceProvider.GetService<Catalog_УпаковкиЕдиницыИзмерения_Service>();

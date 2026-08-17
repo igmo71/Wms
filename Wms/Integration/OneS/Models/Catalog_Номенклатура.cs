@@ -4,7 +4,7 @@ public class Catalog_Номенклатура
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
-    public Guid Parent_Key { get; set; }
+    public Guid? Parent_Key { get; set; }
     public bool IsFolder { get; set; }
     public string? Code { get; set; }
     public string? Description { get; set; }

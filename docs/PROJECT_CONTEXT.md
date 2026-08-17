@@ -175,10 +175,10 @@ The operator UI exposes configuration screens under the `Конфигураци�
   their corresponding zone types; picking and inventory counts use ordinary
   storage zones.
 - `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
-- `Номенклатура`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Номенклатура`, `Партнёры`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs. Partners are displayed as a flat list; their imported `ParentId` hierarchy is not visualized.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
-Manual list imports for all 1C-synchronized catalogs return `ServiceResult` through `SynchronizedCatalogImportService`. Their configuration pages show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. SKU batches may already have been persisted when another parallel batch fails, so that failure explicitly warns the operator that the catalog may have been partially updated; completed batches are not rolled back.
+Manual list imports for 1C-synchronized catalogs return `ServiceResult` through `SynchronizedCatalogImportService`. Configuration pages that expose these imports show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. Large catalogs such as SKUs and partners are loaded in independent parallel batches; completed batches are not rolled back when another batch fails, and the failure warns that the catalog may have been partially updated.
 
 ## Receiving
 
@@ -251,6 +251,8 @@ Inbound synchronization may create and reconcile receiving orders only in `Ready
 ## 1C integration
 
 The 1C OData client is configured through `OneCClient` settings. The integration uses explicit models named after 1C entities.
+
+`Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented; partner resolution through `PartyService` is not yet implemented.
 
 For `Document_ПриходныйОрдерНаТовары`:
 

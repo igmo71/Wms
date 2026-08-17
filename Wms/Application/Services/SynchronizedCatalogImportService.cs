@@ -12,6 +12,9 @@ public class SynchronizedCatalogImportService(IServiceProvider serviceProvider)
     public Task<ServiceResult> RefreshStockKeepingUnitsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_Номенклатура_Service>().ImportListAsync(ct);
 
+    public Task<ServiceResult> RefreshPartnersAsync(CancellationToken ct = default) =>
+        serviceProvider.GetRequiredService<Catalog_Партнеры_Service>().ImportListAsync(ct);
+
     public Task<ServiceResult> RefreshSkuBarcodesAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>().ImportListAsync(ct);
 

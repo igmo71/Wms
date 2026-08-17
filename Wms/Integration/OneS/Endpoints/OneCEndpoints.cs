@@ -8,6 +8,7 @@ public static class OneCEndpoints
     {
         routeBuilder.MapCatalog_ЗоныДоставки_Endpoints();
         routeBuilder.MapCatalog_Номенклатура_Endpoints();
+        routeBuilder.MapCatalog_Партнеры_Endpoints();
         routeBuilder.MapCatalog_Склады_Endpoints();
         routeBuilder.MapCatalog_УпаковкиЕдиницыИзмерения_Endpoints();
         routeBuilder.MapDocument_ПриходныйОрдерНаТовары_Endpoints();
