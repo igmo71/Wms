@@ -5,7 +5,7 @@
 namespace Wms.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class PartyType : Migration
+    public partial class AddPartyType : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

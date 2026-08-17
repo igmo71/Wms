@@ -42,7 +42,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (actualStatus != expectedStatus)
         {
             logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return ServiceResult.Fail(ServiceErrorType.Conflict, $"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            return ServiceError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
@@ -79,8 +79,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
             || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
         {
-            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
-                "Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
+            return ServiceError.Conflict("Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
         }
 
         var freshBaseItemsByLine = freshDocument.ТоварыПоРаспоряжениям.ToDictionary(x => x.LineNumber);
@@ -89,8 +88,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
             || freshItemsByLine.Count(x => Document.IsRegularShippingItem(x.Value)) != shippingOrder.Items.Count)
         {
-            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
-                "Shipping order plan in 1C differs from the WMS plan.");
+            return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
         }
 
         foreach (var localBaseItem in shippingOrder.BaseItems)
@@ -99,8 +97,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshBaseItem.Номенклатура_Key != localBaseItem.StockKeepingUnitId
                 || freshBaseItem.Количество != localBaseItem.PlanQuantity)
             {
-                return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
-                    "Shipping order plan in 1C differs from the WMS plan.");
+                return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
             }
         }
 
@@ -111,8 +108,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshItem.КоличествоУпаковок != localItem.PlanQuantity
                 || ODataEnumMapper.Parse<ShippingOrderAction>(freshItem.Действие) != ShippingOrderAction.PickUp)
             {
-                return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
-                    "Shipping order plan in 1C differs from the WMS plan.");
+                return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
             }
         }
 
@@ -127,8 +123,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         if (!baseItemStockKeepingUnitIds.SequenceEqual(itemStockKeepingUnitIds))
         {
-            return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
-                "Shipping order base lines and shipping lines in WMS cannot be matched safely.");
+            return ServiceError.Conflict("Shipping order base lines and shipping lines in WMS cannot be matched safely.");
         }
 
         var localItemsByStockKeepingUnit = shippingOrder.Items.ToDictionary(x => x.StockKeepingUnitId);
@@ -184,38 +179,38 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
     private static Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям Copy(
         Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям source) => new()
-    {
-        Ref_Key = source.Ref_Key,
-        LineNumber = source.LineNumber,
-        Номенклатура_Key = source.Номенклатура_Key,
-        Количество = source.Количество,
-        Распоряжение = source.Распоряжение,
-        Распоряжение_Type = source.Распоряжение_Type,
-        Характеристика_Key = source.Характеристика_Key,
-        Назначение_Key = source.Назначение_Key,
-        Серия_Key = source.Серия_Key,
-        СтатусУказанияСерий = source.СтатусУказанияСерий
-    };
+        {
+            Ref_Key = source.Ref_Key,
+            LineNumber = source.LineNumber,
+            Номенклатура_Key = source.Номенклатура_Key,
+            Количество = source.Количество,
+            Распоряжение = source.Распоряжение,
+            Распоряжение_Type = source.Распоряжение_Type,
+            Характеристика_Key = source.Характеристика_Key,
+            Назначение_Key = source.Назначение_Key,
+            Серия_Key = source.Серия_Key,
+            СтатусУказанияСерий = source.СтатусУказанияСерий
+        };
 
     private static Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары Copy(
         Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары source) => new()
-    {
-        Ref_Key = source.Ref_Key,
-        LineNumber = source.LineNumber,
-        Номенклатура_Key = source.Номенклатура_Key,
-        Количество = source.Количество,
-        КоличествоУпаковок = source.КоличествоУпаковок,
-        Действие = source.Действие,
-        Характеристика_Key = source.Характеристика_Key,
-        Назначение_Key = source.Назначение_Key,
-        Серия_Key = source.Серия_Key,
-        СтатусУказанияСерий = source.СтатусУказанияСерий,
-        ЭтоУпаковочныйЛист = source.ЭтоУпаковочныйЛист,
-        Упаковка_Key = source.Упаковка_Key,
-        УпаковочныйЛист_Key = source.УпаковочныйЛист_Key,
-        УпаковочныйЛистРодитель_Key = source.УпаковочныйЛистРодитель_Key,
-        ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста = source.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста
-    };
+        {
+            Ref_Key = source.Ref_Key,
+            LineNumber = source.LineNumber,
+            Номенклатура_Key = source.Номенклатура_Key,
+            Количество = source.Количество,
+            КоличествоУпаковок = source.КоличествоУпаковок,
+            Действие = source.Действие,
+            Характеристика_Key = source.Характеристика_Key,
+            Назначение_Key = source.Назначение_Key,
+            Серия_Key = source.Серия_Key,
+            СтатусУказанияСерий = source.СтатусУказанияСерий,
+            ЭтоУпаковочныйЛист = source.ЭтоУпаковочныйЛист,
+            Упаковка_Key = source.Упаковка_Key,
+            УпаковочныйЛист_Key = source.УпаковочныйЛист_Key,
+            УпаковочныйЛистРодитель_Key = source.УпаковочныйЛистРодитель_Key,
+            ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста = source.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста
+        };
 
     private class PatchBody
     {

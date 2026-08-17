@@ -27,12 +27,12 @@ public class ServiceResult
 
     public static ServiceResult Success() => new();
 
-    public static ServiceResult Fail(ServiceError error) => new(error);
+    public static ServiceResult Failure(ServiceError error) => new(error);
 
-    public static ServiceResult Fail(ServiceErrorType errorType, string? message) => new(errorType, message);
+    public static ServiceResult Failure(ServiceErrorType errorType, string? message) => new(errorType, message);
 
 
-    public static implicit operator ServiceResult(ServiceError error) => Fail(error);
+    public static implicit operator ServiceResult(ServiceError error) => Failure(error);
 }
 
 public class ServiceResult<TValue> : ServiceResult
@@ -56,11 +56,11 @@ public class ServiceResult<TValue> : ServiceResult
         Value = default;
     }
 
-    public static new ServiceResult<TValue> Fail(ServiceError error) => new(error);
-    public static new ServiceResult<TValue> Fail(ServiceErrorType errorType, string? message) => new(errorType, message);
+    public static new ServiceResult<TValue> Failure(ServiceError error) => new(error);
+    public static new ServiceResult<TValue> Failure(ServiceErrorType errorType, string? message) => new(errorType, message);
 
 
     public static implicit operator ServiceResult<TValue>(TValue value) => Success(value);
 
-    public static implicit operator ServiceResult<TValue>(ServiceError error) => Fail(error);
+    public static implicit operator ServiceResult<TValue>(ServiceError error) => Failure(error);
 }

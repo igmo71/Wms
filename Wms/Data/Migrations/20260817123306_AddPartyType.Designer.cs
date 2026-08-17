@@ -12,8 +12,8 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260817122705_PartyType")]
-    partial class PartyType
+    [Migration("20260817123306_AddPartyType")]
+    partial class AddPartyType
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

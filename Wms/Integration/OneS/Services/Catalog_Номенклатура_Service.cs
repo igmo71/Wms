@@ -13,23 +13,25 @@ internal class Catalog_Номенклатура_Service(
 {
 
 
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task<ServiceResult> ImportAsync(string Ref_Key, CancellationToken ct = default)
     {
         var uri = Catalog_Номенклатура.GetUri(Ref_Key);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+            return serviceResult;
 
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return;
+            return ServiceError.Failure("Fetched item is null.");
 
         var sku = MapToStockKeepingUnit(fetchedItem);
 
         await stockKeepingUnitService.CreateOrUpdateAsync(sku, ct);
+
+        return ServiceResult.Success();
     }
 
     public async Task ImportListAsync(CancellationToken ct = default)
