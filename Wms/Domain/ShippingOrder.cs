@@ -50,7 +50,6 @@ public class ShippingOrder
     public List<ShippingOrderItem> Items { get; set; } = [];
 
     public bool IsFullyShipped => Items.All(x => x.IsFullyShipped);
-    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
     public double KnownFactWeightKg => Items.Sum(x => x.FactWeightKg ?? 0);
     public bool IsFactWeightComplete => Items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
 
@@ -89,8 +88,7 @@ public class ShippingOrder
             }
 
             if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
-                || existingItem.PlanQuantity != external.PlanQuantity
-                || existingItem.Action != external.Action)
+                || existingItem.PlanQuantity != external.PlanQuantity)
             {
                 return true;
             }
@@ -153,7 +151,6 @@ public class ShippingOrder
             {
                 existing.StockKeepingUnitId = external.StockKeepingUnitId;
                 existing.PlanQuantity = external.PlanQuantity;
-                existing.Action = external.Action;
             }
             else
             {
@@ -163,8 +160,7 @@ public class ShippingOrder
                     LineNumber = external.LineNumber,
                     StockKeepingUnitId = external.StockKeepingUnitId,
                     PlanQuantity = external.PlanQuantity,
-                    FactQuantity = 0,
-                    Action = external.Action
+                    FactQuantity = 0
                 });
             }
         }

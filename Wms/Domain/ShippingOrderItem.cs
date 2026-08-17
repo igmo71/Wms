@@ -1,5 +1,3 @@
-﻿using Wms.Domain.Enums;
-
 namespace Wms.Domain;
 
 public class ShippingOrderItem
@@ -17,10 +15,7 @@ public class ShippingOrderItem
 
     public string? Comment { get; set; }
 
-    public ShippingOrderAction Action { get; set; }
-
     public double RemainingQuantity => PlanQuantity - FactQuantity;
     public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
     public bool IsFullyShipped => FactQuantity == PlanQuantity;
-    public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
 }

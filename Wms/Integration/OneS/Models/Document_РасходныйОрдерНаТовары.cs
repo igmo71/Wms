@@ -54,17 +54,29 @@ internal class Document_РасходныйОрдерНаТовары
 
     public static string PostDocumentUri(string refKey) => $"Document_РасходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
 
+    internal static List<Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары> GetUnexpectedPreparedItemActions(
+        Document_РасходныйОрдерНаТовары document) =>
+        ODataEnumMapper.Parse<ShippingOrderStatus>(document.Статус) != ShippingOrderStatus.Prepared
+            ? []
+            : document.ОтгружаемыеТовары
+                .Where(IsRegularShippingItem)
+                .Where(x => ODataEnumMapper.Parse<ShippingOrderAction>(x.Действие) != ShippingOrderAction.PickUp)
+                .ToList();
+
+    internal static bool IsRegularShippingItem(Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары item) =>
+        !item.ЭтоУпаковочныйЛист && item.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста == 0;
+
     internal static ShippingOrder MapToShippingOrder(Document_РасходныйОрдерНаТовары fetchedDocument)
     {
         var items = fetchedDocument.ОтгружаемыеТовары
+          .Where(IsRegularShippingItem)
           .Select(x => new ShippingOrderItem
           {
               ShippingOrderId = x.Ref_Key,
               LineNumber = x.LineNumber,
               StockKeepingUnitId = x.Номенклатура_Key,
               PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество?
-              FactQuantity = 0,
-              Action = ODataEnumMapper.Parse<ShippingOrderAction>(x.Действие)
+              FactQuantity = 0
           })
           .ToList();
 

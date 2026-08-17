@@ -39,6 +39,16 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
 
         logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
 
+        var unexpectedPreparedItemActions = Document.GetUnexpectedPreparedItemActions(fetchedDocument);
+        if (unexpectedPreparedItemActions.Count > 0)
+        {
+            logger.LogWarning(
+                "Prepared shipping order {OrderId} was not imported because its regular item actions differ from PickUp: {@UnexpectedActions}",
+                fetchedDocument.Ref_Key,
+                unexpectedPreparedItemActions.Select(x => new { x.LineNumber, x.Действие }).ToList());
+            return;
+        }
+
         ShippingOrder order = Document.MapToShippingOrder(fetchedDocument);
 
         await shippingOrderCommandService.ImportOrderAsync(order, ct);

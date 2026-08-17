@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
-using Wms.Domain.Enums;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
@@ -88,7 +87,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         var freshItemsByLine = freshDocument.ОтгружаемыеТовары.ToDictionary(x => x.LineNumber);
 
         if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
-            || freshItemsByLine.Count(x => !x.Value.ЭтоУпаковочныйЛист && x.Value.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста == 0) != shippingOrder.Items.Count)
+            || freshItemsByLine.Count(x => Document.IsRegularShippingItem(x.Value)) != shippingOrder.Items.Count)
         {
             return ServiceResult<PatchBody>.Fail(ServiceErrorType.Conflict,
                 "Shipping order plan in 1C differs from the WMS plan.");

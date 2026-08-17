@@ -844,9 +844,6 @@ namespace Wms.Data.Migrations
                     b.Property<int>("LineNumber")
                         .HasColumnType("int");
 
-                    b.Property<int>("Action")
-                        .HasColumnType("int");
-
                     b.Property<string>("Comment")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
