@@ -43,8 +43,8 @@ public class ShippingOrder
 
     public bool ExternalChangeDetected { get; set; }
 
-    public Guid RecipientId { get; set; }
-    public string? RecipientType { get; set; }
+    public Guid ReceiverId { get; set; }
+    public string? ReceiverType { get; set; }
 
     public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
     public List<ShippingOrderItem> Items { get; set; } = [];
@@ -66,8 +66,8 @@ public class ShippingOrder
             || WarehouseId != externalOrder.WarehouseId
             || PlannedShippingDate != externalOrder.PlannedShippingDate
             || DeliveryDirectionId != externalOrder.DeliveryDirectionId
-            || RecipientId != externalOrder.RecipientId
-            || RecipientType != externalOrder.RecipientType)
+            || ReceiverId != externalOrder.ReceiverId
+            || ReceiverType != externalOrder.ReceiverType)
         {
             return true;
         }
@@ -129,8 +129,8 @@ public class ShippingOrder
         PlannedShippingDate = externalOrder.PlannedShippingDate;
         DeliveryDirectionId = externalOrder.DeliveryDirectionId;
         WarehouseOperation = externalOrder.WarehouseOperation;
-        RecipientId = externalOrder.RecipientId;
-        RecipientType = externalOrder.RecipientType;
+        ReceiverId = externalOrder.ReceiverId;
+        ReceiverType = externalOrder.ReceiverType;
 
         UpdateOrderItems(externalOrder.Items);
 

@@ -12,7 +12,7 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
 
         builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
-        builder.Property(x => x.SenderType).HasMaxLength(DefaultConfiguration.Name);
+        builder.Property(x => x.ShipperType).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.PutawayStartedBy).HasMaxLength(DefaultConfiguration.Guid);

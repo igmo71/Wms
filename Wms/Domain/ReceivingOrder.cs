@@ -40,8 +40,8 @@ public class ReceivingOrder
 
     public bool ExternalChangeDetected { get; set; }
 
-    public Guid SenderId { get; set; }
-    public string? SenderType { get; set; }
+    public Guid ShipperId { get; set; }
+    public string? ShipperType { get; set; }
 
     public Guid BaseOrderId { get; set; }
     public string? BaseOrderType { get; set; }
@@ -67,8 +67,8 @@ public class ReceivingOrder
             || Date != externalOrder.Date
             || Number != externalOrder.Number
             || WarehouseId != externalOrder.WarehouseId
-            || SenderId != externalOrder.SenderId
-            || SenderType != externalOrder.SenderType)
+            || ShipperId != externalOrder.ShipperId
+            || ShipperType != externalOrder.ShipperType)
         {
             return true;
         }
@@ -109,8 +109,8 @@ public class ReceivingOrder
         Queue = externalOrder.Queue;
         WarehouseOperation = externalOrder.WarehouseOperation;
         BusinessOperation = externalOrder.BusinessOperation;
-        SenderId = externalOrder.SenderId;
-        SenderType = externalOrder.SenderType;
+        ShipperId = externalOrder.ShipperId;
+        ShipperType = externalOrder.ShipperType;
         BaseOrderId = externalOrder.BaseOrderId;
         BaseOrderType = externalOrder.BaseOrderType;
 
