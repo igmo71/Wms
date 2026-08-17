@@ -1,4 +1,5 @@
 ﻿using Wms.Application.Services;
+using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 
@@ -27,19 +28,19 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
     }
 
-    public async Task ImportListAsync(CancellationToken ct = default)
+    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+            return serviceResult;
 
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return;
+            return ServiceError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
 
         foreach (var fetchedItem in fetchedItems)
         {
@@ -47,6 +48,8 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
 
             await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
         }
+
+        return ServiceResult.Success();
     }
 
     private static UnitOfMeasure MapToUnitOfMeasure(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)

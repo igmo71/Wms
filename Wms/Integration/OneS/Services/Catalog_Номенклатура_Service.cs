@@ -34,24 +34,25 @@ internal class Catalog_Номенклатура_Service(
         return ServiceResult.Success();
     }
 
-    public async Task ImportListAsync(CancellationToken ct = default)
+    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity("Catalog_Номенклатура Import List", nameof(Catalog_Номенклатура_Service));
 
         var totalUri = Catalog_Номенклатура.TotalUri;
 
-        var serviceResult = await oneCClient.GetValueAsync<int>(totalUri, ct);
+        var serviceResult = await oneCClient.GetValueAsync<int?>(totalUri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+            return serviceResult;
 
-        int totalItems = serviceResult.Value;
+        if (serviceResult.Value is not int totalItems)
+            return ServiceError.Failure("1С вернула некорректный ответ: количество позиций номенклатуры отсутствует.");
 
         int batchSize = Catalog_Номенклатура.BatchSize;
 
         int totalBatches = (totalItems + batchSize - 1) / batchSize;
 
-        List<Task> tasks = [];
+        List<Task<ServiceResult>> tasks = [];
 
         using var semaphore = new SemaphoreSlim(10);
 
@@ -67,21 +68,26 @@ internal class Catalog_Номенклатура_Service(
                 {
                     var uri = Catalog_Номенклатура.GetListUri(batchIndex);
 
-                    var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
+                    var batchResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
 
-                    if (!serviceResult.IsSuccess)
-                        return;
+                    if (!batchResult.IsSuccess)
+                        return ServiceResult.Failure(batchResult.Error!);
 
-                    var fetchedItems = serviceResult.Value?.Value;
+                    var fetchedItems = batchResult.Value?.Value;
 
-                    if (fetchedItems is null || fetchedItems.Count == 0)
-                        return;
+                    if (fetchedItems is null)
+                        return ServiceResult.Failure(ServiceError.Failure("1С вернула некорректный ответ: пакет номенклатуры отсутствует."));
+
+                    if (fetchedItems.Count == 0)
+                        return ServiceResult.Success();
 
                     List<StockKeepingUnit> stockKeepingUnits = fetchedItems
                         .Select(MapToStockKeepingUnit)
                         .ToList();
 
                     await stockKeepingUnitService.CreateOrUpdateBatchAsync(stockKeepingUnits, ct);
+
+                    return ServiceResult.Success();
                 }
                 finally
                 {
@@ -90,7 +96,13 @@ internal class Catalog_Номенклатура_Service(
             }, ct));
         }
 
-        await Task.WhenAll(tasks);
+        var batchResults = await Task.WhenAll(tasks);
+        var failedResult = batchResults.FirstOrDefault(x => !x.IsSuccess);
+
+        return failedResult is null
+            ? ServiceResult.Success()
+            : ServiceError.Failure(
+                $"Не удалось полностью обновить номенклатуру. Часть данных могла быть обновлена. {failedResult.Error?.Message}");
     }
 
     private static StockKeepingUnit MapToStockKeepingUnit(Catalog_Номенклатура fetchedItem)

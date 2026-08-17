@@ -26,9 +26,11 @@ public static class InformationRegister_ШтрихкодыНоменклатур
         [FromServices] InformationRegister_ШтрихкодыНоменклатуры_Service service,
         CancellationToken ct)
     {
-        await service.ImportListAsync(ct);
+        var result = await service.ImportListAsync(ct);
 
-        return TypedResults.Ok();
+        return result.IsSuccess
+            ? TypedResults.Ok()
+            : Results.Problem(result.Error?.Message, statusCode: StatusCodes.Status502BadGateway);
     }
 
     static async Task<IResult> Notify(

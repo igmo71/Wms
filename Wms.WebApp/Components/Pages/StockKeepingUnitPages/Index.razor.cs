@@ -15,6 +15,8 @@ public partial class Index
     private bool _includeDeleted;
     private bool _isImporting;
     private bool _importFailed;
+    private bool _importSucceeded;
+    private string? _importMessage;
 
     private async Task<GridData<StockKeepingUnit>> LoadServerDataAsync(GridState<StockKeepingUnit> state, CancellationToken ct)
     {
@@ -30,14 +32,26 @@ public partial class Index
     {
         _isImporting = true;
         _importFailed = false;
+        _importSucceeded = false;
+        _importMessage = null;
         try
         {
-            await SynchronizedCatalogImportService.RefreshStockKeepingUnitsAsync();
+            var result = await SynchronizedCatalogImportService.RefreshStockKeepingUnitsAsync();
+            if (!result.IsSuccess)
+            {
+                _importFailed = true;
+                _importMessage = result.Error?.Message ?? "Не удалось обновить номенклатуру из 1С.";
+                return;
+            }
+
             await _dataGrid.ReloadServerData();
+            _importSucceeded = true;
+            _importMessage = "Номенклатура успешно обновлена из 1С.";
         }
         catch
         {
             _importFailed = true;
+            _importMessage = "Не удалось обновить номенклатуру из 1С.";
         }
         finally
         {

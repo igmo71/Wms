@@ -16,7 +16,11 @@
 }
 @if (_importFailed)
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить единицы измерения из 1С.</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_importMessage</MudAlert>
+}
+else if (_importSucceeded)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@_importMessage</MudAlert>
 }
 <MudPaper Class="pa-3 mb-4" Elevation="1"><MudStack Row="true" AlignItems="AlignItems.Center"><MudTextField T="string" Value="_searchString" ValueChanged="OnSearchChangedAsync" Label="Поиск по наименованию" Immediate="true" DebounceInterval="300" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" /><MudSwitch T="bool" Value="_includeDeleted" ValueChanged="OnIncludeDeletedChangedAsync" Color="Color.Primary" Label="Показать деактивированные" Class="ml-4" /></MudStack></MudPaper>
 <MudDataGrid T="UnitOfMeasure" @ref="_dataGrid" ServerData="LoadServerDataAsync" SortMode="SortMode.Single" Filterable="false" Hover="true" Striped="true" Dense="true" RowsPerPage="25">

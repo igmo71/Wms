@@ -15,7 +15,11 @@
 }
 @if (_importFailed)
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить направления доставки из 1С.</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_importMessage</MudAlert>
+}
+else if (_importSucceeded)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@_importMessage</MudAlert>
 }
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudSwitch T="bool" Value="_includeDeleted" ValueChanged="OnIncludeDeletedChangedAsync" Color="Color.Primary" Label="Показать деактивированные" />

@@ -15,6 +15,8 @@ public partial class Index
     private bool _includeDeleted;
     private bool _isImporting;
     private bool _importFailed;
+    private bool _importSucceeded;
+    private string? _importMessage;
     private async Task<GridData<UnitOfMeasure>> LoadServerDataAsync(GridState<UnitOfMeasure> state, CancellationToken ct)
     {
         var sort = state.SortDefinitions.FirstOrDefault();
@@ -28,14 +30,26 @@ public partial class Index
     {
         _isImporting = true;
         _importFailed = false;
+        _importSucceeded = false;
+        _importMessage = null;
         try
         {
-            await SynchronizedCatalogImportService.RefreshUnitsOfMeasureAsync();
+            var result = await SynchronizedCatalogImportService.RefreshUnitsOfMeasureAsync();
+            if (!result.IsSuccess)
+            {
+                _importFailed = true;
+                _importMessage = result.Error?.Message ?? "Не удалось обновить единицы измерения из 1С.";
+                return;
+            }
+
             await _dataGrid.ReloadServerData();
+            _importSucceeded = true;
+            _importMessage = "Единицы измерения успешно обновлены из 1С.";
         }
         catch
         {
             _importFailed = true;
+            _importMessage = "Не удалось обновить единицы измерения из 1С.";
         }
         finally
         {

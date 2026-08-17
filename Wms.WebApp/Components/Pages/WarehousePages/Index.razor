@@ -17,7 +17,11 @@
 
 @if (_importFailed)
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">Не удалось обновить склады из 1С.</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_importMessage</MudAlert>
+}
+else if (_importSucceeded)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@_importMessage</MudAlert>
 }
 @if (_isImporting)
 {

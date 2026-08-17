@@ -27,9 +27,11 @@ public static class Catalog_УпаковкиЕдиницыИзмерения_End
         [FromServices] Catalog_УпаковкиЕдиницыИзмерения_Service service,
         CancellationToken ct)
     {
-        await service.ImportListAsync(ct);
+        var result = await service.ImportListAsync(ct);
 
-        return TypedResults.Ok();
+        return result.IsSuccess
+            ? TypedResults.Ok()
+            : Results.Problem(result.Error?.Message, statusCode: StatusCodes.Status502BadGateway);
     }
 
     static async Task<IResult> Notify(

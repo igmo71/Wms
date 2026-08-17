@@ -178,6 +178,8 @@ The operator UI exposes configuration screens under the `Конфигураци�
 - `Номенклатура`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
+Manual list imports for all 1C-synchronized catalogs return `ServiceResult` through `SynchronizedCatalogImportService`. Their configuration pages show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. SKU batches may already have been persisted when another parallel batch fails, so that failure explicitly warns the operator that the catalog may have been partially updated; completed batches are not rolled back.
+
 ## Receiving
 
 `ReceivingOrder` is WMS's local operational representation of the 1C document `ПриходныйОрдерНаТовары`.

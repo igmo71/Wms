@@ -13,6 +13,8 @@ public partial class Index
     private bool _isLoading = true;
     private bool _isImporting;
     private bool _importFailed;
+    private bool _importSucceeded;
+    private string? _importMessage;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -32,14 +34,26 @@ public partial class Index
     {
         _isImporting = true;
         _importFailed = false;
+        _importSucceeded = false;
+        _importMessage = null;
         try
         {
-            await SynchronizedCatalogImportService.RefreshDeliveryDirectionsAsync();
+            var result = await SynchronizedCatalogImportService.RefreshDeliveryDirectionsAsync();
+            if (!result.IsSuccess)
+            {
+                _importFailed = true;
+                _importMessage = result.Error?.Message ?? "Не удалось обновить направления доставки из 1С.";
+                return;
+            }
+
             await LoadAsync();
+            _importSucceeded = true;
+            _importMessage = "Направления доставки успешно обновлены из 1С.";
         }
         catch
         {
             _importFailed = true;
+            _importMessage = "Не удалось обновить направления доставки из 1С.";
         }
         finally
         {

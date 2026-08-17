@@ -1,4 +1,5 @@
 ﻿using Wms.Application.Services;
+using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 
@@ -31,7 +32,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         await skuBarcodeService.CreateListAsync(newItems, ct);
     }
 
-    public async Task ImportListAsync(CancellationToken ct = default)
+    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
     {
 
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
@@ -39,12 +40,12 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         var serviceResult = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+            return serviceResult;
 
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return;
+            return ServiceError.Failure("1С вернула некорректный ответ: список штрихкодов отсутствует.");
 
         await skuBarcodeService.DeleteAllAsync(ct);
 
@@ -53,6 +54,8 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
             .ToList();
 
         await skuBarcodeService.CreateListAsync(newItems, ct);
+
+        return ServiceResult.Success();
     }
 
     private static SkuBarcode CreateNew(InformationRegister_ШтрихкодыНоменклатуры fetchedItem)
