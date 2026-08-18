@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryBalanceService>();
         services.AddScoped<InventoryMovementService>();
         services.AddScoped<InventoryTurnoverService>();
+        services.AddScoped<OrganizationalUnitService>();
         services.AddScoped<PickingCommandService>();
         services.AddScoped<PartyService>();
         services.AddScoped<PartnerService>();

@@ -18,6 +18,9 @@ public class SynchronizedCatalogImportService(IServiceProvider serviceProvider)
     public Task<ServiceResult> RefreshIndividualsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_ФизическиеЛица_Service>().ImportListAsync(ct);
 
+    public Task<ServiceResult> RefreshOrganizationalUnitsAsync(CancellationToken ct = default) =>
+        serviceProvider.GetRequiredService<Catalog_СтруктураПредприятия_Service>().ImportListAsync(ct);
+
     public Task<ServiceResult> RefreshSkuBarcodesAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>().ImportListAsync(ct);
 
