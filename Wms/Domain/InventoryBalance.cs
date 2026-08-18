@@ -1,4 +1,6 @@
-﻿namespace Wms.Domain;
+﻿using Wms.Common;
+
+namespace Wms.Domain;
 
 public class InventoryBalance
 {

@@ -1,3 +1,4 @@
+using Wms.Common;
 using Wms.Domain;
 
 namespace Wms.Application.Services.Inventory;

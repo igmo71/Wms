@@ -1,3 +1,5 @@
+using Wms.Common;
+
 namespace Wms.Domain;
 
 public class ShippingOrderItem

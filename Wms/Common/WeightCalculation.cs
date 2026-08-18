@@ -1,4 +1,6 @@
-namespace Wms.Domain;
+using Wms.Domain;
+
+namespace Wms.Common;
 
 public static class WeightCalculation
 {

@@ -1,4 +1,5 @@
-﻿using Wms.Domain.Enums;
+﻿using Wms.Common;
+using Wms.Domain.Enums;
 
 namespace Wms.Domain;
 
