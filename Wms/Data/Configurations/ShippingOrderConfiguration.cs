@@ -17,6 +17,7 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
         builder.Property(x => x.ShippedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.RolledBackBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.RollbackReason).HasMaxLength(DefaultConfiguration.Description);
+        builder.Ignore(x => x.Receiver);
 
         builder.HasOne(x => x.Warehouse).WithMany()
             .HasForeignKey(x => x.WarehouseId).HasPrincipalKey(x => x.Id)

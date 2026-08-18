@@ -126,6 +126,9 @@
         <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
             <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
         </PropertyColumn>
+        <TemplateColumn Title="Отправитель" Sortable="false">
+            <CellTemplate>@PartyDisplay.Format(context.Item.Shipper, context.Item.ShipperId, context.Item.ShipperType)</CellTemplate>
+        </TemplateColumn>
         <PropertyColumn Property="x => x.PutawayStatus" Title="Размещение">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>

@@ -5,7 +5,9 @@ using Wms.Domain;
 
 namespace Wms.Application.Services.ShippingOrders;
 
-public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+public class ShippingOrderQueryService(
+    IDbContextFactory<ApplicationDbContext> dbContextFactory,
+    PartyService partyService)
 {
     public async Task<ShippingOrder?> GetOrderAsync(Guid id, CancellationToken ct = default)
     {
@@ -34,6 +36,8 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .Where(x => x.ShippingOrderId == id)
             .ToListAsync(ct);
 
+        await PopulateReceiversAsync([order], ct);
+
         return order;
     }
 
@@ -57,11 +61,30 @@ public class ShippingOrderQueryService(IDbContextFactory<ApplicationDbContext> d
             .Take(listQuery.Take)
             .ToListAsync(ct);
 
+        await PopulateReceiversAsync(items, ct);
+
         return new ListResult<ShippingOrder>
         {
             Items = items,
             TotalItems = totalItems
         };
+    }
+
+    private async Task PopulateReceiversAsync(
+        IReadOnlyCollection<ShippingOrder> orders,
+        CancellationToken ct)
+    {
+        var parties = await partyService.GetManyAsync(
+            orders.Select(x => new PartyReference(x.ReceiverId, x.ReceiverType)),
+            ct);
+
+        foreach (var order in orders)
+        {
+            parties.TryGetValue(
+                new PartyReference(order.ReceiverId, order.ReceiverType),
+                out var receiver);
+            order.Receiver = receiver;
+        }
     }
 
     private static IQueryable<ShippingOrder> ApplySearch(IQueryable<ShippingOrder> query, ShippingOrderListQuery listQuery)

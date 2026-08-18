@@ -42,6 +42,7 @@ public class ReceivingOrder
 
     public Guid ShipperId { get; set; }
     public PartyType ShipperType { get; set; }
+    public PartyInfo? Shipper { get; set; }
 
     public Guid BaseOrderId { get; set; }
     public string? BaseOrderType { get; set; }

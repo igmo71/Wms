@@ -82,7 +82,7 @@ transit location is used, only after it is empty.
 ## Document list UI convention
 
 Document lists start with number, date, warehouse, and status. Order lists then
-show queue and warehouse operation, followed by process-specific fields.
+show queue, warehouse operation, and their resolved sender or receiver, followed by process-specific fields.
 Receiving orders show putaway status; shipping orders show delivery direction;
 transfers show their transit location. Separate action columns are omitted
 because document numbers are links. Lists omit creation, update, and process
@@ -92,8 +92,9 @@ completion, shipping orders show picking completion (ready for shipment) and
 shipping, while counts and transfers show their single completion event.
 
 Document detail and work pages use row-based information headers. Order headers
-have separate rows for core properties, operational location/comment/actual
-weight, and action audit. Receiving audit covers starting and completing both
+have separate rows for core properties, including the resolved sender or
+receiver, operational location/comment/actual weight, and action audit.
+Receiving audit covers starting and completing both
 receiving and putaway; shipping audit covers starting and completing picking,
 shipping, and the latest rollback when present. Inventory-count and transfer
 headers put their number and creation timestamp in the page title, then show
@@ -259,7 +260,7 @@ The 1C OData client is configured through `OneCClient` settings. The integration
 
 `Catalog_СтруктураПредприятия_Service` imports `Catalog_СтруктураПредприятия` into the local `OrganizationalUnit` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual organizational-unit update. The imported hierarchy is retained in `ParentId`, while the configuration UI displays a flat list.
 
-Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyService` is the intended resolver from that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Order lists will require a batch resolver such as `GetManyAsync` to avoid N+1 database queries. The resolver is not yet complete.
+Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyService` resolves that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Its batch `GetManyAsync` groups distinct references by type and performs at most one local database query per represented type, avoiding N+1 queries on order lists. It never calls 1C on demand, includes deactivated catalog records for historical display, and excludes individual-catalog folders. Receiving and shipping query services enrich both individual orders and paged lists with non-persisted `Shipper` or `Receiver` information. Missing local records remain visible as unresolved in the UI; party sorting and filtering are not implemented.
 
 For `Document_ПриходныйОрдерНаТовары`:
 

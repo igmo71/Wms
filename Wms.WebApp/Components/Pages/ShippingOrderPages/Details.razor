@@ -90,6 +90,7 @@ else
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Получатель</MudText><MudText>@PartyDisplay.Format(_order.Receiver, _order.ReceiverId, _order.ReceiverType)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="2">
                     <MudText Typo="Typo.caption">Очередь</MudText>
@@ -99,7 +100,6 @@ else
                     </MudStack>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Направление доставки</MudText><MudText>@_order.DeliveryDirection?.Description</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
             </MudGrid>
             <MudDivider Class="my-1" />
             <MudGrid Spacing="2">
@@ -128,7 +128,8 @@ else
                         <MudText>@(_shippingLocation?.Name ?? "—")</MudText>
                     }
                 </MudItem>
-                <MudItem xs="12" sm="6" md="6">
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="4">
                     <MudTooltip Text="@(_order.Comment ?? "—")">
                         <MudText Typo="Typo.caption">Комментарий</MudText>
                         <MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText>

@@ -45,6 +45,7 @@ public class ShippingOrder
 
     public Guid ReceiverId { get; set; }
     public PartyType ReceiverType { get; set; }
+    public PartyInfo? Receiver { get; set; }
 
     public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
     public List<ShippingOrderItem> Items { get; set; } = [];

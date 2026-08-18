@@ -113,6 +113,9 @@
         <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
             <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
         </PropertyColumn>
+        <TemplateColumn Title="Получатель" Sortable="false">
+            <CellTemplate>@PartyDisplay.Format(context.Item.Receiver, context.Item.ReceiverId, context.Item.ReceiverType)</CellTemplate>
+        </TemplateColumn>
         <PropertyColumn Property="x => x.DeliveryDirection == null ? string.Empty : x.DeliveryDirection.Description" Title="Направление доставки" Sortable="true" />
         <TemplateColumn Title="1C" Sortable="false">
             <CellTemplate>
