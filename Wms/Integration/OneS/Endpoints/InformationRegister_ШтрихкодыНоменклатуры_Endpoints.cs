@@ -35,12 +35,15 @@ public static class InformationRegister_ШтрихкодыНоменклатур
 
     static async Task<IResult> Notify(
         [FromServices] NotifyChannel notifyChannel,
-        [FromBody] NotifyRequest request,
+        [FromBody] NotifyRequest[] request,
         CancellationToken ct)
     {
-        await notifyChannel.Writer.WriteAsync(
-            new NotifyRecord(request.Ref_Key, nameof(InformationRegister_ШтрихкодыНоменклатуры)),
-            ct);
+        foreach (var item in request)
+        {
+            await notifyChannel.Writer.WriteAsync(
+                new NotifyRecord(item.Ref_Key, nameof(InformationRegister_ШтрихкодыНоменклатуры)),
+                ct);
+        }
 
         return TypedResults.Ok();
     }
