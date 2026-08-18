@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<BalanceAndTurnoverService>();
         services.AddScoped<DeliveryDirectionService>();
         services.AddScoped<EmployeePerformanceReportService>();
+        services.AddScoped<IndividualService>();
         services.AddScoped<InventoryCountCommandService>();
         services.AddScoped<InventoryCountQueryService>();
         services.AddScoped<InventoryBalanceService>();

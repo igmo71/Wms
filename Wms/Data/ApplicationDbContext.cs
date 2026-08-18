@@ -8,6 +8,7 @@ namespace Wms.Data;
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<DeliveryDirection> DeliveryDirections => Set<DeliveryDirection>();
+    public DbSet<Individual> Individuals => Set<Individual>();
     public DbSet<InventoryBalance> InventoryBalances => Set<InventoryBalance>();
     public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
     public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
