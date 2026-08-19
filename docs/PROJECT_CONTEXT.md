@@ -147,6 +147,11 @@ The project deliberately favors clear, direct code and fast iteration over enter
 - CQRS, DTO layers, repositories, and additional abstractions are optional tools, not mandatory architecture.
 - Detailed validation, resilience, and stabilization are added when they become useful for the MVP, not preemptively.
 - Existing code and the explicitly stated business flow take priority over speculative future needs.
+- Local business invariants that need no database or injected service belong in
+  domain entities and value objects. Checks against external state remain in
+  application services. The model is enriched incrementally where a method
+  expresses a real business operation; the MVP does not pursue abstraction for
+  its own sake.
 
 These principles can change as the product and its constraints mature.
 
@@ -170,12 +175,21 @@ Core domain concepts:
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
 - `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
-- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse and has an explicit type.
+- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse, has an explicit type, and has a required code unique within the warehouse.
 - Zone types distinguish ordinary storage, transit, receiving, and shipping.
   Receiving and shipping location selectors and command services accept only
   their corresponding zone types; picking and inventory counts use ordinary
   storage zones.
-- `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
+- Storage locations form an arbitrary-depth tree inside a zone. Structural
+  nodes use `IsFolder`; only non-folder nodes may participate in inventory and
+  warehouse documents. Each location stores a materialized numeric path code
+  unique inside its zone, while the displayed full address combines the zone
+  code and location code. The configuration UI loads the complete tree for a
+  selected zone and supports single-node editing and transactional generation
+  of immediate children. Subtree moves are outside the MVP. Locations may have
+  nullable dimensions, capacity, absolute warehouse coordinates, and a simple
+  picking sequence. Detailed rules are in
+  `specs/storage-location-topology/spec.md`.
 - `Номенклатура`, `Партнёры`, `Физические лица`, `Структура предприятия`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs. Partners, individuals, and organizational units are displayed as flat lists; their imported `ParentId` hierarchies are not visualized. Individual catalog groups are stored and shown alongside people with an explicit row type.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 

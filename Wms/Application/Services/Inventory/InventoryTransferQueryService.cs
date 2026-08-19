@@ -167,13 +167,15 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .AsNoTracking()
             .Include(x => x.Zone)
             .Where(x => x.WarehouseId == warehouseId
+                && !x.IsFolder
                 && !x.DeletionMark
+                && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Transit
                 && !activeTransitStorageLocationIds.Contains(x.Id)
                 && !dbContext.InventoryBalances.Any(balance => balance.StorageLocationId == x.Id && balance.Quantity > 0));
 
         if (!string.IsNullOrWhiteSpace(searchText))
-            query = query.Where(x => x.Name!.Contains(searchText));
+            query = query.Where(x => x.Name!.Contains(searchText) || x.Code!.Contains(searchText));
 
         return await query
             .OrderBy(x => x.Name)

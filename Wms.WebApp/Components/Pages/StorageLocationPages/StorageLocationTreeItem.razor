@@ -1,0 +1,28 @@
+@using Wms.Domain
+
+<MudTreeViewItem T="StorageLocation"
+                 Value="Location"
+                 Text="@Text"
+                 Icon="@Icon"
+                 IconColor="@IconColor">
+    @foreach (var child in Children)
+    {
+        <StorageLocationTreeItem Location="child" Locations="Locations" />
+    }
+</MudTreeViewItem>
+
+@code {
+    [Parameter, EditorRequired]
+    public StorageLocation Location { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<StorageLocation> Locations { get; set; } = [];
+
+    private IEnumerable<StorageLocation> Children => Locations
+        .Where(x => x.ParentId == Location.Id)
+        .OrderBy(x => x.Code);
+
+    private string Text => $"{Location.Code} · {Location.Name}";
+    private string Icon => Location.IsFolder ? Icons.Material.Filled.Folder : Icons.Material.Filled.Inventory2;
+    private Color IconColor => Location.DeletionMark ? Color.Default : Color.Primary;
+}

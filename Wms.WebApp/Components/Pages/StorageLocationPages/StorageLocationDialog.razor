@@ -1,37 +1,52 @@
 @using Wms.Domain
 
-<MudDialog>
+<MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
     <DialogContent>
-        <MudStack Spacing="3">
-            <MudAutocomplete T="Warehouse"
-                             Value="_warehouse"
-                             ValueChanged="OnWarehouseChanged"
-                             SearchFunc="SearchWarehousesAsync"
-                             ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
-                             Label="Склад"
-                             Required="true"
-                             Clearable="true" />
-            <MudAutocomplete T="Zone"
-                             Value="_zone"
-                             ValueChanged="OnZoneChanged"
-                             SearchFunc="SearchZonesAsync"
-                             ToStringFunc="zone => zone?.Name ?? string.Empty"
-                             Label="Зона"
-                             Required="true"
-                             Clearable="true" />
-            <MudTextField T="string"
-                          @bind-Value="_storageLocation.Name"
-                          Label="Наименование"
-                          Required="true"
-                          Immediate="true" />
+        <MudStack Spacing="2">
+            @if (StorageLocation is null)
+            {
+                <MudStack Row="true">
+                    <MudNumericField T="int" @bind-Value="_number" Label="Номер" Min="1" Required="true" />
+                    <MudNumericField T="int" @bind-Value="_segmentWidth" Label="Ширина сегмента" Min="1" Max="8" Required="true" />
+                </MudStack>
+            }
+            else
+            {
+                <MudTextField Value="@FullAddress" Label="Адрес" ReadOnly="true" />
+                <MudTextField Value="@StorageLocation.Barcode" Label="Значение штрихкода" ReadOnly="true" />
+            }
+
+            <MudTextField T="string" @bind-Value="_name" Label="Наименование" Required="true" Immediate="true" />
+            <MudSwitch T="bool" @bind-Value="_isFolder" Label="Структурная группа" Color="Color.Primary" />
+
+            <MudText Typo="Typo.subtitle2">Размеры и ограничения</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Length" Label="Длина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Width" Label="Ширина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Height" Label="Высота, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Volume" Label="Объём, м³" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.VolumeFactor" Label="Коэффициент объёма" Min="0" Max="1" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.MaxWeight" Label="Макс. вес, кг" Min="0" /></MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.subtitle2">Координаты и отбор</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.X" Label="X, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.Y" Label="Y, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.Z" Label="Z, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="long?" @bind-Value="_pickSequence" Label="Порядок отбора" /></MudItem>
+            </MudGrid>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Отмена</MudButton>
-        <MudButton Color="Color.Primary"
-                   Variant="Variant.Filled"
-                   Disabled="@(_warehouse is null || _zone is null || string.IsNullOrWhiteSpace(_storageLocation.Name))"
-                   OnClick="SaveAsync">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@(_isSaving || string.IsNullOrWhiteSpace(_name))" OnClick="SaveAsync">
             Сохранить
         </MudButton>
     </DialogActions>

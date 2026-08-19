@@ -34,6 +34,7 @@ public partial class ZoneDialog
             : new Zone
             {
                 Id = Zone.Id,
+                Code = Zone.Code,
                 Name = Zone.Name,
                 DeletionMark = Zone.DeletionMark,
                 WarehouseId = Zone.WarehouseId,
@@ -64,7 +65,8 @@ public partial class ZoneDialog
 
     private async Task SaveAsync()
     {
-        if (_warehouse is null || _zoneType is null || string.IsNullOrWhiteSpace(_zone.Name))
+        if (_warehouse is null || _zoneType is null || string.IsNullOrWhiteSpace(_zone.Code)
+            || string.IsNullOrWhiteSpace(_zone.Name))
             return;
 
         _zone.WarehouseId = _warehouse.Id;

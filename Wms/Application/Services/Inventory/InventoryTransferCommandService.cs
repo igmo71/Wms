@@ -45,8 +45,12 @@ public class InventoryTransferCommandService(
             if (transitLocation is null)
                 return ServiceError.NotFound<StorageLocation>();
 
+            if (transitLocation.IsFolder)
+                return ServiceError.Invalid<StorageLocation>("Transit location must be an inventory location.");
+
             if (transitLocation.DeletionMark
                 || transitLocation.WarehouseId != warehouseId
+                || transitLocation.Zone?.DeletionMark == true
                 || transitLocation.Zone?.Type != ZoneType.Transit)
             {
                 return ServiceError.Invalid<StorageLocation>(
@@ -222,7 +226,9 @@ public class InventoryTransferCommandService(
             return ServiceError.NotFound<StorageLocation>();
         }
 
-        if (sourceLocation.DeletionMark || destinationLocation.DeletionMark
+        if (sourceLocation.IsFolder || destinationLocation.IsFolder
+            || sourceLocation.DeletionMark || destinationLocation.DeletionMark
+            || sourceLocation.Zone?.DeletionMark == true || destinationLocation.Zone?.DeletionMark == true
             || sourceLocation.WarehouseId != transfer.WarehouseId
             || destinationLocation.WarehouseId != transfer.WarehouseId)
         {

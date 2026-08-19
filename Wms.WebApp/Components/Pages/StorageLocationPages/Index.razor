@@ -1,105 +1,94 @@
 @page "/storage-locations"
 @using Wms.Domain
 
-<PageTitle>Ячейки хранения</PageTitle>
+<PageTitle>Складские позиции</PageTitle>
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h5">Ячейки хранения</MudText>
+    <MudText Typo="Typo.h5">Складские позиции</MudText>
     <MudSpacer />
-    <MudButton Color="Color.Primary"
-               Variant="Variant.Filled"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="CreateStorageLocationAsync">
-        Создать ячейку
-    </MudButton>
+    <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
+               Disabled="@(_zone is null)" OnClick="CreateRootAsync">Корневая позиция</MudButton>
+    <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.SubdirectoryArrowRight"
+               Disabled="@(_selectedLocation is null)" OnClick="CreateChildAsync">Дочерняя позиция</MudButton>
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.PlaylistAdd"
+               Disabled="@(_zone is null)" OnClick="GenerateChildrenAsync">Создать пакет</MudButton>
 </MudStack>
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row="true" AlignItems="AlignItems.Center">
-        <MudTextField T="string"
-                      Value="_searchString"
-                      ValueChanged="OnSearchChangedAsync"
-                      Label="Поиск по наименованию"
-                      Immediate="true"
-                      DebounceInterval="300"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Clearable="true" />
-        <MudAutocomplete T="Warehouse"
-                         Value="_warehouse"
-                         ValueChanged="OnWarehouseChangedAsync"
-                         SearchFunc="SearchWarehousesAsync"
-                         ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
-                         Label="Склад"
-                         Clearable="true"
-                         Class="ml-4" />
-        <MudAutocomplete T="Zone"
-                         Value="_zone"
-                         ValueChanged="OnZoneChangedAsync"
-                         SearchFunc="SearchZonesAsync"
-                         ToStringFunc="zone => zone?.Name ?? string.Empty"
-                         Label="Зона"
-                         Clearable="true"
-                         Class="ml-4" />
-        <MudSwitch T="bool"
-                   Value="_includeDeleted"
-                   ValueChanged="OnIncludeDeletedChangedAsync"
-                   Color="Color.Primary"
-                   Label="Показать деактивированные"
-                   Class="ml-4" />
+        <MudAutocomplete T="Warehouse" Value="_warehouse" ValueChanged="OnWarehouseChangedAsync"
+                         SearchFunc="SearchWarehousesAsync" ToStringFunc="x => x?.Name ?? string.Empty"
+                         Label="Склад" Clearable="true" />
+        <MudAutocomplete T="Zone" Value="_zone" ValueChanged="OnZoneChangedAsync"
+                         SearchFunc="SearchZonesAsync" ToStringFunc="ZoneText"
+                         Label="Зона" Clearable="true" Class="ml-4" />
+        <MudSwitch T="bool" Value="_includeDeleted" ValueChanged="OnIncludeDeletedChangedAsync"
+                   Color="Color.Primary" Label="Показать деактивированные" Class="ml-4" />
     </MudStack>
 </MudPaper>
 
-<MudDataGrid T="StorageLocation"
-             @ref="_dataGrid"
-             ServerData="LoadServerDataAsync"
-             SortMode="SortMode.Single"
-             Filterable="false"
-             Hover="true"
-             Striped="true"
-             Dense="true"
-             RowsPerPage="25">
-    <Columns>
-        <PropertyColumn Property="x => x.Name" Title="Наименование" Sortable="true" />
-        <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" Sortable="false" />
-        <PropertyColumn Property="x => x.Zone == null ? string.Empty : x.Zone.Name" Title="Зона" Sortable="false" />
-        <TemplateColumn Title="Статус" Sortable="false">
-            <CellTemplate>
-                <MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирована" : "Активна")">
-                    <MudIcon Icon="@(context.Item.DeletionMark
-                                         ? Icons.Material.Filled.Block
-                                         : Icons.Material.Filled.CheckCircle)"
-                             Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" />
-                </MudTooltip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Действия" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudTooltip Text="Редактировать">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => EditStorageLocationAsync(context.Item))" />
-                </MudTooltip>
-                @if (context.Item.DeletionMark)
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+@if (_zone is null)
+{
+    <MudAlert Severity="Severity.Info">Выберите склад и зону.</MudAlert>
+}
+else if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-3" Elevation="1">
+                @if (_locations.Count == 0)
                 {
-                    <MudTooltip Text="Реактивировать">
-                        <MudIconButton Icon="@Icons.Material.Filled.Restore"
-                                       Color="Color.Success"
-                                       OnClick="@(() => UnMarkDeleteAsync(context.Item.Id))" />
-                    </MudTooltip>
+                    <MudText>В зоне пока нет складских позиций.</MudText>
                 }
                 else
                 {
-                    <MudTooltip Text="Деактивировать">
-                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
-                                       Color="Color.Error"
-                                       OnClick="@(() => MarkDeleteAsync(context.Item.Id))" />
-                    </MudTooltip>
+                    <MudTreeView T="StorageLocation" Hover="true" Dense="true"
+                                 SelectedValue="_selectedLocation" SelectedValueChanged="OnSelectedLocationChanged">
+                        @foreach (var location in GetChildren(null))
+                        {
+                            <StorageLocationTreeItem Location="location" Locations="_locations" />
+                        }
+                    </MudTreeView>
                 }
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-    <PagerContent>
-        <MudDataGridPager T="StorageLocation" PageSizeOptions="new[] { 10, 25, 50 }" />
-    </PagerContent>
-</MudDataGrid>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-3" Elevation="1">
+                @if (_selectedLocation is null)
+                {
+                    <MudText>Выберите узел дерева.</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.h6">@_selectedLocation.Name</MudText>
+                        <MudText><b>Адрес:</b> @(_zone.Code)-@(_selectedLocation.Code)</MudText>
+                        <MudText><b>Тип:</b> @(_selectedLocation.IsFolder ? "Структурная группа" : "Место хранения")</MudText>
+                        <MudText><b>Координаты:</b> @CoordinatesText</MudText>
+                        <MudText><b>Порядок отбора:</b> @(_selectedLocation.PickSequence?.ToString() ?? "—")</MudText>
+                        <MudStack Row="true" Class="mt-2">
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditSelectedAsync">Изменить</MudButton>
+                            @if (_selectedLocation.DeletionMark)
+                            {
+                                <MudButton Color="Color.Success" Variant="Variant.Outlined" OnClick="ActivateSelectedAsync">Активировать</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="DeactivateSelectedAsync">Деактивировать</MudButton>
+                            }
+                        </MudStack>
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}

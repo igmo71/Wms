@@ -118,6 +118,9 @@ public class InventoryCountCommandService(
             if (storageLocation is null)
                 return ServiceError.NotFound<StorageLocation>();
 
+            if (storageLocation.IsFolder || storageLocation.DeletionMark || storageLocation.Zone?.DeletionMark == true)
+                return ServiceError.Invalid<StorageLocation>("Inventory count location must be an active inventory location.");
+
             if (storageLocation.WarehouseId != inventoryCount.WarehouseId)
                 return ServiceError.Invalid<StorageLocation>("Storage location must belong to the inventory count warehouse.");
 

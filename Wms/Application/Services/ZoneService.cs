@@ -11,14 +11,33 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        if (!Enum.IsDefined(item.Type))
-            return ServiceError.Invalid<Zone>("Zone type is invalid.");
+        try
+        {
+            item.UpdateDetails(item.Code ?? string.Empty, item.Name ?? string.Empty, item.Type);
+        }
+        catch (ArgumentException ex)
+        {
+            return ServiceError.Invalid<Zone>(ex.Message);
+        }
+
+        if (await dbContext.Zones.AnyAsync(x => x.WarehouseId == item.WarehouseId
+            && x.Code == item.Code && x.Id != item.Id, ct))
+        {
+            return ServiceError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
+        }
 
         var existing = await dbContext.Zones
             .FirstOrDefaultAsync(x => x.Id == item.Id, ct);
 
         if (existing is not null)
         {
+            if (existing.WarehouseId != item.WarehouseId
+                && await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == item.Id, ct))
+            {
+                return ServiceError.Invalid<Zone>("Зону со складскими позициями нельзя перенести в другой склад.");
+            }
+
+            existing.Code = item.Code;
             existing.Name = item.Name;
             existing.DeletionMark = item.DeletionMark;
             existing.WarehouseId = item.WarehouseId;
@@ -98,7 +117,8 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
     private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, ZoneListQuery listQuery)
     {
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
-            query = query.Where(x => x.Name!.Contains(listQuery.SearchString));
+            query = query.Where(x => x.Name!.Contains(listQuery.SearchString)
+                || x.Code!.Contains(listQuery.SearchString));
 
         if (listQuery.WarehouseId is Guid warehouseId)
             query = query.Where(x => x.WarehouseId == warehouseId);

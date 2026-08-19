@@ -281,6 +281,7 @@ public class PutawayCommandService(
         var isValid = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == destinationStorageLocationId
                 && x.WarehouseId == order.WarehouseId
+                && !x.IsFolder
                 && !x.DeletionMark
                 && !x.Zone!.DeletionMark
                 && x.Zone.Type == ZoneType.Storage, ct);
@@ -373,6 +374,7 @@ public class PutawayCommandService(
         var validDestinationCount = await dbContext.StorageLocations
             .CountAsync(x => destinationIds.Contains(x.Id)
                 && x.WarehouseId == order.WarehouseId
+                && !x.IsFolder
                 && !x.DeletionMark
                 && !x.Zone!.DeletionMark
                 && x.Zone.Type == ZoneType.Storage, ct);

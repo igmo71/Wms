@@ -37,12 +37,13 @@ public class PutawayQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .AsNoTracking()
             .Include(x => x.Zone)
             .Where(x => x.WarehouseId == warehouseId
+                && !x.IsFolder
                 && !x.DeletionMark
                 && !x.Zone!.DeletionMark
                 && x.Zone.Type == ZoneType.Storage);
 
         if (!string.IsNullOrWhiteSpace(searchText))
-            query = query.Where(x => x.Name!.Contains(searchText));
+            query = query.Where(x => x.Name!.Contains(searchText) || x.Code!.Contains(searchText));
 
         return await query
             .OrderBy(x => x.Zone!.Name)

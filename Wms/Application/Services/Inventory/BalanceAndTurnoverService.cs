@@ -52,6 +52,26 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
             .ToArray();
         var stockKeepingUnitIds = movements.Select(x => x.StockKeepingUnitId).Distinct().ToArray();
 
+        var locations = await dbContext.StorageLocations
+            .Where(x => storageLocationIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        foreach (var movement in movements)
+        {
+            foreach (var locationId in new[] { movement.SourceStorageLocationId, movement.DestinationStorageLocationId }
+                .Where(x => x.HasValue).Select(x => x!.Value))
+            {
+                if (!locations.TryGetValue(locationId, out var location)
+                    || location.IsFolder
+                    || location.WarehouseId != movement.WarehouseId)
+                {
+                    logger.LogError("Inventory movement location is invalid. Movement: {MovementId}, Location: {LocationId}",
+                        movement.Id, locationId);
+                    return ServiceError.Invalid<StorageLocation>("Inventory movements require non-folder locations in their warehouse.");
+                }
+            }
+        }
+
         var balances = await dbContext.InventoryBalances
             .Where(x => warehouseIds.Contains(x.WarehouseId)
                 && storageLocationIds.Contains(x.StorageLocationId)

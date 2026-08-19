@@ -251,6 +251,9 @@ public class ShippingOrderCommandService(
         var validLocation = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == shippingLocationId
                 && x.WarehouseId == orderWarehouseId
+                && !x.IsFolder
+                && !x.DeletionMark
+                && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Shipping, ct);
 
         if (!validLocation)

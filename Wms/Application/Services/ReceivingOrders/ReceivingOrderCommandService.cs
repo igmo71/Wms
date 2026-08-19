@@ -245,6 +245,7 @@ public class ReceivingOrderCommandService(
         var validLocation = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == receivingLocationId
                 && x.WarehouseId == orderInfo.WarehouseId
+                && !x.IsFolder
                 && !x.DeletionMark
                 && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Receiving, ct);

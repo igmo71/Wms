@@ -65,6 +65,9 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
                 x.WarehouseId == order.WarehouseId &&
                 x.StockKeepingUnitId == orderItem.StockKeepingUnitId &&
                 x.StorageLocationId != order.ShippingLocationId &&
+                !x.StorageLocation!.IsFolder &&
+                !x.StorageLocation.DeletionMark &&
+                !x.StorageLocation.Zone!.DeletionMark &&
                 x.StorageLocation!.Zone!.Type == ZoneType.Storage &&
                 x.Quantity > 0)
             .OrderBy(x => x.StorageLocation!.Name)

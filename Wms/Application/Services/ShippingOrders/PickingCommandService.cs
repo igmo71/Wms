@@ -44,6 +44,9 @@ public class PickingCommandService(
         if (sourceLocation is null)
             return ServiceError.NotFound<StorageLocation>();
 
+        if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
+            return ServiceError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
+
         if (sourceLocation.WarehouseId != order.WarehouseId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
 
@@ -136,6 +139,9 @@ public class PickingCommandService(
 
         if (sourceLocation is null)
             return ServiceError.NotFound<StorageLocation>();
+
+        if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
+            return ServiceError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
 
         if (sourceLocation.WarehouseId != order.WarehouseId)
             return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");

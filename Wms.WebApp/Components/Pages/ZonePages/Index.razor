@@ -67,6 +67,7 @@
              Dense="true"
              RowsPerPage="25">
     <Columns>
+        <PropertyColumn Property="x => x.Code" Title="Код" Sortable="false" />
         <PropertyColumn Property="x => x.Name" Title="Наименование" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" Sortable="false" />
         <PropertyColumn Property="x => x.Type" Title="Тип" Sortable="true">
