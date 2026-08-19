@@ -32,7 +32,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         await skuBarcodeService.CreateListAsync(newItems, ct);
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
 
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
@@ -45,7 +45,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список штрихкодов отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список штрихкодов отсутствует.");
 
         await skuBarcodeService.DeleteAllAsync(ct);
 
@@ -55,7 +55,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
 
         await skuBarcodeService.CreateListAsync(newItems, ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static SkuBarcode CreateNew(InformationRegister_ШтрихкодыНоменклатуры fetchedItem)

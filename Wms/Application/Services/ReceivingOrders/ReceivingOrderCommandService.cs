@@ -67,7 +67,7 @@ public class ReceivingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder SetInReceiving {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("ReceivingOrder.SetInReceiving", nameof(ReceivingOrderCommandService));
@@ -81,7 +81,7 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
         }
 
         var validationResult = existingOrder.ValidateToSetInReceiving();
@@ -104,10 +104,10 @@ public class ReceivingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> SetReceivedAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> SetReceivedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ReceivingOrder SetReceived {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("ReceivingOrder.SetReceived", nameof(ReceivingOrderCommandService));
@@ -121,7 +121,7 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
         }
 
         var validationResult = existingOrder.ValidateToSetReceived();
@@ -179,10 +179,10 @@ public class ReceivingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> UpdateOrderItemFactQuantityAsync(
+    public async Task<OperationResult> UpdateOrderItemFactQuantityAsync(
         Guid receivingOrderId,
         int lineNumber,
         double factQuantity,
@@ -190,7 +190,7 @@ public class ReceivingOrderCommandService(
         CancellationToken ct = default)
     {
         if (factQuantity < 0)
-            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
+            return OperationError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -199,27 +199,27 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
 
         if (existingOrder is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var canEditFactQuantity = existingOrder.Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
 
         if (!canEditFactQuantity)
-            return ServiceError.Invalid<ReceivingOrderItem>("Fact quantity can be edited only while the receiving order is in receiving or requires processing.");
+            return OperationError.Invalid<ReceivingOrderItem>("Fact quantity can be edited only while the receiving order is in receiving or requires processing.");
 
         var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
 
         if (existingItem is null)
-            return ServiceError.NotFound<ReceivingOrderItem>();
+            return OperationError.NotFound<ReceivingOrderItem>();
 
         existingItem.FactQuantity = factQuantity;
         existingItem.Comment = comment;
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> SetReceivingLocationAsync(
+    public async Task<OperationResult> SetReceivingLocationAsync(
         Guid receivingOrderId,
         Guid receivingLocationId,
         CancellationToken ct = default)
@@ -232,13 +232,13 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(ct);
 
         if (orderInfo is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         if (orderInfo.Status is not (ReceivingOrderStatus.ReadyForReceiving
             or ReceivingOrderStatus.InReceiving
             or ReceivingOrderStatus.ProcessingRequired))
         {
-            return ServiceError.Invalid<ReceivingOrder>(
+            return OperationError.Invalid<ReceivingOrder>(
                 "Receiving location can be changed only before the order is received.");
         }
 
@@ -251,7 +251,7 @@ public class ReceivingOrderCommandService(
                 && x.Zone!.Type == ZoneType.Receiving, ct);
 
         if (!validLocation)
-            return ServiceError.Invalid<StorageLocation>("Receiving location must belong to a receiving zone in the order warehouse.");
+            return OperationError.Invalid<StorageLocation>("Receiving location must belong to a receiving zone in the order warehouse.");
 
         var affected = await dbContext.ReceivingOrders
             .Where(x => x.Id == receivingOrderId)
@@ -259,8 +259,8 @@ public class ReceivingOrderCommandService(
                 .SetProperty(p => p.ReceivingLocationId, receivingLocationId), ct);
 
         if (affected == 0)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 }

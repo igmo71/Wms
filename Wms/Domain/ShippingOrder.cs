@@ -199,19 +199,19 @@ public class ShippingOrder
         }
     }
 
-    internal ServiceResult ValidateToSetReadyForPicking()
+    internal OperationResult ValidateToSetReadyForPicking()
     {
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a prepared shipping order can be set ready for picking.");
+            return OperationError.Invalid<ShippingOrder>("Only a prepared shipping order can be set ready for picking.");
         }
 
         if (ShippingLocationId is null)
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before setting the order ready for picking.");
+            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before setting the order ready for picking.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void SetReadyForPicking(string userId)
@@ -223,7 +223,7 @@ public class ShippingOrder
         PickingStartedBy = userId;
     }
 
-    public ServiceResult ValidateToSetReadyForShipment()
+    public OperationResult ValidateToSetReadyForShipment()
     {
         var canSetReadyForShipment = Status is ShippingOrderStatus.ReadyForPicking
             or ShippingOrderStatus.ReadyForVerification
@@ -232,10 +232,10 @@ public class ShippingOrder
 
         if (!canSetReadyForShipment)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a shipping order being picked or verified can be set ready for shipment.");
+            return OperationError.Invalid<ShippingOrder>("Only a shipping order being picked or verified can be set ready for shipment.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void SetReadyForShipment(string userId)
@@ -247,19 +247,19 @@ public class ShippingOrder
         ReadyForShipmentBy = userId;
     }
 
-    public ServiceResult ValidateToSetShipped()
+    public OperationResult ValidateToSetShipped()
     {
         if (Status != ShippingOrderStatus.ReadyForShipment)
         {
-            return ServiceError.Invalid<ShippingOrder>("Only a shipping order ready for shipment can be shipped.");
+            return OperationError.Invalid<ShippingOrder>("Only a shipping order ready for shipment can be shipped.");
         }
 
         if (ShippingLocationId is null)
         {
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before shipping the order.");
+            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before shipping the order.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void SetShipped(string userId)
@@ -271,21 +271,21 @@ public class ShippingOrder
         ShippedBy = userId;
     }
 
-    public ServiceResult ValidateToRollback()
+    public OperationResult ValidateToRollback()
     {
         if (Status is ShippingOrderStatus.Prepared or ShippingOrderStatus.Shipped)
         {
-            return ServiceError.Invalid<ShippingOrder>(
+            return OperationError.Invalid<ShippingOrder>(
                 "Only a shipping order in progress or ready for shipment can be rolled back.");
         }
 
         if (PickingStartedAtUtc is null)
         {
-            return ServiceError.Failure<ShippingOrder>(
+            return OperationError.Failure<ShippingOrder>(
                 "Shipping order has no picking start time and cannot be rolled back safely.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void Rollback(string reason, string userId)

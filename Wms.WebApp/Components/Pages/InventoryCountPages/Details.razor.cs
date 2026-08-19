@@ -235,12 +235,12 @@ public partial class Details
     private string GetItemAuditTooltip(InventoryCountItem item) =>
         $"Создана: {FormatOperation(item.CreatedAtUtc, item.CreatedBy)}\nИзменена: {FormatOperation(item.UpdatedAtUtc, item.UpdatedBy)}";
 
-    private async Task<ServiceResult> RunAsCurrentUserAsync(Func<string, Task<ServiceResult>> action)
+    private async Task<OperationResult> RunAsCurrentUserAsync(Func<string, Task<OperationResult>> action)
     {
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         return userId is null
-            ? ServiceError.Invalid<InventoryCount>("Current user cannot be determined.")
+            ? OperationError.Invalid<InventoryCount>("Current user cannot be determined.")
             : await action(userId);
     }
 }

@@ -12,13 +12,13 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal Task<ServiceResult> SetInReceivingAsync(Guid orderId, CancellationToken ct) =>
+    internal Task<OperationResult> SetInReceivingAsync(Guid orderId, CancellationToken ct) =>
         SwitchStatusAsync("ВРаботе", orderId, ct);
 
-    internal Task<ServiceResult> SetReceivedAsync(Guid orderId, CancellationToken ct) =>
+    internal Task<OperationResult> SetReceivedAsync(Guid orderId, CancellationToken ct) =>
         SwitchStatusAsync("Принят", orderId, ct);
 
-    private async Task<ServiceResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
+    private async Task<OperationResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
     {
         using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
         using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.SwitchStatus", nameof(ShippingOrderCommandService));
@@ -38,14 +38,14 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         if (actualStatus != expectedStatus)
         {
             logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return ServiceError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            return OperationError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
         return await oneCClient.PostValueAsync(postUri, ct);
     }
 
-    internal async Task<ServiceResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
+    internal async Task<OperationResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));
@@ -55,7 +55,7 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         var patchUri = Document.PatchUri(orderId.ToString());
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, Document>(patchUri, patchBody, ct);
 
-        return patchResult.IsSuccess ? ServiceResult.Success() : patchResult;
+        return patchResult.IsSuccess ? OperationResult.Success() : patchResult;
     }
 
     private class PatchBody

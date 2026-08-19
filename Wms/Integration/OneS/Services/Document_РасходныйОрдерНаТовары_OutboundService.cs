@@ -13,16 +13,16 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 {
     private record StatusOrderCommand(string Статус);
 
-    internal Task<ServiceResult> SetReadyForPickingAsync(Guid orderId, CancellationToken ct) =>
+    internal Task<OperationResult> SetReadyForPickingAsync(Guid orderId, CancellationToken ct) =>
         SwitchStatusAsync("КОтбору", orderId, ct);
 
-    internal Task<ServiceResult> SetReadyForShipmentAsync(Guid orderId, CancellationToken ct) =>
+    internal Task<OperationResult> SetReadyForShipmentAsync(Guid orderId, CancellationToken ct) =>
         SwitchStatusAsync("КОтгрузке", orderId, ct);
 
-    internal Task<ServiceResult> SetShippedAsync(Guid orderId, CancellationToken ct) =>
+    internal Task<OperationResult> SetShippedAsync(Guid orderId, CancellationToken ct) =>
         SwitchStatusAsync("Отгружен", orderId, ct);
 
-    private async Task<ServiceResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
+    private async Task<OperationResult> SwitchStatusAsync(string expectedStatus, Guid orderId, CancellationToken ct)
     {
         using var scope = logger.BeginScope("SwitchStatus {OrderId} {ExpectedStatus}", orderId, expectedStatus);
         using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.SwitchStatus", nameof(ShippingOrderCommandService));
@@ -42,14 +42,14 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (actualStatus != expectedStatus)
         {
             logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return ServiceError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            return OperationError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
         return await oneCClient.PostValueAsync(postUri, ct);
     }
 
-    internal async Task<ServiceResult> UpdateDocumentItemsAsync(ShippingOrder shippingOrder, CancellationToken ct)
+    internal async Task<OperationResult> UpdateDocumentItemsAsync(ShippingOrder shippingOrder, CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", shippingOrder.Id);
         using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));
@@ -62,7 +62,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         var freshDocument = freshDocumentResult.Value?.Value?.SingleOrDefault();
         if (freshDocument is null)
-            return ServiceError.NotFound("Shipping order was not found in 1C.");
+            return OperationError.NotFound("Shipping order was not found in 1C.");
 
         var patchBodyResult = CreatePatchBody(shippingOrder, freshDocument);
         if (!patchBodyResult.IsSuccess)
@@ -71,15 +71,15 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         var patchUri = Document.PatchUri(shippingOrder.Id.ToString());
         var patchResult = await oneCClient.PatchValueAsync<PatchBody, object>(patchUri, patchBodyResult.Value!, ct);
 
-        return patchResult.IsSuccess ? ServiceResult.Success() : patchResult;
+        return patchResult.IsSuccess ? OperationResult.Success() : patchResult;
     }
 
-    private static ServiceResult<PatchBody> CreatePatchBody(ShippingOrder shippingOrder, Document freshDocument)
+    private static OperationResult<PatchBody> CreatePatchBody(ShippingOrder shippingOrder, Document freshDocument)
     {
         if (shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
             || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
         {
-            return ServiceError.Conflict("Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
+            return OperationError.Conflict("Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
         }
 
         var freshBaseItemsByLine = freshDocument.ТоварыПоРаспоряжениям.ToDictionary(x => x.LineNumber);
@@ -88,7 +88,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
             || freshItemsByLine.Count(x => Document.IsRegularShippingItem(x.Value)) != shippingOrder.Items.Count)
         {
-            return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+            return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
         }
 
         foreach (var localBaseItem in shippingOrder.BaseItems)
@@ -97,7 +97,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshBaseItem.Номенклатура_Key != localBaseItem.StockKeepingUnitId
                 || freshBaseItem.Количество != localBaseItem.PlanQuantity)
             {
-                return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+                return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
             }
         }
 
@@ -108,7 +108,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshItem.КоличествоУпаковок != localItem.PlanQuantity
                 || ODataEnumMapper.Parse<ShippingOrderAction>(freshItem.Действие) != ShippingOrderAction.PickUp)
             {
-                return ServiceError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+                return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
             }
         }
 
@@ -123,7 +123,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         if (!baseItemStockKeepingUnitIds.SequenceEqual(itemStockKeepingUnitIds))
         {
-            return ServiceError.Conflict("Shipping order base lines and shipping lines in WMS cannot be matched safely.");
+            return OperationError.Conflict("Shipping order base lines and shipping lines in WMS cannot be matched safely.");
         }
 
         var localItemsByStockKeepingUnit = shippingOrder.Items.ToDictionary(x => x.StockKeepingUnitId);

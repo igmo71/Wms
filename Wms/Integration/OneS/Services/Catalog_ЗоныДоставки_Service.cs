@@ -28,7 +28,7 @@ internal class Catalog_ЗоныДоставки_Service(
         await deliveryDirectionService.CreateOrUpdateAsync(deliveryDirection, ct);
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_ЗоныДоставки.GetListUri;
 
@@ -40,7 +40,7 @@ internal class Catalog_ЗоныДоставки_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список направлений доставки отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список направлений доставки отсутствует.");
 
         foreach (var fetchedItem in fetchedItems)
         {
@@ -49,7 +49,7 @@ internal class Catalog_ЗоныДоставки_Service(
             await deliveryDirectionService.CreateOrUpdateAsync(warehouse, ct);
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static DeliveryDirection MapToDeliveryDirection(Catalog_ЗоныДоставки fetchedItem)

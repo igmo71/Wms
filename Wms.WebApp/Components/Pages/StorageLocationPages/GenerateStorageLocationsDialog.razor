@@ -1,4 +1,5 @@
 @using Wms.Application.StorageLocations
+@using Wms.Common
 @using Wms.Domain
 
 <MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
@@ -88,6 +89,26 @@
         _errorMessage = null;
         try
         {
+            var dimensionsResult = LocationDimensions.Create(
+                _length,
+                _width,
+                _height,
+                _volume,
+                _volumeFactor,
+                _maxWeight);
+            if (!dimensionsResult.IsSuccess)
+            {
+                _errorMessage = dimensionsResult.Error?.Message;
+                return;
+            }
+
+            var coordinatesResult = LocationCoordinates.Create(_startX, _startY, _startZ);
+            if (!coordinatesResult.IsSuccess)
+            {
+                _errorMessage = coordinatesResult.Error?.Message;
+                return;
+            }
+
             var request = new GenerateStorageLocationsRequest
             {
                 WarehouseId = Warehouse.Id,
@@ -99,14 +120,8 @@
                 SegmentWidth = _segmentWidth,
                 NamePrefix = _namePrefix,
                 IsFolder = _isFolder,
-                Dimensions = new LocationDimensions(
-                    _length,
-                    _width,
-                    _height,
-                    _volume,
-                    _volumeFactor,
-                    _maxWeight),
-                StartCoordinates = new LocationCoordinates(_startX, _startY, _startZ),
+                Dimensions = dimensionsResult.Value!,
+                StartCoordinates = coordinatesResult.Value!,
                 CoordinateAxis = _coordinateAxis,
                 CoordinateStep = _coordinateStep,
                 StartPickSequence = _startPickSequence,
@@ -120,10 +135,6 @@
                 return;
             }
             MudDialog.Close(DialogResult.Ok(true));
-        }
-        catch (ArgumentException exception)
-        {
-            _errorMessage = exception.Message;
         }
         catch
         {

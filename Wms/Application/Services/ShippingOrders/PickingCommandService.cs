@@ -11,7 +11,7 @@ public class PickingCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     ILogger<PickingCommandService> logger)
 {
-    public async Task<ServiceResult> AddPickingMovementAsync(
+    public async Task<OperationResult> AddPickingMovementAsync(
         Guid orderId,
         int lineNumber,
         Guid sourceStorageLocationId,
@@ -21,7 +21,7 @@ public class PickingCommandService(
         using var scope = logger.BeginScope("Picking AddMovement {OrderId} {LineNumber}", orderId, lineNumber);
 
         if (quantity <= 0)
-            return ServiceError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
+            return OperationError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -30,7 +30,7 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
 
         var validationResult = ValidateEditablePickingOrder(order);
 
@@ -42,24 +42,24 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
 
         if (sourceLocation is null)
-            return ServiceError.NotFound<StorageLocation>();
+            return OperationError.NotFound<StorageLocation>();
 
         if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
 
         if (sourceLocation.WarehouseId != order.WarehouseId)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
 
         if (sourceLocation.Zone?.Type != ZoneType.Storage)
-            return ServiceError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
+            return OperationError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
 
         if (sourceStorageLocationId == order.ShippingLocationId)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
 
         var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
 
         if (orderItem is null)
-            return ServiceError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound<ShippingOrderItem>();
 
         var draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
@@ -93,10 +93,10 @@ public class PickingCommandService(
             .Sum(x => x.Quantity) + movement.Quantity;
 
         await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> UpdatePickingMovementAsync(
+    public async Task<OperationResult> UpdatePickingMovementAsync(
         Guid movementId,
         Guid sourceStorageLocationId,
         double quantity,
@@ -105,7 +105,7 @@ public class PickingCommandService(
         using var scope = logger.BeginScope("Picking UpdateMovement {MovementId}", movementId);
 
         if (quantity <= 0)
-            return ServiceError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
+            return OperationError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -113,20 +113,20 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
-            return ServiceError.NotFound<InventoryMovement>();
+            return OperationError.NotFound<InventoryMovement>();
 
         if (movement.PostedAtUtc is not null)
-            return ServiceError.Invalid<InventoryMovement>("Posted picking movement cannot be updated.");
+            return OperationError.Invalid<InventoryMovement>("Posted picking movement cannot be updated.");
 
         if (movement.RecorderType != RecorderType.ShippingOrder || movement.RecorderId is null || movement.RecorderLineNumber is null)
-            return ServiceError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
+            return OperationError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
 
         var order = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
 
         var validationResult = ValidateEditablePickingOrder(order);
 
@@ -138,24 +138,24 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
 
         if (sourceLocation is null)
-            return ServiceError.NotFound<StorageLocation>();
+            return OperationError.NotFound<StorageLocation>();
 
         if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
 
         if (sourceLocation.WarehouseId != order.WarehouseId)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
 
         if (sourceLocation.Zone?.Type != ZoneType.Storage)
-            return ServiceError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
+            return OperationError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
 
         if (sourceStorageLocationId == order.ShippingLocationId)
-            return ServiceError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
+            return OperationError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
 
         var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
 
         if (orderItem is null)
-            return ServiceError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound<ShippingOrderItem>();
 
         var draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
@@ -178,10 +178,10 @@ public class PickingCommandService(
             .Sum(x => x.Quantity) + quantity;
 
         await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> DeletePickingMovementAsync(Guid movementId, CancellationToken ct = default)
+    public async Task<OperationResult> DeletePickingMovementAsync(Guid movementId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("Picking DeleteMovement {MovementId}", movementId);
 
@@ -191,20 +191,20 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
-            return ServiceError.NotFound<InventoryMovement>();
+            return OperationError.NotFound<InventoryMovement>();
 
         if (movement.PostedAtUtc is not null)
-            return ServiceError.Invalid<InventoryMovement>("Posted picking movement cannot be deleted.");
+            return OperationError.Invalid<InventoryMovement>("Posted picking movement cannot be deleted.");
 
         if (movement.RecorderType != RecorderType.ShippingOrder || movement.RecorderId is null || movement.RecorderLineNumber is null)
-            return ServiceError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
+            return OperationError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
 
         var order = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
 
         var validationResult = ValidateEditablePickingOrder(order);
 
@@ -214,7 +214,7 @@ public class PickingCommandService(
         var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
 
         if (orderItem is null)
-            return ServiceError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound<ShippingOrderItem>();
 
         var draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
@@ -229,10 +229,10 @@ public class PickingCommandService(
             .Sum(x => x.Quantity);
 
         await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static ServiceResult ValidateEditablePickingOrder(ShippingOrder order)
+    private static OperationResult ValidateEditablePickingOrder(ShippingOrder order)
     {
         var isEditable = order.Status is ShippingOrderStatus.ReadyForPicking
             or ShippingOrderStatus.ReadyForVerification
@@ -240,15 +240,15 @@ public class PickingCommandService(
             or ShippingOrderStatus.Verified;
 
         if (!isEditable)
-            return ServiceError.Invalid<ShippingOrder>("Picking movements can be changed only while the shipping order is being picked or verified.");
+            return OperationError.Invalid<ShippingOrder>("Picking movements can be changed only while the shipping order is being picked or verified.");
 
         if (order.ShippingLocationId is null)
-            return ServiceError.Invalid<ShippingOrder>("Shipping location must be specified before changing picking movements.");
+            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before changing picking movements.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static async Task<ServiceResult> ValidateDraftQuantityLimitsAsync(
+    private static async Task<OperationResult> ValidateDraftQuantityLimitsAsync(
         ApplicationDbContext dbContext,
         ShippingOrder order,
         ShippingOrderItem orderItem,
@@ -263,7 +263,7 @@ public class PickingCommandService(
             .Sum(x => x.Quantity) + quantity;
 
         if (lineQuantity > orderItem.PlanQuantity)
-            return ServiceError.Invalid<InventoryMovement>("Picking quantity exceeds the planned quantity for the shipping order line.");
+            return OperationError.Invalid<InventoryMovement>("Picking quantity exceeds the planned quantity for the shipping order line.");
 
         var sourceBalance = await dbContext.InventoryBalances
             .AsNoTracking()
@@ -278,8 +278,8 @@ public class PickingCommandService(
             .Sum(x => x.Quantity) + quantity;
 
         if (sourceBalance is null || sourceQuantity > sourceBalance.Quantity)
-            return ServiceError.Invalid<InventoryMovement>("Picking quantity exceeds the available inventory balance in the source storage location.");
+            return OperationError.Invalid<InventoryMovement>("Picking quantity exceeds the available inventory balance in the source storage location.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 }

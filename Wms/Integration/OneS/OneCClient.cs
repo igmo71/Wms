@@ -13,7 +13,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
     //private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
 
-    public Task<ServiceResult<TResponse?>> GetValueAsync<TResponse>(
+    public Task<OperationResult<TResponse?>> GetValueAsync<TResponse>(
         string uri,
         CancellationToken ct = default)
     {
@@ -22,7 +22,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         return SendAsync<TResponse>(request, ct);
     }
 
-    public Task<ServiceResult<TResponse?>> PatchValueAsync<TRequest, TResponse>(
+    public Task<OperationResult<TResponse?>> PatchValueAsync<TRequest, TResponse>(
         string uri,
         TRequest value,
         CancellationToken ct = default)
@@ -37,7 +37,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         return SendAsync<TResponse>(request, ct);
     }
 
-    public Task<ServiceResult<TResponse?>> PostValueAsync<TRequest, TResponse>(
+    public Task<OperationResult<TResponse?>> PostValueAsync<TRequest, TResponse>(
         string uri,
         TRequest value,
         CancellationToken ct = default)
@@ -52,7 +52,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
         return SendAsync<TResponse>(request, ct);
     }
 
-    private async Task<ServiceResult<TResponse?>> SendAsync<TResponse>(HttpRequestMessage request, CancellationToken ct)
+    private async Task<OperationResult<TResponse?>> SendAsync<TResponse>(HttpRequestMessage request, CancellationToken ct)
     {
         using (request)
         {
@@ -72,7 +72,7 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
                     _logger.LogError("1C request failed {StatusCode}: {Error}", response.StatusCode, error);
 
-                    return ServiceError.Failure<TResponse>($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
+                    return OperationError.Failure<TResponse>($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
                 }
 
                 if (string.IsNullOrWhiteSpace(responseContent))
@@ -90,26 +90,26 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             {
                 _logger.LogError(ex, "1C returned an invalid JSON response {Method} {Uri} {responseContent}", request.Method, request.RequestUri, responseContent);
 
-                return ServiceError.Failure<TResponse>("1C returned an invalid JSON response");
+                return OperationError.Failure<TResponse>("1C returned an invalid JSON response");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "1C request failed: {Method} {Uri}", request.Method, request.RequestUri);
 
-                return ServiceError.Failure<TResponse>($"1C request failed: {ex.Message}");
+                return OperationError.Failure<TResponse>($"1C request failed: {ex.Message}");
             }
         }
 
     }
 
-    public Task<ServiceResult> PostValueAsync(string uri, CancellationToken ct = default)
+    public Task<OperationResult> PostValueAsync(string uri, CancellationToken ct = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, uri);
 
         return SendAsync(request, ct);
     }
 
-    private async Task<ServiceResult> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    private async Task<OperationResult> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         using (request)
         {
@@ -129,10 +129,10 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
 
                     _logger.LogError("1C request failed {StatusCode}: {Error}", response.StatusCode, error);
 
-                    return ServiceError.Failure($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
+                    return OperationError.Failure($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
                 }
 
-                return ServiceResult.Success();
+                return OperationResult.Success();
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -142,13 +142,13 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             {
                 _logger.LogError(ex, "1C returned an invalid JSON response {Method} {Uri} {responseContent}", request.Method, request.RequestUri, responseContent);
 
-                return ServiceError.Failure("1C returned an invalid JSON response");
+                return OperationError.Failure("1C returned an invalid JSON response");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "1C request failed: {Method} {Uri}", request.Method, request.RequestUri);
 
-                return ServiceError.Failure(ex.Message);
+                return OperationError.Failure(ex.Message);
             }
         }
     }

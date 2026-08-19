@@ -9,7 +9,7 @@ internal class Catalog_Партнеры_Service(
     OneCClient oneCClient,
     PartnerService partnerService)
 {
-    public async Task<ServiceResult> ImportAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
         var uri = Catalog_Партнеры.GetUri(refKey);
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Партнеры>>(uri, ct);
@@ -20,14 +20,14 @@ internal class Catalog_Партнеры_Service(
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: партнёр отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: партнёр отсутствует.");
 
         await partnerService.CreateOrUpdateAsync(MapToPartner(fetchedItem), ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity("Catalog_Партнеры Import List", nameof(Catalog_Партнеры_Service));
 
@@ -37,10 +37,10 @@ internal class Catalog_Партнеры_Service(
             return totalResult;
 
         if (totalResult.Value is not int totalItems)
-            return ServiceError.Failure("1С вернула некорректный ответ: количество партнёров отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: количество партнёров отсутствует.");
 
         var totalBatches = (totalItems + Catalog_Партнеры.BatchSize - 1) / Catalog_Партнеры.BatchSize;
-        List<Task<ServiceResult>> tasks = [];
+        List<Task<OperationResult>> tasks = [];
 
         using var semaphore = new SemaphoreSlim(10);
 
@@ -58,16 +58,16 @@ internal class Catalog_Партнеры_Service(
                     var batchResult = await oneCClient.GetValueAsync<RootObject<Catalog_Партнеры>>(uri, ct);
 
                     if (!batchResult.IsSuccess)
-                        return ServiceResult.Failure(batchResult.Error!);
+                        return OperationResult.Failure(batchResult.Error!);
 
                     var fetchedItems = batchResult.Value?.Value;
 
                     if (fetchedItems is null)
-                        return ServiceResult.Failure(
-                            ServiceError.Failure("1С вернула некорректный ответ: пакет партнёров отсутствует."));
+                        return OperationResult.Failure(
+                            OperationError.Failure("1С вернула некорректный ответ: пакет партнёров отсутствует."));
 
                     if (fetchedItems.Count == 0)
-                        return ServiceResult.Success();
+                        return OperationResult.Success();
 
                     var partners = fetchedItems
                         .Select(MapToPartner)
@@ -75,7 +75,7 @@ internal class Catalog_Партнеры_Service(
 
                     await partnerService.CreateOrUpdateBatchAsync(partners, ct);
 
-                    return ServiceResult.Success();
+                    return OperationResult.Success();
                 }
                 finally
                 {
@@ -88,8 +88,8 @@ internal class Catalog_Партнеры_Service(
         var failedResult = batchResults.FirstOrDefault(x => !x.IsSuccess);
 
         return failedResult is null
-            ? ServiceResult.Success()
-            : ServiceError.Failure(
+            ? OperationResult.Success()
+            : OperationError.Failure(
                 $"Не удалось полностью обновить партнёров. Часть данных могла быть обновлена. {failedResult.Error?.Message}");
     }
 

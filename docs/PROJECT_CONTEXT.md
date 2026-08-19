@@ -48,19 +48,6 @@ The operator UI exposes a separate paged list of posted inventory movements. It 
 
 Inventory counts are local WMS documents. They use a local `yyMMdd-HHmmss` number and the creation date. A draft may contain incomplete rows while an operator records the count. Each document and row timestamp is accompanied by the user who performed that operation. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation, and records the posting user as the movement confirmer. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
 
-`InventoryTransfer` is a local WMS inventory document without planned item lines
-or 1C synchronization. It groups an unrestricted chronological sequence of
-direct storage-location movements and movements through one optional transit
-location, such as a trolley. Each operator-confirmed physical action is
-immediately posted through the common inventory service; pick, put, and direct
-actions may be freely interleaved. A transit location is selected once as
-transfer context, starts empty, and belongs exclusively to one active transfer.
-A draft without movements may be deleted, the first movement starts the
-transfer, and it may be completed explicitly only after its transit location is
-empty.
-Posted movements and completed documents are immutable. The detailed process is
-defined in `specs/intra-warehouse-transfers/spec.md`.
-
 Inventory-transfer commands immediately post every confirmed direct, pick, or put action
 together with balance and turnover changes in one `SaveChangesAsync` call,
 allocate a chronological movement line, and start a draft on its first
@@ -70,14 +57,18 @@ command and query backend and the operator web UI are implemented. The UI has a
 filtered, paged transfer list and one work page for both initialization and
 continued work. At start, the operator selects a warehouse and, when needed, an
 empty transit location from that warehouse; both are then fixed for the
-document. The transit selector offers only empty, unassigned transit locations
-and states when none are available. Before confirmation, movement controls are visible but disabled.
+document. The transit location belongs exclusively to one active transfer.
+The transit selector offers only empty, unassigned locations and states when
+none are available. Before confirmation, movement controls are visible but disabled.
 Pick, put, and direct movement remain separate freely interleaved actions.
 Draft and in-progress documents open on the work page; completed documents open
 on a separate read-only details page with their movement history.
 The work page always shows the completion action for an unfinished document;
 it is enabled only after a movement has started the transfer and, when a
 transit location is used, only after it is empty.
+Drafts without movements may be deleted. Posted movements and completed
+documents are immutable. The detailed process is defined in
+`specs/intra-warehouse-transfers/spec.md`.
 
 ## Document list UI convention
 
@@ -141,29 +132,14 @@ audit data. The detailed rules are defined in
 
 ## MVP implementation principles
 
-The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.
-
-- UI and HTTP endpoints may call application services directly.
-- CQRS, DTO layers, repositories, and additional abstractions are optional tools, not mandatory architecture.
-- Detailed validation, resilience, and stabilization are added when they become useful for the MVP, not preemptively.
-- Existing code and the explicitly stated business flow take priority over speculative future needs.
-- Local business invariants that need no database or injected service belong in
-  domain entities and value objects. Checks against external state remain in
-  application services. The model is enriched incrementally where a method
-  expresses a real business operation; the MVP does not pursue abstraction for
-  its own sake.
-- Request objects may validate their own locally self-consistent input. Checks
-  that require persisted state remain named application-service operations, so
-  the main use-case method reads as a short sequence of business steps.
-- Application requests are immutable command parameters created at the call
-  boundary and live beside their feature. Interactive UI form state remains a
-  separate mutable concern. A request type is introduced only when it makes a
-  multi-parameter operation clearer; it does not imply a CQRS framework.
-- New and changed C# code follows Microsoft's common C# coding conventions,
-  including braces for control-flow statements and conventional identifier,
-  layout, and whitespace rules.
-
-These principles can change as the product and its constraints mature.
+The project favors clear, direct code and incremental enrichment over
+enterprise-level generalization. Layer responsibilities, validation placement,
+operation outcomes, coding conventions, and architectural non-goals are defined
+once in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). The ordered refactoring
+backlog is kept in
+[`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/spec.md).
+Existing code and documented business behavior take priority over speculative
+future needs.
 
 ## Solution map
 
@@ -203,7 +179,7 @@ The operator UI exposes configuration screens under the `Конфигураци�
 - `Номенклатура`, `Партнёры`, `Физические лица`, `Структура предприятия`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs. Partners, individuals, and organizational units are displayed as flat lists; their imported `ParentId` hierarchies are not visualized. Individual catalog groups are stored and shown alongside people with an explicit row type.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
-Manual list imports for 1C-synchronized catalogs return `ServiceResult` through `SynchronizedCatalogImportService`. Configuration pages that expose these imports show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. Large catalogs such as SKUs and partners are loaded in independent parallel batches; completed batches are not rolled back when another batch fails, and the failure warns that the catalog may have been partially updated.
+Manual list imports for 1C-synchronized catalogs return `OperationResult` through `SynchronizedCatalogImportService`. Configuration pages that expose these imports show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. Large catalogs such as SKUs and partners are loaded in independent parallel batches; completed batches are not rolled back when another batch fails, and the failure warns that the catalog may have been partially updated.
 Small catalogs may be fetched in one 1C request and saved through one EF Core batch operation instead of issuing one database save per catalog item. The individuals and organizational-unit imports use this approach.
 
 ## Receiving

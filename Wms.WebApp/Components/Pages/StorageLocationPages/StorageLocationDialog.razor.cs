@@ -62,8 +62,15 @@ public partial class StorageLocationDialog
         _errorMessage = null;
         try
         {
-            var details = CreateDetails();
-            ServiceResult result;
+            var detailsResult = CreateDetails();
+            if (!detailsResult.IsSuccess)
+            {
+                _errorMessage = detailsResult.Error?.Message;
+                return;
+            }
+
+            var details = detailsResult.Value!;
+            OperationResult result;
             if (StorageLocation is null)
             {
                 result = await StorageLocationService.CreateAsync(new CreateStorageLocationRequest
@@ -89,10 +96,6 @@ public partial class StorageLocationDialog
 
             MudDialog.Close(DialogResult.Ok(true));
         }
-        catch (ArgumentException exception)
-        {
-            _errorMessage = exception.Message;
-        }
         catch
         {
             _errorMessage = "Не удалось сохранить складскую позицию.";
@@ -103,22 +106,31 @@ public partial class StorageLocationDialog
         }
     }
 
-    private StorageLocationDetails CreateDetails()
+    private OperationResult<StorageLocationDetails> CreateDetails()
     {
-        var dimensions = new LocationDimensions(
+        var dimensionsResult = LocationDimensions.Create(
             _length,
             _width,
             _height,
             _volume,
             _volumeFactor,
             _maxWeight);
+        if (!dimensionsResult.IsSuccess)
+        {
+            return dimensionsResult.Error!;
+        }
 
-        var coordinates = new LocationCoordinates(_x, _y, _z);
-        return new StorageLocationDetails(
+        var coordinatesResult = LocationCoordinates.Create(_x, _y, _z);
+        if (!coordinatesResult.IsSuccess)
+        {
+            return coordinatesResult.Error!;
+        }
+
+        return StorageLocationDetails.Create(
             _name,
             _isFolder,
-            dimensions,
-            coordinates,
+            dimensionsResult.Value,
+            coordinatesResult.Value,
             _pickSequence);
     }
 

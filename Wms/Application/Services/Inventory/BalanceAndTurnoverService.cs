@@ -8,7 +8,7 @@ namespace Wms.Application.Services.Inventory;
 
 public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger)
 {
-    internal async Task<ServiceResult> PostInventoryMovementsAsync(
+    internal async Task<OperationResult> PostInventoryMovementsAsync(
         IReadOnlyCollection<InventoryMovement> movements,
         ApplicationDbContext dbContext,
         CancellationToken ct)
@@ -20,25 +20,25 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
             if (movement.Quantity <= 0)
             {
                 logger.LogError("Inventory movement quantity must be greater than zero. Movement: {MovementId}", movement.Id);
-                return ServiceError.Invalid("Inventory movement quantity must be greater than zero.");
+                return OperationError.Invalid("Inventory movement quantity must be greater than zero.");
             }
 
             if (movement.SourceStorageLocationId is null && movement.DestinationStorageLocationId is null)
             {
                 logger.LogError("Inventory movement source or destination must be specified. Movement: {MovementId}", movement.Id);
-                return ServiceError.Invalid("Inventory movement source or destination must be specified.");
+                return OperationError.Invalid("Inventory movement source or destination must be specified.");
             }
 
             if (movement.SourceStorageLocationId == movement.DestinationStorageLocationId)
             {
                 logger.LogError("Inventory movement source and destination must be different. Movement: {MovementId}", movement.Id);
-                return ServiceError.Invalid("Inventory movement source and destination must be different.");
+                return OperationError.Invalid("Inventory movement source and destination must be different.");
             }
 
             if (movement.PostedAtUtc is not null)
             {
                 logger.LogError("Inventory movement has already been posted. Movement: {MovementId}", movement.Id);
-                return ServiceError.Failure("Inventory movement has already been posted.");
+                return OperationError.Failure("Inventory movement has already been posted.");
             }
         }
 
@@ -67,7 +67,7 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                 {
                     logger.LogError("Inventory movement location is invalid. Movement: {MovementId}, Location: {LocationId}",
                         movement.Id, locationId);
-                    return ServiceError.Invalid<StorageLocation>("Inventory movements require non-folder locations in their warehouse.");
+                    return OperationError.Invalid<StorageLocation>("Inventory movements require non-folder locations in their warehouse.");
                 }
             }
         }
@@ -87,13 +87,13 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
                 if (!balances.TryGetValue(sourceKey, out var sourceBalance))
                 {
                     logger.LogError("Source inventory balance not found. Movement: {MovementId}", movement.Id);
-                    return ServiceError.Failure("Source inventory balance not found.");
+                    return OperationError.Failure("Source inventory balance not found.");
                 }
 
                 if (sourceBalance.Quantity < movement.Quantity)
                 {
                     logger.LogError("Insufficient source inventory balance. Movement: {MovementId}", movement.Id);
-                    return ServiceError.Failure("Insufficient source inventory balance.");
+                    return OperationError.Failure("Insufficient source inventory balance.");
                 }
 
                 var balanceBefore = sourceBalance.Quantity;
@@ -157,6 +157,6 @@ public class BalanceAndTurnoverService(ILogger<BalanceAndTurnoverService> logger
             movement.PostedAtUtc = now;
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 }

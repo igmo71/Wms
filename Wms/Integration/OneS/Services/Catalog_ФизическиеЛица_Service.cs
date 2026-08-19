@@ -9,7 +9,7 @@ internal class Catalog_ФизическиеЛица_Service(
     OneCClient oneCClient,
     IndividualService individualService)
 {
-    public async Task<ServiceResult> ImportAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
         var uri = Catalog_ФизическиеЛица.GetUri(refKey);
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_ФизическиеЛица>>(uri, ct);
@@ -20,14 +20,14 @@ internal class Catalog_ФизическиеЛица_Service(
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: физическое лицо отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: физическое лицо отсутствует.");
 
         await individualService.CreateOrUpdateAsync(MapToIndividual(fetchedItem), ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity(
             "Catalog_ФизическиеЛица Import List",
@@ -43,7 +43,7 @@ internal class Catalog_ФизическиеЛица_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список физических лиц отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список физических лиц отсутствует.");
 
         var individuals = fetchedItems
             .Select(MapToIndividual)
@@ -51,7 +51,7 @@ internal class Catalog_ФизическиеЛица_Service(
 
         await individualService.CreateOrUpdateBatchAsync(individuals, ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static Individual MapToIndividual(Catalog_ФизическиеЛица fetchedItem)

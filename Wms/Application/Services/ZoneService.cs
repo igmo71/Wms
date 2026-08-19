@@ -8,7 +8,7 @@ namespace Wms.Application.Services;
 
 public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task<ServiceResult<Zone>> SaveAsync(
+    public async Task<OperationResult<Zone>> SaveAsync(
         SaveZoneRequest request,
         CancellationToken ct = default)
     {
@@ -17,12 +17,12 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
 
         if (request.Id.HasValue && zone is null)
         {
-            return ServiceError.NotFound<Zone>();
+            return OperationError.NotFound<Zone>();
         }
 
         var originalWarehouseId = zone?.WarehouseId;
 
-        var domainResult = DomainOperation.Execute(() => ApplyRequest(zone, request));
+        var domainResult = ApplyRequest(zone, request);
         if (!domainResult.IsSuccess)
         {
             return domainResult.Error!;
@@ -127,7 +127,7 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
             : Task.FromResult<Zone?>(null);
     }
 
-    private static Zone ApplyRequest(Zone? zone, SaveZoneRequest request)
+    private static OperationResult<Zone> ApplyRequest(Zone? zone, SaveZoneRequest request)
     {
         if (zone is null)
         {
@@ -139,12 +139,22 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
                 request.Type);
         }
 
-        zone.MoveToWarehouse(request.WarehouseId);
-        zone.UpdateDetails(request.Code, request.Name, request.Type);
+        var warehouseResult = zone.MoveToWarehouse(request.WarehouseId);
+        if (!warehouseResult.IsSuccess)
+        {
+            return warehouseResult.Error!;
+        }
+
+        var detailsResult = zone.UpdateDetails(request.Code, request.Name, request.Type);
+        if (!detailsResult.IsSuccess)
+        {
+            return detailsResult.Error!;
+        }
+
         return zone;
     }
 
-    private static async Task<ServiceResult> ValidateStateAsync(
+    private static async Task<OperationResult> ValidateStateAsync(
         ApplicationDbContext dbContext,
         Zone zone,
         Guid? originalWarehouseId,
@@ -158,7 +168,7 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
 
         if (codeIsUsed)
         {
-            return ServiceError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
+            return OperationError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
         }
 
         var changesWarehouse = originalWarehouseId.HasValue
@@ -167,11 +177,11 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
         if (changesWarehouse
             && await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == zone.Id, ct))
         {
-            return ServiceError.Invalid<Zone>(
+            return OperationError.Invalid<Zone>(
                 "Зону со складскими позициями нельзя перенести в другой склад.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static IQueryable<Zone> ApplySearch(

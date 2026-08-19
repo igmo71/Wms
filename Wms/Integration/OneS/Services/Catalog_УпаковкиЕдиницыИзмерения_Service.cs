@@ -28,7 +28,7 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
 
@@ -40,7 +40,7 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
 
         foreach (var fetchedItem in fetchedItems)
         {
@@ -49,7 +49,7 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
             await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static UnitOfMeasure MapToUnitOfMeasure(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)

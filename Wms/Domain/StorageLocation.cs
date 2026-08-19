@@ -1,4 +1,5 @@
 using System.Globalization;
+using Wms.Common;
 
 namespace Wms.Domain;
 
@@ -30,7 +31,7 @@ public class StorageLocation
 
     public string Barcode => $"WMSL:{Id:N}";
 
-    public static string BuildCode(
+    public static OperationResult<string> BuildCode(
         string? parentCode,
         int number,
         int segmentWidth,
@@ -38,21 +39,17 @@ public class StorageLocation
     {
         if (number <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(number), "Location number must be positive.");
+            return OperationError.Invalid<StorageLocation>("Location number must be positive.");
         }
 
         if (segmentWidth is < 1 or > 8)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(segmentWidth),
-                "Segment width must be between 1 and 8.");
+            return OperationError.Invalid<StorageLocation>("Segment width must be between 1 and 8.");
         }
 
         if (maximumLength <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(maximumLength),
-                "Maximum code length must be positive.");
+            return OperationError.Invalid<StorageLocation>("Maximum code length must be positive.");
         }
 
         var segment = number.ToString($"D{segmentWidth}", CultureInfo.InvariantCulture);
@@ -60,15 +57,14 @@ public class StorageLocation
 
         if (code.Length > maximumLength)
         {
-            throw new ArgumentException(
-                $"Location code must not exceed {maximumLength} characters.",
-                nameof(parentCode));
+            return OperationError.Invalid<StorageLocation>(
+                $"Location code must not exceed {maximumLength} characters.");
         }
 
         return code;
     }
 
-    public static StorageLocation Create(
+    public static OperationResult<StorageLocation> Create(
         Guid id,
         Guid warehouseId,
         Guid zoneId,
@@ -79,32 +75,37 @@ public class StorageLocation
     {
         if (id == Guid.Empty)
         {
-            throw new ArgumentException("Location identifier is required.", nameof(id));
+            return OperationError.Invalid<StorageLocation>("Location identifier is required.");
         }
 
         if (warehouseId == Guid.Empty)
         {
-            throw new ArgumentException("Warehouse identifier is required.", nameof(warehouseId));
+            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
         }
 
         if (zoneId == Guid.Empty)
         {
-            throw new ArgumentException("Zone identifier is required.", nameof(zoneId));
+            return OperationError.Invalid<Zone>("Zone identifier is required.");
         }
 
         if (parentId == id)
         {
-            throw new ArgumentException("A location cannot be its own parent.", nameof(parentId));
+            return OperationError.Invalid<StorageLocation>("A location cannot be its own parent.");
         }
 
         if (number <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(number), "Location number must be positive.");
+            return OperationError.Invalid<StorageLocation>("Location number must be positive.");
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            throw new ArgumentException("Location code is required.", nameof(code));
+            return OperationError.Invalid<StorageLocation>("Location code is required.");
+        }
+
+        if (details is null)
+        {
+            return OperationError.Invalid<StorageLocation>("Location details are required.");
         }
 
         var location = new StorageLocation
@@ -117,43 +118,44 @@ public class StorageLocation
             Code = code
         };
 
-        location.UpdateDetails(details);
+        location.ApplyDetails(details);
         return location;
     }
 
-    public void UpdateDetails(StorageLocationDetails details)
+    public OperationResult UpdateDetails(StorageLocationDetails? details)
     {
-        ArgumentNullException.ThrowIfNull(details);
+        if (details is null)
+        {
+            return OperationError.Invalid<StorageLocation>("Location details are required.");
+        }
 
+        ApplyDetails(details);
+        return OperationResult.Success();
+    }
+
+    public void Deactivate() => DeletionMark = true;
+
+    public void Activate() => DeletionMark = false;
+
+    private void ApplyDetails(StorageLocationDetails details)
+    {
         Name = details.Name;
         IsFolder = details.IsFolder;
         Dimensions = details.Dimensions.Copy();
         Coordinates = details.Coordinates.Copy();
         PickSequence = details.PickSequence;
     }
-
-    public void Deactivate() => DeletionMark = true;
-
-    public void Activate() => DeletionMark = false;
 }
 
 public sealed class StorageLocationDetails
 {
-    public StorageLocationDetails(
+    private StorageLocationDetails(
         string name,
         bool isFolder,
         LocationDimensions dimensions,
         LocationCoordinates coordinates,
         long? pickSequence)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Location name is required.", nameof(name));
-        }
-
-        ArgumentNullException.ThrowIfNull(dimensions);
-        ArgumentNullException.ThrowIfNull(coordinates);
-
         Name = name.Trim();
         IsFolder = isFolder;
         Dimensions = dimensions;
@@ -166,6 +168,31 @@ public sealed class StorageLocationDetails
     public LocationDimensions Dimensions { get; }
     public LocationCoordinates Coordinates { get; }
     public long? PickSequence { get; }
+
+    public static OperationResult<StorageLocationDetails> Create(
+        string name,
+        bool isFolder,
+        LocationDimensions? dimensions,
+        LocationCoordinates? coordinates,
+        long? pickSequence)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return OperationError.Invalid<StorageLocation>("Location name is required.");
+        }
+
+        if (dimensions is null)
+        {
+            return OperationError.Invalid<StorageLocation>("Location dimensions are required.");
+        }
+
+        if (coordinates is null)
+        {
+            return OperationError.Invalid<StorageLocation>("Location coordinates are required.");
+        }
+
+        return new StorageLocationDetails(name, isFolder, dimensions, coordinates, pickSequence);
+    }
 }
 
 public sealed class LocationDimensions
@@ -174,7 +201,7 @@ public sealed class LocationDimensions
     {
     }
 
-    public LocationDimensions(
+    private LocationDimensions(
         double? length,
         double? width,
         double? height,
@@ -182,25 +209,6 @@ public sealed class LocationDimensions
         double? volumeFactor,
         double? maxWeight)
     {
-        ValidateFinite(length, nameof(length));
-        ValidateFinite(width, nameof(width));
-        ValidateFinite(height, nameof(height));
-        ValidateFinite(volume, nameof(volume));
-        ValidateFinite(volumeFactor, nameof(volumeFactor));
-        ValidateFinite(maxWeight, nameof(maxWeight));
-        ValidateNonNegative(length, nameof(length));
-        ValidateNonNegative(width, nameof(width));
-        ValidateNonNegative(height, nameof(height));
-        ValidateNonNegative(volume, nameof(volume));
-        ValidateNonNegative(maxWeight, nameof(maxWeight));
-
-        if (volumeFactor is <= 0 or > 1)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(volumeFactor),
-                "Volume factor must be greater than zero and at most one.");
-        }
-
         Length = length;
         Width = width;
         Height = height;
@@ -220,6 +228,35 @@ public sealed class LocationDimensions
 
     public double? UsableVolume => Volume * (VolumeFactor ?? 1d);
 
+    public static OperationResult<LocationDimensions> Create(
+        double? length,
+        double? width,
+        double? height,
+        double? volume,
+        double? volumeFactor,
+        double? maxWeight)
+    {
+        if (!AreFinite(length, width, height, volume, volumeFactor, maxWeight))
+        {
+            return OperationError.Invalid<LocationDimensions>(
+                "Dimensions and capacity must be finite numbers.");
+        }
+
+        if (length < 0 || width < 0 || height < 0 || volume < 0 || maxWeight < 0)
+        {
+            return OperationError.Invalid<LocationDimensions>(
+                "Dimensions and capacity cannot be negative.");
+        }
+
+        if (volumeFactor is <= 0 or > 1)
+        {
+            return OperationError.Invalid<LocationDimensions>(
+                "Volume factor must be greater than zero and at most one.");
+        }
+
+        return new LocationDimensions(length, width, height, volume, volumeFactor, maxWeight);
+    }
+
     public LocationDimensions Copy() => new(
         Length,
         Width,
@@ -228,25 +265,8 @@ public sealed class LocationDimensions
         VolumeFactor,
         MaxWeight);
 
-    private static void ValidateFinite(double? value, string parameterName)
-    {
-        if (value.HasValue && !double.IsFinite(value.Value))
-        {
-            throw new ArgumentOutOfRangeException(
-                parameterName,
-                "Dimensions and capacity must be finite numbers.");
-        }
-    }
-
-    private static void ValidateNonNegative(double? value, string parameterName)
-    {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                parameterName,
-                "Dimensions and capacity cannot be negative.");
-        }
-    }
+    private static bool AreFinite(params double?[] values) =>
+        values.All(value => !value.HasValue || double.IsFinite(value.Value));
 }
 
 public sealed class LocationCoordinates
@@ -255,12 +275,8 @@ public sealed class LocationCoordinates
     {
     }
 
-    public LocationCoordinates(double? x, double? y, double? z)
+    private LocationCoordinates(double? x, double? y, double? z)
     {
-        ValidateFinite(x, nameof(x));
-        ValidateFinite(y, nameof(y));
-        ValidateFinite(z, nameof(z));
-
         X = x;
         Y = y;
         Z = z;
@@ -272,15 +288,18 @@ public sealed class LocationCoordinates
     public double? Y { get; private set; }
     public double? Z { get; private set; }
 
+    public static OperationResult<LocationCoordinates> Create(double? x, double? y, double? z)
+    {
+        if (!AreFinite(x, y, z))
+        {
+            return OperationError.Invalid<LocationCoordinates>("Coordinates must be finite numbers.");
+        }
+
+        return new LocationCoordinates(x, y, z);
+    }
+
     public LocationCoordinates Copy() => new(X, Y, Z);
 
-    private static void ValidateFinite(double? value, string parameterName)
-    {
-        if (value.HasValue && !double.IsFinite(value.Value))
-        {
-            throw new ArgumentOutOfRangeException(
-                parameterName,
-                "Coordinates must be finite numbers.");
-        }
-    }
+    private static bool AreFinite(params double?[] values) =>
+        values.All(value => !value.HasValue || double.IsFinite(value.Value));
 }

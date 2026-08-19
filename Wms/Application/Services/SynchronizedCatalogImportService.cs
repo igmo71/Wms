@@ -6,27 +6,27 @@ namespace Wms.Application.Services;
 
 public class SynchronizedCatalogImportService(IServiceProvider serviceProvider)
 {
-    public Task<ServiceResult> RefreshWarehousesAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshWarehousesAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_Склады_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshStockKeepingUnitsAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshStockKeepingUnitsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_Номенклатура_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshPartnersAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshPartnersAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_Партнеры_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshIndividualsAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshIndividualsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_ФизическиеЛица_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshOrganizationalUnitsAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshOrganizationalUnitsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_СтруктураПредприятия_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshSkuBarcodesAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshSkuBarcodesAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshUnitsOfMeasureAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshUnitsOfMeasureAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_УпаковкиЕдиницыИзмерения_Service>().ImportListAsync(ct);
 
-    public Task<ServiceResult> RefreshDeliveryDirectionsAsync(CancellationToken ct = default) =>
+    public Task<OperationResult> RefreshDeliveryDirectionsAsync(CancellationToken ct = default) =>
         serviceProvider.GetRequiredService<Catalog_ЗоныДоставки_Service>().ImportListAsync(ct);
 }

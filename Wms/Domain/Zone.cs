@@ -1,3 +1,4 @@
+using Wms.Common;
 using Wms.Domain.Enums;
 
 namespace Wms.Domain;
@@ -21,7 +22,7 @@ public class Zone
 
     public IReadOnlyCollection<StorageLocation> StorageLocations => _storageLocations;
 
-    public static Zone Create(
+    public static OperationResult<Zone> Create(
         Guid id,
         Guid warehouseId,
         string code,
@@ -30,52 +31,93 @@ public class Zone
     {
         if (id == Guid.Empty)
         {
-            throw new ArgumentException("Zone identifier is required.", nameof(id));
+            return OperationError.Invalid<Zone>("Zone identifier is required.");
+        }
+
+        var warehouseResult = ValidateWarehouse(warehouseId);
+        if (!warehouseResult.IsSuccess)
+        {
+            return warehouseResult.Error!;
+        }
+
+        var detailsResult = ValidateDetails(code, name, type);
+        if (!detailsResult.IsSuccess)
+        {
+            return detailsResult.Error!;
         }
 
         var zone = new Zone
         {
-            Id = id
+            Id = id,
+            WarehouseId = warehouseId
         };
 
-        zone.MoveToWarehouse(warehouseId);
-        zone.UpdateDetails(code, name, type);
+        zone.ApplyDetails(code, name, type);
         return zone;
     }
 
-    public void UpdateDetails(string code, string name, ZoneType type)
+    public OperationResult UpdateDetails(string code, string name, ZoneType type)
     {
-        if (string.IsNullOrWhiteSpace(code))
+        var validation = ValidateDetails(code, name, type);
+        if (!validation.IsSuccess)
         {
-            throw new ArgumentException("Zone code is required.", nameof(code));
+            return validation;
         }
 
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Zone name is required.", nameof(name));
-        }
-
-        if (!Enum.IsDefined(type))
-        {
-            throw new ArgumentOutOfRangeException(nameof(type), "Zone type is invalid.");
-        }
-
-        Code = code.Trim().ToUpperInvariant();
-        Name = name.Trim();
-        Type = type;
+        ApplyDetails(code, name, type);
+        return OperationResult.Success();
     }
 
-    public void MoveToWarehouse(Guid warehouseId)
+    public OperationResult MoveToWarehouse(Guid warehouseId)
     {
-        if (warehouseId == Guid.Empty)
+        var validation = ValidateWarehouse(warehouseId);
+        if (!validation.IsSuccess)
         {
-            throw new ArgumentException("Warehouse identifier is required.", nameof(warehouseId));
+            return validation;
         }
 
         WarehouseId = warehouseId;
+        return OperationResult.Success();
     }
 
     public void Deactivate() => DeletionMark = true;
 
     public void Activate() => DeletionMark = false;
+
+    private static OperationResult ValidateDetails(string code, string name, ZoneType type)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return OperationError.Invalid<Zone>("Zone code is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return OperationError.Invalid<Zone>("Zone name is required.");
+        }
+
+        if (!Enum.IsDefined(type))
+        {
+            return OperationError.Invalid<Zone>("Zone type is invalid.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private void ApplyDetails(string code, string name, ZoneType type)
+    {
+        Code = code.Trim().ToUpperInvariant();
+        Name = name.Trim();
+        Type = type;
+    }
+
+    private static OperationResult ValidateWarehouse(Guid warehouseId)
+    {
+        if (warehouseId == Guid.Empty)
+        {
+            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+        }
+
+        return OperationResult.Success();
+    }
 }

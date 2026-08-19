@@ -13,12 +13,12 @@ public class PutawayCommandService(
     BalanceAndTurnoverService balanceAndTurnoverService,
     ILogger<PutawayCommandService> logger)
 {
-    public async Task<ServiceResult> StartAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> StartAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("Putaway Start {OrderId}", orderId);
 
         if (string.IsNullOrWhiteSpace(userId))
-            return ServiceError.Invalid<ReceivingOrder>("Starting user must be specified.");
+            return OperationError.Invalid<ReceivingOrder>("Starting user must be specified.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -27,7 +27,7 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var validationResult = order.ValidateToStartPutaway();
         if (!validationResult.IsSuccess)
@@ -36,10 +36,10 @@ public class PutawayCommandService(
         order.StartPutaway(userId);
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> AddMovementAsync(
+    public async Task<OperationResult> AddMovementAsync(
         Guid orderId,
         int lineNumber,
         Guid destinationStorageLocationId,
@@ -47,13 +47,13 @@ public class PutawayCommandService(
         CancellationToken ct = default)
     {
         if (quantity <= 0)
-            return ServiceError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
+            return OperationError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var validationResult = ValidateEditableOrder(order);
         if (!validationResult.IsSuccess)
@@ -66,7 +66,7 @@ public class PutawayCommandService(
 
         var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
         if (orderItem is null)
-            return ServiceError.NotFound<ReceivingOrderItem>();
+            return OperationError.NotFound<ReceivingOrderItem>();
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
         var limitsResult = await ValidateQuantityLimitsAsync(
@@ -90,17 +90,17 @@ public class PutawayCommandService(
         dbContext.InventoryMovements.Add(movement);
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> UpdateMovementAsync(
+    public async Task<OperationResult> UpdateMovementAsync(
         Guid movementId,
         Guid destinationStorageLocationId,
         double quantity,
         CancellationToken ct = default)
     {
         if (quantity <= 0)
-            return ServiceError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
+            return OperationError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -108,7 +108,7 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
-            return ServiceError.NotFound<InventoryMovement>();
+            return OperationError.NotFound<InventoryMovement>();
 
         var movementValidation = ValidateDraftPutawayMovement(movement);
         if (!movementValidation.IsSuccess)
@@ -116,7 +116,7 @@ public class PutawayCommandService(
 
         var order = await LoadEditableOrderAsync(dbContext, movement.RecorderId!.Value, ct);
         if (order is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var orderValidation = ValidateEditableOrder(order);
         if (!orderValidation.IsSuccess)
@@ -129,7 +129,7 @@ public class PutawayCommandService(
 
         var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (orderItem is null)
-            return ServiceError.NotFound<ReceivingOrderItem>();
+            return OperationError.NotFound<ReceivingOrderItem>();
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
         var limitsResult = await ValidateQuantityLimitsAsync(
@@ -144,10 +144,10 @@ public class PutawayCommandService(
         movement.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> DeleteMovementAsync(Guid movementId, CancellationToken ct = default)
+    public async Task<OperationResult> DeleteMovementAsync(Guid movementId, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -155,7 +155,7 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
-            return ServiceError.NotFound<InventoryMovement>();
+            return OperationError.NotFound<InventoryMovement>();
 
         var movementValidation = ValidateDraftPutawayMovement(movement);
         if (!movementValidation.IsSuccess)
@@ -165,7 +165,7 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
 
         if (order is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var orderValidation = ValidateEditableOrder(order);
         if (!orderValidation.IsSuccess)
@@ -174,21 +174,21 @@ public class PutawayCommandService(
         dbContext.InventoryMovements.Remove(movement);
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> CompleteAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> CompleteAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("Putaway Complete {OrderId}", orderId);
 
         if (string.IsNullOrWhiteSpace(userId))
-            return ServiceError.Invalid<ReceivingOrder>("Completing user must be specified.");
+            return OperationError.Invalid<ReceivingOrder>("Completing user must be specified.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
-            return ServiceError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound<ReceivingOrder>();
 
         var orderValidation = ValidateEditableOrder(order);
         if (!orderValidation.IsSuccess)
@@ -215,7 +215,7 @@ public class PutawayCommandService(
         order.CompletePutaway(userId);
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static Task<ReceivingOrder?> LoadEditableOrderAsync(
@@ -236,25 +236,25 @@ public class PutawayCommandService(
                 && x.RecorderId == orderId)
             .ToListAsync(ct);
 
-    private static ServiceResult ValidateEditableOrder(ReceivingOrder order)
+    private static OperationResult ValidateEditableOrder(ReceivingOrder order)
     {
         if (order.Status != ReceivingOrderStatus.Received
             || order.PutawayStatus != PutawayStatus.InProgress)
         {
-            return ServiceError.Invalid<ReceivingOrder>(
+            return OperationError.Invalid<ReceivingOrder>(
                 "Putaway movements can be changed only while putaway is in progress.");
         }
 
         if (order.ReceivingLocationId is null)
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified for putaway.");
+            return OperationError.Invalid<ReceivingOrder>("Receiving location must be specified for putaway.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static ServiceResult ValidateDraftPutawayMovement(InventoryMovement movement)
+    private static OperationResult ValidateDraftPutawayMovement(InventoryMovement movement)
     {
         if (movement.PostedAtUtc is not null)
-            return ServiceError.Invalid<InventoryMovement>("Posted putaway movement cannot be changed.");
+            return OperationError.Invalid<InventoryMovement>("Posted putaway movement cannot be changed.");
 
         if (movement.RecorderType != RecorderType.ReceivingOrder
             || movement.RecorderId is null
@@ -262,21 +262,21 @@ public class PutawayCommandService(
             || movement.SourceStorageLocationId is null
             || movement.DestinationStorageLocationId is null)
         {
-            return ServiceError.Invalid<InventoryMovement>(
+            return OperationError.Invalid<InventoryMovement>(
                 "Movement does not belong to a receiving-order putaway line.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static async Task<ServiceResult> ValidateDestinationAsync(
+    private static async Task<OperationResult> ValidateDestinationAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
         Guid destinationStorageLocationId,
         CancellationToken ct)
     {
         if (destinationStorageLocationId == order.ReceivingLocationId)
-            return ServiceError.Invalid<StorageLocation>("Destination must differ from the receiving location.");
+            return OperationError.Invalid<StorageLocation>("Destination must differ from the receiving location.");
 
         var isValid = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == destinationStorageLocationId
@@ -287,12 +287,12 @@ public class PutawayCommandService(
                 && x.Zone.Type == ZoneType.Storage, ct);
 
         return isValid
-            ? ServiceResult.Success()
-            : ServiceError.Invalid<StorageLocation>(
+            ? OperationResult.Success()
+            : OperationError.Invalid<StorageLocation>(
                 "Putaway destination must be an active storage location in the order warehouse.");
     }
 
-    private static async Task<ServiceResult> ValidateQuantityLimitsAsync(
+    private static async Task<OperationResult> ValidateQuantityLimitsAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
         ReceivingOrderItem orderItem,
@@ -307,7 +307,7 @@ public class PutawayCommandService(
             .Sum(x => x.Quantity) + quantity;
 
         if (lineQuantity > orderItem.FactQuantity)
-            return ServiceError.Invalid<InventoryMovement>(
+            return OperationError.Invalid<InventoryMovement>(
                 "Putaway quantity exceeds the received quantity for the order line.");
 
         var sourceBalance = await dbContext.InventoryBalances
@@ -322,24 +322,24 @@ public class PutawayCommandService(
             .Sum(x => x.Quantity) + quantity;
 
         if (sourceBalance is null || skuQuantity > sourceBalance.Quantity)
-            return ServiceError.Invalid<InventoryMovement>(
+            return OperationError.Invalid<InventoryMovement>(
                 "Putaway quantity exceeds the available receiving-location balance.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static ServiceResult ValidateCompletion(
+    private static OperationResult ValidateCompletion(
         ReceivingOrder order,
         IReadOnlyCollection<InventoryMovement> draftMovements)
     {
         if (draftMovements.Count == 0)
-            return ServiceError.Invalid<ReceivingOrder>("Putaway has no movements.");
+            return OperationError.Invalid<ReceivingOrder>("Putaway has no movements.");
 
         if (draftMovements.Any(x => x.WarehouseId != order.WarehouseId
             || x.SourceStorageLocationId != order.ReceivingLocationId
             || x.DestinationStorageLocationId is null))
         {
-            return ServiceError.Invalid<InventoryMovement>("Putaway contains an invalid movement.");
+            return OperationError.Invalid<InventoryMovement>("Putaway contains an invalid movement.");
         }
 
         foreach (var item in order.Items)
@@ -349,18 +349,18 @@ public class PutawayCommandService(
             if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
                 || movements.Sum(x => x.Quantity) != item.FactQuantity)
             {
-                return ServiceError.Invalid<ReceivingOrder>(
+                return OperationError.Invalid<ReceivingOrder>(
                     "Every received order line must be fully allocated before completing putaway.");
             }
         }
 
         if (draftMovements.Any(x => order.Items.All(item => item.LineNumber != x.RecorderLineNumber)))
-            return ServiceError.Invalid<InventoryMovement>("Putaway contains a movement for an unknown order line.");
+            return OperationError.Invalid<InventoryMovement>("Putaway contains a movement for an unknown order line.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    private static async Task<ServiceResult> ValidateCompletionDestinationsAsync(
+    private static async Task<OperationResult> ValidateCompletionDestinationsAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
         IReadOnlyCollection<InventoryMovement> draftMovements,
@@ -380,8 +380,8 @@ public class PutawayCommandService(
                 && x.Zone.Type == ZoneType.Storage, ct);
 
         return validDestinationCount == destinationIds.Length
-            ? ServiceResult.Success()
-            : ServiceError.Invalid<StorageLocation>(
+            ? OperationResult.Success()
+            : OperationError.Invalid<StorageLocation>(
                 "Every putaway destination must remain an active storage location in the order warehouse.");
     }
 }

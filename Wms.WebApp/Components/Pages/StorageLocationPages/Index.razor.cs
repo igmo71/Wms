@@ -137,7 +137,7 @@ public partial class Index
         await HandleActionResultAsync(result);
     }
 
-    private async Task HandleActionResultAsync(ServiceResult result)
+    private async Task HandleActionResultAsync(OperationResult result)
     {
         if (!result.IsSuccess)
         {

@@ -1,3 +1,4 @@
+using Wms.Common;
 using Wms.Domain;
 using CoordinateAxisValue = Wms.Application.StorageLocations.CoordinateAxis;
 
@@ -33,83 +34,82 @@ public sealed class GenerateStorageLocationsRequest
     public long? StartPickSequence { get; init; }
     public long PickSequenceStep { get; init; } = 1;
 
-    public void Validate()
+    public OperationResult Validate()
     {
-        ArgumentNullException.ThrowIfNull(Dimensions);
-        ArgumentNullException.ThrowIfNull(StartCoordinates);
-
         if (WarehouseId == Guid.Empty)
         {
-            throw new ArgumentException("Идентификатор склада обязателен.", nameof(WarehouseId));
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         if (ZoneId == Guid.Empty)
         {
-            throw new ArgumentException("Идентификатор зоны обязателен.", nameof(ZoneId));
+            return OperationError.Invalid("Идентификатор зоны обязателен.");
         }
 
         if (Count is <= 0 or > MaximumCount)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(Count),
-                $"Количество должно быть от 1 до {MaximumCount}.");
+            return OperationError.Invalid($"Количество должно быть от 1 до {MaximumCount}.");
         }
 
         if (StartNumber <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(StartNumber), "Начальный номер должен быть положительным.");
+            return OperationError.Invalid("Начальный номер должен быть положительным.");
         }
 
         if (NumberStep <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(NumberStep), "Шаг нумерации должен быть положительным.");
+            return OperationError.Invalid("Шаг нумерации должен быть положительным.");
         }
 
         if (SegmentWidth is < 1 or > 8)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(SegmentWidth),
-                "Ширина сегмента должна быть от 1 до 8.");
+            return OperationError.Invalid("Ширина сегмента должна быть от 1 до 8.");
         }
 
         if (string.IsNullOrWhiteSpace(NamePrefix))
         {
-            throw new ArgumentException("Префикс наименования обязателен.", nameof(NamePrefix));
+            return OperationError.Invalid("Префикс наименования обязателен.");
+        }
+
+        if (Dimensions is null)
+        {
+            return OperationError.Invalid("Параметры размеров обязательны.");
+        }
+
+        if (StartCoordinates is null)
+        {
+            return OperationError.Invalid("Начальные координаты обязательны.");
         }
 
         if (!double.IsFinite(CoordinateStep) || CoordinateStep < 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(CoordinateStep),
-                "Шаг координат должен быть конечным неотрицательным числом.");
+            return OperationError.Invalid("Шаг координат должен быть конечным неотрицательным числом.");
         }
 
         if (CoordinateStep > 0 && CoordinateAxis is null)
         {
-            throw new ArgumentException(
-                "Для ненулевого шага выберите направление координат.",
-                nameof(CoordinateAxis));
+            return OperationError.Invalid("Для ненулевого шага выберите направление координат.");
         }
 
-        ValidateGeneratedRanges();
+        return ValidateGeneratedRanges();
     }
 
-    private void ValidateGeneratedRanges()
+    private OperationResult ValidateGeneratedRanges()
     {
-        try
+        var lastNumber = (long)StartNumber + ((Count - 1L) * NumberStep);
+        if (lastNumber > int.MaxValue)
         {
-            _ = checked(StartNumber + ((Count - 1) * NumberStep));
-
-            if (StartPickSequence.HasValue)
-            {
-                _ = checked(StartPickSequence.Value + ((Count - 1L) * PickSequenceStep));
-            }
+            return OperationError.Invalid("Диапазон номеров слишком велик.");
         }
-        catch (OverflowException)
+
+        if (StartPickSequence.HasValue)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(Count),
-                "Диапазон номеров или порядка отбора слишком велик.");
+            var lastPickSequence = (decimal)StartPickSequence.Value
+                + ((Count - 1m) * PickSequenceStep);
+            if (lastPickSequence is < long.MinValue or > long.MaxValue)
+            {
+                return OperationError.Invalid("Диапазон порядка отбора слишком велик.");
+            }
         }
 
         var selectedStart = CoordinateAxis switch
@@ -123,10 +123,10 @@ public sealed class GenerateStorageLocationsRequest
         var lastCoordinate = selectedStart + (CoordinateStep * (Count - 1));
         if (lastCoordinate.HasValue && !double.IsFinite(lastCoordinate.Value))
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(CoordinateStep),
-                "Диапазон координат слишком велик.");
+            return OperationError.Invalid("Диапазон координат слишком велик.");
         }
+
+        return OperationResult.Success();
     }
 }
 

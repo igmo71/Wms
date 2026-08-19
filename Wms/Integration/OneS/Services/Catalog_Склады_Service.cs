@@ -28,7 +28,7 @@ public class Catalog_Склады_Service(
         await warehouseService.CreateOrUpdateAsync(warehouse, ct);
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_Склады.GetListUri;
 
@@ -40,7 +40,7 @@ public class Catalog_Склады_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список складов отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список складов отсутствует.");
 
         foreach (var fetchedItem in fetchedItems)
         {
@@ -49,7 +49,7 @@ public class Catalog_Склады_Service(
             await warehouseService.CreateOrUpdateAsync(warehouse, ct);
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static Warehouse MapToWarehouse(Catalog_Склады fetchedItem)

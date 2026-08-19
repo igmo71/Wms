@@ -147,19 +147,19 @@ public class ReceivingOrder
         }
     }
 
-    public ServiceResult ValidateToSetInReceiving()
+    public OperationResult ValidateToSetInReceiving()
     {
         if (Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be set in receiving.");
+            return OperationError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be set in receiving.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before setting the order in receiving.");
+            return OperationError.Invalid<ReceivingOrder>("Receiving location must be specified before setting the order in receiving.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void SetInReceiving(string userId)
@@ -171,21 +171,21 @@ public class ReceivingOrder
         StartedBy = userId;
     }
 
-    public ServiceResult ValidateToSetReceived()
+    public OperationResult ValidateToSetReceived()
     {
         var canSetReceived = Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
 
         if (!canSetReceived)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order in receiving or requiring processing can be set received.");
+            return OperationError.Invalid<ReceivingOrder>("Only a receiving order in receiving or requiring processing can be set received.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before receiving the order.");
+            return OperationError.Invalid<ReceivingOrder>("Receiving location must be specified before receiving the order.");
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void SetReceived(string userId)
@@ -200,21 +200,21 @@ public class ReceivingOrder
             PutawayStatus = PutawayStatus.Pending;
     }
 
-    public ServiceResult ValidateToStartPutaway()
+    public OperationResult ValidateToStartPutaway()
     {
         if (Status != ReceivingOrderStatus.Received)
-            return ServiceError.Invalid<ReceivingOrder>("Only a received order can be put away.");
+            return OperationError.Invalid<ReceivingOrder>("Only a received order can be put away.");
 
         if (PutawayStatus != PutawayStatus.Pending)
-            return ServiceError.Invalid<ReceivingOrder>("Only pending putaway can be started.");
+            return OperationError.Invalid<ReceivingOrder>("Only pending putaway can be started.");
 
         if (ReceivingLocationId is null)
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting putaway.");
+            return OperationError.Invalid<ReceivingOrder>("Receiving location must be specified before starting putaway.");
 
         if (!Items.Any(x => x.FactQuantity > 0))
-            return ServiceError.Invalid<ReceivingOrder>("Putaway requires a positive received quantity.");
+            return OperationError.Invalid<ReceivingOrder>("Putaway requires a positive received quantity.");
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     public void StartPutaway(string userId)

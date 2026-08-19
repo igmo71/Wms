@@ -9,7 +9,7 @@ internal class Catalog_СтруктураПредприятия_Service(
     OneCClient oneCClient,
     OrganizationalUnitService organizationalUnitService)
 {
-    public async Task<ServiceResult> ImportAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
         var uri = Catalog_СтруктураПредприятия.GetUri(refKey);
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_СтруктураПредприятия>>(uri, ct);
@@ -20,14 +20,14 @@ internal class Catalog_СтруктураПредприятия_Service(
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: подразделение отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: подразделение отсутствует.");
 
         await organizationalUnitService.CreateOrUpdateAsync(MapToOrganizationalUnit(fetchedItem), ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity(
             "Catalog_СтруктураПредприятия Import List",
@@ -43,7 +43,7 @@ internal class Catalog_СтруктураПредприятия_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: структура предприятия отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: структура предприятия отсутствует.");
 
         var organizationalUnits = fetchedItems
             .Select(MapToOrganizationalUnit)
@@ -51,7 +51,7 @@ internal class Catalog_СтруктураПредприятия_Service(
 
         await organizationalUnitService.CreateOrUpdateBatchAsync(organizationalUnits, ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static OrganizationalUnit MapToOrganizationalUnit(Catalog_СтруктураПредприятия fetchedItem)

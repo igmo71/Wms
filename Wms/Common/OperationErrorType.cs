@@ -1,6 +1,6 @@
 ﻿namespace Wms.Common;
 
-public enum ServiceErrorType
+public enum OperationErrorType
 {
     Unknown = 0,
     Invalid = 1,

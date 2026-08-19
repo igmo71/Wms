@@ -68,7 +68,7 @@ public class ShippingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<ServiceResult> SetReadyForPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> SetReadyForPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ShippingOrder SetReadyForPicking {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForPicking", nameof(ShippingOrderCommandService));
@@ -82,7 +82,7 @@ public class ShippingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
         }
 
         var validationResult = existingOrder.ValidateToSetReadyForPicking();
@@ -105,10 +105,10 @@ public class ShippingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> SetReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> SetReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ShippingOrder SetReadyForShipment {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForShipment", nameof(ShippingOrderCommandService));
@@ -123,7 +123,7 @@ public class ShippingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
         }
 
         var validationResult = existingOrder.ValidateToSetReadyForShipment();
@@ -166,10 +166,10 @@ public class ShippingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("ShippingOrder.SetShipped", nameof(ShippingOrderCommandService));
@@ -183,7 +183,7 @@ public class ShippingOrderCommandService(
         if (existingOrder is null)
         {
             logger.LogError("Not Found");
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
         }
 
         var validationResult = existingOrder.ValidateToSetShipped();
@@ -230,10 +230,10 @@ public class ShippingOrderCommandService(
 
         await dbContext.SaveChangesAsync(ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> SetShippingLocationAsync(
+    public async Task<OperationResult> SetShippingLocationAsync(
         Guid shippingOrderId,
         Guid shippingLocationId,
         CancellationToken ct = default)
@@ -246,7 +246,7 @@ public class ShippingOrderCommandService(
             .FirstOrDefaultAsync(ct);
 
         if (orderWarehouseId is null)
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
 
         var validLocation = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == shippingLocationId
@@ -257,7 +257,7 @@ public class ShippingOrderCommandService(
                 && x.Zone!.Type == ZoneType.Shipping, ct);
 
         if (!validLocation)
-            return ServiceError.Invalid<StorageLocation>("Shipping location must belong to a shipping zone in the order warehouse.");
+            return OperationError.Invalid<StorageLocation>("Shipping location must belong to a shipping zone in the order warehouse.");
 
         var affected = await dbContext.ShippingOrders
             .Where(x => x.Id == shippingOrderId)
@@ -265,12 +265,12 @@ public class ShippingOrderCommandService(
                 .SetProperty(p => p.ShippingLocationId, shippingLocationId), ct);
 
         if (affected == 0)
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> RollbackAsync(
+    public async Task<OperationResult> RollbackAsync(
         Guid orderId,
         string reason,
         string userId,
@@ -280,10 +280,10 @@ public class ShippingOrderCommandService(
         using var activity = AppTracing.StartActivity("ShippingOrder.Rollback", nameof(ShippingOrderCommandService));
 
         if (string.IsNullOrWhiteSpace(reason))
-            return ServiceError.Invalid<ShippingOrder>("Rollback reason must be specified.");
+            return OperationError.Invalid<ShippingOrder>("Rollback reason must be specified.");
 
         if (string.IsNullOrWhiteSpace(userId))
-            return ServiceError.Invalid<ShippingOrder>("Rollback user must be specified.");
+            return OperationError.Invalid<ShippingOrder>("Rollback user must be specified.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -294,7 +294,7 @@ public class ShippingOrderCommandService(
         if (order is null)
         {
             logger.LogError("Shipping order not found");
-            return ServiceError.NotFound<ShippingOrder>();
+            return OperationError.NotFound<ShippingOrder>();
         }
 
         var validationResult = order.ValidateToRollback();
@@ -321,7 +321,7 @@ public class ShippingOrderCommandService(
             || x.DestinationStorageLocationId != order.ShippingLocationId))
         {
             logger.LogError("Shipping order rollback found an unexpected posted movement");
-            return ServiceError.Failure<ShippingOrder>(
+            return OperationError.Failure<ShippingOrder>(
                 "Shipping order contains movements that cannot be rolled back safely.");
         }
 
@@ -363,6 +363,6 @@ public class ShippingOrderCommandService(
         await dbContext.SaveChangesAsync(ct);
 
         logger.LogInformation("Shipping order rolled back by {UserId}. Reason: {Reason}", userId, reason.Trim());
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 }
