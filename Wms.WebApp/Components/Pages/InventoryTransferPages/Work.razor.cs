@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Wms.Application.Services;
 using Wms.Application.Services.Inventory;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

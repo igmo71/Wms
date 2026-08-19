@@ -40,33 +40,6 @@ public class SkuBarcodeService(
 
         return new ListResult<SkuBarcode> { Items = items, TotalItems = totalItems };
     }
-
-
-    public async Task<SkuBarcode> CreateAsync(SkuBarcode item, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var entity = dbContext.SkuBarcodes.Add(item).Entity;
-
-        _ = await dbContext.SaveChangesAsync(ct);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Entity}", nameof(CreateAsync), entity);
-
-        return entity;
-    }
-
-    public async Task DeleteAsync(SkuBarcode item, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        await dbContext.SkuBarcodes.Where(x => x.SkuId == item.SkuId && x.Value == item.Value)
-            .ExecuteDeleteAsync(ct);
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug("{Source} {@Item}", nameof(DeleteAsync), item);
-    }
-
     public async Task<int> CreateListAsync(List<SkuBarcode> items, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

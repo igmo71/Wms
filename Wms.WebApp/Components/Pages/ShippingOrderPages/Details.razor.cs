@@ -4,6 +4,8 @@ using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.ShippingOrders;
+using Wms.Application.StorageLocations;
+using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

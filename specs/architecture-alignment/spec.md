@@ -13,7 +13,8 @@ The 2026-08-19 audit found that most persisted models exposed public mutation.
 `InventoryTransfer`, `InventoryCount`, the inventory facts, receiving,
 putaway, and the integrated shipping workflow have since been aligned.
 Catalog and configuration models were then reviewed according to data
-ownership; the remaining work starts with query, UI, and cleanup boundaries.
+ownership. Query and UI boundaries were reviewed last; the planned alignment
+pass is complete.
 
 Large command services contain both necessary persistence decisions and local
 domain rules. The goal is not to remove conditions, but to leave each condition
@@ -93,10 +94,17 @@ application and integration services.
 
 ### Stage 6: queries, UI, and cleanup
 
-- Keep UI form state separate from requests and domain models.
-- Move feature-specific list contracts out of generic locations when touched.
-- Remove obsolete requests, mutation paths, and duplicated validation.
-- Split command/query services only when responsibilities justify it.
+- UI forms keep editable state in local fields and create requests only at the
+  application boundary; selected domain objects remain read-only values
+  (completed).
+- `ZoneListQuery` and `StorageLocationListQuery` were moved from `Wms.Common`
+  to their application features (completed).
+- The unused `WarehouseImportService` and obsolete single-barcode mutation
+  methods were removed; the remaining requests all describe active operations
+  (completed).
+- Workflow command/query services remain split. Configuration services remain
+  cohesive because separating them would add UI dependencies without isolating
+  an independent responsibility (completed).
 
 ## Acceptance criteria for a functional substage
 

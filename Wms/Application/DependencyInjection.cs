@@ -41,7 +41,6 @@ public static class DependencyInjection
         services.AddScoped<SynchronizedCatalogImportService>();
         services.AddScoped<StorageLocationService>();
         services.AddScoped<UnitOfMeasureService>();
-        services.AddScoped<WarehouseImportService>();
         services.AddScoped<WarehouseService>();
         services.AddScoped<ZoneService>();
 
