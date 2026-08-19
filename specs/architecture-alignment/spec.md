@@ -8,11 +8,12 @@ without a big-bang rewrite or speculative frameworks.
 
 ## Audit summary
 
-The 2026-08-19 audit found that most persisted models still expose public
-mutation. `Zone` and `StorageLocation` established the rich-model pilot;
+The 2026-08-19 audit found that most persisted models exposed public mutation.
+`Zone` and `StorageLocation` established the rich-model pilot;
 `InventoryTransfer`, `InventoryCount`, the inventory facts, receiving,
-putaway, and the integrated shipping workflow have since been aligned. The
-remaining review starts with catalogs and configuration models.
+putaway, and the integrated shipping workflow have since been aligned.
+Catalog and configuration models were then reviewed according to data
+ownership; the remaining work starts with query, UI, and cleanup boundaries.
 
 Large command services contain both necessary persistence decisions and local
 domain rules. The goal is not to remove conditions, but to leave each condition
@@ -83,9 +84,12 @@ application and integration services.
 
 ### Stage 5: catalogs and configuration review
 
-- Review `Warehouse` and synchronized catalogs only for actual WMS-owned rules.
-- Keep data-only imports simple where no such rule exists.
-- Encapsulate navigation collections when callers do not need mutation.
+- `Warehouse` and synchronized catalogs were reviewed for actual WMS-owned
+  rules (completed).
+- Data-only imports remain simple where no such rule exists (completed).
+- Unused public mutation of `Warehouse` and `StockKeepingUnit` navigation
+  collections was removed while preserving their straightforward import model
+  (completed).
 
 ### Stage 6: queries, UI, and cleanup
 

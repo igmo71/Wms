@@ -11,5 +11,13 @@ internal class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name);
+
+        builder.Navigation(x => x.Zones)
+            .HasField("_zones")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.StorageLocations)
+            .HasField("_storageLocations")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

@@ -16,5 +16,9 @@ public class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepi
         builder.HasOne(x => x.BaseUnitOfMeasure).WithMany()
             .HasForeignKey(x => x.BaseUnitOfMeasureId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.Barcodes)
+            .HasField("_barcodes")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
