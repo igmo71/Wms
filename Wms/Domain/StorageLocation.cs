@@ -1,4 +1,6 @@
-﻿namespace Wms.Domain;
+using System.Globalization;
+
+namespace Wms.Domain;
 
 public class StorageLocation
 {
@@ -26,6 +28,44 @@ public class StorageLocation
 
     public string Barcode => $"WMSL:{Id:N}";
 
+    public static string BuildCode(
+        string? parentCode,
+        int number,
+        int segmentWidth,
+        int maximumLength)
+    {
+        if (number <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(number), "Location number must be positive.");
+        }
+
+        if (segmentWidth is < 1 or > 8)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(segmentWidth),
+                "Segment width must be between 1 and 8.");
+        }
+
+        if (maximumLength <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumLength),
+                "Maximum code length must be positive.");
+        }
+
+        var segment = number.ToString($"D{segmentWidth}", CultureInfo.InvariantCulture);
+        var code = string.IsNullOrEmpty(parentCode) ? segment : $"{parentCode}-{segment}";
+
+        if (code.Length > maximumLength)
+        {
+            throw new ArgumentException(
+                $"Location code must not exceed {maximumLength} characters.",
+                nameof(parentCode));
+        }
+
+        return code;
+    }
+
     public static StorageLocation Create(
         Guid id,
         Guid warehouseId,
@@ -40,18 +80,34 @@ public class StorageLocation
         long? pickSequence)
     {
         if (id == Guid.Empty)
+        {
             throw new ArgumentException("Location identifier is required.", nameof(id));
+        }
+
         if (warehouseId == Guid.Empty)
+        {
             throw new ArgumentException("Warehouse identifier is required.", nameof(warehouseId));
+        }
+
         if (zoneId == Guid.Empty)
+        {
             throw new ArgumentException("Zone identifier is required.", nameof(zoneId));
+        }
+
         if (parentId == id)
+        {
             throw new ArgumentException("A location cannot be its own parent.", nameof(parentId));
+        }
+
         if (number <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(number), "Location number must be positive.");
+        }
 
         if (string.IsNullOrWhiteSpace(code))
+        {
             throw new ArgumentException("Location code is required.", nameof(code));
+        }
 
         var location = new StorageLocation
         {
@@ -75,8 +131,12 @@ public class StorageLocation
         long? pickSequence)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
             throw new ArgumentException("Location name is required.", nameof(name));
+        }
 
+        ArgumentNullException.ThrowIfNull(dimensions);
+        ArgumentNullException.ThrowIfNull(coordinates);
         dimensions.Validate();
         coordinates.Validate();
 
@@ -106,16 +166,26 @@ public class LocationDimensions
     public void Validate()
     {
         if (new[] { Length, Width, Height, Volume, VolumeFactor, MaxWeight }
-            .Any(x => x.HasValue && !double.IsFinite(x.Value)))
+            .Any(value => value.HasValue && !double.IsFinite(value.Value)))
         {
-            throw new ArgumentOutOfRangeException(nameof(LocationDimensions), "Dimensions and capacity must be finite numbers.");
+            throw new ArgumentOutOfRangeException(
+                nameof(LocationDimensions),
+                "Dimensions and capacity must be finite numbers.");
         }
 
         if (Length < 0 || Width < 0 || Height < 0 || Volume < 0 || MaxWeight < 0)
-            throw new ArgumentOutOfRangeException(nameof(LocationDimensions), "Dimensions and capacity cannot be negative.");
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(LocationDimensions),
+                "Dimensions and capacity cannot be negative.");
+        }
 
         if (VolumeFactor is <= 0 or > 1)
-            throw new ArgumentOutOfRangeException(nameof(VolumeFactor), "Volume factor must be greater than zero and at most one.");
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(VolumeFactor),
+                "Volume factor must be greater than zero and at most one.");
+        }
     }
 }
 
@@ -127,7 +197,11 @@ public class LocationCoordinates
 
     public void Validate()
     {
-        if (new[] { X, Y, Z }.Any(x => x.HasValue && !double.IsFinite(x.Value)))
-            throw new ArgumentOutOfRangeException(nameof(LocationCoordinates), "Coordinates must be finite numbers.");
+        if (new[] { X, Y, Z }.Any(value => value.HasValue && !double.IsFinite(value.Value)))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(LocationCoordinates),
+                "Coordinates must be finite numbers.");
+        }
     }
 }

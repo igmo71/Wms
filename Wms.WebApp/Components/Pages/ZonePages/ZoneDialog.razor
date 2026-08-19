@@ -14,12 +14,12 @@
                              Required="true"
                              Clearable="true" />
             <MudTextField T="string"
-                          @bind-Value="_zone.Code"
+                          @bind-Value="_code"
                           Label="Код"
                           Required="true"
                           Immediate="true" />
             <MudTextField T="string"
-                          @bind-Value="_zone.Name"
+                          @bind-Value="_name"
                           Label="Наименование"
                           Required="true"
                           Immediate="true" />
@@ -44,7 +44,7 @@
         <MudButton OnClick="Cancel">Отмена</MudButton>
         <MudButton Color="Color.Primary"
                    Variant="Variant.Filled"
-                   Disabled="@(_isSaving || _warehouse is null || _zoneType is null || string.IsNullOrWhiteSpace(_zone.Code) || string.IsNullOrWhiteSpace(_zone.Name))"
+                   Disabled="@(_isSaving || _warehouse is null || _zoneType is null || string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_name))"
                    OnClick="SaveAsync">
             Сохранить
         </MudButton>

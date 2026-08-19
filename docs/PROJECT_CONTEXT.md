@@ -152,6 +152,12 @@ The project deliberately favors clear, direct code and fast iteration over enter
   application services. The model is enriched incrementally where a method
   expresses a real business operation; the MVP does not pursue abstraction for
   its own sake.
+- Request objects may validate their own locally self-consistent input. Checks
+  that require persisted state remain named application-service operations, so
+  the main use-case method reads as a short sequence of business steps.
+- New and changed C# code follows Microsoft's common C# coding conventions,
+  including braces for control-flow statements and conventional identifier,
+  layout, and whitespace rules.
 
 These principles can change as the product and its constraints mature.
 

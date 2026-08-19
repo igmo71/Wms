@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -7,85 +7,99 @@ namespace Wms.Application.Services;
 
 public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task<ServiceResult> CreateOrUpdateAsync(Zone item, CancellationToken ct = default)
+    public async Task<ServiceResult<Zone>> SaveAsync(
+        SaveZoneRequest request,
+        CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var zone = await FindForUpdateAsync(dbContext, request.Id, ct);
+
+        if (request.Id.HasValue && zone is null)
+        {
+            return ServiceError.NotFound<Zone>();
+        }
+
+        var originalWarehouseId = zone?.WarehouseId;
 
         try
         {
-            item.UpdateDetails(item.Code ?? string.Empty, item.Name ?? string.Empty, item.Type);
-        }
-        catch (ArgumentException ex)
-        {
-            return ServiceError.Invalid<Zone>(ex.Message);
-        }
-
-        if (await dbContext.Zones.AnyAsync(x => x.WarehouseId == item.WarehouseId
-            && x.Code == item.Code && x.Id != item.Id, ct))
-        {
-            return ServiceError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
-        }
-
-        var existing = await dbContext.Zones
-            .FirstOrDefaultAsync(x => x.Id == item.Id, ct);
-
-        if (existing is not null)
-        {
-            if (existing.WarehouseId != item.WarehouseId
-                && await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == item.Id, ct))
+            if (zone is null)
             {
-                return ServiceError.Invalid<Zone>("Зону со складскими позициями нельзя перенести в другой склад.");
-            }
+                zone = Zone.Create(
+                    Guid.NewGuid(),
+                    request.WarehouseId,
+                    request.Code,
+                    request.Name,
+                    request.Type);
 
-            existing.Code = item.Code;
-            existing.Name = item.Name;
-            existing.DeletionMark = item.DeletionMark;
-            existing.WarehouseId = item.WarehouseId;
-            existing.Type = item.Type;
+                dbContext.Zones.Add(zone);
+            }
+            else
+            {
+                zone.MoveToWarehouse(request.WarehouseId);
+                zone.UpdateDetails(request.Code, request.Name, request.Type);
+            }
         }
-        else
-            dbContext.Zones.Add(item);
+        catch (ArgumentException exception)
+        {
+            return ServiceError.Invalid<Zone>(exception.Message);
+        }
+
+        var stateValidation = await ValidateStateAsync(
+            dbContext,
+            zone,
+            originalWarehouseId,
+            ct);
+
+        if (!stateValidation.IsSuccess)
+        {
+            return stateValidation.Error!;
+        }
 
         await dbContext.SaveChangesAsync(ct);
-        return ServiceResult.Success();
+        return zone;
     }
 
     public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var zone = await dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id, ct);
 
-        int rowsAffected = await dbContext.Zones
-            .Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, true), ct);
+        if (zone is null)
+        {
+            return 0;
+        }
 
-        return rowsAffected;
+        zone.Deactivate();
+        return await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var zone = await dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id, ct);
 
-        int rowsAffected = await dbContext.Zones
-            .Where(x => x.Id == id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.DeletionMark, false), ct);
+        if (zone is null)
+        {
+            return 0;
+        }
 
-        return rowsAffected;
+        zone.Activate();
+        return await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<Zone?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var result = await dbContext.Zones
+        return await dbContext.Zones
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, ct);
-
-        return result;
     }
 
-    public async Task<ListResult<Zone>> ListAsync(ZoneListQuery listQuery, CancellationToken ct = default)
+    public async Task<ListResult<Zone>> ListAsync(
+        ZoneListQuery listQuery,
+        CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -94,12 +108,12 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
             .Include(x => x.Warehouse);
 
         if (listQuery.ExcludeDeleted)
-            query = query.Where(x => x.DeletionMark == false);
+        {
+            query = query.Where(x => !x.DeletionMark);
+        }
 
         query = ApplySearch(query, listQuery);
-
-        int totalItems = await query.CountAsync(ct);
-
+        var totalItems = await query.CountAsync(ct);
         query = ApplySorting(query, listQuery.SortBy, listQuery.SortDescending);
 
         var items = await query
@@ -114,28 +128,83 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
         };
     }
 
-    private static IQueryable<Zone> ApplySearch(IQueryable<Zone> query, ZoneListQuery listQuery)
+    private static Task<Zone?> FindForUpdateAsync(
+        ApplicationDbContext dbContext,
+        Guid? id,
+        CancellationToken ct)
+    {
+        return id.HasValue
+            ? dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id.Value, ct)
+            : Task.FromResult<Zone?>(null);
+    }
+
+    private static async Task<ServiceResult> ValidateStateAsync(
+        ApplicationDbContext dbContext,
+        Zone zone,
+        Guid? originalWarehouseId,
+        CancellationToken ct)
+    {
+        var codeIsUsed = await dbContext.Zones.AnyAsync(
+            x => x.WarehouseId == zone.WarehouseId
+                && x.Code == zone.Code
+                && x.Id != zone.Id,
+            ct);
+
+        if (codeIsUsed)
+        {
+            return ServiceError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
+        }
+
+        var changesWarehouse = originalWarehouseId.HasValue
+            && originalWarehouseId.Value != zone.WarehouseId;
+
+        if (changesWarehouse
+            && await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == zone.Id, ct))
+        {
+            return ServiceError.Invalid<Zone>(
+                "Зону со складскими позициями нельзя перенести в другой склад.");
+        }
+
+        return ServiceResult.Success();
+    }
+
+    private static IQueryable<Zone> ApplySearch(
+        IQueryable<Zone> query,
+        ZoneListQuery listQuery)
     {
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
+        {
             query = query.Where(x => x.Name!.Contains(listQuery.SearchString)
                 || x.Code!.Contains(listQuery.SearchString));
+        }
 
         if (listQuery.WarehouseId is Guid warehouseId)
+        {
             query = query.Where(x => x.WarehouseId == warehouseId);
+        }
 
         if (listQuery.Type is Domain.Enums.ZoneType type)
+        {
             query = query.Where(x => x.Type == type);
+        }
 
         return query;
     }
 
-    private static IQueryable<Zone> ApplySorting(IQueryable<Zone> query, string? sortBy, bool sortDescending)
+    private static IQueryable<Zone> ApplySorting(
+        IQueryable<Zone> query,
+        string? sortBy,
+        bool sortDescending)
     {
         return sortBy switch
         {
-            "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
-            "Type" => sortDescending ? query.OrderByDescending(x => x.Type) : query.OrderBy(x => x.Type),
-            _ => query.OrderByDescending(x => x.Name),
+            "Name" => sortDescending
+                ? query.OrderByDescending(x => x.Name)
+                : query.OrderBy(x => x.Name),
+            "Type" => sortDescending
+                ? query.OrderByDescending(x => x.Type)
+                : query.OrderBy(x => x.Type),
+            _ => query.OrderByDescending(x => x.Name)
         };
     }
 }
