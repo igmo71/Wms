@@ -17,9 +17,6 @@ public class PutawayCommandService(
     {
         using var scope = logger.BeginScope("Putaway Start {OrderId}", orderId);
 
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<ReceivingOrder>("Starting user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var order = await dbContext.ReceivingOrders
@@ -29,11 +26,12 @@ public class PutawayCommandService(
         if (order is null)
             return OperationError.NotFound<ReceivingOrder>();
 
-        var validationResult = order.ValidateToStartPutaway();
-        if (!validationResult.IsSuccess)
-            return validationResult;
+        var startResult = order.StartPutaway(DateTimeOffset.UtcNow, userId);
+        if (!startResult.IsSuccess)
+        {
+            return startResult;
+        }
 
-        order.StartPutaway(userId);
         await dbContext.SaveChangesAsync(ct);
 
         return OperationResult.Success();
@@ -190,9 +188,6 @@ public class PutawayCommandService(
     {
         using var scope = logger.BeginScope("Putaway Complete {OrderId}", orderId);
 
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<ReceivingOrder>("Completing user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
@@ -213,6 +208,12 @@ public class PutawayCommandService(
         if (!destinationsValidation.IsSuccess)
             return destinationsValidation;
 
+        var completionResult = order.CompletePutaway(DateTimeOffset.UtcNow, userId);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult;
+        }
+
         foreach (var movement in draftMovements)
         {
             var confirmationResult = movement.Confirm(userId);
@@ -227,7 +228,6 @@ public class PutawayCommandService(
         if (!postingResult.IsSuccess)
             return postingResult;
 
-        order.CompletePutaway(userId);
         await dbContext.SaveChangesAsync(ct);
 
         return OperationResult.Success();

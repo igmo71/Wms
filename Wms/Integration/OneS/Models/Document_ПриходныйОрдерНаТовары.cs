@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -55,38 +55,33 @@ internal class Document_ПриходныйОрдерНаТовары
 
     public static string PostDocumentUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
 
-    public static ReceivingOrder MapToReceivingOrder(Document_ПриходныйОрдерНаТовары fetchedDocument)
+    public static ReceivingOrderImportSnapshot MapToImportSnapshot(
+        Document_ПриходныйОрдерНаТовары fetchedDocument)
     {
         var items = fetchedDocument.Товары
-            .Select(x => new ReceivingOrderItem
-            {
-                ReceivingOrderId = x.Ref_Key,
-                LineNumber = x.LineNumber,
-                StockKeepingUnitId = x.Номенклатура_Key,
-                PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество?
-                FactQuantity = 0
-            })
+            .Select(x => new ReceivingOrderItemImportSnapshot(
+                x.LineNumber,
+                x.Номенклатура_Key,
+                x.КоличествоУпаковок)) // TODO: КоличествоУпаковок или Количество?
             .ToList();
 
-        return new ReceivingOrder
-        {
-            Id = fetchedDocument.Ref_Key,
-            Posted = fetchedDocument.Posted,
-            DeletionMark = fetchedDocument.DeletionMark,
-            Date = fetchedDocument.Date,
-            Number = fetchedDocument.Number,
-            Comment = fetchedDocument.Комментарий,
-            WarehouseId = fetchedDocument.Склад_Key,
-            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
-            Status = ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedDocument.Статус),
-            Queue = ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
-            BusinessOperation = ODataEnumMapper.Parse<BusinessOperation>(fetchedDocument.ХозяйственнаяОперация),
-            ShipperId = fetchedDocument.Отправитель,
-            ShipperType = ODataEnumMapper.Parse<PartyType>(fetchedDocument.Отправитель_Type),
-            BaseOrderId = fetchedDocument.Распоряжение,
-            BaseOrderType = fetchedDocument.Распоряжение_Type.TrimODataPrefix(),
-            Items = items
-        };
+        return new ReceivingOrderImportSnapshot(
+            fetchedDocument.Ref_Key,
+            fetchedDocument.DeletionMark,
+            fetchedDocument.Posted,
+            fetchedDocument.Number,
+            fetchedDocument.Date,
+            fetchedDocument.Склад_Key,
+            fetchedDocument.Комментарий,
+            ODataEnumMapper.Parse<ReceivingOrderStatus>(fetchedDocument.Статус),
+            ODataEnumMapper.Parse<ReceivingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
+            ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
+            ODataEnumMapper.Parse<BusinessOperation>(fetchedDocument.ХозяйственнаяОперация),
+            fetchedDocument.Отправитель,
+            ODataEnumMapper.Parse<PartyType>(fetchedDocument.Отправитель_Type),
+            fetchedDocument.Распоряжение,
+            fetchedDocument.Распоряжение_Type.TrimODataPrefix(),
+            items);
     }
 }
 

@@ -45,7 +45,10 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         return await oneCClient.PostValueAsync(postUri, ct);
     }
 
-    internal async Task<OperationResult> UpdateDocumentItemsAsync(Guid orderId, List<ReceivingOrderItem> receivingOrderItems, CancellationToken ct)
+    internal async Task<OperationResult> UpdateDocumentItemsAsync(
+        Guid orderId,
+        IReadOnlyCollection<ReceivingOrderItem> receivingOrderItems,
+        CancellationToken ct)
     {
         using var scope = logger.BeginScope("UpdateDocumentItems {OrderId}", orderId);
         using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.UpdateDocumentItems", nameof(ShippingOrderCommandService));

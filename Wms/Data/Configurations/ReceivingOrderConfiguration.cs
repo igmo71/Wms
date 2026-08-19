@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
 
@@ -26,5 +26,9 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
         builder.HasOne(X => X.ReceivingLocation).WithMany()
             .HasForeignKey(X => X.ReceivingLocationId).HasPrincipalKey(X => X.Id)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.Items)
+            .HasField("_items")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

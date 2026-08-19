@@ -137,8 +137,11 @@ public partial class InProcess
                 return;
             }
 
-            item.FactQuantity = factQuantity;
-            item.Comment = comment;
+            var receivingZone = _receivingZone;
+            var receivingLocation = _receivingLocation;
+            _order = await OrderQueryService.GetOrderAsync(Id);
+            _receivingZone = receivingZone;
+            _receivingLocation = receivingLocation;
         }
         catch
         {

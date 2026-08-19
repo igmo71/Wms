@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -18,16 +18,12 @@ public class ReceivingOrderQueryService(
             .Include(x => x.Warehouse)
             .Include(x => x.ReceivingLocation)
                 .ThenInclude(x => x!.Zone)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.StockKeepingUnit)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (order is null)
             return null;
-
-        order.Items = await dbContext.ReceivingOrderItems
-            .AsNoTracking()
-            .Include(x => x.StockKeepingUnit)
-            .Where(x => x.ReceivingOrderId == id)
-            .ToListAsync(ct);
 
         await PopulateShippersAsync([order], ct);
 
@@ -75,7 +71,7 @@ public class ReceivingOrderQueryService(
             parties.TryGetValue(
                 new PartyReference(order.ShipperId, order.ShipperType),
                 out var shipper);
-            order.Shipper = shipper;
+            order.SetShipper(shipper);
         }
     }
 

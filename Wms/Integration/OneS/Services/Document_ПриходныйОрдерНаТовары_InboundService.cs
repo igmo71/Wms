@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wms.Application.Services.ReceivingOrders;
 using Wms.Application.Services.ShippingOrders;
@@ -40,9 +40,15 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 
         logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
 
-        ReceivingOrder order = Document.MapToReceivingOrder(fetchedDocument);
-
-        await receivingOrderCommandService.ImportOrderAsync(order, ct);
+        var snapshot = Document.MapToImportSnapshot(fetchedDocument);
+        var importResult = await receivingOrderCommandService.ImportOrderAsync(snapshot, ct);
+        if (!importResult.IsSuccess)
+        {
+            logger.LogWarning(
+                "Receiving order import was not applied. Order: {OrderId}, Error: {ErrorMessage}",
+                snapshot.Id,
+                importResult.Error?.Message);
+        }
     }
 
     internal async Task ImportDocumentListAsync(CancellationToken ct)

@@ -265,7 +265,9 @@ Receiving and shipping orders retain a party reference as a 1C identifier plus `
 
 For `Document_ПриходныйОрдерНаТовары`:
 
-- `Document_ПриходныйОрдерНаТовары_InboundService` fetches a document by `Ref_Key`, maps it to `ReceivingOrder`, and imports it.
+- `Document_ПриходныйОрдерНаТовары_InboundService` fetches a document by
+  `Ref_Key`, maps it to a domain import snapshot, and lets `ReceivingOrder`
+  create or reconcile its local state.
 - `Document_ПриходныйОрдерНаТовары_OutboundService` changes the document status, updates item facts when needed, and posts the document in 1C.
 - `POST /api/1c/Document_ПриходныйОрдерНаТовары/notify` enqueues a notification; `NotifyBackgroundService` consumes it and imports the document asynchronously.
 

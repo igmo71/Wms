@@ -15,56 +15,57 @@ public class ReceivingOrderCommandService(
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderCommandService> logger)
 {
-    public async Task ImportOrderAsync(ReceivingOrder externalOrder, CancellationToken ct = default)
+    public async Task<OperationResult> ImportOrderAsync(
+        ReceivingOrderImportSnapshot snapshot,
+        CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Import {OrderId}", externalOrder.Id);
+        using var scope = logger.BeginScope("ReceivingOrder Import {OrderId}", snapshot.Id);
         using var activity = AppTracing.StartActivity("ReceivingOrder.Import", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var existingOrder = await dbContext.ReceivingOrders
             .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == externalOrder.Id, ct);
+            .FirstOrDefaultAsync(x => x.Id == snapshot.Id, ct);
 
         var now = DateTimeOffset.UtcNow;
-
         if (existingOrder is null)
         {
-            if (externalOrder.Status != ReceivingOrderStatus.ReadyForReceiving)
+            var creationResult = ReceivingOrder.Create(snapshot, now);
+            if (!creationResult.IsSuccess)
             {
-                logger.LogWarning("External receiving order create is not allowed for status {Status}", externalOrder.Status);
-                return;
+                return creationResult.Error!;
             }
 
-            externalOrder.CreatedAtUtc = now;
-            dbContext.ReceivingOrders.Add(externalOrder);
+            dbContext.ReceivingOrders.Add(creationResult.Value!);
+            await dbContext.SaveChangesAsync(ct);
+            return OperationResult.Success();
         }
-        else
+
+        var reconciliationResult = existingOrder.Reconcile(snapshot, now);
+        if (!reconciliationResult.IsSuccess)
         {
-            var hasExternalChanges = existingOrder.HasExternalChanges(externalOrder);
+            return reconciliationResult.Error!;
+        }
 
-            if (!hasExternalChanges)
-            {
-                logger.LogDebug("No external document changes detected");
-                return;
-            }
-
-            if (existingOrder.Status != ReceivingOrderStatus.ReadyForReceiving)
-            {
-                existingOrder.ExternalChangeDetected = true;
-
-                logger.LogWarning("External receiving order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
-                    existingOrder.Status, externalOrder.Status);
-            }
-            else
-            {
-                existingOrder.UpdateOrder(externalOrder);
-                existingOrder.UpdatedAtUtc = now;
-                existingOrder.ExternalChangeDetected = false;
-            }
+        if (reconciliationResult.Value == ReceivingOrderReconciliation.Unchanged)
+        {
+            logger.LogDebug("No external document changes detected");
+            return OperationResult.Success();
         }
 
         await dbContext.SaveChangesAsync(ct);
+        if (reconciliationResult.Value == ReceivingOrderReconciliation.Conflict)
+        {
+            logger.LogWarning(
+                "External receiving order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
+                existingOrder.Status,
+                snapshot.Status);
+            return OperationError.Conflict(
+                "External receiving order changes conflict with local processing.");
+        }
+
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
@@ -84,12 +85,11 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound<ReceivingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToSetInReceiving();
-
-        if (!validationResult.IsSuccess)
+        var transitionResult = existingOrder.SetInReceiving(DateTimeOffset.UtcNow, userId);
+        if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set in receiving failed: {ErrorMessage}", validationResult.Error?.Message);
-            return validationResult;
+            logger.LogError("Validation to set in receiving failed: {ErrorMessage}", transitionResult.Error?.Message);
+            return transitionResult;
         }
 
         var externalResult = await outboundService.SetInReceivingAsync(orderId, ct);
@@ -99,8 +99,6 @@ public class ReceivingOrderCommandService(
             logger.LogError("Failed to set external document in receiving: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
-
-        existingOrder.SetInReceiving(userId);
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -124,15 +122,14 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound<ReceivingOrder>();
         }
 
-        var validationResult = existingOrder.ValidateToSetReceived();
-
-        if (!validationResult.IsSuccess)
+        var now = DateTimeOffset.UtcNow;
+        var transitionResult = existingOrder.SetReceived(now, userId);
+        if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set received failed: {ErrorMessage}", validationResult.Error?.Message);
-            return validationResult;
+            logger.LogError("Validation to set received failed: {ErrorMessage}", transitionResult.Error?.Message);
+            return transitionResult;
         }
 
-        var now = DateTimeOffset.UtcNow;
         var movementsResult = CreateReceivingMovements(existingOrder, now);
         if (!movementsResult.IsSuccess)
         {
@@ -167,8 +164,6 @@ public class ReceivingOrderCommandService(
             return externalResult;
         }
 
-        existingOrder.SetReceived(userId);
-
         await dbContext.SaveChangesAsync(ct);
 
         return OperationResult.Success();
@@ -181,9 +176,6 @@ public class ReceivingOrderCommandService(
         string? comment,
         CancellationToken ct = default)
     {
-        if (factQuantity < 0)
-            return OperationError.Invalid<ReceivingOrderItem>("Fact quantity cannot be negative.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var existingOrder = await dbContext.ReceivingOrders
@@ -193,18 +185,11 @@ public class ReceivingOrderCommandService(
         if (existingOrder is null)
             return OperationError.NotFound<ReceivingOrder>();
 
-        var canEditFactQuantity = existingOrder.Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
-
-        if (!canEditFactQuantity)
-            return OperationError.Invalid<ReceivingOrderItem>("Fact quantity can be edited only while the receiving order is in receiving or requires processing.");
-
-        var existingItem = existingOrder.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
-
-        if (existingItem is null)
-            return OperationError.NotFound<ReceivingOrderItem>();
-
-        existingItem.FactQuantity = factQuantity;
-        existingItem.Comment = comment;
+        var updateResult = existingOrder.UpdateItemFact(lineNumber, factQuantity, comment);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -218,41 +203,33 @@ public class ReceivingOrderCommandService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var orderInfo = await dbContext.ReceivingOrders
-            .Where(x => x.Id == receivingOrderId)
-            .Select(x => new { x.WarehouseId, x.Status })
-            .FirstOrDefaultAsync(ct);
-
-        if (orderInfo is null)
-            return OperationError.NotFound<ReceivingOrder>();
-
-        if (orderInfo.Status is not (ReceivingOrderStatus.ReadyForReceiving
-            or ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired))
+        var order = await dbContext.ReceivingOrders
+            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
+        if (order is null)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location can be changed only before the order is received.");
+            return OperationError.NotFound<ReceivingOrder>();
         }
 
         var validLocation = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == receivingLocationId
-                && x.WarehouseId == orderInfo.WarehouseId
+                && x.WarehouseId == order.WarehouseId
                 && !x.IsFolder
                 && !x.DeletionMark
                 && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Receiving, ct);
 
         if (!validLocation)
+        {
             return OperationError.Invalid<StorageLocation>("Receiving location must belong to a receiving zone in the order warehouse.");
+        }
 
-        var affected = await dbContext.ReceivingOrders
-            .Where(x => x.Id == receivingOrderId)
-            .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.ReceivingLocationId, receivingLocationId), ct);
+        var locationResult = order.SetReceivingLocation(receivingLocationId);
+        if (!locationResult.IsSuccess)
+        {
+            return locationResult;
+        }
 
-        if (affected == 0)
-            return OperationError.NotFound<ReceivingOrder>();
-
+        await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
 
