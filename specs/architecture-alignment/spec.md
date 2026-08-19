@@ -11,8 +11,8 @@ without a big-bang rewrite or speculative frameworks.
 The 2026-08-19 audit found that most persisted models still expose public
 mutation. `Zone` and `StorageLocation` established the rich-model pilot;
 `InventoryTransfer`, `InventoryCount`, the inventory facts, receiving,
-putaway, and the main shipping transitions have since been aligned. Picking
-movement and rollback rules remain to be completed.
+putaway, and the integrated shipping workflow have since been aligned. The
+remaining review starts with catalogs and configuration models.
 
 Large command services contain both necessary persistence decisions and local
 domain rules. The goal is not to remove conditions, but to leave each condition
@@ -74,7 +74,9 @@ services.
 3. Shipping import/reconciliation and shipping transitions (completed): domain
    import snapshot, conflict-safe reconciliation, shipping location, controlled
    facts, status transitions, audit state, and read-only lines.
-4. Picking and rollback lifecycle.
+4. Picking and rollback lifecycle (completed): controlled draft creation,
+   editing and removal, synchronized line facts, completion consistency,
+   compensation creation, and rollback audit state.
 
 This stage removes public workflow mutation while keeping 1C calls in
 application and integration services.

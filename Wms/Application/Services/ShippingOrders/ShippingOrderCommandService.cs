@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wms.Application.Services.Inventory;
@@ -19,20 +20,20 @@ public class ShippingOrderCommandService(
         ShippingOrderImportSnapshot snapshot,
         CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder Import {OrderId}", snapshot.Id);
-        using var activity = AppTracing.StartActivity("ShippingOrder.Import", nameof(ShippingOrderCommandService));
+        using IDisposable? scope = logger.BeginScope("ShippingOrder Import {OrderId}", snapshot.Id);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.Import", nameof(ShippingOrderCommandService));
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existingOrder = await dbContext.ShippingOrders
+        ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .Include(x => x.BaseItems)
             .FirstOrDefaultAsync(x => x.Id == snapshot.Id, ct);
 
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         if (existingOrder is null)
         {
-            var creationResult = ShippingOrder.Create(snapshot, now);
+            OperationResult<ShippingOrder> creationResult = ShippingOrder.Create(snapshot, now);
             if (!creationResult.IsSuccess)
             {
                 return creationResult.Error!;
@@ -43,7 +44,7 @@ public class ShippingOrderCommandService(
             return OperationResult.Success();
         }
 
-        var reconciliationResult = existingOrder.Reconcile(snapshot, now);
+        OperationResult<ShippingOrderReconciliation> reconciliationResult = existingOrder.Reconcile(snapshot, now);
         if (!reconciliationResult.IsSuccess)
         {
             return reconciliationResult.Error!;
@@ -71,12 +72,12 @@ public class ShippingOrderCommandService(
 
     public async Task<OperationResult> SetReadyForPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder SetReadyForPicking {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForPicking", nameof(ShippingOrderCommandService));
+        using IDisposable? scope = logger.BeginScope("ShippingOrder SetReadyForPicking {OrderId}", orderId);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetReadyForPicking", nameof(ShippingOrderCommandService));
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existingOrder = await dbContext.ShippingOrders
+        ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
@@ -86,14 +87,14 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var transitionResult = existingOrder.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
+        OperationResult transitionResult = existingOrder.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Validation to set ready for picking failed: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        var externalResult = await outboundService.SetReadyForPickingAsync(orderId, ct);
+        OperationResult externalResult = await outboundService.SetReadyForPickingAsync(orderId, ct);
 
         if (!externalResult.IsSuccess)
         {
@@ -108,12 +109,12 @@ public class ShippingOrderCommandService(
 
     public async Task<OperationResult> SetReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder SetReadyForShipment {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ShippingOrder.SetReadyForShipment", nameof(ShippingOrderCommandService));
+        using IDisposable? scope = logger.BeginScope("ShippingOrder SetReadyForShipment {OrderId}", orderId);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetReadyForShipment", nameof(ShippingOrderCommandService));
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existingOrder = await dbContext.ShippingOrders
+        ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .Include(x => x.BaseItems)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
@@ -124,20 +125,23 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var transitionResult = existingOrder.SetReadyForShipment(DateTimeOffset.UtcNow, userId);
+        List<InventoryMovement> draftPickingMovements = await dbContext.InventoryMovements
+            .Where(x => x.PostedAtUtc == null
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == existingOrder.Id)
+            .ToListAsync(ct);
+
+        OperationResult transitionResult = existingOrder.SetReadyForShipment(
+            draftPickingMovements,
+            DateTimeOffset.UtcNow,
+            userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Validation to set ready for shipment failed: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        var draftPickingMovements = await dbContext.InventoryMovements
-            .Where(x => x.PostedAtUtc == null
-                && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == existingOrder.Id)
-            .ToListAsync(ct);
-
-        var balanceAndTurnoverResult = await balanceAndTurnoverService
+        OperationResult balanceAndTurnoverResult = await balanceAndTurnoverService
             .PostInventoryMovementsAsync(draftPickingMovements, dbContext, ct);
 
         if (!balanceAndTurnoverResult.IsSuccess)
@@ -145,7 +149,7 @@ public class ShippingOrderCommandService(
             return balanceAndTurnoverResult;
         }
 
-        var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder, ct);
+        OperationResult externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder, ct);
 
         if (!externalItemsUpdateResult.IsSuccess)
         {
@@ -153,7 +157,7 @@ public class ShippingOrderCommandService(
             return externalItemsUpdateResult;
         }
 
-        var externalResult = await outboundService.SetReadyForShipmentAsync(orderId, ct);
+        OperationResult externalResult = await outboundService.SetReadyForShipmentAsync(orderId, ct);
 
         if (!externalResult.IsSuccess)
         {
@@ -168,12 +172,12 @@ public class ShippingOrderCommandService(
 
     public async Task<OperationResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ShippingOrder.SetShipped", nameof(ShippingOrderCommandService));
+        using IDisposable? scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetShipped", nameof(ShippingOrderCommandService));
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var existingOrder = await dbContext.ShippingOrders
+        ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
@@ -183,24 +187,24 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var transitionResult = existingOrder.SetShipped(now, userId);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationResult transitionResult = existingOrder.SetShipped(now, userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Validation to set shipped failed: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        var movementsResult = CreateShippingMovements(existingOrder, now);
+        OperationResult<List<InventoryMovement>> movementsResult = CreateShippingMovements(existingOrder, now);
         if (!movementsResult.IsSuccess)
         {
             return movementsResult.Error!;
         }
 
-        var movements = movementsResult.Value!;
+        List<InventoryMovement> movements = movementsResult.Value!;
         dbContext.InventoryMovements.AddRange(movements);
 
-        var balanceAndTurnoverResult = await balanceAndTurnoverService
+        OperationResult balanceAndTurnoverResult = await balanceAndTurnoverService
             .PostInventoryMovementsAsync(movements, dbContext, ct);
 
         if (!balanceAndTurnoverResult.IsSuccess)
@@ -208,7 +212,7 @@ public class ShippingOrderCommandService(
             return balanceAndTurnoverResult;
         }
 
-        var externalResult = await outboundService.SetShippedAsync(orderId, ct);
+        OperationResult externalResult = await outboundService.SetShippedAsync(orderId, ct);
 
         if (!externalResult.IsSuccess)
         {
@@ -226,9 +230,9 @@ public class ShippingOrderCommandService(
         Guid shippingLocationId,
         CancellationToken ct = default)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var order = await dbContext.ShippingOrders
+        ShippingOrder? order = await dbContext.ShippingOrders
             .FirstOrDefaultAsync(x => x.Id == shippingOrderId, ct);
 
         if (order is null)
@@ -249,7 +253,7 @@ public class ShippingOrderCommandService(
             return OperationError.Invalid<StorageLocation>("Shipping location must belong to a shipping zone in the order warehouse.");
         }
 
-        var locationResult = order.SetShippingLocation(shippingLocationId);
+        OperationResult locationResult = order.SetShippingLocation(shippingLocationId);
         if (!locationResult.IsSuccess)
         {
             return locationResult;
@@ -265,22 +269,12 @@ public class ShippingOrderCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ShippingOrder Rollback {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ShippingOrder.Rollback", nameof(ShippingOrderCommandService));
+        using IDisposable? scope = logger.BeginScope("ShippingOrder Rollback {OrderId}", orderId);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.Rollback", nameof(ShippingOrderCommandService));
 
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            return OperationError.Invalid<ShippingOrder>("Rollback reason must be specified.");
-        }
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid<ShippingOrder>("Rollback user must be specified.");
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var order = await dbContext.ShippingOrders
+        ShippingOrder? order = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
@@ -290,49 +284,39 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = order.ValidateToRollback();
-        if (!validationResult.IsSuccess)
-        {
-            logger.LogError("Shipping order rollback validation failed: {ErrorMessage}", validationResult.Error?.Message);
-            return validationResult;
-        }
-
-        var draftMovements = await dbContext.InventoryMovements
+        List<InventoryMovement> draftMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder
                 && x.RecorderId == order.Id)
             .ToListAsync(ct);
 
-        var postedMovements = await dbContext.InventoryMovements
+        List<InventoryMovement> postedMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc != null
-                && x.CreatedAtUtc >= order.PickingStartedAtUtc!.Value
                 && x.RecorderType == RecorderType.ShippingOrder
                 && x.RecorderId == order.Id)
             .ToListAsync(ct);
 
-        if (postedMovements.Any(x => x.SourceStorageLocationId is null
-            || x.DestinationStorageLocationId != order.ShippingLocationId))
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationResult<List<InventoryMovement>> rollbackResult = order.Rollback(
+            reason,
+            userId,
+            now,
+            draftMovements,
+            postedMovements);
+        if (!rollbackResult.IsSuccess)
         {
-            logger.LogError("Shipping order rollback found an unexpected posted movement");
-            return OperationError.Failure<ShippingOrder>(
-                "Shipping order contains movements that cannot be rolled back safely.");
+            logger.LogError("Shipping order rollback validation failed: {ErrorMessage}", rollbackResult.Error?.Message);
+            return rollbackResult.Error!;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var compensationResult = CreateCompensationMovements(order, postedMovements, now);
-        if (!compensationResult.IsSuccess)
-        {
-            return compensationResult.Error!;
-        }
-
-        var compensationMovements = compensationResult.Value!;
+        List<InventoryMovement> compensationMovements = rollbackResult.Value!;
         dbContext.InventoryMovements.RemoveRange(draftMovements);
 
         if (compensationMovements.Count > 0)
         {
             dbContext.InventoryMovements.AddRange(compensationMovements);
 
-            var postingResult = await balanceAndTurnoverService
+            OperationResult postingResult = await balanceAndTurnoverService
                 .PostInventoryMovementsAsync(compensationMovements, dbContext, ct);
 
             if (!postingResult.IsSuccess)
@@ -341,8 +325,6 @@ public class ShippingOrderCommandService(
                 return postingResult;
             }
         }
-
-        order.Rollback(reason.Trim(), userId);
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -355,9 +337,9 @@ public class ShippingOrderCommandService(
         DateTimeOffset createdAtUtc)
     {
         var movements = new List<InventoryMovement>();
-        foreach (var item in order.Items.Where(x => x.FactQuantity != 0))
+        foreach (ShippingOrderItem? item in order.Items.Where(x => x.FactQuantity != 0))
         {
-            var movementResult = InventoryMovement.Create(
+            OperationResult<InventoryMovement> movementResult = InventoryMovement.Create(
                 Guid.NewGuid(),
                 order.WarehouseId,
                 order.ShippingLocationId,
@@ -379,33 +361,4 @@ public class ShippingOrderCommandService(
         return movements;
     }
 
-    private static OperationResult<List<InventoryMovement>> CreateCompensationMovements(
-        ShippingOrder order,
-        IEnumerable<InventoryMovement> postedMovements,
-        DateTimeOffset createdAtUtc)
-    {
-        var movements = new List<InventoryMovement>();
-        foreach (var postedMovement in postedMovements.OrderByDescending(x => x.PostedAtUtc))
-        {
-            var movementResult = InventoryMovement.Create(
-                Guid.NewGuid(),
-                postedMovement.WarehouseId,
-                postedMovement.DestinationStorageLocationId,
-                postedMovement.SourceStorageLocationId,
-                postedMovement.StockKeepingUnitId,
-                postedMovement.Quantity,
-                createdAtUtc,
-                RecorderType.ShippingOrder,
-                order.Id,
-                postedMovement.RecorderLineNumber);
-            if (!movementResult.IsSuccess)
-            {
-                return movementResult.Error!;
-            }
-
-            movements.Add(movementResult.Value!);
-        }
-
-        return movements;
-    }
 }

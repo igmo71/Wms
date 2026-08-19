@@ -54,7 +54,7 @@ public class ShippingOrder
         ShippingOrderImportSnapshot snapshot,
         DateTimeOffset createdAtUtc)
     {
-        var validationResult = ValidateImport(snapshot, createdAtUtc);
+        OperationResult validationResult = ValidateImport(snapshot, createdAtUtc);
         if (!validationResult.IsSuccess)
         {
             return validationResult.Error!;
@@ -73,9 +73,9 @@ public class ShippingOrder
         };
 
         order.ApplyImport(snapshot);
-        foreach (var itemSnapshot in snapshot.Items)
+        foreach (ShippingOrderItemImportSnapshot itemSnapshot in snapshot.Items)
         {
-            var itemResult = ShippingOrderItem.Create(order.Id, itemSnapshot);
+            OperationResult<ShippingOrderItem> itemResult = ShippingOrderItem.Create(order.Id, itemSnapshot);
             if (!itemResult.IsSuccess)
             {
                 return itemResult.Error!;
@@ -84,9 +84,9 @@ public class ShippingOrder
             order._items.Add(itemResult.Value!);
         }
 
-        foreach (var itemSnapshot in snapshot.BaseItems)
+        foreach (ShippingOrderBaseItemImportSnapshot itemSnapshot in snapshot.BaseItems)
         {
-            var itemResult = ShippingOrderBaseItem.Create(order.Id, itemSnapshot);
+            OperationResult<ShippingOrderBaseItem> itemResult = ShippingOrderBaseItem.Create(order.Id, itemSnapshot);
             if (!itemResult.IsSuccess)
             {
                 return itemResult.Error!;
@@ -119,7 +119,7 @@ public class ShippingOrder
             return ShippingOrderReconciliation.Conflict;
         }
 
-        var validationResult = ValidateImport(snapshot, updatedAtUtc);
+        OperationResult validationResult = ValidateImport(snapshot, updatedAtUtc);
         if (!validationResult.IsSuccess)
         {
             return validationResult.Error!;
@@ -131,13 +131,13 @@ public class ShippingOrder
                 "Shipping order update time cannot precede its creation time.");
         }
 
-        var itemsResult = ReconcileItems(snapshot.Items);
+        OperationResult itemsResult = ReconcileItems(snapshot.Items);
         if (!itemsResult.IsSuccess)
         {
             return itemsResult.Error!;
         }
 
-        var baseItemsResult = ReconcileBaseItems(snapshot.BaseItems);
+        OperationResult baseItemsResult = ReconcileBaseItems(snapshot.BaseItems);
         if (!baseItemsResult.IsSuccess)
         {
             return baseItemsResult.Error!;
@@ -181,7 +181,7 @@ public class ShippingOrder
                 "Shipping location must be specified before setting the order ready for picking.");
         }
 
-        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Picking user must be specified.");
+        OperationResult auditResult = ValidateAudit(startedAtUtc, startedBy, "Picking user must be specified.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -199,25 +199,151 @@ public class ShippingOrder
         return OperationResult.Success();
     }
 
-    public OperationResult UpdateItemFact(int lineNumber, double factQuantity)
+    public OperationResult<InventoryMovement> CreatePickingMovement(
+        Guid movementId,
+        int lineNumber,
+        Guid sourceStorageLocationId,
+        double quantity,
+        DateTimeOffset createdAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
     {
-        bool isEditable = Status is ShippingOrderStatus.ReadyForPicking
-            or ShippingOrderStatus.ReadyForVerification
-            or ShippingOrderStatus.InVerification
-            or ShippingOrderStatus.Verified;
-        if (!isEditable)
+        OperationResult editingResult = ValidatePickingEditing();
+        if (!editingResult.IsSuccess)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping facts can be changed only while the order is being picked or verified.");
+            return editingResult.Error!;
         }
 
-        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
-        return item is null
-            ? OperationError.NotFound<ShippingOrderItem>()
-            : item.UpdateFact(factQuantity);
+        OperationResult draftsResult = ValidatePickingDraftMovements(draftMovements);
+        if (!draftsResult.IsSuccess)
+        {
+            return draftsResult.Error!;
+        }
+
+        ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound<ShippingOrderItem>();
+        }
+
+        OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, null);
+        if (!factResult.IsSuccess)
+        {
+            return factResult.Error!;
+        }
+
+        OperationResult<InventoryMovement> movementResult = InventoryMovement.Create(
+            movementId,
+            WarehouseId,
+            sourceStorageLocationId,
+            ShippingLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            createdAtUtc,
+            RecorderType.ShippingOrder,
+            Id,
+            item.LineNumber);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult.Error!;
+        }
+
+        OperationResult itemResult = item.UpdateFact(factResult.Value);
+        return itemResult.IsSuccess
+            ? movementResult.Value!
+            : itemResult.Error!;
     }
 
-    public OperationResult SetReadyForShipment(DateTimeOffset readyAtUtc, string readyBy)
+    public OperationResult UpdatePickingMovement(
+        InventoryMovement movement,
+        Guid sourceStorageLocationId,
+        double quantity,
+        DateTimeOffset updatedAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        OperationResult movementResult = ValidatePickingMovementChange(movement);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult;
+        }
+
+        OperationResult draftsResult = ValidatePickingDraftMovements(draftMovements);
+        if (!draftsResult.IsSuccess)
+        {
+            return draftsResult;
+        }
+
+        if (draftMovements.All(x => x.Id != movement.Id))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Picking movement is not part of the order drafts.");
+        }
+
+        ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound<ShippingOrderItem>();
+        }
+
+        OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, movement.Id);
+        if (!factResult.IsSuccess)
+        {
+            return factResult.Error!;
+        }
+
+        OperationResult updateResult = movement.UpdateDraft(
+            sourceStorageLocationId,
+            ShippingLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            updatedAtUtc);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
+
+        return item.UpdateFact(factResult.Value);
+    }
+
+    public OperationResult RemovePickingMovement(
+        InventoryMovement movement,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        OperationResult movementResult = ValidatePickingMovementChange(movement);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult;
+        }
+
+        OperationResult draftsResult = ValidatePickingDraftMovements(draftMovements);
+        if (!draftsResult.IsSuccess)
+        {
+            return draftsResult;
+        }
+
+        if (draftMovements.All(x => x.Id != movement.Id))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Picking movement is not part of the order drafts.");
+        }
+
+        ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound<ShippingOrderItem>();
+        }
+
+        double factQuantity = draftMovements
+            .Where(x => x.Id != movement.Id
+                && x.RecorderLineNumber == item.LineNumber)
+            .Sum(x => x.Quantity);
+
+        return item.UpdateFact(factQuantity);
+    }
+
+    public OperationResult SetReadyForShipment(
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        DateTimeOffset readyAtUtc,
+        string readyBy)
     {
         bool canSetReady = Status is ShippingOrderStatus.ReadyForPicking
             or ShippingOrderStatus.ReadyForVerification
@@ -229,7 +355,13 @@ public class ShippingOrder
                 "Only a shipping order being picked or verified can be set ready for shipment.");
         }
 
-        var auditResult = ValidateAudit(readyAtUtc, readyBy, "Picking completion user must be specified.");
+        OperationResult pickingResult = ValidatePickingCompletion(draftMovements);
+        if (!pickingResult.IsSuccess)
+        {
+            return pickingResult;
+        }
+
+        OperationResult auditResult = ValidateAudit(readyAtUtc, readyBy, "Picking completion user must be specified.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -261,7 +393,7 @@ public class ShippingOrder
                 "Shipping location must be specified before shipping the order.");
         }
 
-        var auditResult = ValidateAudit(shippedAtUtc, shippedBy, "Shipping user must be specified.");
+        OperationResult auditResult = ValidateAudit(shippedAtUtc, shippedBy, "Shipping user must be specified.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -279,7 +411,12 @@ public class ShippingOrder
         return OperationResult.Success();
     }
 
-    public OperationResult ValidateToRollback()
+    public OperationResult<List<InventoryMovement>> Rollback(
+        string reason,
+        string userId,
+        DateTimeOffset rolledBackAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        IReadOnlyCollection<InventoryMovement> postedMovements)
     {
         if (Status is ShippingOrderStatus.Prepared or ShippingOrderStatus.Shipped)
         {
@@ -293,25 +430,225 @@ public class ShippingOrder
                 "Shipping order has no picking start time and cannot be rolled back safely.");
         }
 
-        return OperationResult.Success();
-    }
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return OperationError.Invalid<ShippingOrder>("Rollback reason must be specified.");
+        }
 
-    public void Rollback(string reason, string userId)
-    {
+        OperationResult auditResult = ValidateAudit(rolledBackAtUtc, userId, "Rollback user must be specified.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult.Error!;
+        }
+
+        if (rolledBackAtUtc < PickingStartedAtUtc)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Rollback time cannot precede picking start.");
+        }
+
+        if (draftMovements.Any(x => x.PostedAtUtc is not null
+            || x.RecorderType != RecorderType.ShippingOrder
+            || x.RecorderId != Id))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Shipping order contains an invalid draft picking movement.");
+        }
+
+        var currentCycleMovements = postedMovements
+            .Where(x => x.CreatedAtUtc >= PickingStartedAtUtc)
+            .OrderByDescending(x => x.PostedAtUtc)
+            .ToList();
+        if (currentCycleMovements.Any(x => x.PostedAtUtc is null
+            || x.RecorderType != RecorderType.ShippingOrder
+            || x.RecorderId != Id
+            || x.WarehouseId != WarehouseId
+            || x.SourceStorageLocationId is null
+            || x.DestinationStorageLocationId != ShippingLocationId
+            || x.RecorderLineNumber is null))
+        {
+            return OperationError.Failure<ShippingOrder>(
+                "Shipping order contains movements that cannot be rolled back safely.");
+        }
+
+        OperationResult<List<InventoryMovement>> compensationResult = CreateCompensationMovements(
+            currentCycleMovements,
+            rolledBackAtUtc);
+        if (!compensationResult.IsSuccess)
+        {
+            return compensationResult.Error!;
+        }
+
         Status = ShippingOrderStatus.Prepared;
-        UpdatedAtUtc = DateTimeOffset.UtcNow;
+        UpdatedAtUtc = rolledBackAtUtc;
         PickingStartedAtUtc = null;
         ReadyForShipmentAtUtc = null;
         PickingStartedBy = null;
         ReadyForShipmentBy = null;
-        RolledBackAtUtc = UpdatedAtUtc;
-        RolledBackBy = userId;
-        RollbackReason = reason;
+        RolledBackAtUtc = rolledBackAtUtc;
+        RolledBackBy = userId.Trim();
+        RollbackReason = reason.Trim();
 
-        foreach (var item in _items)
+        foreach (ShippingOrderItem item in _items)
         {
             item.ResetFact();
         }
+
+        return compensationResult.Value!;
+    }
+
+    private OperationResult ValidatePickingEditing()
+    {
+        bool isEditable = Status is ShippingOrderStatus.ReadyForPicking
+            or ShippingOrderStatus.ReadyForVerification
+            or ShippingOrderStatus.InVerification
+            or ShippingOrderStatus.Verified;
+        if (!isEditable)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Picking movements can be changed only while the shipping order is being picked or verified.");
+        }
+
+        if (ShippingLocationId is null)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping location must be specified before changing picking movements.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePickingMovementChange(InventoryMovement movement)
+    {
+        OperationResult editingResult = ValidatePickingEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        OperationResult draftResult = movement.ValidateDraft();
+        if (!draftResult.IsSuccess)
+        {
+            return draftResult;
+        }
+
+        if (movement.RecorderType != RecorderType.ShippingOrder
+            || movement.RecorderId != Id
+            || movement.RecorderLineNumber is null)
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Movement does not belong to a shipping order line.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePickingDraftMovements(
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        return draftMovements.Any(x => x.PostedAtUtc is not null
+            || x.RecorderType != RecorderType.ShippingOrder
+            || x.RecorderId != Id)
+            ? OperationError.Invalid<InventoryMovement>(
+                "Picking contains an invalid draft movement.")
+            : OperationResult.Success();
+    }
+
+    private OperationResult ValidatePickingCompletion(
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        if (ShippingLocationId is null)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping location must be specified before completing picking.");
+        }
+
+        if (draftMovements.Any(x => x.PostedAtUtc is not null
+            || x.RecorderType != RecorderType.ShippingOrder
+            || x.RecorderId != Id
+            || x.WarehouseId != WarehouseId
+            || x.SourceStorageLocationId is null
+            || x.DestinationStorageLocationId != ShippingLocationId
+            || x.RecorderLineNumber is null
+            || !double.IsFinite(x.Quantity)
+            || x.Quantity <= 0))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Picking contains an invalid movement.");
+        }
+
+        foreach (ShippingOrderItem item in _items)
+        {
+            var movements = draftMovements
+                .Where(x => x.RecorderLineNumber == item.LineNumber)
+                .ToList();
+            if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
+                || movements.Sum(x => x.Quantity) != item.FactQuantity)
+            {
+                return OperationError.Invalid<ShippingOrder>(
+                    "Every shipping order line fact must match its picking movements.");
+            }
+        }
+
+        if (draftMovements.Any(x => _items.All(item => item.LineNumber != x.RecorderLineNumber)))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Picking contains a movement for an unknown order line.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private static OperationResult<double> CalculatePickingLineFact(
+        ShippingOrderItem item,
+        double quantity,
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        Guid? excludedMovementId)
+    {
+        if (!double.IsFinite(quantity) || quantity <= 0)
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Picking quantity must be a finite number greater than zero.");
+        }
+
+        double lineQuantity = draftMovements
+            .Where(x => x.Id != excludedMovementId
+                && x.RecorderLineNumber == item.LineNumber)
+            .Sum(x => x.Quantity) + quantity;
+
+        return lineQuantity <= item.PlanQuantity
+            ? lineQuantity
+            : OperationError.Invalid<InventoryMovement>(
+                "Picking quantity exceeds the planned quantity for the shipping order line.");
+    }
+
+    private OperationResult<List<InventoryMovement>> CreateCompensationMovements(
+        IEnumerable<InventoryMovement> postedMovements,
+        DateTimeOffset createdAtUtc)
+    {
+        var movements = new List<InventoryMovement>();
+        foreach (InventoryMovement postedMovement in postedMovements)
+        {
+            OperationResult<InventoryMovement> movementResult = InventoryMovement.Create(
+                Guid.NewGuid(),
+                postedMovement.WarehouseId,
+                postedMovement.DestinationStorageLocationId,
+                postedMovement.SourceStorageLocationId,
+                postedMovement.StockKeepingUnitId,
+                postedMovement.Quantity,
+                createdAtUtc,
+                RecorderType.ShippingOrder,
+                Id,
+                postedMovement.RecorderLineNumber);
+            if (!movementResult.IsSuccess)
+            {
+                return movementResult.Error!;
+            }
+
+            movements.Add(movementResult.Value!);
+        }
+
+        return movements;
     }
 
     internal void SetReceiver(PartyInfo? receiver)
@@ -353,18 +690,18 @@ public class ShippingOrder
                 "Shipping order base item line numbers must be unique.");
         }
 
-        foreach (var itemSnapshot in snapshot.Items)
+        foreach (ShippingOrderItemImportSnapshot itemSnapshot in snapshot.Items)
         {
-            var itemResult = ShippingOrderItem.ValidateImport(snapshot.Id, itemSnapshot);
+            OperationResult itemResult = ShippingOrderItem.ValidateImport(snapshot.Id, itemSnapshot);
             if (!itemResult.IsSuccess)
             {
                 return itemResult;
             }
         }
 
-        foreach (var itemSnapshot in snapshot.BaseItems)
+        foreach (ShippingOrderBaseItemImportSnapshot itemSnapshot in snapshot.BaseItems)
         {
-            var itemResult = ShippingOrderBaseItem.ValidateImport(snapshot.Id, itemSnapshot);
+            OperationResult itemResult = ShippingOrderBaseItem.ValidateImport(snapshot.Id, itemSnapshot);
             if (!itemResult.IsSuccess)
             {
                 return itemResult;
@@ -400,8 +737,8 @@ public class ShippingOrder
             return true;
         }
 
-        var importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
-        foreach (var existingItem in _items)
+        ILookup<int, ShippingOrderItemImportSnapshot> importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
+        foreach (ShippingOrderItem existingItem in _items)
         {
             var importedLine = importedItems[existingItem.LineNumber].ToList();
             if (importedLine.Count != 1
@@ -412,8 +749,8 @@ public class ShippingOrder
             }
         }
 
-        var importedBaseItems = snapshot.BaseItems.ToLookup(x => x.LineNumber);
-        foreach (var existingItem in _baseItems)
+        ILookup<int, ShippingOrderBaseItemImportSnapshot> importedBaseItems = snapshot.BaseItems.ToLookup(x => x.LineNumber);
+        foreach (ShippingOrderBaseItem existingItem in _baseItems)
         {
             var importedLine = importedBaseItems[existingItem.LineNumber].ToList();
             if (importedLine.Count != 1
@@ -436,11 +773,11 @@ public class ShippingOrder
         _items.RemoveAll(existingItem => !importedItems.ContainsKey(existingItem.LineNumber));
 
         var existingItems = _items.ToDictionary(x => x.LineNumber);
-        foreach (var snapshot in snapshots)
+        foreach (ShippingOrderItemImportSnapshot snapshot in snapshots)
         {
-            if (existingItems.TryGetValue(snapshot.LineNumber, out var existingItem))
+            if (existingItems.TryGetValue(snapshot.LineNumber, out ShippingOrderItem? existingItem))
             {
-                var itemResult = existingItem.Reconcile(snapshot);
+                OperationResult itemResult = existingItem.Reconcile(snapshot);
                 if (!itemResult.IsSuccess)
                 {
                     return itemResult;
@@ -448,7 +785,7 @@ public class ShippingOrder
             }
             else
             {
-                var itemResult = ShippingOrderItem.Create(Id, snapshot);
+                OperationResult<ShippingOrderItem> itemResult = ShippingOrderItem.Create(Id, snapshot);
                 if (!itemResult.IsSuccess)
                 {
                     return itemResult.Error!;
@@ -468,11 +805,11 @@ public class ShippingOrder
         _baseItems.RemoveAll(existingItem => !importedItems.ContainsKey(existingItem.LineNumber));
 
         var existingItems = _baseItems.ToDictionary(x => x.LineNumber);
-        foreach (var snapshot in snapshots)
+        foreach (ShippingOrderBaseItemImportSnapshot snapshot in snapshots)
         {
-            if (existingItems.TryGetValue(snapshot.LineNumber, out var existingItem))
+            if (existingItems.TryGetValue(snapshot.LineNumber, out ShippingOrderBaseItem? existingItem))
             {
-                var itemResult = existingItem.Reconcile(snapshot);
+                OperationResult itemResult = existingItem.Reconcile(snapshot);
                 if (!itemResult.IsSuccess)
                 {
                     return itemResult;
@@ -480,7 +817,7 @@ public class ShippingOrder
             }
             else
             {
-                var itemResult = ShippingOrderBaseItem.Create(Id, snapshot);
+                OperationResult<ShippingOrderBaseItem> itemResult = ShippingOrderBaseItem.Create(Id, snapshot);
                 if (!itemResult.IsSuccess)
                 {
                     return itemResult.Error!;

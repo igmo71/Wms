@@ -18,109 +18,44 @@ public class PickingCommandService(
         double quantity,
         CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("Picking AddMovement {OrderId} {LineNumber}", orderId, lineNumber);
+        using IDisposable? scope = logger.BeginScope("Picking AddMovement {OrderId} {LineNumber}", orderId, lineNumber);
 
-        if (quantity <= 0)
-        {
-            return OperationError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var order = await dbContext.ShippingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
-
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        ShippingOrder? order = await LoadOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = ValidateEditablePickingOrder(order);
-
-        if (!validationResult.IsSuccess)
-        {
-            return validationResult;
-        }
-
-        var sourceLocation = await dbContext.StorageLocations
-            .Include(x => x.Zone)
-            .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
-
-        if (sourceLocation is null)
-        {
-            return OperationError.NotFound<StorageLocation>();
-        }
-
-        if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
-        }
-
-        if (sourceLocation.WarehouseId != order.WarehouseId)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
-        }
-
-        if (sourceLocation.Zone?.Type != ZoneType.Storage)
-        {
-            return OperationError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
-        }
-
-        if (sourceStorageLocationId == order.ShippingLocationId)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
-        }
-
-        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
-
-        if (orderItem is null)
-        {
-            return OperationError.NotFound<ShippingOrderItem>();
-        }
-
-        var draftMovements = await dbContext.InventoryMovements
-            .Where(x => x.PostedAtUtc == null
-                && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == order.Id)
-            .ToListAsync(ct);
-
-        var limitsValidationResult = await ValidateDraftQuantityLimitsAsync(
-            dbContext, order, orderItem, sourceStorageLocationId, quantity, draftMovements, null, ct);
-
-        if (!limitsValidationResult.IsSuccess)
-        {
-            return limitsValidationResult;
-        }
-
-        var movementResult = InventoryMovement.Create(
+        List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
+        OperationResult<InventoryMovement> movementResult = order.CreatePickingMovement(
             Guid.NewGuid(),
-            order.WarehouseId,
+            lineNumber,
             sourceStorageLocationId,
-            order.ShippingLocationId,
-            orderItem.StockKeepingUnitId,
             quantity,
             DateTimeOffset.UtcNow,
-            RecorderType.ShippingOrder,
-            order.Id,
-            orderItem.LineNumber);
+            draftMovements);
         if (!movementResult.IsSuccess)
         {
             return movementResult.Error!;
         }
 
-        var movement = movementResult.Value!;
-        dbContext.InventoryMovements.Add(movement);
-        var factResult = order.UpdateItemFact(
-            lineNumber,
-            draftMovements
-            .Where(x => x.RecorderLineNumber == lineNumber)
-            .Sum(x => x.Quantity) + movement.Quantity);
-        if (!factResult.IsSuccess)
+        InventoryMovement movement = movementResult.Value!;
+        OperationResult sourceResult = await ValidateSourceLocationAsync(
+            dbContext, order, sourceStorageLocationId, ct);
+        if (!sourceResult.IsSuccess)
         {
-            return factResult;
+            return sourceResult;
         }
 
+        OperationResult balanceResult = await ValidateSourceBalanceAsync(
+            dbContext, order, movement, draftMovements, null, ct);
+        if (!balanceResult.IsSuccess)
+        {
+            return balanceResult;
+        }
+
+        dbContext.InventoryMovements.Add(movement);
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
@@ -131,250 +66,149 @@ public class PickingCommandService(
         double quantity,
         CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("Picking UpdateMovement {MovementId}", movementId);
+        using IDisposable? scope = logger.BeginScope("Picking UpdateMovement {MovementId}", movementId);
 
-        if (quantity <= 0)
-        {
-            return OperationError.Invalid<InventoryMovement>("Picking quantity must be greater than zero.");
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var movement = await dbContext.InventoryMovements
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        InventoryMovement? movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
-
         if (movement is null)
         {
             return OperationError.NotFound<InventoryMovement>();
         }
 
-        if (movement.PostedAtUtc is not null)
-        {
-            return OperationError.Invalid<InventoryMovement>("Posted picking movement cannot be updated.");
-        }
-
-        if (movement.RecorderType != RecorderType.ShippingOrder || movement.RecorderId is null || movement.RecorderLineNumber is null)
-        {
-            return OperationError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
-        }
-
-        var order = await dbContext.ShippingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
-
+        ShippingOrder? order = movement.RecorderId is Guid orderId
+            ? await LoadOrderAsync(dbContext, orderId, ct)
+            : null;
         if (order is null)
         {
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = ValidateEditablePickingOrder(order);
-
-        if (!validationResult.IsSuccess)
-        {
-            return validationResult;
-        }
-
-        var sourceLocation = await dbContext.StorageLocations
-            .Include(x => x.Zone)
-            .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
-
-        if (sourceLocation is null)
-        {
-            return OperationError.NotFound<StorageLocation>();
-        }
-
-        if (sourceLocation.IsFolder || sourceLocation.DeletionMark || sourceLocation.Zone?.DeletionMark == true)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must be an active inventory location.");
-        }
-
-        if (sourceLocation.WarehouseId != order.WarehouseId)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must belong to the shipping order warehouse.");
-        }
-
-        if (sourceLocation.Zone?.Type != ZoneType.Storage)
-        {
-            return OperationError.Invalid<StorageLocation>("Picking source location must belong to a storage zone.");
-        }
-
-        if (sourceStorageLocationId == order.ShippingLocationId)
-        {
-            return OperationError.Invalid<StorageLocation>("Source storage location must differ from the shipping location.");
-        }
-
-        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
-
-        if (orderItem is null)
-        {
-            return OperationError.NotFound<ShippingOrderItem>();
-        }
-
-        var draftMovements = await dbContext.InventoryMovements
-            .Where(x => x.PostedAtUtc == null
-                && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == order.Id)
-            .ToListAsync(ct);
-
-        var limitsValidationResult = await ValidateDraftQuantityLimitsAsync(
-            dbContext, order, orderItem, sourceStorageLocationId, quantity, draftMovements, movement.Id, ct);
-
-        if (!limitsValidationResult.IsSuccess)
-        {
-            return limitsValidationResult;
-        }
-
-        var updateResult = movement.UpdateDraft(
+        List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
+        OperationResult updateResult = order.UpdatePickingMovement(
+            movement,
             sourceStorageLocationId,
-            movement.DestinationStorageLocationId,
-            movement.StockKeepingUnitId,
             quantity,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            draftMovements);
         if (!updateResult.IsSuccess)
         {
             return updateResult;
         }
 
-        var factResult = order.UpdateItemFact(
-            orderItem.LineNumber,
-            draftMovements
-            .Where(x => x.RecorderLineNumber == movement.RecorderLineNumber && x.Id != movement.Id)
-            .Sum(x => x.Quantity) + quantity);
-        if (!factResult.IsSuccess)
+        OperationResult sourceResult = await ValidateSourceLocationAsync(
+            dbContext, order, sourceStorageLocationId, ct);
+        if (!sourceResult.IsSuccess)
         {
-            return factResult;
+            return sourceResult;
+        }
+
+        OperationResult balanceResult = await ValidateSourceBalanceAsync(
+            dbContext, order, movement, draftMovements, movement.Id, ct);
+        if (!balanceResult.IsSuccess)
+        {
+            return balanceResult;
         }
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> DeletePickingMovementAsync(Guid movementId, CancellationToken ct = default)
+    public async Task<OperationResult> DeletePickingMovementAsync(
+        Guid movementId,
+        CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("Picking DeleteMovement {MovementId}", movementId);
+        using IDisposable? scope = logger.BeginScope("Picking DeleteMovement {MovementId}", movementId);
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var movement = await dbContext.InventoryMovements
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        InventoryMovement? movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
-
         if (movement is null)
         {
             return OperationError.NotFound<InventoryMovement>();
         }
 
-        var draftResult = movement.ValidateDraft();
-        if (!draftResult.IsSuccess)
-        {
-            return draftResult;
-        }
-
-        if (movement.RecorderType != RecorderType.ShippingOrder || movement.RecorderId is null || movement.RecorderLineNumber is null)
-        {
-            return OperationError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");
-        }
-
-        var order = await dbContext.ShippingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
-
+        ShippingOrder? order = movement.RecorderId is Guid orderId
+            ? await LoadOrderAsync(dbContext, orderId, ct)
+            : null;
         if (order is null)
         {
             return OperationError.NotFound<ShippingOrder>();
         }
 
-        var validationResult = ValidateEditablePickingOrder(order);
-
-        if (!validationResult.IsSuccess)
+        List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
+        OperationResult removalResult = order.RemovePickingMovement(movement, draftMovements);
+        if (!removalResult.IsSuccess)
         {
-            return validationResult;
+            return removalResult;
         }
-
-        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
-
-        if (orderItem is null)
-        {
-            return OperationError.NotFound<ShippingOrderItem>();
-        }
-
-        var draftMovements = await dbContext.InventoryMovements
-            .Where(x => x.PostedAtUtc == null
-                && x.RecorderType == RecorderType.ShippingOrder
-                && x.RecorderId == order.Id
-                && x.RecorderLineNumber == movement.RecorderLineNumber)
-            .ToListAsync(ct);
 
         dbContext.InventoryMovements.Remove(movement);
-        var factResult = order.UpdateItemFact(
-            orderItem.LineNumber,
-            draftMovements
-            .Where(x => x.Id != movement.Id)
-            .Sum(x => x.Quantity));
-        if (!factResult.IsSuccess)
-        {
-            return factResult;
-        }
-
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
 
-    private static OperationResult ValidateEditablePickingOrder(ShippingOrder order)
-    {
-        bool isEditable = order.Status is ShippingOrderStatus.ReadyForPicking
-            or ShippingOrderStatus.ReadyForVerification
-            or ShippingOrderStatus.InVerification
-            or ShippingOrderStatus.Verified;
+    private static Task<ShippingOrder?> LoadOrderAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        CancellationToken ct) =>
+        dbContext.ShippingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
-        if (!isEditable)
-        {
-            return OperationError.Invalid<ShippingOrder>("Picking movements can be changed only while the shipping order is being picked or verified.");
-        }
+    private static Task<List<InventoryMovement>> LoadDraftMovementsAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        CancellationToken ct) =>
+        dbContext.InventoryMovements
+            .Where(x => x.PostedAtUtc == null
+                && x.RecorderType == RecorderType.ShippingOrder
+                && x.RecorderId == orderId)
+            .ToListAsync(ct);
 
-        if (order.ShippingLocationId is null)
-        {
-            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before changing picking movements.");
-        }
-
-        return OperationResult.Success();
-    }
-
-    private static async Task<OperationResult> ValidateDraftQuantityLimitsAsync(
+    private static async Task<OperationResult> ValidateSourceLocationAsync(
         ApplicationDbContext dbContext,
         ShippingOrder order,
-        ShippingOrderItem orderItem,
         Guid sourceStorageLocationId,
-        double quantity,
+        CancellationToken ct)
+    {
+        bool isValid = await dbContext.StorageLocations
+            .AnyAsync(x => x.Id == sourceStorageLocationId
+                && x.WarehouseId == order.WarehouseId
+                && !x.IsFolder
+                && !x.DeletionMark
+                && !x.Zone!.DeletionMark
+                && x.Zone.Type == ZoneType.Storage, ct);
+
+        return isValid
+            ? OperationResult.Success()
+            : OperationError.Invalid<StorageLocation>(
+                "Picking source must be an active storage location in the order warehouse.");
+    }
+
+    private static async Task<OperationResult> ValidateSourceBalanceAsync(
+        ApplicationDbContext dbContext,
+        ShippingOrder order,
+        InventoryMovement movement,
         IReadOnlyCollection<InventoryMovement> draftMovements,
         Guid? excludedMovementId,
         CancellationToken ct)
     {
-        double lineQuantity = draftMovements
-            .Where(x => x.Id != excludedMovementId && x.RecorderLineNumber == orderItem.LineNumber)
-            .Sum(x => x.Quantity) + quantity;
-
-        if (lineQuantity > orderItem.PlanQuantity)
-        {
-            return OperationError.Invalid<InventoryMovement>("Picking quantity exceeds the planned quantity for the shipping order line.");
-        }
-
-        var sourceBalance = await dbContext.InventoryBalances
+        InventoryBalance? sourceBalance = await dbContext.InventoryBalances
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.WarehouseId == order.WarehouseId
-                && x.StorageLocationId == sourceStorageLocationId
-                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId, ct);
+                && x.StorageLocationId == movement.SourceStorageLocationId
+                && x.StockKeepingUnitId == movement.StockKeepingUnitId, ct);
 
         double sourceQuantity = draftMovements
             .Where(x => x.Id != excludedMovementId
-                && x.SourceStorageLocationId == sourceStorageLocationId
-                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId)
-            .Sum(x => x.Quantity) + quantity;
+                && x.SourceStorageLocationId == movement.SourceStorageLocationId
+                && x.StockKeepingUnitId == movement.StockKeepingUnitId)
+            .Sum(x => x.Quantity) + movement.Quantity;
 
-        if (sourceBalance is null || sourceQuantity > sourceBalance.Quantity)
-        {
-            return OperationError.Invalid<InventoryMovement>("Picking quantity exceeds the available inventory balance in the source storage location.");
-        }
-
-        return OperationResult.Success();
+        return sourceBalance is not null && sourceQuantity <= sourceBalance.Quantity
+            ? OperationResult.Success()
+            : OperationError.Invalid<InventoryMovement>(
+                "Picking quantity exceeds the available inventory balance in the source storage location.");
     }
 }
