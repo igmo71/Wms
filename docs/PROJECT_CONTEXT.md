@@ -15,6 +15,13 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
+The operator channels are the server-side web application and an Android mobile
+client. The mobile channel is intended primarily for industrial handheld
+terminals with an integrated barcode scanner, with camera scanning on an
+ordinary Android smartphone as a supported fallback. It exposes the same WMS
+processes and business rules through a scanning-oriented workflow rather than
+creating a separate mobile inventory model.
+
 Receiving, receiving putaway, the initial shipping/picking flow,
 inventory-count backend, and the intra-warehouse transfer backend are currently
 being implemented. Outgoing orders are imported from 1C and use their own
@@ -150,11 +157,66 @@ The project deliberately favors clear, direct code and fast iteration over enter
 
 These principles can change as the product and its constraints mature.
 
+## Mobile WMS
+
+`Wms.Mobile` is an Android-only .NET MAUI client. It never accesses the WMS
+database, EF Core, application services, or 1C directly. All mobile reads and
+commands go through an authenticated, versioned HTTP API hosted by `Wms.WebApi`.
+The first contract namespace and route family are `Wms.Contracts.Mobile.V1` and
+`/api/mobile/v1`.
+
+`Wms.Contracts` is the shared wire-contract boundary referenced by
+`Wms.Mobile` and `Wms.WebApi`. It contains request/response models and API-facing
+enums, but no domain entities, persistence types, business services, MAUI or
+Android types. The server maps between contracts and the existing application
+services; `Wms.Mobile` does not reference `Wms`.
+
+The initial mobile authentication flow reuses existing ASP.NET Core Identity
+users with email/password and token-based authentication. Access and refresh
+tokens are stored in platform secure storage. The API derives the acting
+`ApplicationUser.Id` from the authenticated principal and never trusts a user id
+provided as the author of a mobile command. Mobile self-registration and badge
+login are outside the first version. A user id printed on a badge is an
+identifier, not an authentication secret; badge login requires a separately
+specified PIN, revocable credential, or equivalent proof.
+
+Mobile inventory commands are initially online-only. A physical action is not
+shown as completed until the server confirms it. Every state-changing mobile
+business command carries a stable client request id and is processed
+idempotently so a timeout, retry, or double tap cannot create a duplicate
+inventory action. Offline command queues and conflict reconciliation are
+deferred.
+
+Scanning is exposed to mobile workflows through one vendor-neutral event model.
+Integrated Android scanner adapters may use Intent/Broadcast or keyboard-wedge
+mechanisms, and camera scanning is the smartphone fallback. Vendor-specific
+actions and extras remain inside device adapters or profiles and do not enter
+application contracts, workflow view models, or user-facing names. Available
+sources are checked when the app starts and resumes; the preferred source can be
+overridden by the operator.
+
+Codes are resolved on the server in the context expected by the current step,
+such as storage location, SKU, or a particular document type. SKU barcodes come
+from the synchronized 1C catalog and remain strings. WMS-owned storage-location
+QR payloads use `wms:location:v1:<storage-location-guid>` and printed labels also
+show the warehouse, zone, and location name. The 1C document-barcode algorithm
+is a server integration boundary and must be obtained from 1C with control
+examples; the mobile client does not decode `Ref_Key`.
+
+The first mobile business vertical is intra-warehouse transfer: direct movement
+between ordinary storage locations first, followed by the existing transit
+location workflow. The detailed scope and staged delivery plan are defined in
+`specs/mobile-wms/`.
+
 ## Solution map
 
 - `Wms` contains domain entities, EF Core persistence, application services, and 1C integration.
+- `Wms.Contracts` contains versioned wire contracts shared by the HTTP API and
+  mobile client without exposing the WMS domain model.
 - `Wms.WebApi` hosts HTTP API and 1C webhook endpoints.
 - `Wms.WebApp` is the Blazor/MudBlazor operator UI.
+- `Wms.Mobile` is the Android .NET MAUI scanning-oriented operator client and
+  communicates only with `Wms.WebApi`.
 
 Core domain concepts:
 
