@@ -24,7 +24,9 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (order is null)
+        {
             return OperationError.NotFound<ReceivingOrder>();
+        }
 
         var startResult = order.StartPutaway(DateTimeOffset.UtcNow, userId);
         if (!startResult.IsSuccess)
@@ -44,51 +46,42 @@ public class PutawayCommandService(
         double quantity,
         CancellationToken ct = default)
     {
-        if (quantity <= 0)
-            return OperationError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
 
         if (order is null)
+        {
             return OperationError.NotFound<ReceivingOrder>();
-
-        var validationResult = ValidateEditableOrder(order);
-        if (!validationResult.IsSuccess)
-            return validationResult;
-
-        var destinationResult = await ValidateDestinationAsync(
-            dbContext, order, destinationStorageLocationId, ct);
-        if (!destinationResult.IsSuccess)
-            return destinationResult;
-
-        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
-        if (orderItem is null)
-            return OperationError.NotFound<ReceivingOrderItem>();
+        }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
-        var limitsResult = await ValidateQuantityLimitsAsync(
-            dbContext, order, orderItem, quantity, draftMovements, null, ct);
-        if (!limitsResult.IsSuccess)
-            return limitsResult;
-
-        var movementResult = InventoryMovement.Create(
+        var movementResult = order.CreatePutawayMovement(
             Guid.NewGuid(),
-            order.WarehouseId,
-            order.ReceivingLocationId,
+            lineNumber,
             destinationStorageLocationId,
-            orderItem.StockKeepingUnitId,
             quantity,
             DateTimeOffset.UtcNow,
-            RecorderType.ReceivingOrder,
-            order.Id,
-            orderItem.LineNumber);
+            draftMovements);
         if (!movementResult.IsSuccess)
         {
             return movementResult.Error!;
         }
 
         var movement = movementResult.Value!;
+        var destinationResult = await ValidateDestinationAsync(
+            dbContext, order, destinationStorageLocationId, ct);
+        if (!destinationResult.IsSuccess)
+        {
+            return destinationResult;
+        }
+
+        var balanceResult = await ValidateSourceBalanceAsync(
+            dbContext, order, movement, draftMovements, null, ct);
+        if (!balanceResult.IsSuccess)
+        {
+            return balanceResult;
+        }
+
         dbContext.InventoryMovements.Add(movement);
         await dbContext.SaveChangesAsync(ct);
 
@@ -101,53 +94,48 @@ public class PutawayCommandService(
         double quantity,
         CancellationToken ct = default)
     {
-        if (quantity <= 0)
-            return OperationError.Invalid<InventoryMovement>("Putaway quantity must be greater than zero.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
+        {
             return OperationError.NotFound<InventoryMovement>();
+        }
 
-        var movementValidation = ValidateDraftPutawayMovement(movement);
-        if (!movementValidation.IsSuccess)
-            return movementValidation;
-
-        var order = await LoadEditableOrderAsync(dbContext, movement.RecorderId!.Value, ct);
+        var order = movement.RecorderId is Guid orderId
+            ? await LoadEditableOrderAsync(dbContext, orderId, ct)
+            : null;
         if (order is null)
+        {
             return OperationError.NotFound<ReceivingOrder>();
+        }
 
-        var orderValidation = ValidateEditableOrder(order);
-        if (!orderValidation.IsSuccess)
-            return orderValidation;
+        var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
+        var updateResult = order.UpdatePutawayMovement(
+            movement,
+            destinationStorageLocationId,
+            quantity,
+            DateTimeOffset.UtcNow,
+            draftMovements);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
 
         var destinationResult = await ValidateDestinationAsync(
             dbContext, order, destinationStorageLocationId, ct);
         if (!destinationResult.IsSuccess)
-            return destinationResult;
-
-        var orderItem = order.Items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
-        if (orderItem is null)
-            return OperationError.NotFound<ReceivingOrderItem>();
-
-        var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
-        var limitsResult = await ValidateQuantityLimitsAsync(
-            dbContext, order, orderItem, quantity, draftMovements, movement.Id, ct);
-        if (!limitsResult.IsSuccess)
-            return limitsResult;
-
-        var updateResult = movement.UpdateDraft(
-            order.ReceivingLocationId,
-            destinationStorageLocationId,
-            orderItem.StockKeepingUnitId,
-            quantity,
-            DateTimeOffset.UtcNow);
-        if (!updateResult.IsSuccess)
         {
-            return updateResult;
+            return destinationResult;
+        }
+
+        var balanceResult = await ValidateSourceBalanceAsync(
+            dbContext, order, movement, draftMovements, movement.Id, ct);
+        if (!balanceResult.IsSuccess)
+        {
+            return balanceResult;
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -162,21 +150,24 @@ public class PutawayCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
         if (movement is null)
+        {
             return OperationError.NotFound<InventoryMovement>();
+        }
 
-        var movementValidation = ValidateDraftPutawayMovement(movement);
-        if (!movementValidation.IsSuccess)
-            return movementValidation;
-
-        var order = await dbContext.ReceivingOrders
-            .FirstOrDefaultAsync(x => x.Id == movement.RecorderId, ct);
+        var order = movement.RecorderId is Guid orderId
+            ? await dbContext.ReceivingOrders.FirstOrDefaultAsync(x => x.Id == orderId, ct)
+            : null;
 
         if (order is null)
+        {
             return OperationError.NotFound<ReceivingOrder>();
+        }
 
-        var orderValidation = ValidateEditableOrder(order);
-        if (!orderValidation.IsSuccess)
-            return orderValidation;
+        var removalResult = order.ValidatePutawayMovementRemoval(movement);
+        if (!removalResult.IsSuccess)
+        {
+            return removalResult;
+        }
 
         dbContext.InventoryMovements.Remove(movement);
         await dbContext.SaveChangesAsync(ct);
@@ -192,26 +183,22 @@ public class PutawayCommandService(
 
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
+        {
             return OperationError.NotFound<ReceivingOrder>();
-
-        var orderValidation = ValidateEditableOrder(order);
-        if (!orderValidation.IsSuccess)
-            return orderValidation;
+        }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
-        var completionValidation = ValidateCompletion(order, draftMovements);
-        if (!completionValidation.IsSuccess)
-            return completionValidation;
+        var completionResult = order.CompletePutaway(draftMovements, DateTimeOffset.UtcNow, userId);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult;
+        }
 
         var destinationsValidation = await ValidateCompletionDestinationsAsync(
             dbContext, order, draftMovements, ct);
         if (!destinationsValidation.IsSuccess)
-            return destinationsValidation;
-
-        var completionResult = order.CompletePutaway(DateTimeOffset.UtcNow, userId);
-        if (!completionResult.IsSuccess)
         {
-            return completionResult;
+            return destinationsValidation;
         }
 
         foreach (var movement in draftMovements)
@@ -226,7 +213,9 @@ public class PutawayCommandService(
         var postingResult = await balanceAndTurnoverService
             .PostInventoryMovementsAsync(draftMovements, dbContext, ct);
         if (!postingResult.IsSuccess)
+        {
             return postingResult;
+        }
 
         await dbContext.SaveChangesAsync(ct);
 
@@ -251,42 +240,6 @@ public class PutawayCommandService(
                 && x.RecorderId == orderId)
             .ToListAsync(ct);
 
-    private static OperationResult ValidateEditableOrder(ReceivingOrder order)
-    {
-        if (order.Status != ReceivingOrderStatus.Received
-            || order.PutawayStatus != PutawayStatus.InProgress)
-        {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Putaway movements can be changed only while putaway is in progress.");
-        }
-
-        if (order.ReceivingLocationId is null)
-            return OperationError.Invalid<ReceivingOrder>("Receiving location must be specified for putaway.");
-
-        return OperationResult.Success();
-    }
-
-    private static OperationResult ValidateDraftPutawayMovement(InventoryMovement movement)
-    {
-        var draftResult = movement.ValidateDraft();
-        if (!draftResult.IsSuccess)
-        {
-            return draftResult;
-        }
-
-        if (movement.RecorderType != RecorderType.ReceivingOrder
-            || movement.RecorderId is null
-            || movement.RecorderLineNumber is null
-            || movement.SourceStorageLocationId is null
-            || movement.DestinationStorageLocationId is null)
-        {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement does not belong to a receiving-order putaway line.");
-        }
-
-        return OperationResult.Success();
-    }
-
     private static async Task<OperationResult> ValidateDestinationAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
@@ -294,7 +247,9 @@ public class PutawayCommandService(
         CancellationToken ct)
     {
         if (destinationStorageLocationId == order.ReceivingLocationId)
+        {
             return OperationError.Invalid<StorageLocation>("Destination must differ from the receiving location.");
+        }
 
         var isValid = await dbContext.StorageLocations
             .AnyAsync(x => x.Id == destinationStorageLocationId
@@ -310,70 +265,30 @@ public class PutawayCommandService(
                 "Putaway destination must be an active storage location in the order warehouse.");
     }
 
-    private static async Task<OperationResult> ValidateQuantityLimitsAsync(
+    private static async Task<OperationResult> ValidateSourceBalanceAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
-        ReceivingOrderItem orderItem,
-        double quantity,
+        InventoryMovement movement,
         IReadOnlyCollection<InventoryMovement> draftMovements,
         Guid? excludedMovementId,
         CancellationToken ct)
     {
-        var lineQuantity = draftMovements
-            .Where(x => x.Id != excludedMovementId
-                && x.RecorderLineNumber == orderItem.LineNumber)
-            .Sum(x => x.Quantity) + quantity;
-
-        if (lineQuantity > orderItem.FactQuantity)
-            return OperationError.Invalid<InventoryMovement>(
-                "Putaway quantity exceeds the received quantity for the order line.");
-
         var sourceBalance = await dbContext.InventoryBalances
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.WarehouseId == order.WarehouseId
                 && x.StorageLocationId == order.ReceivingLocationId
-                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId, ct);
+                && x.StockKeepingUnitId == movement.StockKeepingUnitId, ct);
 
         var skuQuantity = draftMovements
             .Where(x => x.Id != excludedMovementId
-                && x.StockKeepingUnitId == orderItem.StockKeepingUnitId)
-            .Sum(x => x.Quantity) + quantity;
+                && x.StockKeepingUnitId == movement.StockKeepingUnitId)
+            .Sum(x => x.Quantity) + movement.Quantity;
 
         if (sourceBalance is null || skuQuantity > sourceBalance.Quantity)
+        {
             return OperationError.Invalid<InventoryMovement>(
                 "Putaway quantity exceeds the available receiving-location balance.");
-
-        return OperationResult.Success();
-    }
-
-    private static OperationResult ValidateCompletion(
-        ReceivingOrder order,
-        IReadOnlyCollection<InventoryMovement> draftMovements)
-    {
-        if (draftMovements.Count == 0)
-            return OperationError.Invalid<ReceivingOrder>("Putaway has no movements.");
-
-        if (draftMovements.Any(x => x.WarehouseId != order.WarehouseId
-            || x.SourceStorageLocationId != order.ReceivingLocationId
-            || x.DestinationStorageLocationId is null))
-        {
-            return OperationError.Invalid<InventoryMovement>("Putaway contains an invalid movement.");
         }
-
-        foreach (var item in order.Items)
-        {
-            var movements = draftMovements.Where(x => x.RecorderLineNumber == item.LineNumber).ToList();
-
-            if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
-                || movements.Sum(x => x.Quantity) != item.FactQuantity)
-            {
-                return OperationError.Invalid<ReceivingOrder>(
-                    "Every received order line must be fully allocated before completing putaway.");
-            }
-        }
-
-        if (draftMovements.Any(x => order.Items.All(item => item.LineNumber != x.RecorderLineNumber)))
-            return OperationError.Invalid<InventoryMovement>("Putaway contains a movement for an unknown order line.");
 
         return OperationResult.Success();
     }

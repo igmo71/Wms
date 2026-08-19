@@ -312,12 +312,90 @@ public class ReceivingOrder
         return OperationResult.Success();
     }
 
-    public OperationResult CompletePutaway(DateTimeOffset completedAtUtc, string completedBy)
+    public OperationResult<InventoryMovement> CreatePutawayMovement(
+        Guid movementId,
+        int lineNumber,
+        Guid destinationStorageLocationId,
+        double quantity,
+        DateTimeOffset createdAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
     {
-        if (Status != ReceivingOrderStatus.Received || PutawayStatus != PutawayStatus.InProgress)
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Only in-progress putaway can be completed.");
+            return editingResult.Error!;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound<ReceivingOrderItem>();
+        }
+
+        var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, null);
+        if (!quantityResult.IsSuccess)
+        {
+            return quantityResult.Error!;
+        }
+
+        return InventoryMovement.Create(
+            movementId,
+            WarehouseId,
+            ReceivingLocationId,
+            destinationStorageLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            createdAtUtc,
+            RecorderType.ReceivingOrder,
+            Id,
+            item.LineNumber);
+    }
+
+    public OperationResult UpdatePutawayMovement(
+        InventoryMovement movement,
+        Guid destinationStorageLocationId,
+        double quantity,
+        DateTimeOffset updatedAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        var movementResult = ValidatePutawayMovementChange(movement);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound<ReceivingOrderItem>();
+        }
+
+        var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, movement.Id);
+        if (!quantityResult.IsSuccess)
+        {
+            return quantityResult;
+        }
+
+        return movement.UpdateDraft(
+            ReceivingLocationId,
+            destinationStorageLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            updatedAtUtc);
+    }
+
+    public OperationResult ValidatePutawayMovementRemoval(InventoryMovement movement) =>
+        ValidatePutawayMovementChange(movement);
+
+    public OperationResult CompletePutaway(
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        DateTimeOffset completedAtUtc,
+        string completedBy)
+    {
+        var completionResult = ValidatePutawayCompletion(draftMovements);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult;
         }
 
         var auditResult = ValidateAudit(completedAtUtc, completedBy, "Completing user must be specified.");
@@ -336,6 +414,121 @@ public class ReceivingOrder
         PutawayCompletedAtUtc = completedAtUtc;
         PutawayCompletedBy = completedBy.Trim();
         return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayEditing()
+    {
+        if (Status != ReceivingOrderStatus.Received
+            || PutawayStatus != PutawayStatus.InProgress)
+        {
+            return OperationError.Invalid<ReceivingOrder>(
+                "Putaway movements can be changed only while putaway is in progress.");
+        }
+
+        if (ReceivingLocationId is null)
+        {
+            return OperationError.Invalid<ReceivingOrder>(
+                "Receiving location must be specified for putaway.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayMovementChange(InventoryMovement movement)
+    {
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        var draftResult = movement.ValidateDraft();
+        if (!draftResult.IsSuccess)
+        {
+            return draftResult;
+        }
+
+        if (movement.RecorderType != RecorderType.ReceivingOrder
+            || movement.RecorderId != Id
+            || movement.RecorderLineNumber is null
+            || movement.SourceStorageLocationId is null
+            || movement.DestinationStorageLocationId is null)
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Movement does not belong to a receiving-order putaway line.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayCompletion(
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        if (draftMovements.Count == 0)
+        {
+            return OperationError.Invalid<ReceivingOrder>("Putaway has no movements.");
+        }
+
+        if (draftMovements.Any(x => x.PostedAtUtc is not null
+            || x.RecorderType != RecorderType.ReceivingOrder
+            || x.RecorderId != Id
+            || x.WarehouseId != WarehouseId
+            || x.SourceStorageLocationId != ReceivingLocationId
+            || x.DestinationStorageLocationId is null))
+        {
+            return OperationError.Invalid<InventoryMovement>("Putaway contains an invalid movement.");
+        }
+
+        foreach (var item in _items)
+        {
+            var movements = draftMovements
+                .Where(x => x.RecorderLineNumber == item.LineNumber)
+                .ToList();
+
+            if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
+                || movements.Sum(x => x.Quantity) != item.FactQuantity)
+            {
+                return OperationError.Invalid<ReceivingOrder>(
+                    "Every received order line must be fully allocated before completing putaway.");
+            }
+        }
+
+        if (draftMovements.Any(x => _items.All(item => item.LineNumber != x.RecorderLineNumber)))
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Putaway contains a movement for an unknown order line.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private static OperationResult ValidatePutawayLineQuantity(
+        ReceivingOrderItem item,
+        double quantity,
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        Guid? excludedMovementId)
+    {
+        if (!double.IsFinite(quantity) || quantity <= 0)
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Putaway quantity must be a finite number greater than zero.");
+        }
+
+        var lineQuantity = draftMovements
+            .Where(x => x.Id != excludedMovementId
+                && x.RecorderLineNumber == item.LineNumber)
+            .Sum(x => x.Quantity) + quantity;
+
+        return lineQuantity <= item.FactQuantity
+            ? OperationResult.Success()
+            : OperationError.Invalid<InventoryMovement>(
+                "Putaway quantity exceeds the received quantity for the order line.");
     }
 
     internal void SetShipper(PartyInfo? shipper)

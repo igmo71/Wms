@@ -10,10 +10,9 @@ without a big-bang rewrite or speculative frameworks.
 
 The 2026-08-19 audit found that most persisted models still expose public
 mutation. `Zone` and `StorageLocation` established the rich-model pilot;
-`InventoryTransfer`, `InventoryCount`, and the inventory facts have since been
-aligned. Receiving import and receiving transitions have also been aligned.
-Putaway still has local movement checks in application services, while shipping
-continues to expose mutable workflow state.
+`InventoryTransfer`, `InventoryCount`, the inventory facts, receiving, and
+putaway have since been aligned. Shipping continues to expose mutable workflow
+state.
 
 Large command services contain both necessary persistence decisions and local
 domain rules. The goal is not to remove conditions, but to leave each condition
@@ -69,8 +68,9 @@ services.
 1. Receiving import/reconciliation and receiving transitions (completed):
    domain import snapshot, conflict-safe reconciliation, controlled fact
    editing, receiving location, status transitions, and audit state.
-2. Putaway lifecycle and draft movement editing (transition mutation is already
-   protected; local movement and completion invariants remain to be aligned).
+2. Putaway lifecycle and draft movement editing (completed): controlled draft
+   creation, editing and removal, per-line quantity limits, completion checks,
+   and audit state.
 3. Shipping import/reconciliation and shipping transitions.
 4. Picking and rollback lifecycle.
 
