@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.ReceivingOrders;
 using Wms.Common;
@@ -137,11 +137,12 @@ public partial class InProcess
                 return;
             }
 
-            var receivingZone = _receivingZone;
-            var receivingLocation = _receivingLocation;
-            _order = await OrderQueryService.GetOrderAsync(Id);
-            _receivingZone = receivingZone;
-            _receivingLocation = receivingLocation;
+            var localUpdateResult = _order!.UpdateItemFact(item.LineNumber, factQuantity, comment);
+            if (!localUpdateResult.IsSuccess)
+            {
+                _completeFailed = true;
+                _errorMessage = localUpdateResult.Error?.Message ?? "Не удалось обновить строку на странице.";
+            }
         }
         catch
         {
