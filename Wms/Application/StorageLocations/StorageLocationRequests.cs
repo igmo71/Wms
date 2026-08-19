@@ -1,53 +1,43 @@
 using Wms.Domain;
-using CoordinateAxisValue = Wms.Common.CoordinateAxis;
+using CoordinateAxisValue = Wms.Application.StorageLocations.CoordinateAxis;
 
-namespace Wms.Common;
+namespace Wms.Application.StorageLocations;
 
-public class CreateStorageLocationRequest
+public sealed class CreateStorageLocationRequest
 {
-    public Guid WarehouseId { get; set; }
-    public Guid ZoneId { get; set; }
-    public Guid? ParentId { get; set; }
-    public int Number { get; set; } = 1;
-    public int SegmentWidth { get; set; } = 2;
-    public string Name { get; set; } = string.Empty;
-    public bool IsFolder { get; set; }
-    public LocationDimensions Dimensions { get; set; } = new();
-    public LocationCoordinates Coordinates { get; set; } = new();
-    public long? PickSequence { get; set; }
+    public required Guid WarehouseId { get; init; }
+    public required Guid ZoneId { get; init; }
+    public required Guid? ParentId { get; init; }
+    public int Number { get; init; } = 1;
+    public int SegmentWidth { get; init; } = 2;
+    public required StorageLocationDetails Details { get; init; }
 }
 
-public class UpdateStorageLocationRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public bool IsFolder { get; set; }
-    public LocationDimensions Dimensions { get; set; } = new();
-    public LocationCoordinates Coordinates { get; set; } = new();
-    public long? PickSequence { get; set; }
-}
-
-public class GenerateStorageLocationsRequest
+public sealed class GenerateStorageLocationsRequest
 {
     public const int MaximumCount = 1000;
 
-    public Guid WarehouseId { get; set; }
-    public Guid ZoneId { get; set; }
-    public Guid? ParentId { get; set; }
-    public int Count { get; set; } = 1;
-    public int StartNumber { get; set; } = 1;
-    public int NumberStep { get; set; } = 1;
-    public int SegmentWidth { get; set; } = 2;
-    public string NamePrefix { get; set; } = "Позиция";
-    public bool IsFolder { get; set; }
-    public LocationDimensions Dimensions { get; set; } = new();
-    public LocationCoordinates StartCoordinates { get; set; } = new();
-    public CoordinateAxis? CoordinateAxis { get; set; }
-    public double CoordinateStep { get; set; }
-    public long? StartPickSequence { get; set; }
-    public long PickSequenceStep { get; set; } = 1;
+    public required Guid WarehouseId { get; init; }
+    public required Guid ZoneId { get; init; }
+    public required Guid? ParentId { get; init; }
+    public int Count { get; init; } = 1;
+    public int StartNumber { get; init; } = 1;
+    public int NumberStep { get; init; } = 1;
+    public int SegmentWidth { get; init; } = 2;
+    public string NamePrefix { get; init; } = "Позиция";
+    public bool IsFolder { get; init; }
+    public required LocationDimensions Dimensions { get; init; }
+    public required LocationCoordinates StartCoordinates { get; init; }
+    public CoordinateAxis? CoordinateAxis { get; init; }
+    public double CoordinateStep { get; init; }
+    public long? StartPickSequence { get; init; }
+    public long PickSequenceStep { get; init; } = 1;
 
     public void Validate()
     {
+        ArgumentNullException.ThrowIfNull(Dimensions);
+        ArgumentNullException.ThrowIfNull(StartCoordinates);
+
         if (WarehouseId == Guid.Empty)
         {
             throw new ArgumentException("Идентификатор склада обязателен.", nameof(WarehouseId));
@@ -101,10 +91,6 @@ public class GenerateStorageLocationsRequest
                 nameof(CoordinateAxis));
         }
 
-        ArgumentNullException.ThrowIfNull(Dimensions);
-        ArgumentNullException.ThrowIfNull(StartCoordinates);
-        Dimensions.Validate();
-        StartCoordinates.Validate();
         ValidateGeneratedRanges();
     }
 

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -21,28 +22,16 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
 
         var originalWarehouseId = zone?.WarehouseId;
 
-        try
+        var domainResult = DomainOperation.Execute(() => ApplyRequest(zone, request));
+        if (!domainResult.IsSuccess)
         {
-            if (zone is null)
-            {
-                zone = Zone.Create(
-                    Guid.NewGuid(),
-                    request.WarehouseId,
-                    request.Code,
-                    request.Name,
-                    request.Type);
-
-                dbContext.Zones.Add(zone);
-            }
-            else
-            {
-                zone.MoveToWarehouse(request.WarehouseId);
-                zone.UpdateDetails(request.Code, request.Name, request.Type);
-            }
+            return domainResult.Error!;
         }
-        catch (ArgumentException exception)
+
+        zone = domainResult.Value!;
+        if (!request.Id.HasValue)
         {
-            return ServiceError.Invalid<Zone>(exception.Message);
+            dbContext.Zones.Add(zone);
         }
 
         var stateValidation = await ValidateStateAsync(
@@ -136,6 +125,23 @@ public class ZoneService(IDbContextFactory<ApplicationDbContext> dbContextFactor
         return id.HasValue
             ? dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id.Value, ct)
             : Task.FromResult<Zone?>(null);
+    }
+
+    private static Zone ApplyRequest(Zone? zone, SaveZoneRequest request)
+    {
+        if (zone is null)
+        {
+            return Zone.Create(
+                Guid.NewGuid(),
+                request.WarehouseId,
+                request.Code,
+                request.Name,
+                request.Type);
+        }
+
+        zone.MoveToWarehouse(request.WarehouseId);
+        zone.UpdateDetails(request.Code, request.Name, request.Type);
+        return zone;
     }
 
     private static async Task<ServiceResult> ValidateStateAsync(

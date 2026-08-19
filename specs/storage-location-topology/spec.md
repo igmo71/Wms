@@ -57,6 +57,10 @@ The generation request validates its own ranges and mutually dependent input.
 The application service remains responsible for zone and parent state and for
 code conflicts because those checks require persisted data.
 
+Single-location creation reuses one domain `StorageLocationDetails` value for
+the editable properties. Updating accepts that value directly rather than a
+duplicate update request. UI form state is not used as an application request.
+
 ## Non-goals
 
 - moving nodes or subtrees;

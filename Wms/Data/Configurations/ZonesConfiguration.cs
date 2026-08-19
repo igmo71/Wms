@@ -18,6 +18,15 @@ internal class ZonesConfiguration : IEntityTypeConfiguration<Zone>
             .HasForeignKey(x => x.WarehouseId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(x => x.StorageLocations).WithOne(x => x.Zone)
+            .HasForeignKey(x => x.ZoneId).HasPrincipalKey(x => x.Id)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.StorageLocations)
+            .HasField("_storageLocations")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(x => new { x.WarehouseId, x.Code }).IsUnique();
     }
 }

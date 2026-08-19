@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 using Wms.Application.Services;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Domain;
 
@@ -20,8 +21,15 @@ public partial class StorageLocationDialog
     private int _number = 1;
     private int _segmentWidth = 2;
     private long? _pickSequence;
-    private LocationDimensions _dimensions = new();
-    private LocationCoordinates _coordinates = new();
+    private double? _length;
+    private double? _width;
+    private double? _height;
+    private double? _volume;
+    private double? _volumeFactor;
+    private double? _maxWeight;
+    private double? _x;
+    private double? _y;
+    private double? _z;
     private bool _isSaving;
     private string? _errorMessage;
 
@@ -30,26 +38,22 @@ public partial class StorageLocationDialog
     protected override void OnInitialized()
     {
         if (StorageLocation is null)
+        {
             return;
+        }
 
-        _name = StorageLocation.Name ?? string.Empty;
+        _name = StorageLocation.Name;
         _isFolder = StorageLocation.IsFolder;
         _pickSequence = StorageLocation.PickSequence;
-        _dimensions = new LocationDimensions
-        {
-            Length = StorageLocation.Dimensions.Length,
-            Width = StorageLocation.Dimensions.Width,
-            Height = StorageLocation.Dimensions.Height,
-            Volume = StorageLocation.Dimensions.Volume,
-            VolumeFactor = StorageLocation.Dimensions.VolumeFactor,
-            MaxWeight = StorageLocation.Dimensions.MaxWeight
-        };
-        _coordinates = new LocationCoordinates
-        {
-            X = StorageLocation.Coordinates.X,
-            Y = StorageLocation.Coordinates.Y,
-            Z = StorageLocation.Coordinates.Z
-        };
+        _length = StorageLocation.Dimensions.Length;
+        _width = StorageLocation.Dimensions.Width;
+        _height = StorageLocation.Dimensions.Height;
+        _volume = StorageLocation.Dimensions.Volume;
+        _volumeFactor = StorageLocation.Dimensions.VolumeFactor;
+        _maxWeight = StorageLocation.Dimensions.MaxWeight;
+        _x = StorageLocation.Coordinates.X;
+        _y = StorageLocation.Coordinates.Y;
+        _z = StorageLocation.Coordinates.Z;
     }
 
     private async Task SaveAsync()
@@ -58,6 +62,7 @@ public partial class StorageLocationDialog
         _errorMessage = null;
         try
         {
+            var details = CreateDetails();
             ServiceResult result;
             if (StorageLocation is null)
             {
@@ -68,23 +73,12 @@ public partial class StorageLocationDialog
                     ParentId = Parent?.Id,
                     Number = _number,
                     SegmentWidth = _segmentWidth,
-                    Name = _name,
-                    IsFolder = _isFolder,
-                    Dimensions = _dimensions,
-                    Coordinates = _coordinates,
-                    PickSequence = _pickSequence
+                    Details = details
                 });
             }
             else
             {
-                result = await StorageLocationService.UpdateAsync(StorageLocation.Id, new UpdateStorageLocationRequest
-                {
-                    Name = _name,
-                    IsFolder = _isFolder,
-                    Dimensions = _dimensions,
-                    Coordinates = _coordinates,
-                    PickSequence = _pickSequence
-                });
+                result = await StorageLocationService.UpdateAsync(StorageLocation.Id, details);
             }
 
             if (!result.IsSuccess)
@@ -95,6 +89,10 @@ public partial class StorageLocationDialog
 
             MudDialog.Close(DialogResult.Ok(true));
         }
+        catch (ArgumentException exception)
+        {
+            _errorMessage = exception.Message;
+        }
         catch
         {
             _errorMessage = "Не удалось сохранить складскую позицию.";
@@ -103,6 +101,25 @@ public partial class StorageLocationDialog
         {
             _isSaving = false;
         }
+    }
+
+    private StorageLocationDetails CreateDetails()
+    {
+        var dimensions = new LocationDimensions(
+            _length,
+            _width,
+            _height,
+            _volume,
+            _volumeFactor,
+            _maxWeight);
+
+        var coordinates = new LocationCoordinates(_x, _y, _z);
+        return new StorageLocationDetails(
+            _name,
+            _isFolder,
+            dimensions,
+            coordinates,
+            _pickSequence);
     }
 
     private void Cancel() => MudDialog.Cancel();

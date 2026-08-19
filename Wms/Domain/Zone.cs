@@ -1,7 +1,11 @@
+using Wms.Domain.Enums;
+
 namespace Wms.Domain;
 
 public class Zone
 {
+    private readonly List<StorageLocation> _storageLocations = [];
+
     private Zone()
     {
     }
@@ -10,19 +14,19 @@ public class Zone
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public bool DeletionMark { get; private set; }
-    public Enums.ZoneType Type { get; private set; }
+    public ZoneType Type { get; private set; }
 
     public Guid WarehouseId { get; private set; }
     public Warehouse? Warehouse { get; private set; }
 
-    public List<StorageLocation> StorageLocations { get; private set; } = [];
+    public IReadOnlyCollection<StorageLocation> StorageLocations => _storageLocations;
 
     public static Zone Create(
         Guid id,
         Guid warehouseId,
         string code,
         string name,
-        Enums.ZoneType type)
+        ZoneType type)
     {
         if (id == Guid.Empty)
         {
@@ -39,7 +43,7 @@ public class Zone
         return zone;
     }
 
-    public void UpdateDetails(string code, string name, Enums.ZoneType type)
+    public void UpdateDetails(string code, string name, ZoneType type)
     {
         if (string.IsNullOrWhiteSpace(code))
         {

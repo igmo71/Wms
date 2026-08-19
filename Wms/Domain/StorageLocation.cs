@@ -4,25 +4,27 @@ namespace Wms.Domain;
 
 public class StorageLocation
 {
+    private readonly List<StorageLocation> _children = [];
+
     public Guid Id { get; private set; }
     public int Number { get; private set; }
-    public string? Code { get; private set; }
-    public string? Name { get; private set; }
+    public string Code { get; private set; } = null!;
+    public string Name { get; private set; } = null!;
     public bool IsFolder { get; private set; }
     public bool DeletionMark { get; private set; }
 
     public Guid WarehouseId { get; private set; }
-    public Warehouse? Warehouse { get; set; }
+    public Warehouse? Warehouse { get; private set; }
 
     public Guid ZoneId { get; private set; }
-    public Zone? Zone { get; set; }
+    public Zone? Zone { get; private set; }
 
     public Guid? ParentId { get; private set; }
-    public StorageLocation? Parent { get; set; }
-    public List<StorageLocation> Children { get; set; } = [];
+    public StorageLocation? Parent { get; private set; }
+    public IReadOnlyCollection<StorageLocation> Children => _children;
 
-    public LocationDimensions Dimensions { get; private set; } = new();
-    public LocationCoordinates Coordinates { get; private set; } = new();
+    public LocationDimensions Dimensions { get; private set; } = LocationDimensions.Empty;
+    public LocationCoordinates Coordinates { get; private set; } = LocationCoordinates.Empty;
 
     public long? PickSequence { get; private set; }
 
@@ -73,11 +75,7 @@ public class StorageLocation
         Guid? parentId,
         int number,
         string code,
-        string name,
-        bool isFolder,
-        LocationDimensions dimensions,
-        LocationCoordinates coordinates,
-        long? pickSequence)
+        StorageLocationDetails details)
     {
         if (id == Guid.Empty)
         {
@@ -119,11 +117,29 @@ public class StorageLocation
             Code = code
         };
 
-        location.UpdateDetails(name, isFolder, dimensions, coordinates, pickSequence);
+        location.UpdateDetails(details);
         return location;
     }
 
-    public void UpdateDetails(
+    public void UpdateDetails(StorageLocationDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+
+        Name = details.Name;
+        IsFolder = details.IsFolder;
+        Dimensions = details.Dimensions.Copy();
+        Coordinates = details.Coordinates.Copy();
+        PickSequence = details.PickSequence;
+    }
+
+    public void Deactivate() => DeletionMark = true;
+
+    public void Activate() => DeletionMark = false;
+}
+
+public sealed class StorageLocationDetails
+{
+    public StorageLocationDetails(
         string name,
         bool isFolder,
         LocationDimensions dimensions,
@@ -137,8 +153,6 @@ public class StorageLocation
 
         ArgumentNullException.ThrowIfNull(dimensions);
         ArgumentNullException.ThrowIfNull(coordinates);
-        dimensions.Validate();
-        coordinates.Validate();
 
         Name = name.Trim();
         IsFolder = isFolder;
@@ -147,60 +161,125 @@ public class StorageLocation
         PickSequence = pickSequence;
     }
 
-    public void Deactivate() => DeletionMark = true;
-
-    public void Activate() => DeletionMark = false;
+    public string Name { get; }
+    public bool IsFolder { get; }
+    public LocationDimensions Dimensions { get; }
+    public LocationCoordinates Coordinates { get; }
+    public long? PickSequence { get; }
 }
 
-public class LocationDimensions
+public sealed class LocationDimensions
 {
-    public double? Length { get; set; }
-    public double? Width { get; set; }
-    public double? Height { get; set; }
-    public double? Volume { get; set; }
-    public double? VolumeFactor { get; set; }
-    public double? MaxWeight { get; set; }
+    private LocationDimensions()
+    {
+    }
+
+    public LocationDimensions(
+        double? length,
+        double? width,
+        double? height,
+        double? volume,
+        double? volumeFactor,
+        double? maxWeight)
+    {
+        ValidateFinite(length, nameof(length));
+        ValidateFinite(width, nameof(width));
+        ValidateFinite(height, nameof(height));
+        ValidateFinite(volume, nameof(volume));
+        ValidateFinite(volumeFactor, nameof(volumeFactor));
+        ValidateFinite(maxWeight, nameof(maxWeight));
+        ValidateNonNegative(length, nameof(length));
+        ValidateNonNegative(width, nameof(width));
+        ValidateNonNegative(height, nameof(height));
+        ValidateNonNegative(volume, nameof(volume));
+        ValidateNonNegative(maxWeight, nameof(maxWeight));
+
+        if (volumeFactor is <= 0 or > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(volumeFactor),
+                "Volume factor must be greater than zero and at most one.");
+        }
+
+        Length = length;
+        Width = width;
+        Height = height;
+        Volume = volume;
+        VolumeFactor = volumeFactor;
+        MaxWeight = maxWeight;
+    }
+
+    public static LocationDimensions Empty => new(null, null, null, null, null, null);
+
+    public double? Length { get; private set; }
+    public double? Width { get; private set; }
+    public double? Height { get; private set; }
+    public double? Volume { get; private set; }
+    public double? VolumeFactor { get; private set; }
+    public double? MaxWeight { get; private set; }
 
     public double? UsableVolume => Volume * (VolumeFactor ?? 1d);
 
-    public void Validate()
+    public LocationDimensions Copy() => new(
+        Length,
+        Width,
+        Height,
+        Volume,
+        VolumeFactor,
+        MaxWeight);
+
+    private static void ValidateFinite(double? value, string parameterName)
     {
-        if (new[] { Length, Width, Height, Volume, VolumeFactor, MaxWeight }
-            .Any(value => value.HasValue && !double.IsFinite(value.Value)))
+        if (value.HasValue && !double.IsFinite(value.Value))
         {
             throw new ArgumentOutOfRangeException(
-                nameof(LocationDimensions),
+                parameterName,
                 "Dimensions and capacity must be finite numbers.");
         }
+    }
 
-        if (Length < 0 || Width < 0 || Height < 0 || Volume < 0 || MaxWeight < 0)
+    private static void ValidateNonNegative(double? value, string parameterName)
+    {
+        if (value < 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(LocationDimensions),
+                parameterName,
                 "Dimensions and capacity cannot be negative.");
-        }
-
-        if (VolumeFactor is <= 0 or > 1)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(VolumeFactor),
-                "Volume factor must be greater than zero and at most one.");
         }
     }
 }
 
-public class LocationCoordinates
+public sealed class LocationCoordinates
 {
-    public double? X { get; set; }
-    public double? Y { get; set; }
-    public double? Z { get; set; }
-
-    public void Validate()
+    private LocationCoordinates()
     {
-        if (new[] { X, Y, Z }.Any(value => value.HasValue && !double.IsFinite(value.Value)))
+    }
+
+    public LocationCoordinates(double? x, double? y, double? z)
+    {
+        ValidateFinite(x, nameof(x));
+        ValidateFinite(y, nameof(y));
+        ValidateFinite(z, nameof(z));
+
+        X = x;
+        Y = y;
+        Z = z;
+    }
+
+    public static LocationCoordinates Empty => new(null, null, null);
+
+    public double? X { get; private set; }
+    public double? Y { get; private set; }
+    public double? Z { get; private set; }
+
+    public LocationCoordinates Copy() => new(X, Y, Z);
+
+    private static void ValidateFinite(double? value, string parameterName)
+    {
+        if (value.HasValue && !double.IsFinite(value.Value))
         {
             throw new ArgumentOutOfRangeException(
-                nameof(LocationCoordinates),
+                parameterName,
                 "Coordinates must be finite numbers.");
         }
     }

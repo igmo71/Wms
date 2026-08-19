@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Data.Configurations;
@@ -31,18 +32,21 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
             return ServiceError.Conflict<StorageLocation>("В выбранной зоне уже есть позиция с таким кодом.");
         }
 
-        StorageLocation location;
-        try
+        var locationResult = DomainOperation.Execute(() => StorageLocation.Create(
+            Guid.NewGuid(),
+            request.WarehouseId,
+            request.ZoneId,
+            request.ParentId,
+            request.Number,
+            code,
+            request.Details));
+
+        if (!locationResult.IsSuccess)
         {
-            location = StorageLocation.Create(Guid.NewGuid(), request.WarehouseId, request.ZoneId, request.ParentId,
-                request.Number, code, request.Name, request.IsFolder, request.Dimensions, request.Coordinates,
-                request.PickSequence);
-        }
-        catch (ArgumentException exception)
-        {
-            return ServiceError.Invalid<StorageLocation>(exception.Message);
+            return locationResult.Error!;
         }
 
+        var location = locationResult.Value!;
         dbContext.StorageLocations.Add(location);
         await dbContext.SaveChangesAsync(ct);
         return location;
@@ -50,7 +54,7 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
 
     public async Task<ServiceResult> UpdateAsync(
         Guid id,
-        UpdateStorageLocationRequest request,
+        StorageLocationDetails details,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -60,19 +64,15 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
             return ServiceError.NotFound<StorageLocation>();
         }
 
-        if (!location.IsFolder && request.IsFolder && await HasBeenUsedAsync(dbContext, id, ct))
+        if (!location.IsFolder && details.IsFolder && await HasBeenUsedAsync(dbContext, id, ct))
         {
             return ServiceError.Invalid<StorageLocation>("Использованную складскую позицию нельзя преобразовать в группу.");
         }
 
-        try
+        var updateResult = DomainOperation.Execute(() => location.UpdateDetails(details));
+        if (!updateResult.IsSuccess)
         {
-            location.UpdateDetails(request.Name, request.IsFolder, request.Dimensions, request.Coordinates,
-                request.PickSequence);
-        }
-        catch (ArgumentException exception)
-        {
-            return ServiceError.Invalid<StorageLocation>(exception.Message);
+            return updateResult;
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -96,16 +96,13 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
             return contextResult.Error!;
         }
 
-        IReadOnlyList<StorageLocation> locations;
-        try
+        var locationsResult = DomainOperation.Execute(() => BuildLocations(request, contextResult.Value));
+        if (!locationsResult.IsSuccess)
         {
-            locations = BuildLocations(request, contextResult.Value);
-        }
-        catch (ArgumentException exception)
-        {
-            return ServiceError.Invalid<StorageLocation>(exception.Message);
+            return locationsResult.Error!;
         }
 
+        var locations = locationsResult.Value!;
         var codes = locations.Select(location => location.Code!).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var hasCodeConflict = codes.Count != locations.Count
             || await dbContext.StorageLocations.AnyAsync(
@@ -273,31 +270,16 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
 
     private static ServiceResult<string> BuildCode(StorageLocation? parent, int number, int segmentWidth)
     {
-        try
-        {
-            return StorageLocation.BuildCode(
-                parent?.Code,
-                number,
-                segmentWidth,
-                DefaultConfiguration.Code);
-        }
-        catch (ArgumentException exception)
-        {
-            return ServiceError.Invalid<StorageLocation>(exception.Message);
-        }
+        return DomainOperation.Execute(() => StorageLocation.BuildCode(
+            parent?.Code,
+            number,
+            segmentWidth,
+            DefaultConfiguration.Code));
     }
 
     private static ServiceResult ValidateRequest(GenerateStorageLocationsRequest request)
     {
-        try
-        {
-            request.Validate();
-            return ServiceResult.Success();
-        }
-        catch (ArgumentException exception)
-        {
-            return ServiceError.Invalid<StorageLocation>(exception.Message);
-        }
+        return DomainOperation.Execute(request.Validate);
     }
 
     private static IReadOnlyList<StorageLocation> BuildLocations(
@@ -322,11 +304,12 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
                 request.ParentId,
                 number,
                 code,
-                $"{request.NamePrefix.Trim()} {number}",
-                request.IsFolder,
-                CopyDimensions(request.Dimensions),
-                BuildCoordinates(request, index),
-                BuildPickSequence(request, index)));
+                new StorageLocationDetails(
+                    $"{request.NamePrefix.Trim()} {number}",
+                    request.IsFolder,
+                    request.Dimensions,
+                    BuildCoordinates(request, index),
+                    BuildPickSequence(request, index))));
         }
 
         return locations;
@@ -336,24 +319,22 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
         GenerateStorageLocationsRequest request,
         int index)
     {
-        return new LocationCoordinates
-        {
-            X = OffsetCoordinate(
+        return new LocationCoordinates(
+            OffsetCoordinate(
                 request.StartCoordinates.X,
                 request.CoordinateAxis == CoordinateAxis.X,
                 request.CoordinateStep,
                 index),
-            Y = OffsetCoordinate(
+            OffsetCoordinate(
                 request.StartCoordinates.Y,
                 request.CoordinateAxis == CoordinateAxis.Y,
                 request.CoordinateStep,
                 index),
-            Z = OffsetCoordinate(
+            OffsetCoordinate(
                 request.StartCoordinates.Z,
                 request.CoordinateAxis == CoordinateAxis.Z,
                 request.CoordinateStep,
-                index)
-        };
+                index));
     }
 
     private static long? BuildPickSequence(GenerateStorageLocationsRequest request, int index)
@@ -365,16 +346,6 @@ public class StorageLocationService(IDbContextFactory<ApplicationDbContext> dbCo
 
     private static double? OffsetCoordinate(double? start, bool selected, double step, int index) =>
         start is null ? null : start + (selected ? step * index : 0);
-
-    private static LocationDimensions CopyDimensions(LocationDimensions source) => new()
-    {
-        Length = source.Length,
-        Width = source.Width,
-        Height = source.Height,
-        Volume = source.Volume,
-        VolumeFactor = source.VolumeFactor,
-        MaxWeight = source.MaxWeight
-    };
 
     private static async Task<bool> HasBeenUsedAsync(ApplicationDbContext dbContext, Guid id, CancellationToken ct) =>
         await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == id, ct)

@@ -21,19 +21,19 @@
 
             <MudText Typo="Typo.subtitle2">Размеры и ограничения</MudText>
             <MudGrid Spacing="2">
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Length" Label="Длина, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Width" Label="Ширина, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Height" Label="Высота, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.Volume" Label="Объём, м³" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.VolumeFactor" Label="Коэффициент объёма" Min="0" Max="1" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_dimensions.MaxWeight" Label="Макс. вес, кг" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_length" Label="Длина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_width" Label="Ширина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_height" Label="Высота, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_volume" Label="Объём, м³" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_volumeFactor" Label="Коэффициент объёма" Min="0" Max="1" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_maxWeight" Label="Макс. вес, кг" Min="0" /></MudItem>
             </MudGrid>
 
             <MudText Typo="Typo.subtitle2">Координаты и отбор</MudText>
             <MudGrid Spacing="2">
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.X" Label="X, м" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.Y" Label="Y, м" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_coordinates.Z" Label="Z, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_x" Label="X, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_y" Label="Y, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_z" Label="Z, м" /></MudItem>
                 <MudItem xs="3"><MudNumericField T="long?" @bind-Value="_pickSequence" Label="Порядок отбора" /></MudItem>
             </MudGrid>
 

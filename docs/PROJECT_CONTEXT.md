@@ -155,6 +155,10 @@ The project deliberately favors clear, direct code and fast iteration over enter
 - Request objects may validate their own locally self-consistent input. Checks
   that require persisted state remain named application-service operations, so
   the main use-case method reads as a short sequence of business steps.
+- Application requests are immutable command parameters created at the call
+  boundary and live beside their feature. Interactive UI form state remains a
+  separate mutable concern. A request type is introduced only when it makes a
+  multi-parameter operation clearer; it does not imply a CQRS framework.
 - New and changed C# code follows Microsoft's common C# coding conventions,
   including braces for control-flow statements and conventional identifier,
   layout, and whitespace rules.

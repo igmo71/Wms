@@ -1,4 +1,4 @@
-@using Wms.Common
+@using Wms.Application.StorageLocations
 @using Wms.Domain
 
 <MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
@@ -6,39 +6,39 @@
         <MudStack Spacing="2">
             <MudText Typo="Typo.body2">Родитель: @(Parent is null ? "корень зоны" : $"{Parent.Code} · {Parent.Name}")</MudText>
             <MudGrid Spacing="2">
-                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_request.Count" Label="Количество" Min="1" Max="1000" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_request.StartNumber" Label="Начальный номер" Min="1" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_request.NumberStep" Label="Шаг номера" Min="1" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_request.SegmentWidth" Label="Ширина" Min="1" Max="8" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_count" Label="Количество" Min="1" Max="1000" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_startNumber" Label="Начальный номер" Min="1" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_numberStep" Label="Шаг номера" Min="1" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="int" @bind-Value="_segmentWidth" Label="Ширина" Min="1" Max="8" /></MudItem>
             </MudGrid>
-            <MudTextField T="string" @bind-Value="_request.NamePrefix" Label="Префикс наименования" Required="true" />
-            <MudSwitch T="bool" @bind-Value="_request.IsFolder" Label="Создать структурные группы" Color="Color.Primary" />
+            <MudTextField T="string" @bind-Value="_namePrefix" Label="Префикс наименования" Required="true" />
+            <MudSwitch T="bool" @bind-Value="_isFolder" Label="Создать структурные группы" Color="Color.Primary" />
 
             <MudText Typo="Typo.subtitle2">Начальная точка и шаг</MudText>
             <MudGrid Spacing="2">
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_request.StartCoordinates.X" Label="X, м" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_request.StartCoordinates.Y" Label="Y, м" /></MudItem>
-                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_request.StartCoordinates.Z" Label="Z, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_startX" Label="X, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_startY" Label="Y, м" /></MudItem>
+                <MudItem xs="3"><MudNumericField T="double?" @bind-Value="_startZ" Label="Z, м" /></MudItem>
                 <MudItem xs="3">
-                    <MudSelect T="CoordinateAxis?" @bind-Value="_request.CoordinateAxis" Label="Направление" Clearable="true">
+                    <MudSelect T="CoordinateAxis?" @bind-Value="_coordinateAxis" Label="Направление" Clearable="true">
                         <MudSelectItem T="CoordinateAxis?" Value="CoordinateAxis.X">X</MudSelectItem>
                         <MudSelectItem T="CoordinateAxis?" Value="CoordinateAxis.Y">Y</MudSelectItem>
                         <MudSelectItem T="CoordinateAxis?" Value="CoordinateAxis.Z">Z</MudSelectItem>
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="4"><MudNumericField T="double" @bind-Value="_request.CoordinateStep" Label="Шаг координаты, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="long?" @bind-Value="_request.StartPickSequence" Label="Начальный порядок" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="long" @bind-Value="_request.PickSequenceStep" Label="Шаг порядка" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double" @bind-Value="_coordinateStep" Label="Шаг координаты, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="long?" @bind-Value="_startPickSequence" Label="Начальный порядок" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="long" @bind-Value="_pickSequenceStep" Label="Шаг порядка" /></MudItem>
             </MudGrid>
 
             <MudText Typo="Typo.subtitle2">Одинаковые параметры создаваемых позиций</MudText>
             <MudGrid Spacing="2">
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.Length" Label="Длина, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.Width" Label="Ширина, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.Height" Label="Высота, м" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.Volume" Label="Объём, м³" Min="0" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.VolumeFactor" Label="Коэффициент" Min="0" Max="1" /></MudItem>
-                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_request.Dimensions.MaxWeight" Label="Макс. вес, кг" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_length" Label="Длина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_width" Label="Ширина, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_height" Label="Высота, м" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_volume" Label="Объём, м³" Min="0" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_volumeFactor" Label="Коэффициент" Min="0" Max="1" /></MudItem>
+                <MudItem xs="4"><MudNumericField T="double?" @bind-Value="_maxWeight" Label="Макс. вес, кг" Min="0" /></MudItem>
             </MudGrid>
 
             @if (!string.IsNullOrWhiteSpace(_errorMessage))
@@ -60,16 +60,27 @@
     [Parameter] public StorageLocation? Parent { get; set; }
     [Inject] private Wms.Application.Services.StorageLocationService StorageLocationService { get; set; } = null!;
 
-    private readonly GenerateStorageLocationsRequest _request = new();
+    private int _count = 1;
+    private int _startNumber = 1;
+    private int _numberStep = 1;
+    private int _segmentWidth = 2;
+    private string _namePrefix = "Позиция";
+    private bool _isFolder;
+    private double? _startX;
+    private double? _startY;
+    private double? _startZ;
+    private CoordinateAxis? _coordinateAxis;
+    private double _coordinateStep;
+    private long? _startPickSequence;
+    private long _pickSequenceStep = 1;
+    private double? _length;
+    private double? _width;
+    private double? _height;
+    private double? _volume;
+    private double? _volumeFactor;
+    private double? _maxWeight;
     private bool _isSaving;
     private string? _errorMessage;
-
-    protected override void OnInitialized()
-    {
-        _request.WarehouseId = Warehouse.Id;
-        _request.ZoneId = Zone.Id;
-        _request.ParentId = Parent?.Id;
-    }
 
     private async Task GenerateAsync()
     {
@@ -77,13 +88,42 @@
         _errorMessage = null;
         try
         {
-            var result = await StorageLocationService.GenerateChildrenAsync(_request);
+            var request = new GenerateStorageLocationsRequest
+            {
+                WarehouseId = Warehouse.Id,
+                ZoneId = Zone.Id,
+                ParentId = Parent?.Id,
+                Count = _count,
+                StartNumber = _startNumber,
+                NumberStep = _numberStep,
+                SegmentWidth = _segmentWidth,
+                NamePrefix = _namePrefix,
+                IsFolder = _isFolder,
+                Dimensions = new LocationDimensions(
+                    _length,
+                    _width,
+                    _height,
+                    _volume,
+                    _volumeFactor,
+                    _maxWeight),
+                StartCoordinates = new LocationCoordinates(_startX, _startY, _startZ),
+                CoordinateAxis = _coordinateAxis,
+                CoordinateStep = _coordinateStep,
+                StartPickSequence = _startPickSequence,
+                PickSequenceStep = _pickSequenceStep
+            };
+
+            var result = await StorageLocationService.GenerateChildrenAsync(request);
             if (!result.IsSuccess)
             {
                 _errorMessage = result.Error?.Message ?? "Не удалось создать позиции.";
                 return;
             }
             MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException exception)
+        {
+            _errorMessage = exception.Message;
         }
         catch
         {
