@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wms.Application.Services.ShippingOrders;
 using Wms.Common;
@@ -23,12 +23,14 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
-        var uri = Document.GetUri(refKey);
+        string uri = Document.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
+        {
             return;
+        }
 
         var fetchedDocument = serviceResult.Value?.Value?[0];
 
@@ -49,9 +51,15 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
             return;
         }
 
-        ShippingOrder order = Document.MapToShippingOrder(fetchedDocument);
-
-        await shippingOrderCommandService.ImportOrderAsync(order, ct);
+        var snapshot = Document.MapToImportSnapshot(fetchedDocument);
+        var importResult = await shippingOrderCommandService.ImportOrderAsync(snapshot, ct);
+        if (!importResult.IsSuccess)
+        {
+            logger.LogWarning(
+                "Shipping order import was not applied. Order: {OrderId}, Error: {ErrorMessage}",
+                snapshot.Id,
+                importResult.Error?.Message);
+        }
     }
 
     internal async Task ImportDocumentListAsync(CancellationToken ct)

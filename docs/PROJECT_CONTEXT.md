@@ -30,7 +30,7 @@ An unfinished shipping order may be rolled back locally to `Prepared`. Draft pic
 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. The picking UI and command service prevent the current shipping order's draft movements from exceeding either the line plan or a source location's physical balance for the SKU; drafts of other orders are not reservations and remain subject to the final posting check.
 
-The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
+The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking; that location is fixed once picking starts. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
 The operator UI exposes a paged inventory-balance list. It shows the current SKU quantity in each storage location and supports filtering by warehouse, storage location, and SKU; it does not aggregate balances or account for reservations.
 
@@ -270,6 +270,17 @@ For `Document_ПриходныйОрдерНаТовары`:
   create or reconcile its local state.
 - `Document_ПриходныйОрдерНаТовары_OutboundService` changes the document status, updates item facts when needed, and posts the document in 1C.
 - `POST /api/1c/Document_ПриходныйОрдерНаТовары/notify` enqueues a notification; `NotifyBackgroundService` consumes it and imports the document asynchronously.
+
+For `Document_РасходныйОрдерНаТовары`:
+
+- `Document_РасходныйОрдерНаТовары_InboundService` fetches a document by
+  `Ref_Key`, maps it to a domain import snapshot, and lets `ShippingOrder`
+  create or reconcile its local state.
+- `Document_РасходныйОрдерНаТовары_OutboundService` changes the document
+  status, updates its table sections from WMS picking facts, and posts the
+  document in 1C.
+- `POST /api/1c/Document_РасходныйОрдерНаТовары/notify` enqueues a notification;
+  `NotifyBackgroundService` consumes it and imports the document asynchronously.
 
 ## Working conventions
 

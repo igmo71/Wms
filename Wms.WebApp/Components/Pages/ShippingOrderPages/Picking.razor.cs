@@ -1,7 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
-using System.Security.Claims;
 using Wms.Application.Services;
 using Wms.Application.Services.ShippingOrders;
 using Wms.Domain;
@@ -93,7 +93,7 @@ public partial class Picking
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"
-        : _userNames.TryGetValue(userId, out var userName)
+        : _userNames.TryGetValue(userId, out string? userName)
             ? userName
             : "Пользователь не найден";
 
@@ -107,7 +107,9 @@ public partial class Picking
         }
 
         if (_expandedLineNumber is not null)
+        {
             await _orderItemsGrid.CollapseAllHierarchy();
+        }
 
         _operationFailed = false;
         _selectedLine = line;
@@ -129,7 +131,9 @@ public partial class Picking
     private async Task LoadSelectedLineDataAsync()
     {
         if (_selectedLine is null)
+        {
             return;
+        }
 
         _movements = await PickingQueryService.GetPickingMovementsAsync(Id, _selectedLine.LineNumber);
         _availableSourceLocations = await PickingQueryService.GetAvailableSourceLocationsAsync(Id, _selectedLine.LineNumber);
@@ -166,7 +170,9 @@ public partial class Picking
     private async Task SaveMovementAsync()
     {
         if (_selectedLine is null || _selectedSourceLocation is null)
+        {
             return;
+        }
 
         _operationFailed = false;
         var result = _editingMovement is null
@@ -194,7 +200,9 @@ public partial class Picking
         }
 
         if (_editingMovement?.Id == movement.Id)
+        {
             CancelEditing();
+        }
 
         await ReloadSelectedLineDataAsync();
     }
@@ -202,10 +210,18 @@ public partial class Picking
     private async Task ReloadSelectedLineDataAsync()
     {
         if (_selectedLine is null)
+        {
             return;
+        }
 
         await LoadSelectedLineDataAsync();
-        _selectedLine.FactQuantity = _movements.Sum(x => x.Quantity);
+        var factResult = _order!.UpdateItemFact(
+            _selectedLine.LineNumber,
+            _movements.Sum(x => x.Quantity));
+        if (!factResult.IsSuccess)
+        {
+            SetError(factResult.Error?.Message ?? "Не удалось обновить строку на странице.");
+        }
     }
 
     private async Task SetReadyForShipmentAsync()
@@ -215,7 +231,7 @@ public partial class Picking
 
         try
         {
-            var userId = await GetCurrentUserIdAsync();
+            string? userId = await GetCurrentUserIdAsync();
             if (userId is null)
             {
                 SetError("Не удалось определить текущего пользователя.");
@@ -247,14 +263,16 @@ public partial class Picking
         var dialogResult = await dialog.Result;
 
         if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not string reason)
+        {
             return;
+        }
 
         _isRollingBack = true;
         _operationFailed = false;
 
         try
         {
-            var userId = await GetCurrentUserIdAsync();
+            string? userId = await GetCurrentUserIdAsync();
             if (userId is null)
             {
                 SetError("Не удалось определить текущего пользователя.");

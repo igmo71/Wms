@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
 
@@ -30,5 +30,13 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
         builder.HasOne(x => x.DeliveryDirection).WithMany()
             .HasForeignKey(x => x.DeliveryDirectionId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.Items)
+            .HasField("_items")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.BaseItems)
+            .HasField("_baseItems")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

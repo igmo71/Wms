@@ -15,26 +15,21 @@ public class ShippingOrderQueryService(
 
         var order = await dbContext.ShippingOrders
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(x => x.Warehouse)
             .Include(x => x.DeliveryDirection)
             .Include(x => x.ShippingLocation)
                 .ThenInclude(x => x!.Zone)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.StockKeepingUnit)
+            .Include(x => x.BaseItems)
+                .ThenInclude(x => x.StockKeepingUnit)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (order is null)
+        {
             return null;
-
-        order.Items = await dbContext.ShippingOrderItems
-            .AsNoTracking()
-            .Include(x => x.StockKeepingUnit)
-            .Where(x => x.ShippingOrderId == id)
-            .ToListAsync(ct);
-
-        order.BaseItems = await dbContext.ShippingOrderBaseItems
-            .AsNoTracking()
-            .Include(x => x.StockKeepingUnit)
-            .Where(x => x.ShippingOrderId == id)
-            .ToListAsync(ct);
+        }
 
         await PopulateReceiversAsync([order], ct);
 
@@ -52,7 +47,7 @@ public class ShippingOrderQueryService(
 
         query = ApplySearch(query, listQuery);
 
-        var totalItems = await query.CountAsync(ct);
+        int totalItems = await query.CountAsync(ct);
 
         query = ApplySorting(query, listQuery);
 
@@ -83,38 +78,56 @@ public class ShippingOrderQueryService(
             parties.TryGetValue(
                 new PartyReference(order.ReceiverId, order.ReceiverType),
                 out var receiver);
-            order.Receiver = receiver;
+            order.SetReceiver(receiver);
         }
     }
 
     private static IQueryable<ShippingOrder> ApplySearch(IQueryable<ShippingOrder> query, ShippingOrderListQuery listQuery)
     {
         if (listQuery.ExcludeDeleted)
+        {
             query = query.Where(x => x.DeletionMark == false);
+        }
 
         if (listQuery.IncludePostedOnly)
+        {
             query = query.Where(x => x.Posted == true);
+        }
 
         if (listQuery.WarehouseId is Guid warehouseId)
+        {
             query = query.Where(x => x.WarehouseId == warehouseId);
+        }
 
         if (!string.IsNullOrWhiteSpace(listQuery.SearchString))
+        {
             query = query.Where(x => x.Number!.Contains(listQuery.SearchString));
+        }
 
         if (listQuery.DateFrom is not null)
+        {
             query = query.Where(x => x.Date >= listQuery.DateFrom);
+        }
 
         if (listQuery.DateTo is not null)
+        {
             query = query.Where(x => x.Date < ((DateTime)listQuery.DateTo).AddDays(1));
+        }
 
         if (listQuery.Status is not null)
+        {
             query = query.Where(x => x.Status == listQuery.Status);
+        }
 
         if (listQuery.Queue is not null)
+        {
             query = query.Where(x => x.Queue == listQuery.Queue);
+        }
 
         if (listQuery.WarehouseOperation is not null)
+        {
             query = query.Where(x => x.WarehouseOperation == listQuery.WarehouseOperation);
+        }
 
         return query;
     }

@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -58,58 +58,53 @@ internal class Document_РасходныйОрдерНаТовары
         Document_РасходныйОрдерНаТовары document) =>
         ODataEnumMapper.Parse<ShippingOrderStatus>(document.Статус) != ShippingOrderStatus.Prepared
             ? []
-            : document.ОтгружаемыеТовары
+            : [.. document.ОтгружаемыеТовары
                 .Where(IsRegularShippingItem)
-                .Where(x => ODataEnumMapper.Parse<ShippingOrderAction>(x.Действие) != ShippingOrderAction.PickUp)
-                .ToList();
+                .Where(x => ODataEnumMapper.Parse<ShippingOrderAction>(x.Действие) != ShippingOrderAction.PickUp)];
 
     internal static bool IsRegularShippingItem(Document_РасходныйОрдерНаТовары_ОтгружаемыеТовары item) =>
         !item.ЭтоУпаковочныйЛист && item.ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста == 0;
 
-    internal static ShippingOrder MapToShippingOrder(Document_РасходныйОрдерНаТовары fetchedDocument)
+    internal static ShippingOrderImportSnapshot MapToImportSnapshot(
+        Document_РасходныйОрдерНаТовары fetchedDocument)
     {
         var items = fetchedDocument.ОтгружаемыеТовары
-          .Where(IsRegularShippingItem)
-          .Select(x => new ShippingOrderItem
-          {
-              ShippingOrderId = x.Ref_Key,
-              LineNumber = x.LineNumber,
-              StockKeepingUnitId = x.Номенклатура_Key,
-              PlanQuantity = x.КоличествоУпаковок, // TODO: КоличествоУпаковок или Количество?
-              FactQuantity = 0
-          })
-          .ToList();
-
-        var baseItems = fetchedDocument.ТоварыПоРаспоряжениям
-            .Select(x => new ShippingOrderBaseItem
-            {
-                ShippingOrderId = x.Ref_Key,
-                LineNumber = x.LineNumber,
-                StockKeepingUnitId = x.Номенклатура_Key,
-                PlanQuantity = x.Количество,
-                BaseOrderId = x.Распоряжение,
-                BaseOrderType = x.Распоряжение_Type.TrimODataPrefix()
-            })
+            .Where(IsRegularShippingItem)
+            .Select(x => new ShippingOrderItemImportSnapshot(
+                x.LineNumber,
+                x.Номенклатура_Key,
+                x.КоличествоУпаковок)) // TODO: КоличествоУпаковок или Количество?
             .ToList();
 
-        return new ShippingOrder
-        {
-            Id = fetchedDocument.Ref_Key,
-            Posted = fetchedDocument.Posted,
-            DeletionMark = fetchedDocument.DeletionMark,
-            Date = fetchedDocument.Date,
-            Number = fetchedDocument.Number,
-            Comment = fetchedDocument.Комментарий,
-            WarehouseId = fetchedDocument.Склад_Key,
-            WarehouseOperation = ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
-            Status = ODataEnumMapper.Parse<ShippingOrderStatus>(fetchedDocument.Статус),
-            Queue = ODataEnumMapper.Parse<ShippingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
-            PlannedShippingDate = fetchedDocument.Доброга_ПланируемаяДатаОтгрузки?.Date == DateTime.MinValue.Date ? null : fetchedDocument.Доброга_ПланируемаяДатаОтгрузки,
-            DeliveryDirectionId = fetchedDocument.Доброга_НаправлениеДоставки_Key == Guid.Empty ? null : fetchedDocument.Доброга_НаправлениеДоставки_Key,
-            ReceiverId = fetchedDocument.Получатель,
-            ReceiverType = ODataEnumMapper.Parse<PartyType>(fetchedDocument.Получатель_Type),
-            Items = items,
-            BaseItems = baseItems
-        };
+        var baseItems = fetchedDocument.ТоварыПоРаспоряжениям
+            .Select(x => new ShippingOrderBaseItemImportSnapshot(
+                x.LineNumber,
+                x.Номенклатура_Key,
+                x.Количество,
+                x.Распоряжение,
+                x.Распоряжение_Type.TrimODataPrefix()))
+            .ToList();
+
+        return new ShippingOrderImportSnapshot(
+            fetchedDocument.Ref_Key,
+            fetchedDocument.DeletionMark,
+            fetchedDocument.Posted,
+            fetchedDocument.Number,
+            fetchedDocument.Date,
+            fetchedDocument.Склад_Key,
+            fetchedDocument.Комментарий,
+            ODataEnumMapper.Parse<ShippingOrderStatus>(fetchedDocument.Статус),
+            ODataEnumMapper.Parse<ShippingOrderQueue>(fetchedDocument.Доброга_ТипОчереди),
+            fetchedDocument.Доброга_ПланируемаяДатаОтгрузки?.Date == DateTime.MinValue.Date
+                ? null
+                : fetchedDocument.Доброга_ПланируемаяДатаОтгрузки,
+            fetchedDocument.Доброга_НаправлениеДоставки_Key == Guid.Empty
+                ? null
+                : fetchedDocument.Доброга_НаправлениеДоставки_Key,
+            ODataEnumMapper.Parse<WarehouseOperation>(fetchedDocument.СкладскаяОперация),
+            fetchedDocument.Получатель,
+            ODataEnumMapper.Parse<PartyType>(fetchedDocument.Получатель_Type),
+            items,
+            baseItems);
     }
 }

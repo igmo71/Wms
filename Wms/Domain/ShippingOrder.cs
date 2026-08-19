@@ -1,274 +1,282 @@
-﻿using Wms.Common;
+using Wms.Common;
 using Wms.Domain.Enums;
 
 namespace Wms.Domain;
 
 public class ShippingOrder
 {
-    public Guid Id { get; set; }
-    public bool DeletionMark { get; set; }
-    public bool Posted { get; set; }
-    public string? Number { get; set; }
-    public DateTime Date { get; set; }
+    private readonly List<ShippingOrderBaseItem> _baseItems = [];
+    private readonly List<ShippingOrderItem> _items = [];
 
-    public Guid WarehouseId { get; set; }
-    public Warehouse? Warehouse { get; set; }
-
-    public Guid? ShippingLocationId { get; set; }
-    public StorageLocation? ShippingLocation { get; set; }
-
-    public string? Comment { get; set; }
-
-    public ShippingOrderStatus Status { get; set; }
-    public ShippingOrderQueue Queue { get; set; }
-    public DateTime? PlannedShippingDate { get; set; }
-    public Guid? DeliveryDirectionId { get; set; }
-    public DeliveryDirection? DeliveryDirection { get; set; }
-    public WarehouseOperation WarehouseOperation { get; set; }
-
-
-    public DateTimeOffset CreatedAtUtc { get; set; }
-    public DateTimeOffset? UpdatedAtUtc { get; set; }
-    public DateTimeOffset? PickingStartedAtUtc { get; set; }
-    public DateTimeOffset? ReadyForShipmentAtUtc { get; set; }
-    public DateTimeOffset? ShippedAtUtc { get; set; }
-
-    public DateTimeOffset? RolledBackAtUtc { get; set; }
-
-    public string? PickingStartedBy { get; set; }
-    public string? ReadyForShipmentBy { get; set; }
-    public string? ShippedBy { get; set; }
-    public string? RolledBackBy { get; set; }
-    public string? RollbackReason { get; set; }
-
-    public bool ExternalChangeDetected { get; set; }
-
-    public Guid ReceiverId { get; set; }
-    public PartyType ReceiverType { get; set; }
-    public PartyInfo? Receiver { get; set; }
-
-    public List<ShippingOrderBaseItem> BaseItems { get; set; } = [];
-    public List<ShippingOrderItem> Items { get; set; } = [];
-
-    public bool IsFullyShipped => Items.All(x => x.IsFullyShipped);
-    public double KnownFactWeightKg => Items.Sum(x => x.FactWeightKg ?? 0);
-    public bool IsFactWeightComplete => Items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
-
-    internal bool HasExternalChanges(ShippingOrder externalOrder)
+    private ShippingOrder()
     {
-        if (Status != externalOrder.Status
-            || Queue != externalOrder.Queue
-            || WarehouseOperation != externalOrder.WarehouseOperation
-            || Comment != externalOrder.Comment
-            || Posted != externalOrder.Posted
-            || DeletionMark != externalOrder.DeletionMark
-            || Date != externalOrder.Date
-            || Number != externalOrder.Number
-            || WarehouseId != externalOrder.WarehouseId
-            || PlannedShippingDate != externalOrder.PlannedShippingDate
-            || DeliveryDirectionId != externalOrder.DeliveryDirectionId
-            || ReceiverId != externalOrder.ReceiverId
-            || ReceiverType != externalOrder.ReceiverType)
-        {
-            return true;
-        }
-
-        if (Items.Count != externalOrder.Items.Count)
-            return true;
-
-        if (BaseItems.Count != externalOrder.BaseItems.Count)
-            return true;
-
-        var externalItemsByLineNumber = externalOrder.Items.ToDictionary(x => x.LineNumber);
-
-        foreach (var existingItem in Items)
-        {
-            if (!externalItemsByLineNumber.TryGetValue(existingItem.LineNumber, out var external))
-            {
-                return true;
-            }
-
-            if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
-                || existingItem.PlanQuantity != external.PlanQuantity)
-            {
-                return true;
-            }
-        }
-
-        var externalBaseItemsByLineNumber = externalOrder.BaseItems.ToDictionary(x => x.LineNumber);
-
-        foreach (var existingItem in BaseItems)
-        {
-            if (!externalBaseItemsByLineNumber.TryGetValue(existingItem.LineNumber, out var external))
-            {
-                return true;
-            }
-
-            if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
-                || existingItem.PlanQuantity != external.PlanQuantity
-                || existingItem.BaseOrderId != external.BaseOrderId
-                || existingItem.BaseOrderType != external.BaseOrderType)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
-    internal void UpdateOrder(ShippingOrder externalOrder)
+    public Guid Id { get; private set; }
+    public bool DeletionMark { get; private set; }
+    public bool Posted { get; private set; }
+    public string? Number { get; private set; }
+    public DateTime Date { get; private set; }
+    public Guid WarehouseId { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public Guid? ShippingLocationId { get; private set; }
+    public StorageLocation? ShippingLocation { get; private set; }
+    public string? Comment { get; private set; }
+    public ShippingOrderStatus Status { get; private set; }
+    public ShippingOrderQueue Queue { get; private set; }
+    public DateTime? PlannedShippingDate { get; private set; }
+    public Guid? DeliveryDirectionId { get; private set; }
+    public DeliveryDirection? DeliveryDirection { get; private set; }
+    public WarehouseOperation WarehouseOperation { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public DateTimeOffset? UpdatedAtUtc { get; private set; }
+    public DateTimeOffset? PickingStartedAtUtc { get; private set; }
+    public DateTimeOffset? ReadyForShipmentAtUtc { get; private set; }
+    public DateTimeOffset? ShippedAtUtc { get; private set; }
+    public DateTimeOffset? RolledBackAtUtc { get; private set; }
+    public string? PickingStartedBy { get; private set; }
+    public string? ReadyForShipmentBy { get; private set; }
+    public string? ShippedBy { get; private set; }
+    public string? RolledBackBy { get; private set; }
+    public string? RollbackReason { get; private set; }
+    public bool ExternalChangeDetected { get; private set; }
+    public Guid ReceiverId { get; private set; }
+    public PartyType ReceiverType { get; private set; }
+    public PartyInfo? Receiver { get; private set; }
+    public IReadOnlyCollection<ShippingOrderBaseItem> BaseItems => _baseItems;
+    public IReadOnlyCollection<ShippingOrderItem> Items => _items;
+
+    public bool IsFullyShipped => _items.All(x => x.IsFullyShipped);
+    public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
+    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
+
+    public static OperationResult<ShippingOrder> Create(
+        ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset createdAtUtc)
     {
-        DeletionMark = externalOrder.DeletionMark;
-        Posted = externalOrder.Posted;
-        Number = externalOrder.Number;
-        Date = externalOrder.Date;
-        WarehouseId = externalOrder.WarehouseId;
-        WarehouseOperation = externalOrder.WarehouseOperation;
-        Comment = externalOrder.Comment;
-        Status = externalOrder.Status;
-        Queue = externalOrder.Queue;
-        PlannedShippingDate = externalOrder.PlannedShippingDate;
-        DeliveryDirectionId = externalOrder.DeliveryDirectionId;
-        WarehouseOperation = externalOrder.WarehouseOperation;
-        ReceiverId = externalOrder.ReceiverId;
-        ReceiverType = externalOrder.ReceiverType;
-
-        UpdateOrderItems(externalOrder.Items);
-
-        UpdateOrderBaseItems(externalOrder.BaseItems);
-    }
-
-    private void UpdateOrderItems(List<ShippingOrderItem> externalOrderItems)
-    {
-        var externalByLineNumber = externalOrderItems.ToDictionary(item => item.LineNumber);
-
-        Items.RemoveAll(existing => !externalByLineNumber.ContainsKey(existing.LineNumber));
-
-        var existingByLineNumber = Items.ToDictionary(item => item.LineNumber);
-
-        foreach (var external in externalOrderItems)
+        var validationResult = ValidateImport(snapshot, createdAtUtc);
+        if (!validationResult.IsSuccess)
         {
-            if (existingByLineNumber.TryGetValue(external.LineNumber, out var existing))
-            {
-                existing.StockKeepingUnitId = external.StockKeepingUnitId;
-                existing.PlanQuantity = external.PlanQuantity;
-            }
-            else
-            {
-                Items.Add(new ShippingOrderItem
-                {
-                    ShippingOrderId = Id,
-                    LineNumber = external.LineNumber,
-                    StockKeepingUnitId = external.StockKeepingUnitId,
-                    PlanQuantity = external.PlanQuantity,
-                    FactQuantity = 0
-                });
-            }
+            return validationResult.Error!;
         }
-    }
 
-    private void UpdateOrderBaseItems(List<ShippingOrderBaseItem> externalOrderBaseItems)
-    {
-        var externalByLineNumber = externalOrderBaseItems.ToDictionary(item => item.LineNumber);
-
-        BaseItems.RemoveAll(existing => !externalByLineNumber.ContainsKey(existing.LineNumber));
-
-        var existingByLineNumber = BaseItems.ToDictionary(item => item.LineNumber);
-
-        foreach (var external in externalOrderBaseItems)
+        if (snapshot.Status != ShippingOrderStatus.Prepared)
         {
-            if (existingByLineNumber.TryGetValue(external.LineNumber, out var existing))
-            {
-                existing.StockKeepingUnitId = external.StockKeepingUnitId;
-                existing.PlanQuantity = external.PlanQuantity;
-                existing.BaseOrderId = external.BaseOrderId;
-                existing.BaseOrderType = external.BaseOrderType;
-            }
-            else
-            {
-                BaseItems.Add(new ShippingOrderBaseItem
-                {
-                    ShippingOrderId = Id,
-                    LineNumber = external.LineNumber,
-                    StockKeepingUnitId = external.StockKeepingUnitId,
-                    PlanQuantity = external.PlanQuantity,
-                    BaseOrderId = external.BaseOrderId,
-                    BaseOrderType = external.BaseOrderType
-                });
-            }
+            return OperationError.Invalid<ShippingOrder>(
+                "A shipping order can be created only when it is prepared.");
         }
+
+        var order = new ShippingOrder
+        {
+            Id = snapshot.Id,
+            CreatedAtUtc = createdAtUtc
+        };
+
+        order.ApplyImport(snapshot);
+        foreach (var itemSnapshot in snapshot.Items)
+        {
+            var itemResult = ShippingOrderItem.Create(order.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult.Error!;
+            }
+
+            order._items.Add(itemResult.Value!);
+        }
+
+        foreach (var itemSnapshot in snapshot.BaseItems)
+        {
+            var itemResult = ShippingOrderBaseItem.Create(order.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult.Error!;
+            }
+
+            order._baseItems.Add(itemResult.Value!);
+        }
+
+        return order;
     }
 
-    internal OperationResult ValidateToSetReadyForPicking()
+    public OperationResult<ShippingOrderReconciliation> Reconcile(
+        ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (snapshot.Id != Id)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Imported shipping order identifier does not match the existing order.");
+        }
+
+        if (!HasExternalChanges(snapshot))
+        {
+            return ShippingOrderReconciliation.Unchanged;
+        }
+
+        if (Status != ShippingOrderStatus.Prepared)
+        {
+            ExternalChangeDetected = true;
+            return ShippingOrderReconciliation.Conflict;
+        }
+
+        var validationResult = ValidateImport(snapshot, updatedAtUtc);
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult.Error!;
+        }
+
+        if (updatedAtUtc < CreatedAtUtc)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping order update time cannot precede its creation time.");
+        }
+
+        var itemsResult = ReconcileItems(snapshot.Items);
+        if (!itemsResult.IsSuccess)
+        {
+            return itemsResult.Error!;
+        }
+
+        var baseItemsResult = ReconcileBaseItems(snapshot.BaseItems);
+        if (!baseItemsResult.IsSuccess)
+        {
+            return baseItemsResult.Error!;
+        }
+
+        ApplyImport(snapshot);
+        UpdatedAtUtc = updatedAtUtc;
+        ExternalChangeDetected = false;
+        return ShippingOrderReconciliation.Updated;
+    }
+
+    public OperationResult SetShippingLocation(Guid shippingLocationId)
+    {
+        if (shippingLocationId == Guid.Empty)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Shipping location identifier is required.");
+        }
+
+        if (Status != ShippingOrderStatus.Prepared)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping location can be changed only while the order is prepared.");
+        }
+
+        ShippingLocationId = shippingLocationId;
+        return OperationResult.Success();
+    }
+
+    public OperationResult SetReadyForPicking(DateTimeOffset startedAtUtc, string startedBy)
     {
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return OperationError.Invalid<ShippingOrder>("Only a prepared shipping order can be set ready for picking.");
+            return OperationError.Invalid<ShippingOrder>(
+                "Only a prepared shipping order can be set ready for picking.");
         }
 
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before setting the order ready for picking.");
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping location must be specified before setting the order ready for picking.");
         }
 
+        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Picking user must be specified.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (startedAtUtc < CreatedAtUtc)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Picking start time cannot precede order creation.");
+        }
+
+        Status = ShippingOrderStatus.ReadyForPicking;
+        PickingStartedAtUtc = startedAtUtc;
+        PickingStartedBy = startedBy.Trim();
         return OperationResult.Success();
     }
 
-    public void SetReadyForPicking(string userId)
+    public OperationResult UpdateItemFact(int lineNumber, double factQuantity)
     {
-        Status = ShippingOrderStatus.ReadyForPicking;
-
-        PickingStartedAtUtc = DateTimeOffset.UtcNow;
-
-        PickingStartedBy = userId;
-    }
-
-    public OperationResult ValidateToSetReadyForShipment()
-    {
-        var canSetReadyForShipment = Status is ShippingOrderStatus.ReadyForPicking
+        bool isEditable = Status is ShippingOrderStatus.ReadyForPicking
             or ShippingOrderStatus.ReadyForVerification
             or ShippingOrderStatus.InVerification
             or ShippingOrderStatus.Verified;
-
-        if (!canSetReadyForShipment)
+        if (!isEditable)
         {
-            return OperationError.Invalid<ShippingOrder>("Only a shipping order being picked or verified can be set ready for shipment.");
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping facts can be changed only while the order is being picked or verified.");
         }
 
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        return item is null
+            ? OperationError.NotFound<ShippingOrderItem>()
+            : item.UpdateFact(factQuantity);
+    }
+
+    public OperationResult SetReadyForShipment(DateTimeOffset readyAtUtc, string readyBy)
+    {
+        bool canSetReady = Status is ShippingOrderStatus.ReadyForPicking
+            or ShippingOrderStatus.ReadyForVerification
+            or ShippingOrderStatus.InVerification
+            or ShippingOrderStatus.Verified;
+        if (!canSetReady)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Only a shipping order being picked or verified can be set ready for shipment.");
+        }
+
+        var auditResult = ValidateAudit(readyAtUtc, readyBy, "Picking completion user must be specified.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (PickingStartedAtUtc is null || readyAtUtc < PickingStartedAtUtc)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Ready-for-shipment time cannot precede picking start.");
+        }
+
+        Status = ShippingOrderStatus.ReadyForShipment;
+        ReadyForShipmentAtUtc = readyAtUtc;
+        ReadyForShipmentBy = readyBy.Trim();
         return OperationResult.Success();
     }
 
-    public void SetReadyForShipment(string userId)
-    {
-        Status = ShippingOrderStatus.ReadyForShipment;
-
-        ReadyForShipmentAtUtc = DateTimeOffset.UtcNow;
-
-        ReadyForShipmentBy = userId;
-    }
-
-    public OperationResult ValidateToSetShipped()
+    public OperationResult SetShipped(DateTimeOffset shippedAtUtc, string shippedBy)
     {
         if (Status != ShippingOrderStatus.ReadyForShipment)
         {
-            return OperationError.Invalid<ShippingOrder>("Only a shipping order ready for shipment can be shipped.");
+            return OperationError.Invalid<ShippingOrder>(
+                "Only a shipping order ready for shipment can be shipped.");
         }
 
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>("Shipping location must be specified before shipping the order.");
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping location must be specified before shipping the order.");
         }
 
-        return OperationResult.Success();
-    }
+        var auditResult = ValidateAudit(shippedAtUtc, shippedBy, "Shipping user must be specified.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
 
-    public void SetShipped(string userId)
-    {
+        if (ReadyForShipmentAtUtc is null || shippedAtUtc < ReadyForShipmentAtUtc)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping time cannot precede readiness for shipment.");
+        }
+
         Status = ShippingOrderStatus.Shipped;
-
-        ShippedAtUtc = DateTimeOffset.UtcNow;
-
-        ShippedBy = userId;
+        ShippedAtUtc = shippedAtUtc;
+        ShippedBy = shippedBy.Trim();
+        return OperationResult.Success();
     }
 
     public OperationResult ValidateToRollback()
@@ -300,7 +308,220 @@ public class ShippingOrder
         RolledBackBy = userId;
         RollbackReason = reason;
 
-        foreach (var item in Items)
-            item.FactQuantity = 0;
+        foreach (var item in _items)
+        {
+            item.ResetFact();
+        }
+    }
+
+    internal void SetReceiver(PartyInfo? receiver)
+    {
+        Receiver = receiver;
+    }
+
+    private static OperationResult ValidateImport(
+        ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset occurredAtUtc)
+    {
+        if (snapshot.Id == Guid.Empty || snapshot.WarehouseId == Guid.Empty)
+        {
+            return OperationError.Invalid<ShippingOrder>(
+                "Shipping order and warehouse identifiers are required.");
+        }
+
+        if (snapshot.Date == default)
+        {
+            return OperationError.Invalid<ShippingOrder>("Shipping order date is required.");
+        }
+
+        if (occurredAtUtc == default)
+        {
+            return OperationError.Invalid<ShippingOrder>("Import time is required.");
+        }
+
+        if (snapshot.Items is null
+            || snapshot.Items.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
+        {
+            return OperationError.Invalid<ShippingOrderItem>(
+                "Shipping order item line numbers must be unique.");
+        }
+
+        if (snapshot.BaseItems is null
+            || snapshot.BaseItems.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
+        {
+            return OperationError.Invalid<ShippingOrderBaseItem>(
+                "Shipping order base item line numbers must be unique.");
+        }
+
+        foreach (var itemSnapshot in snapshot.Items)
+        {
+            var itemResult = ShippingOrderItem.ValidateImport(snapshot.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult;
+            }
+        }
+
+        foreach (var itemSnapshot in snapshot.BaseItems)
+        {
+            var itemResult = ShippingOrderBaseItem.ValidateImport(snapshot.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult;
+            }
+        }
+
+        return OperationResult.Success();
+    }
+
+    private bool HasExternalChanges(ShippingOrderImportSnapshot snapshot)
+    {
+        if (snapshot.Items is null || snapshot.BaseItems is null)
+        {
+            return true;
+        }
+
+        if (Status != snapshot.Status
+            || Queue != snapshot.Queue
+            || WarehouseOperation != snapshot.WarehouseOperation
+            || Comment != snapshot.Comment
+            || Posted != snapshot.Posted
+            || DeletionMark != snapshot.DeletionMark
+            || Date != snapshot.Date
+            || Number != snapshot.Number
+            || WarehouseId != snapshot.WarehouseId
+            || PlannedShippingDate != snapshot.PlannedShippingDate
+            || DeliveryDirectionId != snapshot.DeliveryDirectionId
+            || ReceiverId != snapshot.ReceiverId
+            || ReceiverType != snapshot.ReceiverType
+            || _items.Count != snapshot.Items.Count
+            || _baseItems.Count != snapshot.BaseItems.Count)
+        {
+            return true;
+        }
+
+        var importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
+        foreach (var existingItem in _items)
+        {
+            var importedLine = importedItems[existingItem.LineNumber].ToList();
+            if (importedLine.Count != 1
+                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
+                || existingItem.PlanQuantity != importedLine[0].PlanQuantity)
+            {
+                return true;
+            }
+        }
+
+        var importedBaseItems = snapshot.BaseItems.ToLookup(x => x.LineNumber);
+        foreach (var existingItem in _baseItems)
+        {
+            var importedLine = importedBaseItems[existingItem.LineNumber].ToList();
+            if (importedLine.Count != 1
+                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
+                || existingItem.PlanQuantity != importedLine[0].PlanQuantity
+                || existingItem.BaseOrderId != importedLine[0].BaseOrderId
+                || existingItem.BaseOrderType != importedLine[0].BaseOrderType)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private OperationResult ReconcileItems(
+        IReadOnlyCollection<ShippingOrderItemImportSnapshot> snapshots)
+    {
+        var importedItems = snapshots.ToDictionary(x => x.LineNumber);
+        _items.RemoveAll(existingItem => !importedItems.ContainsKey(existingItem.LineNumber));
+
+        var existingItems = _items.ToDictionary(x => x.LineNumber);
+        foreach (var snapshot in snapshots)
+        {
+            if (existingItems.TryGetValue(snapshot.LineNumber, out var existingItem))
+            {
+                var itemResult = existingItem.Reconcile(snapshot);
+                if (!itemResult.IsSuccess)
+                {
+                    return itemResult;
+                }
+            }
+            else
+            {
+                var itemResult = ShippingOrderItem.Create(Id, snapshot);
+                if (!itemResult.IsSuccess)
+                {
+                    return itemResult.Error!;
+                }
+
+                _items.Add(itemResult.Value!);
+            }
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ReconcileBaseItems(
+        IReadOnlyCollection<ShippingOrderBaseItemImportSnapshot> snapshots)
+    {
+        var importedItems = snapshots.ToDictionary(x => x.LineNumber);
+        _baseItems.RemoveAll(existingItem => !importedItems.ContainsKey(existingItem.LineNumber));
+
+        var existingItems = _baseItems.ToDictionary(x => x.LineNumber);
+        foreach (var snapshot in snapshots)
+        {
+            if (existingItems.TryGetValue(snapshot.LineNumber, out var existingItem))
+            {
+                var itemResult = existingItem.Reconcile(snapshot);
+                if (!itemResult.IsSuccess)
+                {
+                    return itemResult;
+                }
+            }
+            else
+            {
+                var itemResult = ShippingOrderBaseItem.Create(Id, snapshot);
+                if (!itemResult.IsSuccess)
+                {
+                    return itemResult.Error!;
+                }
+
+                _baseItems.Add(itemResult.Value!);
+            }
+        }
+
+        return OperationResult.Success();
+    }
+
+    private void ApplyImport(ShippingOrderImportSnapshot snapshot)
+    {
+        DeletionMark = snapshot.DeletionMark;
+        Posted = snapshot.Posted;
+        Number = snapshot.Number;
+        Date = snapshot.Date;
+        WarehouseId = snapshot.WarehouseId;
+        Comment = snapshot.Comment;
+        Status = snapshot.Status;
+        Queue = snapshot.Queue;
+        PlannedShippingDate = snapshot.PlannedShippingDate;
+        DeliveryDirectionId = snapshot.DeliveryDirectionId;
+        WarehouseOperation = snapshot.WarehouseOperation;
+        ReceiverId = snapshot.ReceiverId;
+        ReceiverType = snapshot.ReceiverType;
+    }
+
+    private static OperationResult ValidateAudit(
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        string missingUserMessage)
+    {
+        if (occurredAtUtc == default)
+        {
+            return OperationError.Invalid<ShippingOrder>("Operation time is required.");
+        }
+
+        return string.IsNullOrWhiteSpace(userId)
+            ? OperationError.Invalid<ShippingOrder>(missingUserMessage)
+            : OperationResult.Success();
     }
 }
