@@ -16,75 +16,51 @@ public class InventoryTransferCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryTransfer>("Creating user must be specified.");
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId && !x.DeletionMark, ct))
-            return OperationError.NotFound<Warehouse>();
-
         var now = DateTimeOffset.UtcNow;
-        var transfer = new InventoryTransfer
+        var transferResult = InventoryTransfer.Create(
+            Guid.NewGuid(),
+            now.LocalDateTime.ToString("yyMMdd-HHmmss"),
+            now.LocalDateTime.Date,
+            warehouseId,
+            transitStorageLocationId,
+            now,
+            userId);
+        if (!transferResult.IsSuccess)
         {
-            Id = Guid.NewGuid(),
-            Number = now.LocalDateTime.ToString("yyMMdd-HHmmss"),
-            Date = now.LocalDateTime.Date,
-            WarehouseId = warehouseId,
-            Status = InventoryTransferStatus.Draft,
-            CreatedAtUtc = now,
-            CreatedBy = userId
-        };
-
-        if (transitStorageLocationId is Guid locationId)
-        {
-            var transitLocation = await dbContext.StorageLocations
-                .Include(x => x.Zone)
-                .FirstOrDefaultAsync(x => x.Id == locationId, ct);
-
-            if (transitLocation is null)
-                return OperationError.NotFound<StorageLocation>();
-
-            if (transitLocation.IsFolder)
-                return OperationError.Invalid<StorageLocation>("Transit location must be an inventory location.");
-
-            if (transitLocation.DeletionMark
-                || transitLocation.WarehouseId != warehouseId
-                || transitLocation.Zone?.DeletionMark == true
-                || transitLocation.Zone?.Type != ZoneType.Transit)
-            {
-                return OperationError.Invalid<StorageLocation>(
-                    "Transit location must be active and belong to a transit zone in the transfer warehouse.");
-            }
-
-            if (await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == locationId && x.Quantity > 0, ct))
-                return OperationError.Invalid<StorageLocation>("Transit location must be empty before assignment.");
-
-            if (await dbContext.InventoryTransfers.AnyAsync(x => x.TransitStorageLocationId == locationId
-                && x.Status != InventoryTransferStatus.Completed, ct))
-            {
-                return OperationError.Invalid<StorageLocation>("Transit location is already assigned to an active inventory transfer.");
-            }
-
-            transfer.TransitStorageLocationId = locationId;
+            return transferResult.Error!;
         }
 
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var contextResult = await ValidateCreationContextAsync(
+            dbContext,
+            warehouseId,
+            transitStorageLocationId,
+            ct);
+        if (!contextResult.IsSuccess)
+        {
+            return contextResult.Error!;
+        }
+
+        var transfer = transferResult.Value!;
         dbContext.InventoryTransfers.Add(transfer);
         await dbContext.SaveChangesAsync(ct);
-
         return transfer;
     }
 
     public async Task<OperationResult> DeleteDraftAsync(Guid transferId, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
+        {
             return OperationError.NotFound<InventoryTransfer>();
+        }
 
-        if (transfer.Status != InventoryTransferStatus.Draft)
-            return OperationError.Invalid<InventoryTransfer>("Only a draft inventory transfer can be deleted.");
+        var deletionResult = transfer.ValidateDeletion();
+        if (!deletionResult.IsSuccess)
+        {
+            return deletionResult;
+        }
 
         dbContext.InventoryTransfers.Remove(transfer);
         await dbContext.SaveChangesAsync(ct);
@@ -98,8 +74,15 @@ public class InventoryTransferCommandService(
         double quantity,
         string userId,
         CancellationToken ct = default) =>
-        PostMovementAsync(transferId, MovementMode.Pick, sourceStorageLocationId, null,
-            stockKeepingUnitId, quantity, userId, ct);
+        PostMovementAsync(
+            transferId,
+            MovementMode.Pick,
+            sourceStorageLocationId,
+            null,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
 
     public Task<OperationResult> PutAsync(
         Guid transferId,
@@ -108,8 +91,15 @@ public class InventoryTransferCommandService(
         double quantity,
         string userId,
         CancellationToken ct = default) =>
-        PostMovementAsync(transferId, MovementMode.Put, null, destinationStorageLocationId,
-            stockKeepingUnitId, quantity, userId, ct);
+        PostMovementAsync(
+            transferId,
+            MovementMode.Put,
+            null,
+            destinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
 
     public Task<OperationResult> MoveDirectAsync(
         Guid transferId,
@@ -119,37 +109,43 @@ public class InventoryTransferCommandService(
         double quantity,
         string userId,
         CancellationToken ct = default) =>
-        PostMovementAsync(transferId, MovementMode.Direct, sourceStorageLocationId,
-            destinationStorageLocationId, stockKeepingUnitId, quantity, userId, ct);
+        PostMovementAsync(
+            transferId,
+            MovementMode.Direct,
+            sourceStorageLocationId,
+            destinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
 
     public async Task<OperationResult> CompleteAsync(
         Guid transferId,
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryTransfer>("Completing user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
+        {
             return OperationError.NotFound<InventoryTransfer>();
-
-        if (transfer.Status != InventoryTransferStatus.InProgress)
-            return OperationError.Invalid<InventoryTransfer>("Only an inventory transfer in progress can be completed.");
+        }
 
         if (transfer.TransitStorageLocationId is Guid transitLocationId
-            && await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == transitLocationId && x.Quantity > 0, ct))
+            && await dbContext.InventoryBalances.AnyAsync(
+                x => x.StorageLocationId == transitLocationId && x.Quantity > 0,
+                ct))
         {
-            return OperationError.Invalid<InventoryTransfer>("Transit location must be empty before completing the inventory transfer.");
+            return OperationError.Invalid<InventoryTransfer>(
+                "Transit location must be empty before completing the inventory transfer.");
         }
 
         var now = DateTimeOffset.UtcNow;
-        transfer.Status = InventoryTransferStatus.Completed;
-        transfer.UpdatedAtUtc = now;
-        transfer.CompletedAtUtc = now;
-        transfer.CompletedBy = userId;
+        var completionResult = transfer.Complete(now, userId);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult;
+        }
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
@@ -165,118 +161,213 @@ public class InventoryTransferCommandService(
         string userId,
         CancellationToken ct)
     {
-        if (quantity <= 0)
-            return OperationError.Invalid<InventoryMovement>("Movement quantity must be greater than zero.");
-
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryMovement>("Confirming user must be specified.");
+        if (!double.IsFinite(quantity) || quantity <= 0)
+        {
+            return OperationError.Invalid<InventoryMovement>(
+                "Movement quantity must be a finite number greater than zero.");
+        }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
+        {
             return OperationError.NotFound<InventoryTransfer>();
+        }
 
-        if (transfer.Status == InventoryTransferStatus.Completed)
-            return OperationError.Invalid<InventoryTransfer>("A completed inventory transfer cannot be changed.");
+        var routeResult = CreateRoute(
+            transfer,
+            mode,
+            enteredSourceStorageLocationId,
+            enteredDestinationStorageLocationId);
+        if (!routeResult.IsSuccess)
+        {
+            return routeResult.Error!;
+        }
 
-        if (!await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == stockKeepingUnitId && !x.DeletionMark, ct))
+        if (!await dbContext.StockKeepingUnits.AnyAsync(
+            x => x.Id == stockKeepingUnitId && !x.DeletionMark,
+            ct))
+        {
             return OperationError.NotFound<StockKeepingUnit>();
-
-        Guid? sourceStorageLocationId;
-        Guid? destinationStorageLocationId;
-
-        switch (mode)
-        {
-            case MovementMode.Pick:
-                if (transfer.TransitStorageLocationId is null)
-                    return OperationError.Invalid<InventoryTransfer>("Transit location must be assigned before picking.");
-                sourceStorageLocationId = enteredSourceStorageLocationId;
-                destinationStorageLocationId = transfer.TransitStorageLocationId;
-                break;
-            case MovementMode.Put:
-                if (transfer.TransitStorageLocationId is null)
-                    return OperationError.Invalid<InventoryTransfer>("Transit location must be assigned before putting.");
-                sourceStorageLocationId = transfer.TransitStorageLocationId;
-                destinationStorageLocationId = enteredDestinationStorageLocationId;
-                break;
-            case MovementMode.Direct:
-                sourceStorageLocationId = enteredSourceStorageLocationId;
-                destinationStorageLocationId = enteredDestinationStorageLocationId;
-                break;
-            default:
-                return OperationError.Invalid<InventoryMovement>("Transfer movement mode is invalid.");
         }
 
-        if (sourceStorageLocationId is null || destinationStorageLocationId is null)
-            return OperationError.Invalid<InventoryMovement>("Source and destination locations must be specified.");
-
-        if (sourceStorageLocationId == destinationStorageLocationId)
-            return OperationError.Invalid<InventoryMovement>("Source and destination locations must be different.");
-
-        var locationIds = new[] { sourceStorageLocationId.Value, destinationStorageLocationId.Value };
-        var locations = await dbContext.StorageLocations
-            .Include(x => x.Zone)
-            .Where(x => locationIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, ct);
-
-        if (!locations.TryGetValue(sourceStorageLocationId.Value, out var sourceLocation)
-            || !locations.TryGetValue(destinationStorageLocationId.Value, out var destinationLocation))
+        var route = routeResult.Value!;
+        var locationsResult = await ValidateLocationsAsync(dbContext, transfer, route, mode, ct);
+        if (!locationsResult.IsSuccess)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return locationsResult;
         }
-
-        if (sourceLocation.IsFolder || destinationLocation.IsFolder
-            || sourceLocation.DeletionMark || destinationLocation.DeletionMark
-            || sourceLocation.Zone?.DeletionMark == true || destinationLocation.Zone?.DeletionMark == true
-            || sourceLocation.WarehouseId != transfer.WarehouseId
-            || destinationLocation.WarehouseId != transfer.WarehouseId)
-        {
-            return OperationError.Invalid<StorageLocation>("Movement locations must be active and belong to the transfer warehouse.");
-        }
-
-        var expectedSourceType = mode == MovementMode.Put ? ZoneType.Transit : ZoneType.Storage;
-        var expectedDestinationType = mode == MovementMode.Pick ? ZoneType.Transit : ZoneType.Storage;
-
-        if (sourceLocation.Zone?.Type != expectedSourceType || destinationLocation.Zone?.Type != expectedDestinationType)
-            return OperationError.Invalid<StorageLocation>("Movement locations do not match the selected transfer action.");
 
         var lineNumber = (await dbContext.InventoryMovements
             .Where(x => x.RecorderType == RecorderType.InventoryTransfer && x.RecorderId == transfer.Id)
             .Select(x => (int?)x.RecorderLineNumber)
             .MaxAsync(ct) ?? 0) + 1;
+
         var now = DateTimeOffset.UtcNow;
+        var movementResult = transfer.RecordMovement(now, userId);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult;
+        }
+
         var movement = new InventoryMovement
         {
             Id = Guid.NewGuid(),
             WarehouseId = transfer.WarehouseId,
-            SourceStorageLocationId = sourceStorageLocationId,
-            DestinationStorageLocationId = destinationStorageLocationId,
+            SourceStorageLocationId = route.SourceStorageLocationId,
+            DestinationStorageLocationId = route.DestinationStorageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
             Quantity = quantity,
             CreatedAtUtc = now,
-            ConfirmedBy = userId,
+            ConfirmedBy = userId.Trim(),
             RecorderType = RecorderType.InventoryTransfer,
             RecorderId = transfer.Id,
             RecorderLineNumber = lineNumber
         };
 
         dbContext.InventoryMovements.Add(movement);
-        var postingResult = await balanceAndTurnoverService.PostInventoryMovementsAsync([movement], dbContext, ct);
+        var postingResult = await balanceAndTurnoverService.PostInventoryMovementsAsync(
+            [movement],
+            dbContext,
+            ct);
         if (!postingResult.IsSuccess)
-            return postingResult;
-
-        if (transfer.Status == InventoryTransferStatus.Draft)
         {
-            transfer.Status = InventoryTransferStatus.InProgress;
-            transfer.StartedAtUtc = now;
-            transfer.StartedBy = userId;
+            return postingResult;
         }
-
-        transfer.UpdatedAtUtc = now;
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
+    }
+
+    private static OperationResult<InventoryTransferRoute> CreateRoute(
+        InventoryTransfer transfer,
+        MovementMode mode,
+        Guid? enteredSourceStorageLocationId,
+        Guid? enteredDestinationStorageLocationId)
+    {
+        return mode switch
+        {
+            MovementMode.Pick => transfer.CreatePickRoute(enteredSourceStorageLocationId ?? Guid.Empty),
+            MovementMode.Put => transfer.CreatePutRoute(enteredDestinationStorageLocationId ?? Guid.Empty),
+            MovementMode.Direct => transfer.CreateDirectRoute(
+                enteredSourceStorageLocationId ?? Guid.Empty,
+                enteredDestinationStorageLocationId ?? Guid.Empty),
+            _ => OperationError.Invalid<InventoryMovement>("Transfer movement mode is invalid.")
+        };
+    }
+
+    private static async Task<OperationResult> ValidateCreationContextAsync(
+        ApplicationDbContext dbContext,
+        Guid warehouseId,
+        Guid? transitStorageLocationId,
+        CancellationToken ct)
+    {
+        if (!await dbContext.Warehouses.AnyAsync(
+            x => x.Id == warehouseId && !x.DeletionMark,
+            ct))
+        {
+            return OperationError.NotFound<Warehouse>();
+        }
+
+        return transitStorageLocationId is Guid locationId
+            ? await ValidateTransitStorageLocationAsync(dbContext, warehouseId, locationId, ct)
+            : OperationResult.Success();
+    }
+
+    private static async Task<OperationResult> ValidateTransitStorageLocationAsync(
+        ApplicationDbContext dbContext,
+        Guid warehouseId,
+        Guid locationId,
+        CancellationToken ct)
+    {
+        var transitLocation = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .FirstOrDefaultAsync(x => x.Id == locationId, ct);
+        if (transitLocation is null)
+        {
+            return OperationError.NotFound<StorageLocation>();
+        }
+
+        if (transitLocation.IsFolder)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Transit location must be an inventory location.");
+        }
+
+        if (transitLocation.DeletionMark
+            || transitLocation.WarehouseId != warehouseId
+            || transitLocation.Zone?.DeletionMark == true
+            || transitLocation.Zone?.Type != ZoneType.Transit)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Transit location must be active and belong to a transit zone in the transfer warehouse.");
+        }
+
+        if (await dbContext.InventoryBalances.AnyAsync(
+            x => x.StorageLocationId == locationId && x.Quantity > 0,
+            ct))
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Transit location must be empty before assignment.");
+        }
+
+        if (await dbContext.InventoryTransfers.AnyAsync(
+            x => x.TransitStorageLocationId == locationId
+                && x.Status != InventoryTransferStatus.Completed,
+            ct))
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Transit location is already assigned to an active inventory transfer.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private static async Task<OperationResult> ValidateLocationsAsync(
+        ApplicationDbContext dbContext,
+        InventoryTransfer transfer,
+        InventoryTransferRoute route,
+        MovementMode mode,
+        CancellationToken ct)
+    {
+        var locationIds = new[]
+        {
+            route.SourceStorageLocationId,
+            route.DestinationStorageLocationId
+        };
+
+        var locations = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Where(x => locationIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        if (!locations.TryGetValue(route.SourceStorageLocationId, out var sourceLocation)
+            || !locations.TryGetValue(route.DestinationStorageLocationId, out var destinationLocation))
+        {
+            return OperationError.NotFound<StorageLocation>();
+        }
+
+        if (sourceLocation.IsFolder
+            || destinationLocation.IsFolder
+            || sourceLocation.DeletionMark
+            || destinationLocation.DeletionMark
+            || sourceLocation.Zone?.DeletionMark == true
+            || destinationLocation.Zone?.DeletionMark == true
+            || sourceLocation.WarehouseId != transfer.WarehouseId
+            || destinationLocation.WarehouseId != transfer.WarehouseId)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Movement locations must be active and belong to the transfer warehouse.");
+        }
+
+        var expectedSourceType = mode == MovementMode.Put ? ZoneType.Transit : ZoneType.Storage;
+        var expectedDestinationType = mode == MovementMode.Pick ? ZoneType.Transit : ZoneType.Storage;
+
+        return sourceLocation.Zone?.Type == expectedSourceType
+            && destinationLocation.Zone?.Type == expectedDestinationType
+            ? OperationResult.Success()
+            : OperationError.Invalid<StorageLocation>(
+                "Movement locations do not match the selected transfer action.");
     }
 
     private enum MovementMode
