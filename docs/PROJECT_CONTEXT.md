@@ -47,6 +47,7 @@ display.
 The operator UI exposes a separate paged list of posted inventory movements. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving order, shipping order, inventory count, or transfer, with the current day as default. It shows source and destination storage locations and links a movement to its source document with its number and date when known. Draft movements are deliberately excluded.
 
 Inventory counts are local WMS documents. They use a local `yyMMdd-HHmmss` number and the creation date. A draft may contain incomplete rows while an operator records the count. Each document and row timestamp is accompanied by the user who performed that operation. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation, and records the posting user as the movement confirmer. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
+Detailed rules are defined in `specs/inventory-count-backend/spec.md`.
 
 Inventory-transfer commands immediately post every confirmed direct, pick, or put action
 together with balance and turnover changes in one `SaveChangesAsync` call,

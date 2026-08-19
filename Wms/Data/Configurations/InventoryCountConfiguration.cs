@@ -21,6 +21,10 @@ internal class InventoryCountConfiguration : IEntityTypeConfiguration<InventoryC
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
+        builder.Navigation(x => x.Items)
+            .HasField("_items")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(x => x.Number);
         builder.HasIndex(x => new { x.WarehouseId, x.Date });
     }

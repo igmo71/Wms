@@ -15,29 +15,28 @@ public class InventoryCountCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryCount>("Creating user must be specified.");
+        var now = DateTimeOffset.UtcNow;
+        var countResult = InventoryCount.Create(
+            Guid.NewGuid(),
+            now.LocalDateTime.ToString("yyMMdd-HHmmss"),
+            now.LocalDateTime.Date,
+            warehouseId,
+            now,
+            userId);
+        if (!countResult.IsSuccess)
+        {
+            return countResult.Error!;
+        }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId, ct))
-            return OperationError.NotFound<Warehouse>();
-
-        var now = DateTimeOffset.UtcNow;
-        var inventoryCount = new InventoryCount
         {
-            Id = Guid.NewGuid(),
-            Number = now.LocalDateTime.ToString("yyMMdd-HHmmss"),
-            Date = now.LocalDateTime.Date,
-            WarehouseId = warehouseId,
-            Status = InventoryCountStatus.Draft,
-            CreatedAtUtc = now,
-            CreatedBy = userId
-        };
+            return OperationError.NotFound<Warehouse>();
+        }
 
+        var inventoryCount = countResult.Value!;
         dbContext.InventoryCounts.Add(inventoryCount);
         await dbContext.SaveChangesAsync(ct);
-
         return inventoryCount;
     }
 
@@ -46,39 +45,23 @@ public class InventoryCountCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryCountItem>("Creating user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var inventoryCount = await dbContext.InventoryCounts
+            .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
-
         if (inventoryCount is null)
-            return OperationError.NotFound<InventoryCount>();
-
-        if (inventoryCount.Status != InventoryCountStatus.Draft)
-            return OperationError.Invalid<InventoryCount>("Items can be added only to a draft inventory count.");
-
-        var lastLineNumber = await dbContext.InventoryCountItems
-            .Where(x => x.InventoryCountId == inventoryCountId)
-            .Select(x => (int?)x.LineNumber)
-            .MaxAsync(ct) ?? 0;
-
-        var now = DateTimeOffset.UtcNow;
-        dbContext.InventoryCountItems.Add(new InventoryCountItem
         {
-            Id = Guid.NewGuid(),
-            InventoryCountId = inventoryCount.Id,
-            LineNumber = lastLineNumber + 1,
-            CreatedAtUtc = now,
-            CreatedBy = userId
-        });
+            return OperationError.NotFound<InventoryCount>();
+        }
 
-        inventoryCount.UpdatedAtUtc = now;
-        inventoryCount.UpdatedBy = userId;
+        var itemResult = inventoryCount.AddItem(Guid.NewGuid(), DateTimeOffset.UtcNow, userId);
+        if (!itemResult.IsSuccess)
+        {
+            return itemResult.Error!;
+        }
+
+        dbContext.InventoryCountItems.Add(itemResult.Value!);
         await dbContext.SaveChangesAsync(ct);
-
         return OperationResult.Success();
     }
 
@@ -90,82 +73,36 @@ public class InventoryCountCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (countedQuantity < 0)
-            return OperationError.Invalid<InventoryCountItem>("Counted quantity cannot be negative.");
-
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryCountItem>("Updating user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var item = await dbContext.InventoryCountItems
-            .Include(x => x.InventoryCount)
-            .FirstOrDefaultAsync(x => x.Id == itemId, ct);
-
-        if (item is null)
+        var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
+        if (inventoryCount is null)
+        {
             return OperationError.NotFound<InventoryCountItem>();
-
-        var inventoryCount = item.InventoryCount!;
-        if (inventoryCount.Status != InventoryCountStatus.Draft)
-            return OperationError.Invalid<InventoryCount>("Items can be changed only in a draft inventory count.");
-
-        if (storageLocationId is Guid locationId)
-        {
-            var storageLocation = await dbContext.StorageLocations
-                .Include(x => x.Zone)
-                .FirstOrDefaultAsync(x => x.Id == locationId, ct);
-
-            if (storageLocation is null)
-                return OperationError.NotFound<StorageLocation>();
-
-            if (storageLocation.IsFolder || storageLocation.DeletionMark || storageLocation.Zone?.DeletionMark == true)
-                return OperationError.Invalid<StorageLocation>("Inventory count location must be an active inventory location.");
-
-            if (storageLocation.WarehouseId != inventoryCount.WarehouseId)
-                return OperationError.Invalid<StorageLocation>("Storage location must belong to the inventory count warehouse.");
-
-            if (storageLocation.Zone?.Type != ZoneType.Storage)
-                return OperationError.Invalid<StorageLocation>("Inventory count location must belong to a storage zone.");
         }
 
-        if (stockKeepingUnitId is Guid skuId
-            && !await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == skuId, ct))
+        var contextResult = await ValidateItemContextAsync(
+            dbContext,
+            inventoryCount,
+            storageLocationId,
+            stockKeepingUnitId,
+            ct);
+        if (!contextResult.IsSuccess)
         {
-            return OperationError.NotFound<StockKeepingUnit>();
+            return contextResult.Error!;
         }
 
-        if (storageLocationId is not null && stockKeepingUnitId is not null)
+        var updateResult = inventoryCount.UpdateItem(
+            itemId,
+            storageLocationId,
+            stockKeepingUnitId,
+            contextResult.Value,
+            countedQuantity,
+            DateTimeOffset.UtcNow,
+            userId);
+        if (!updateResult.IsSuccess)
         {
-            var duplicateExists = await dbContext.InventoryCountItems
-                .AnyAsync(x => x.InventoryCountId == inventoryCount.Id
-                    && x.Id != item.Id
-                    && x.StorageLocationId == storageLocationId
-                    && x.StockKeepingUnitId == stockKeepingUnitId, ct);
-
-            if (duplicateExists)
-                return OperationError.Invalid<InventoryCountItem>("Storage location and SKU combination must be unique within the inventory count.");
+            return updateResult;
         }
-
-        item.StorageLocationId = storageLocationId;
-        item.StockKeepingUnitId = stockKeepingUnitId;
-        item.CountedQuantity = countedQuantity;
-        item.ExpectedQuantity = 0;
-
-        if (storageLocationId is Guid inventoryLocationId && stockKeepingUnitId is Guid inventorySkuId)
-        {
-            item.ExpectedQuantity = await dbContext.InventoryBalances
-                .Where(x => x.WarehouseId == inventoryCount.WarehouseId
-                    && x.StorageLocationId == inventoryLocationId
-                    && x.StockKeepingUnitId == inventorySkuId)
-                .Select(x => (double?)x.Quantity)
-                .FirstOrDefaultAsync(ct) ?? 0;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        item.UpdatedAtUtc = now;
-        item.UpdatedBy = userId;
-        inventoryCount.UpdatedAtUtc = now;
-        inventoryCount.UpdatedBy = userId;
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
@@ -176,25 +113,18 @@ public class InventoryCountCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryCountItem>("Deleting user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var item = await dbContext.InventoryCountItems
-            .Include(x => x.InventoryCount)
-            .FirstOrDefaultAsync(x => x.Id == itemId, ct);
-
-        if (item is null)
+        var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
+        if (inventoryCount is null)
+        {
             return OperationError.NotFound<InventoryCountItem>();
+        }
 
-        var inventoryCount = item.InventoryCount!;
-        if (inventoryCount.Status != InventoryCountStatus.Draft)
-            return OperationError.Invalid<InventoryCount>("Items can be deleted only from a draft inventory count.");
-
-        dbContext.InventoryCountItems.Remove(item);
-        inventoryCount.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        inventoryCount.UpdatedBy = userId;
+        var removalResult = inventoryCount.RemoveItem(itemId, DateTimeOffset.UtcNow, userId);
+        if (!removalResult.IsSuccess)
+        {
+            return removalResult;
+        }
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
@@ -205,33 +135,129 @@ public class InventoryCountCommandService(
         string userId,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid<InventoryCount>("Posting user must be specified.");
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var inventoryCount = await dbContext.InventoryCounts
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
-
         if (inventoryCount is null)
+        {
             return OperationError.NotFound<InventoryCount>();
-
-        if (inventoryCount.Status != InventoryCountStatus.Draft)
-            return OperationError.Invalid<InventoryCount>("Only a draft inventory count can be posted.");
-
-        if (inventoryCount.Items.Any(x => x.StorageLocationId is null || x.StockKeepingUnitId is null))
-            return OperationError.Invalid<InventoryCountItem>("Every inventory count item must have a storage location and SKU before posting.");
-
-        var hasDuplicates = inventoryCount.Items
-            .GroupBy(x => new { x.StorageLocationId, x.StockKeepingUnitId })
-            .Any(x => x.Count() > 1);
-
-        if (hasDuplicates)
-            return OperationError.Invalid<InventoryCountItem>("Storage location and SKU combination must be unique within the inventory count.");
+        }
 
         var now = DateTimeOffset.UtcNow;
-        var movements = inventoryCount.Items
+        var postResult = inventoryCount.Post(now, userId);
+        if (!postResult.IsSuccess)
+        {
+            return postResult;
+        }
+
+        var movements = CreateDifferenceMovements(inventoryCount, now, userId);
+        dbContext.InventoryMovements.AddRange(movements);
+
+        if (movements.Count > 0)
+        {
+            var postingResult = await balanceAndTurnoverService
+                .PostInventoryMovementsAsync(movements, dbContext, ct);
+            if (!postingResult.IsSuccess)
+            {
+                return postingResult;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    private static Task<InventoryCount?> FindByItemAsync(
+        ApplicationDbContext dbContext,
+        Guid itemId,
+        CancellationToken ct)
+    {
+        return dbContext.InventoryCounts
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Items.Any(item => item.Id == itemId), ct);
+    }
+
+    private static async Task<OperationResult<double>> ValidateItemContextAsync(
+        ApplicationDbContext dbContext,
+        InventoryCount inventoryCount,
+        Guid? storageLocationId,
+        Guid? stockKeepingUnitId,
+        CancellationToken ct)
+    {
+        if (storageLocationId is Guid locationId)
+        {
+            var locationResult = await ValidateStorageLocationAsync(
+                dbContext,
+                inventoryCount.WarehouseId,
+                locationId,
+                ct);
+            if (!locationResult.IsSuccess)
+            {
+                return locationResult.Error!;
+            }
+        }
+
+        if (stockKeepingUnitId is Guid skuId
+            && !await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == skuId, ct))
+        {
+            return OperationError.NotFound<StockKeepingUnit>();
+        }
+
+        if (storageLocationId is not Guid inventoryLocationId
+            || stockKeepingUnitId is not Guid inventorySkuId)
+        {
+            return 0d;
+        }
+
+        return await dbContext.InventoryBalances
+            .Where(x => x.WarehouseId == inventoryCount.WarehouseId
+                && x.StorageLocationId == inventoryLocationId
+                && x.StockKeepingUnitId == inventorySkuId)
+            .Select(x => (double?)x.Quantity)
+            .FirstOrDefaultAsync(ct) ?? 0d;
+    }
+
+    private static async Task<OperationResult> ValidateStorageLocationAsync(
+        ApplicationDbContext dbContext,
+        Guid warehouseId,
+        Guid storageLocationId,
+        CancellationToken ct)
+    {
+        var storageLocation = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .FirstOrDefaultAsync(x => x.Id == storageLocationId, ct);
+        if (storageLocation is null)
+        {
+            return OperationError.NotFound<StorageLocation>();
+        }
+
+        if (storageLocation.IsFolder
+            || storageLocation.DeletionMark
+            || storageLocation.Zone?.DeletionMark == true)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Inventory count location must be an active inventory location.");
+        }
+
+        if (storageLocation.WarehouseId != warehouseId)
+        {
+            return OperationError.Invalid<StorageLocation>(
+                "Storage location must belong to the inventory count warehouse.");
+        }
+
+        return storageLocation.Zone?.Type == ZoneType.Storage
+            ? OperationResult.Success()
+            : OperationError.Invalid<StorageLocation>(
+                "Inventory count location must belong to a storage zone.");
+    }
+
+    private static List<InventoryMovement> CreateDifferenceMovements(
+        InventoryCount inventoryCount,
+        DateTimeOffset createdAtUtc,
+        string confirmedBy)
+    {
+        return inventoryCount.Items
             .Where(x => x.DifferenceQuantity != 0)
             .Select(x => new InventoryMovement
             {
@@ -241,32 +267,12 @@ public class InventoryCountCommandService(
                 DestinationStorageLocationId = x.DifferenceQuantity > 0 ? x.StorageLocationId : null,
                 StockKeepingUnitId = x.StockKeepingUnitId!.Value,
                 Quantity = Math.Abs(x.DifferenceQuantity),
-                CreatedAtUtc = now,
-                ConfirmedBy = userId,
+                CreatedAtUtc = createdAtUtc,
+                ConfirmedBy = confirmedBy.Trim(),
                 RecorderType = RecorderType.InventoryCount,
                 RecorderId = inventoryCount.Id,
                 RecorderLineNumber = x.LineNumber
             })
             .ToList();
-
-        dbContext.InventoryMovements.AddRange(movements);
-
-        if (movements.Count > 0)
-        {
-            var postingResult = await balanceAndTurnoverService
-                .PostInventoryMovementsAsync(movements, dbContext, ct);
-
-            if (!postingResult.IsSuccess)
-                return postingResult;
-        }
-
-        inventoryCount.Status = InventoryCountStatus.Posted;
-        inventoryCount.PostedAtUtc = now;
-        inventoryCount.PostedBy = userId;
-        inventoryCount.UpdatedAtUtc = now;
-        inventoryCount.UpdatedBy = userId;
-
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
     }
 }

@@ -55,8 +55,8 @@ at the layer that has the information needed to decide it.
 
 1. `InventoryTransfer` (completed): factory, immutable transit context,
    start-on-first-movement, completion, audit state, and private mutation.
-2. `InventoryCount` and `InventoryCountItem`: factory, controlled row editing,
-   posting transition, audit state, and read-only items.
+2. `InventoryCount` and `InventoryCountItem` (completed): factory, controlled
+   row editing, posting transition, audit state, and read-only items.
 3. Inventory facts as needed by those workflows: controlled movement creation
    and posting, balance adjustment, and immutable turnover creation.
 
