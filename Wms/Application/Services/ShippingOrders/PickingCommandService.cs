@@ -73,20 +73,23 @@ public class PickingCommandService(
         if (!limitsValidationResult.IsSuccess)
             return limitsValidationResult;
 
-        var now = DateTimeOffset.UtcNow;
-        var movement = new InventoryMovement
+        var movementResult = InventoryMovement.Create(
+            Guid.NewGuid(),
+            order.WarehouseId,
+            sourceStorageLocationId,
+            order.ShippingLocationId,
+            orderItem.StockKeepingUnitId,
+            quantity,
+            DateTimeOffset.UtcNow,
+            RecorderType.ShippingOrder,
+            order.Id,
+            orderItem.LineNumber);
+        if (!movementResult.IsSuccess)
         {
-            WarehouseId = order.WarehouseId,
-            SourceStorageLocationId = sourceStorageLocationId,
-            DestinationStorageLocationId = order.ShippingLocationId,
-            StockKeepingUnitId = orderItem.StockKeepingUnitId,
-            Quantity = quantity,
-            CreatedAtUtc = now,
-            RecorderType = RecorderType.ShippingOrder,
-            RecorderId = order.Id,
-            RecorderLineNumber = orderItem.LineNumber
-        };
+            return movementResult.Error!;
+        }
 
+        var movement = movementResult.Value!;
         dbContext.InventoryMovements.Add(movement);
         orderItem.FactQuantity = draftMovements
             .Where(x => x.RecorderLineNumber == lineNumber)
@@ -169,9 +172,16 @@ public class PickingCommandService(
         if (!limitsValidationResult.IsSuccess)
             return limitsValidationResult;
 
-        movement.SourceStorageLocationId = sourceStorageLocationId;
-        movement.Quantity = quantity;
-        movement.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        var updateResult = movement.UpdateDraft(
+            sourceStorageLocationId,
+            movement.DestinationStorageLocationId,
+            movement.StockKeepingUnitId,
+            quantity,
+            DateTimeOffset.UtcNow);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
 
         orderItem.FactQuantity = draftMovements
             .Where(x => x.RecorderLineNumber == movement.RecorderLineNumber && x.Id != movement.Id)
@@ -193,8 +203,11 @@ public class PickingCommandService(
         if (movement is null)
             return OperationError.NotFound<InventoryMovement>();
 
-        if (movement.PostedAtUtc is not null)
-            return OperationError.Invalid<InventoryMovement>("Posted picking movement cannot be deleted.");
+        var draftResult = movement.ValidateDraft();
+        if (!draftResult.IsSuccess)
+        {
+            return draftResult;
+        }
 
         if (movement.RecorderType != RecorderType.ShippingOrder || movement.RecorderId is null || movement.RecorderLineNumber is null)
             return OperationError.Invalid<InventoryMovement>("Movement does not belong to a shipping order line.");

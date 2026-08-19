@@ -9,10 +9,10 @@ without a big-bang rewrite or speculative frameworks.
 ## Audit summary
 
 The 2026-08-19 audit found that most persisted models still expose public
-mutation. `Zone` and `StorageLocation` are the rich-model pilot;
-`InventoryTransfer` and `InventoryCount` are the next WMS-owned lifecycles.
-Receiving and shipping already contain behavior but still expose mutable state,
-while inventory facts are largely created and changed procedurally by services.
+mutation. `Zone` and `StorageLocation` established the rich-model pilot;
+`InventoryTransfer`, `InventoryCount`, and the inventory facts have since been
+aligned. Receiving and shipping already contain behavior but still expose
+mutable workflow state.
 
 Large command services contain both necessary persistence decisions and local
 domain rules. The goal is not to remove conditions, but to leave each condition
@@ -57,8 +57,8 @@ at the layer that has the information needed to decide it.
    start-on-first-movement, completion, audit state, and private mutation.
 2. `InventoryCount` and `InventoryCountItem` (completed): factory, controlled
    row editing, posting transition, audit state, and read-only items.
-3. Inventory facts as needed by those workflows: controlled movement creation
-   and posting, balance adjustment, and immutable turnover creation.
+3. Inventory facts (completed): controlled movement creation, draft editing and
+   posting, balance adjustment, and immutable turnover creation.
 
 Cross-location balance checks and the EF transaction remain in application
 services.

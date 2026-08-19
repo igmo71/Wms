@@ -210,21 +210,24 @@ public class InventoryTransferCommandService(
             return movementResult;
         }
 
-        var movement = new InventoryMovement
+        var inventoryMovementResult = InventoryMovement.Create(
+            Guid.NewGuid(),
+            transfer.WarehouseId,
+            route.SourceStorageLocationId,
+            route.DestinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            now,
+            RecorderType.InventoryTransfer,
+            transfer.Id,
+            lineNumber,
+            userId);
+        if (!inventoryMovementResult.IsSuccess)
         {
-            Id = Guid.NewGuid(),
-            WarehouseId = transfer.WarehouseId,
-            SourceStorageLocationId = route.SourceStorageLocationId,
-            DestinationStorageLocationId = route.DestinationStorageLocationId,
-            StockKeepingUnitId = stockKeepingUnitId,
-            Quantity = quantity,
-            CreatedAtUtc = now,
-            ConfirmedBy = userId.Trim(),
-            RecorderType = RecorderType.InventoryTransfer,
-            RecorderId = transfer.Id,
-            RecorderLineNumber = lineNumber
-        };
+            return inventoryMovementResult.Error!;
+        }
 
+        var movement = inventoryMovementResult.Value!;
         dbContext.InventoryMovements.Add(movement);
         var postingResult = await balanceAndTurnoverService.PostInventoryMovementsAsync(
             [movement],

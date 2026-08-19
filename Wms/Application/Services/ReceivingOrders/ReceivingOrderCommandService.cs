@@ -133,21 +133,13 @@ public class ReceivingOrderCommandService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var movements = existingOrder.Items
-            .Where(x => x.FactQuantity != 0)
-            .Select(x => new InventoryMovement
-            {
-                WarehouseId = existingOrder.WarehouseId,
-                DestinationStorageLocationId = existingOrder.ReceivingLocationId,
-                StockKeepingUnitId = x.StockKeepingUnitId,
-                Quantity = x.FactQuantity,
-                CreatedAtUtc = now,
-                RecorderId = existingOrder.Id,
-                RecorderLineNumber = x.LineNumber,
-                RecorderType = RecorderType.ReceivingOrder
-            })
-            .ToList();
+        var movementsResult = CreateReceivingMovements(existingOrder, now);
+        if (!movementsResult.IsSuccess)
+        {
+            return movementsResult.Error!;
+        }
 
+        var movements = movementsResult.Value!;
         dbContext.InventoryMovements.AddRange(movements);
 
         var balanceAndTurnoverResult = await balanceAndTurnoverService
@@ -262,5 +254,34 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound<ReceivingOrder>();
 
         return OperationResult.Success();
+    }
+
+    private static OperationResult<List<InventoryMovement>> CreateReceivingMovements(
+        ReceivingOrder order,
+        DateTimeOffset createdAtUtc)
+    {
+        var movements = new List<InventoryMovement>();
+        foreach (var item in order.Items.Where(x => x.FactQuantity != 0))
+        {
+            var movementResult = InventoryMovement.Create(
+                Guid.NewGuid(),
+                order.WarehouseId,
+                null,
+                order.ReceivingLocationId,
+                item.StockKeepingUnitId,
+                item.FactQuantity,
+                createdAtUtc,
+                RecorderType.ReceivingOrder,
+                order.Id,
+                item.LineNumber);
+            if (!movementResult.IsSuccess)
+            {
+                return movementResult.Error!;
+            }
+
+            movements.Add(movementResult.Value!);
+        }
+
+        return movements;
     }
 }

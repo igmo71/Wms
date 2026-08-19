@@ -195,21 +195,13 @@ public class ShippingOrderCommandService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var movements = existingOrder.Items
-            .Where(x => x.FactQuantity != 0)
-            .Select(x => new InventoryMovement
-            {
-                WarehouseId = existingOrder.WarehouseId,
-                SourceStorageLocationId = existingOrder.ShippingLocationId,
-                StockKeepingUnitId = x.StockKeepingUnitId,
-                Quantity = x.FactQuantity,
-                CreatedAtUtc = now,
-                RecorderId = existingOrder.Id,
-                RecorderLineNumber = x.LineNumber,
-                RecorderType = RecorderType.ShippingOrder
-            })
-            .ToList();
+        var movementsResult = CreateShippingMovements(existingOrder, now);
+        if (!movementsResult.IsSuccess)
+        {
+            return movementsResult.Error!;
+        }
 
+        var movements = movementsResult.Value!;
         dbContext.InventoryMovements.AddRange(movements);
 
         var balanceAndTurnoverResult = await balanceAndTurnoverService
@@ -326,22 +318,13 @@ public class ShippingOrderCommandService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var compensationMovements = postedMovements
-            .OrderByDescending(x => x.PostedAtUtc)
-            .Select(x => new InventoryMovement
-            {
-                WarehouseId = x.WarehouseId,
-                SourceStorageLocationId = x.DestinationStorageLocationId,
-                DestinationStorageLocationId = x.SourceStorageLocationId,
-                StockKeepingUnitId = x.StockKeepingUnitId,
-                Quantity = x.Quantity,
-                CreatedAtUtc = now,
-                RecorderId = order.Id,
-                RecorderLineNumber = x.RecorderLineNumber,
-                RecorderType = RecorderType.ShippingOrder
-            })
-            .ToList();
+        var compensationResult = CreateCompensationMovements(order, postedMovements, now);
+        if (!compensationResult.IsSuccess)
+        {
+            return compensationResult.Error!;
+        }
 
+        var compensationMovements = compensationResult.Value!;
         dbContext.InventoryMovements.RemoveRange(draftMovements);
 
         if (compensationMovements.Count > 0)
@@ -364,5 +347,64 @@ public class ShippingOrderCommandService(
 
         logger.LogInformation("Shipping order rolled back by {UserId}. Reason: {Reason}", userId, reason.Trim());
         return OperationResult.Success();
+    }
+
+    private static OperationResult<List<InventoryMovement>> CreateShippingMovements(
+        ShippingOrder order,
+        DateTimeOffset createdAtUtc)
+    {
+        var movements = new List<InventoryMovement>();
+        foreach (var item in order.Items.Where(x => x.FactQuantity != 0))
+        {
+            var movementResult = InventoryMovement.Create(
+                Guid.NewGuid(),
+                order.WarehouseId,
+                order.ShippingLocationId,
+                null,
+                item.StockKeepingUnitId,
+                item.FactQuantity,
+                createdAtUtc,
+                RecorderType.ShippingOrder,
+                order.Id,
+                item.LineNumber);
+            if (!movementResult.IsSuccess)
+            {
+                return movementResult.Error!;
+            }
+
+            movements.Add(movementResult.Value!);
+        }
+
+        return movements;
+    }
+
+    private static OperationResult<List<InventoryMovement>> CreateCompensationMovements(
+        ShippingOrder order,
+        IEnumerable<InventoryMovement> postedMovements,
+        DateTimeOffset createdAtUtc)
+    {
+        var movements = new List<InventoryMovement>();
+        foreach (var postedMovement in postedMovements.OrderByDescending(x => x.PostedAtUtc))
+        {
+            var movementResult = InventoryMovement.Create(
+                Guid.NewGuid(),
+                postedMovement.WarehouseId,
+                postedMovement.DestinationStorageLocationId,
+                postedMovement.SourceStorageLocationId,
+                postedMovement.StockKeepingUnitId,
+                postedMovement.Quantity,
+                createdAtUtc,
+                RecorderType.ShippingOrder,
+                order.Id,
+                postedMovement.RecorderLineNumber);
+            if (!movementResult.IsSuccess)
+            {
+                return movementResult.Error!;
+            }
+
+            movements.Add(movementResult.Value!);
+        }
+
+        return movements;
     }
 }

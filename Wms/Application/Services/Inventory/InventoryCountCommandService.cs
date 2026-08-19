@@ -151,7 +151,13 @@ public class InventoryCountCommandService(
             return postResult;
         }
 
-        var movements = CreateDifferenceMovements(inventoryCount, now, userId);
+        var movementsResult = CreateDifferenceMovements(inventoryCount, now, userId);
+        if (!movementsResult.IsSuccess)
+        {
+            return movementsResult.Error!;
+        }
+
+        var movements = movementsResult.Value!;
         dbContext.InventoryMovements.AddRange(movements);
 
         if (movements.Count > 0)
@@ -252,27 +258,34 @@ public class InventoryCountCommandService(
                 "Inventory count location must belong to a storage zone.");
     }
 
-    private static List<InventoryMovement> CreateDifferenceMovements(
+    private static OperationResult<List<InventoryMovement>> CreateDifferenceMovements(
         InventoryCount inventoryCount,
         DateTimeOffset createdAtUtc,
         string confirmedBy)
     {
-        return inventoryCount.Items
-            .Where(x => x.DifferenceQuantity != 0)
-            .Select(x => new InventoryMovement
+        var movements = new List<InventoryMovement>();
+        foreach (var item in inventoryCount.Items.Where(x => x.DifferenceQuantity != 0))
+        {
+            var movementResult = InventoryMovement.Create(
+                Guid.NewGuid(),
+                inventoryCount.WarehouseId,
+                item.DifferenceQuantity < 0 ? item.StorageLocationId : null,
+                item.DifferenceQuantity > 0 ? item.StorageLocationId : null,
+                item.StockKeepingUnitId!.Value,
+                Math.Abs(item.DifferenceQuantity),
+                createdAtUtc,
+                RecorderType.InventoryCount,
+                inventoryCount.Id,
+                item.LineNumber,
+                confirmedBy);
+            if (!movementResult.IsSuccess)
             {
-                Id = Guid.NewGuid(),
-                WarehouseId = inventoryCount.WarehouseId,
-                SourceStorageLocationId = x.DifferenceQuantity < 0 ? x.StorageLocationId : null,
-                DestinationStorageLocationId = x.DifferenceQuantity > 0 ? x.StorageLocationId : null,
-                StockKeepingUnitId = x.StockKeepingUnitId!.Value,
-                Quantity = Math.Abs(x.DifferenceQuantity),
-                CreatedAtUtc = createdAtUtc,
-                ConfirmedBy = confirmedBy.Trim(),
-                RecorderType = RecorderType.InventoryCount,
-                RecorderId = inventoryCount.Id,
-                RecorderLineNumber = x.LineNumber
-            })
-            .ToList();
+                return movementResult.Error!;
+            }
+
+            movements.Add(movementResult.Value!);
+        }
+
+        return movements;
     }
 }

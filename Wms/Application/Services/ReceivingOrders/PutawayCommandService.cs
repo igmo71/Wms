@@ -74,19 +74,23 @@ public class PutawayCommandService(
         if (!limitsResult.IsSuccess)
             return limitsResult;
 
-        var movement = new InventoryMovement
+        var movementResult = InventoryMovement.Create(
+            Guid.NewGuid(),
+            order.WarehouseId,
+            order.ReceivingLocationId,
+            destinationStorageLocationId,
+            orderItem.StockKeepingUnitId,
+            quantity,
+            DateTimeOffset.UtcNow,
+            RecorderType.ReceivingOrder,
+            order.Id,
+            orderItem.LineNumber);
+        if (!movementResult.IsSuccess)
         {
-            WarehouseId = order.WarehouseId,
-            SourceStorageLocationId = order.ReceivingLocationId,
-            DestinationStorageLocationId = destinationStorageLocationId,
-            StockKeepingUnitId = orderItem.StockKeepingUnitId,
-            Quantity = quantity,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
-            RecorderType = RecorderType.ReceivingOrder,
-            RecorderId = order.Id,
-            RecorderLineNumber = orderItem.LineNumber
-        };
+            return movementResult.Error!;
+        }
 
+        var movement = movementResult.Value!;
         dbContext.InventoryMovements.Add(movement);
         await dbContext.SaveChangesAsync(ct);
 
@@ -137,11 +141,16 @@ public class PutawayCommandService(
         if (!limitsResult.IsSuccess)
             return limitsResult;
 
-        movement.SourceStorageLocationId = order.ReceivingLocationId;
-        movement.DestinationStorageLocationId = destinationStorageLocationId;
-        movement.StockKeepingUnitId = orderItem.StockKeepingUnitId;
-        movement.Quantity = quantity;
-        movement.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        var updateResult = movement.UpdateDraft(
+            order.ReceivingLocationId,
+            destinationStorageLocationId,
+            orderItem.StockKeepingUnitId,
+            quantity,
+            DateTimeOffset.UtcNow);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
@@ -205,7 +214,13 @@ public class PutawayCommandService(
             return destinationsValidation;
 
         foreach (var movement in draftMovements)
-            movement.ConfirmedBy = userId;
+        {
+            var confirmationResult = movement.Confirm(userId);
+            if (!confirmationResult.IsSuccess)
+            {
+                return confirmationResult;
+            }
+        }
 
         var postingResult = await balanceAndTurnoverService
             .PostInventoryMovementsAsync(draftMovements, dbContext, ct);
@@ -253,8 +268,11 @@ public class PutawayCommandService(
 
     private static OperationResult ValidateDraftPutawayMovement(InventoryMovement movement)
     {
-        if (movement.PostedAtUtc is not null)
-            return OperationError.Invalid<InventoryMovement>("Posted putaway movement cannot be changed.");
+        var draftResult = movement.ValidateDraft();
+        if (!draftResult.IsSuccess)
+        {
+            return draftResult;
+        }
 
         if (movement.RecorderType != RecorderType.ReceivingOrder
             || movement.RecorderId is null
