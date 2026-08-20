@@ -1,6 +1,6 @@
 ﻿namespace Wms.Integration.OneS;
 
-public class OneCClientConfig
+internal class OneCClientConfig
 {
     public const string Section = "OneCClient";
 

@@ -138,6 +138,10 @@ last-resort user-facing response and logging.
   in Russian. External protocol values and technical identifiers retain their
   original spelling.
 - Names describe business intent; helpers describe one rule or step.
+- A class is `public` only when it is consumed by another project or is a
+  deliberate boundary of the `Wms` assembly. Assembly implementation details
+  are `internal`; their member modifiers may remain `public` when that keeps
+  the local API straightforward.
 - Each refactoring stage preserves documented behavior, builds the affected
   projects and complete solution, and checks EF migration drift when the model
   changes.

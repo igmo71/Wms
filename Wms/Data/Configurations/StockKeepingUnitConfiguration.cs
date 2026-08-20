@@ -4,7 +4,7 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-public class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepingUnit>
+internal class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepingUnit>
 {
     public void Configure(EntityTypeBuilder<StockKeepingUnit> builder)
     {

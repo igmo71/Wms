@@ -7,7 +7,7 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS.Endpoints;
 
-public static class Catalog_Партнеры_Endpoints
+internal static class Catalog_Партнеры_Endpoints
 {
     public static IEndpointRouteBuilder MapCatalog_Партнеры_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {

@@ -3,7 +3,7 @@ using System.Threading.Channels;
 
 namespace Wms.Integration.OneS;
 
-public class NotifyChannel(ILogger<NotifyChannel> logger)
+internal class NotifyChannel(ILogger<NotifyChannel> logger)
 {
     private readonly Channel<NotifyRecord> _channel = Channel.CreateUnbounded<NotifyRecord>(new UnboundedChannelOptions
     {

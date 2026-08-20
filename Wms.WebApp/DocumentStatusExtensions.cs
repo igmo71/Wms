@@ -3,7 +3,7 @@ using Wms.Domain.Enums;
 
 namespace Wms.WebApp;
 
-public static class DocumentStatusExtensions
+internal static class DocumentStatusExtensions
 {
     public static string GetIcon(this ReceivingOrderQueue queue) => queue switch
     {

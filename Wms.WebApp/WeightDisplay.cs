@@ -1,6 +1,6 @@
 namespace Wms.WebApp;
 
-public static class WeightDisplay
+internal static class WeightDisplay
 {
     public static string Format(double? weightKg) =>
         weightKg is double value ? $"{value:0.###} кг" : "—";

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Wms.WebApp.Components.Account;
 
-public sealed class RussianIdentityErrorDescriber : IdentityErrorDescriber
+internal sealed class RussianIdentityErrorDescriber : IdentityErrorDescriber
 {
     public override IdentityError DefaultError() => Error(nameof(DefaultError), "Произошла непредвиденная ошибка.");
     public override IdentityError ConcurrencyFailure() => Error(nameof(ConcurrencyFailure), "Данные были изменены. Повторите операцию.");

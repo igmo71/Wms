@@ -1,6 +1,6 @@
 ﻿namespace Wms.Integration.OneS.Models;
 
-public class Catalog_Номенклатура
+internal class Catalog_Номенклатура
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }

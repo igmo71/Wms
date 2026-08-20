@@ -7,7 +7,7 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS;
 
-public class NotifyBackgroundService(
+internal class NotifyBackgroundService(
     NotifyChannel notifyChannel,
     IServiceScopeFactory scopeFactory,
     ILogger<NotifyBackgroundService> logger) : BackgroundService

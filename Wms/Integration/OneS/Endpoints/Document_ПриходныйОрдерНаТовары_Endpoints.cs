@@ -6,7 +6,7 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Endpoints;
 
-public static class Document_ПриходныйОрдерНаТовары_Endpoints
+internal static class Document_ПриходныйОрдерНаТовары_Endpoints
 {
     public static IEndpointRouteBuilder MapDocument_ПриходныйОрдерНаТовары_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {

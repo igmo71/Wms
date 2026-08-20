@@ -4,7 +4,7 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-public class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
+internal class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
 {
     public void Configure(EntityTypeBuilder<UnitOfMeasure> builder)
     {

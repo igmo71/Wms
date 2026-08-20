@@ -1,6 +1,6 @@
 namespace Wms.WebApi;
 
-public class WeatherForecast
+internal class WeatherForecast
 {
     public DateOnly Date { get; set; }
 
