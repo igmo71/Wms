@@ -34,14 +34,8 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
-    {
-        var result = await ImportListAndGetAsync(ct);
-
-        return result.IsSuccess
-            ? OperationResult.Success()
-            : OperationResult.Failure(result.Error!);
-    }
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default) =>
+        await ImportListAndGetAsync(ct);
 
     internal async Task<OperationResult<IReadOnlyDictionary<Guid, UnitOfMeasure>>> ImportListAndGetAsync(
         CancellationToken ct = default)
@@ -51,7 +45,7 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return OperationResult<IReadOnlyDictionary<Guid, UnitOfMeasure>>.Failure(serviceResult.Error!);
+            return serviceResult.Error!;
 
         var fetchedItems = serviceResult.Value?.Value;
 

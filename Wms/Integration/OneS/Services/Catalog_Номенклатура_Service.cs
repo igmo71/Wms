@@ -76,7 +76,7 @@ public class Catalog_Номенклатура_Service(
         {
             int batchIndex = i;
 
-            tasks.Add(Task.Run(async () =>
+            tasks.Add(Task.Run<OperationResult<StockKeepingUnitImportSummary>>(async () =>
             {
                 await semaphore.WaitAsync(ct);
 
@@ -87,13 +87,12 @@ public class Catalog_Номенклатура_Service(
                     var batchResult = await oneCClient.GetValueAsync<RootObject<Catalog_Номенклатура>>(uri, ct);
 
                     if (!batchResult.IsSuccess)
-                        return OperationResult<StockKeepingUnitImportSummary>.Failure(batchResult.Error!);
+                        return batchResult.Error!;
 
                     var fetchedItems = batchResult.Value?.Value;
 
                     if (fetchedItems is null)
-                        return OperationResult<StockKeepingUnitImportSummary>.Failure(
-                            OperationError.Failure("1С вернула некорректный ответ: пакет номенклатуры отсутствует."));
+                        return OperationError.Failure("1С вернула некорректный ответ: пакет номенклатуры отсутствует.");
 
                     if (fetchedItems.Count == 0)
                         return new StockKeepingUnitImportSummary(0, 0);

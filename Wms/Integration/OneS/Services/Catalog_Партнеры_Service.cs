@@ -48,7 +48,7 @@ public class Catalog_Партнеры_Service(
         {
             var batchIndex = i;
 
-            tasks.Add(Task.Run(async () =>
+            tasks.Add(Task.Run<OperationResult>(async () =>
             {
                 await semaphore.WaitAsync(ct);
 
@@ -58,13 +58,12 @@ public class Catalog_Партнеры_Service(
                     var batchResult = await oneCClient.GetValueAsync<RootObject<Catalog_Партнеры>>(uri, ct);
 
                     if (!batchResult.IsSuccess)
-                        return OperationResult.Failure(batchResult.Error!);
+                        return batchResult.Error!;
 
                     var fetchedItems = batchResult.Value?.Value;
 
                     if (fetchedItems is null)
-                        return OperationResult.Failure(
-                            OperationError.Failure("1С вернула некорректный ответ: пакет партнёров отсутствует."));
+                        return OperationError.Failure("1С вернула некорректный ответ: пакет партнёров отсутствует.");
 
                     if (fetchedItems.Count == 0)
                         return OperationResult.Success();
