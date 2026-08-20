@@ -12,11 +12,8 @@ internal static class IdentityDataInitializer
         await using var scope = services.CreateAsyncScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var options = scope.ServiceProvider
-            .GetRequiredService<IOptions<IdentityBootstrapOptions>>()
-            .Value;
-        var logger = scope.ServiceProvider
-            .GetRequiredService<ILoggerFactory>()
+        var options = scope.ServiceProvider.GetRequiredService<IOptions<IdentityBootstrapOptions>>().Value;
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(IdentityDataInitializer));
 
         foreach (var roleName in ApplicationRoles.All)

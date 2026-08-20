@@ -7,9 +7,9 @@ services:
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
+      OneCClient__Username: "${ONEC_USERNAME}"
+      OneCClient__Password: "${ONEC_PASSWORD}"
       OPENSSL_CONF: "/app/openssl-legacy.cnf"
-      OneC__Username: "${ONEC_USERNAME}"
-      OneC__Password: "${ONEC_PASSWORD}"
     volumes:
       - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
     ports:
@@ -23,6 +23,11 @@ services:
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
+      IdentityBootstrap__AdministratorEmail: "${ADMINISTRATOR_EMAIL}"
+      IdentityBootstrap__AdministratorPassword: "${ADMINISTRATOR_PASSWORD}"
+      IdentityBootstrap__AdministratorDisplayName: "${ADMINISTRATOR_DISPLAYNAME}"
+      OneCClient__Username: "${ONEC_USERNAME}"
+      OneCClient__Password: "${ONEC_PASSWORD}"
       OPENSSL_CONF: "/app/openssl-legacy.cnf"
     volumes:
       - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
