@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Counts;
+using Wms.Application.StockKeepingUnits;
 using Wms.Application.StorageLocations;
+using Wms.Application.Users;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -18,7 +19,7 @@ public partial class Details
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
@@ -50,7 +51,7 @@ public partial class Details
         if (_inventoryCount is null)
             return [];
 
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _inventoryCount.WarehouseId,

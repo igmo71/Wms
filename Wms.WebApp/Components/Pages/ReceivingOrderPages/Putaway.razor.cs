@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.ReceivingOrders;
+using Wms.Application.ReceivingOrders;
+using Wms.Application.Users;
 using Wms.Domain;
 using Wms.Domain.Enums;
 

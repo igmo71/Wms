@@ -1,4 +1,4 @@
-﻿using Wms.Application.Services;
+﻿using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
 using Wms.Application.StorageLocations;
+using Wms.Application.Warehouses;
 using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
@@ -10,9 +10,10 @@ namespace Wms.WebApp.Components.Pages.StorageLocationPages;
 
 public partial class Index
 {
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationCommandService StorageLocationCommandService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private ZoneService ZoneService { get; set; } = null!;
+    [Inject] private ZoneQueryService ZoneQueryService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
 
     private Warehouse? _warehouse;
@@ -43,7 +44,7 @@ public partial class Index
 
     private async Task<IEnumerable<Zone>> SearchZonesAsync(string? searchText, CancellationToken ct)
     {
-        var result = await ZoneService.ListAsync(new ZoneListQuery
+        var result = await ZoneQueryService.ListAsync(new ZoneListQuery
         {
             SearchString = searchText,
             WarehouseId = _warehouse?.Id,
@@ -127,7 +128,7 @@ public partial class Index
     {
         if (_selectedLocation is null)
             return;
-        var result = await StorageLocationService.MarkDeleteAsync(_selectedLocation.Id);
+        var result = await StorageLocationCommandService.MarkDeleteAsync(_selectedLocation.Id);
         await HandleActionResultAsync(result);
     }
 
@@ -135,7 +136,7 @@ public partial class Index
     {
         if (_selectedLocation is null)
             return;
-        var result = await StorageLocationService.UnMarkDeleteAsync(_selectedLocation.Id);
+        var result = await StorageLocationCommandService.UnMarkDeleteAsync(_selectedLocation.Id);
         await HandleActionResultAsync(result);
     }
 
@@ -162,7 +163,7 @@ public partial class Index
         _isLoading = true;
         try
         {
-            _locations = await StorageLocationService.GetTreeAsync(_zone.Id, _includeDeleted);
+            _locations = await StorageLocationQueryService.GetTreeAsync(_zone.Id, _includeDeleted);
         }
         catch
         {

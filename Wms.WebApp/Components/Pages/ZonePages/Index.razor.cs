@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.Warehouses;
 using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
@@ -11,7 +11,10 @@ namespace Wms.WebApp.Components.Pages.ZonePages;
 public partial class Index
 {
     [Inject]
-    private ZoneService ZoneService { get; set; } = null!;
+    private ZoneCommandService ZoneCommandService { get; set; } = null!;
+
+    [Inject]
+    private ZoneQueryService ZoneQueryService { get; set; } = null!;
 
     [Inject]
     private WarehouseService WarehouseService { get; set; } = null!;
@@ -42,7 +45,7 @@ public partial class Index
             Take = state.PageSize
         };
 
-        var result = await ZoneService.ListAsync(query, cancellationToken);
+        var result = await ZoneQueryService.ListAsync(query, cancellationToken);
 
         return new GridData<Zone>
         {
@@ -109,13 +112,13 @@ public partial class Index
 
     private async Task MarkDeleteAsync(Guid id)
     {
-        await ZoneService.MarkDeleteAsync(id);
+        await ZoneCommandService.MarkDeleteAsync(id);
         await _dataGrid.ReloadServerData();
     }
 
     private async Task UnMarkDeleteAsync(Guid id)
     {
-        await ZoneService.UnMarkDeleteAsync(id);
+        await ZoneCommandService.UnMarkDeleteAsync(id);
         await _dataGrid.ReloadServerData();
     }
 }

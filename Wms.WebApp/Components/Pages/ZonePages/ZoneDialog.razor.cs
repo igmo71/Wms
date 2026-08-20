@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.Warehouses;
 using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
@@ -17,7 +17,7 @@ public partial class ZoneDialog
     public Zone? Zone { get; set; }
 
     [Inject]
-    private ZoneService ZoneService { get; set; } = null!;
+    private ZoneCommandService ZoneCommandService { get; set; } = null!;
 
     [Inject]
     private WarehouseService WarehouseService { get; set; } = null!;
@@ -68,7 +68,7 @@ public partial class ZoneDialog
 
         try
         {
-            var result = await ZoneService.SaveAsync(new SaveZoneRequest
+            var result = await ZoneCommandService.SaveAsync(new SaveZoneCommand
             {
                 Id = Zone?.Id,
                 WarehouseId = _warehouse.Id,

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Domain;
@@ -14,7 +13,7 @@ public partial class StorageLocationDialog
     [Parameter, EditorRequired] public Zone Zone { get; set; } = null!;
     [Parameter] public StorageLocation? Parent { get; set; }
     [Parameter] public StorageLocation? StorageLocation { get; set; }
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationCommandService StorageLocationCommandService { get; set; } = null!;
 
     private string _name = string.Empty;
     private bool _isFolder;
@@ -73,7 +72,7 @@ public partial class StorageLocationDialog
             OperationResult result;
             if (StorageLocation is null)
             {
-                result = await StorageLocationService.CreateAsync(new CreateStorageLocationRequest
+                result = await StorageLocationCommandService.CreateAsync(new CreateStorageLocationCommand
                 {
                     WarehouseId = Warehouse.Id,
                     ZoneId = Zone.Id,
@@ -85,7 +84,7 @@ public partial class StorageLocationDialog
             }
             else
             {
-                result = await StorageLocationService.UpdateAsync(StorageLocation.Id, details);
+                result = await StorageLocationCommandService.UpdateAsync(StorageLocation.Id, details);
             }
 
             if (!result.IsSuccess)

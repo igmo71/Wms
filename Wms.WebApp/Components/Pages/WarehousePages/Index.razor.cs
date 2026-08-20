@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.CatalogSynchronization;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 

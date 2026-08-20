@@ -59,7 +59,7 @@
     [Parameter, EditorRequired] public Warehouse Warehouse { get; set; } = null!;
     [Parameter, EditorRequired] public Zone Zone { get; set; } = null!;
     [Parameter] public StorageLocation? Parent { get; set; }
-    [Inject] private Wms.Application.Services.StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationCommandService StorageLocationCommandService { get; set; } = null!;
 
     private int _count = 1;
     private int _startNumber = 1;
@@ -109,7 +109,7 @@
                 return;
             }
 
-            var request = new GenerateStorageLocationsRequest
+            var command = new GenerateStorageLocationsCommand
             {
                 WarehouseId = Warehouse.Id,
                 ZoneId = Zone.Id,
@@ -128,7 +128,7 @@
                 PickSequenceStep = _pickSequenceStep
             };
 
-            var result = await StorageLocationService.GenerateChildrenAsync(request);
+            var result = await StorageLocationCommandService.GenerateChildrenAsync(command);
             if (!result.IsSuccess)
             {
                 _errorMessage = result.Error?.Message ?? "Не удалось создать позиции.";

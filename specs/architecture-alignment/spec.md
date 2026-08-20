@@ -26,7 +26,8 @@ at the layer that has the information needed to decide it.
 - Enrich models selectively according to WMS ownership and actual behavior.
 - Use the shared `OperationResult` family for expected domain, application, and
   integration outcomes; unexpected failures remain exceptions.
-- Keep immutable, feature-local requests only where they clarify an operation.
+- Keep immutable, feature-local commands only where they clarify an operation.
+- Organize application code by feature without a technical `Services` folder.
 - Pass time and user identifiers into audited domain transitions.
 - Do not introduce CQRS infrastructure, repositories, base entities, or
   validation pipelines as part of alignment.
@@ -50,8 +51,8 @@ at the layer that has the information needed to decide it.
 - Let `Zone`, `StorageLocation`, and their value objects return expected
   validation failures directly.
 - Remove the exception-to-result `DomainOperation` adapter.
-- Keep request-only cross-field validation on
-  `GenerateStorageLocationsRequest` and database checks in its service.
+- Keep command-only cross-field validation on
+  `GenerateStorageLocationsCommand` and database checks in its service.
 
 ### Stage 3: WMS-owned inventory documents
 
@@ -94,17 +95,20 @@ application and integration services.
 
 ### Stage 6: queries, UI, and cleanup
 
-- UI forms keep editable state in local fields and create requests only at the
+- UI forms keep editable state in local fields and create commands only at the
   application boundary; selected domain objects remain read-only values
   (completed).
-- `ZoneListQuery` and `StorageLocationListQuery` were moved from `Wms.Common`
-  to their application features (completed).
+- Feature-specific list queries for zones, storage locations, balances,
+  movements, transfers, and turnovers were moved from `Wms.Common` to their
+  application features. Only the shared `ListQuery` and `ListResult<T>` remain
+  common (completed).
 - The unused `WarehouseImportService` and obsolete single-barcode mutation
-  methods were removed; the remaining requests all describe active operations
+  methods were removed; the remaining commands all describe active operations
   (completed).
-- Workflow command/query services remain split. Configuration services remain
-  cohesive because separating them would add UI dependencies without isolating
-  an independent responsibility (completed).
+- Application services and contracts were regrouped by feature; the technical
+  `Services` folder was removed. Zone and storage-location public reads were
+  separated from their commands, while command-internal database checks remain
+  local. Small synchronized catalogs retain cohesive services (completed).
 
 ## Acceptance criteria for a functional substage
 

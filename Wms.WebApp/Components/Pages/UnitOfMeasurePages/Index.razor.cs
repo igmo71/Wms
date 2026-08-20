@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.CatalogSynchronization;
+using Wms.Application.UnitsOfMeasure;
 using Wms.Common;
 using Wms.Domain;
 

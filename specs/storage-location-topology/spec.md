@@ -53,13 +53,13 @@ starting number, number step, segment width, name prefix, node type, and optiona
 coordinate and picking-sequence generation parameters. Only immediate children
 are created. The whole batch succeeds or fails in one transaction.
 
-The generation request validates its own ranges and mutually dependent input.
+The generation command validates its own ranges and mutually dependent input.
 The application service remains responsible for zone and parent state and for
 code conflicts because those checks require persisted data.
 
 Single-location creation reuses one domain `StorageLocationDetails` value for
 the editable properties. Updating accepts that value directly rather than a
-duplicate update request. UI form state is not used as an application request.
+duplicate update command. UI form state is not used as an application command.
 
 ## Non-goals
 

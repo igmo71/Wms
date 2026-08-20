@@ -1,10 +1,26 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Wms.Application.CatalogSynchronization;
+using Wms.Application.DeliveryDirections;
+using Wms.Application.Individuals;
+using Wms.Application.Inventory.Balances;
+using Wms.Application.Inventory.Counts;
+using Wms.Application.Inventory.Movements;
+using Wms.Application.Inventory.Transfers;
+using Wms.Application.Inventory.Turnovers;
+using Wms.Application.OrganizationalUnits;
+using Wms.Application.Parties;
+using Wms.Application.Partners;
+using Wms.Application.ReceivingOrders;
 using Wms.Application.Reports.EmployeePerformance;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
-using Wms.Application.Services.ReceivingOrders;
-using Wms.Application.Services.ShippingOrders;
+using Wms.Application.ShippingOrders;
+using Wms.Application.SkuBarcodes;
+using Wms.Application.StockKeepingUnits;
+using Wms.Application.StorageLocations;
+using Wms.Application.UnitsOfMeasure;
+using Wms.Application.Users;
+using Wms.Application.Warehouses;
+using Wms.Application.Zones;
 using Wms.Common;
 
 namespace Wms.Application;
@@ -14,18 +30,18 @@ public static class DependencyInjection
     public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<ApplicationUserQueryService>();
-        services.AddScoped<BalanceAndTurnoverService>();
+        services.AddScoped<InventoryPostingService>();
         services.AddScoped<DeliveryDirectionService>();
         services.AddScoped<EmployeePerformanceReportService>();
         services.AddScoped<IndividualService>();
         services.AddScoped<InventoryCountCommandService>();
         services.AddScoped<InventoryCountQueryService>();
-        services.AddScoped<InventoryBalanceService>();
-        services.AddScoped<InventoryMovementService>();
-        services.AddScoped<InventoryTurnoverService>();
+        services.AddScoped<InventoryBalanceQueryService>();
+        services.AddScoped<InventoryMovementQueryService>();
+        services.AddScoped<InventoryTurnoverQueryService>();
         services.AddScoped<OrganizationalUnitService>();
         services.AddScoped<PickingCommandService>();
-        services.AddScoped<PartyService>();
+        services.AddScoped<PartyQueryService>();
         services.AddScoped<PartnerService>();
         services.AddScoped<PickingQueryService>();
         services.AddScoped<PutawayCommandService>();
@@ -39,10 +55,12 @@ public static class DependencyInjection
         services.AddScoped<InventoryTransferCommandService>();
         services.AddScoped<InventoryTransferQueryService>();
         services.AddScoped<SynchronizedCatalogImportService>();
-        services.AddScoped<StorageLocationService>();
+        services.AddScoped<StorageLocationCommandService>();
+        services.AddScoped<StorageLocationQueryService>();
         services.AddScoped<UnitOfMeasureService>();
         services.AddScoped<WarehouseService>();
-        services.AddScoped<ZoneService>();
+        services.AddScoped<ZoneCommandService>();
+        services.AddScoped<ZoneQueryService>();
 
         services.Configure<WmsSettings>(configuration.GetSection(nameof(WmsSettings)));
 

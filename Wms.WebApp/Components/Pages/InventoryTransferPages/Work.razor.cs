@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Transfers;
+using Wms.Application.StockKeepingUnits;
 using Wms.Application.StorageLocations;
+using Wms.Application.Users;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -18,7 +20,7 @@ public partial class Work
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryTransferCommandService InventoryTransferCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
@@ -144,7 +146,7 @@ public partial class Work
         if (_transfer is null)
             return [];
 
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _transfer.WarehouseId,

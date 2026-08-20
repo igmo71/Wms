@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Wms.Application.Services.ShippingOrders;
+using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;

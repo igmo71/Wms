@@ -1,0 +1,21 @@
+using Wms.Domain;
+using Wms.Domain.Enums;
+
+namespace Wms.Application.Inventory.Movements;
+
+public class InventoryMovementListItem
+{
+    public InventoryMovement Movement { get; init; } = null!;
+    public string? RecorderNumber { get; init; }
+    public DateTime? RecorderDate { get; init; }
+
+    public DateTimeOffset? PostedAtUtc => Movement.PostedAtUtc;
+    public Warehouse? Warehouse => Movement.Warehouse;
+    public StorageLocation? SourceStorageLocation => Movement.SourceStorageLocation;
+    public StorageLocation? DestinationStorageLocation => Movement.DestinationStorageLocation;
+    public StockKeepingUnit? StockKeepingUnit => Movement.StockKeepingUnit;
+    public double Quantity => Movement.Quantity;
+    public double? WeightKg => Movement.WeightKg;
+    public RecorderType RecorderType => Movement.RecorderType;
+    public Guid? RecorderId => Movement.RecorderId;
+}

@@ -246,7 +246,7 @@ are not implemented.
 - `PutawayCommandService` starts and completes putaway and manages its draft
   movements; `PutawayQueryService` reads putaway movements and valid storage
   destinations.
-- `BalanceAndTurnoverService` records inventory movements and updates balances
+- `InventoryPostingService` records inventory movements and updates balances
   when receiving or putaway is completed.
 
 Inbound synchronization may create and reconcile receiving orders only in `ReadyForReceiving` and shipping orders only in `Prepared`. Once WMS work has started, any inbound difference leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Receiving facts are editable only in `InReceiving` or `ProcessingRequired`; shipping facts are editable only while picking or verification is in progress.
@@ -255,13 +255,13 @@ Inbound synchronization may create and reconcile receiving orders only in `Ready
 
 The 1C OData client is configured through `OneCClient` settings. The integration uses explicit models named after 1C entities.
 
-`Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented; partner resolution through `PartyService` is not yet implemented.
+`Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented.
 
 `Catalog_ФизическиеЛица_Service` imports `Catalog_ФизическиеЛица` into the local `Individual` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual record update. Catalog groups are stored with `IsFolder` and displayed in the same flat configuration list as people.
 
 `Catalog_СтруктураПредприятия_Service` imports `Catalog_СтруктураПредприятия` into the local `OrganizationalUnit` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual organizational-unit update. The imported hierarchy is retained in `ParentId`, while the configuration UI displays a flat list.
 
-Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyService` resolves that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Its batch `GetManyAsync` groups distinct references by type and performs at most one local database query per represented type, avoiding N+1 queries on order lists. It never calls 1C on demand, includes deactivated catalog records for historical display, and excludes individual-catalog folders. Receiving and shipping query services enrich both individual orders and paged lists with non-persisted `Shipper` or `Receiver` information. Missing local records remain visible as unresolved in the UI; party sorting and filtering are not implemented.
+Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyQueryService` resolves that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Its batch `GetManyAsync` groups distinct references by type and performs at most one local database query per represented type, avoiding N+1 queries on order lists. It never calls 1C on demand, includes deactivated catalog records for historical display, and excludes individual-catalog folders. Receiving and shipping query services enrich both individual orders and paged lists with non-persisted `Shipper` or `Receiver` information. Missing local records remain visible as unresolved in the UI; party sorting and filtering are not implemented.
 
 For `Document_ПриходныйОрдерНаТовары`:
 

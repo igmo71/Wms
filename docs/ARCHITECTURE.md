@@ -19,7 +19,7 @@ refactored. The guide does not authorize unrelated cleanup.
 ### UI and endpoints
 
 - Own form state and transport concerns.
-- Create application requests at the operation boundary; do not use requests
+- Create application commands at the operation boundary; do not use commands
   or domain entities as mutable form models.
 - Display operation outcomes without repeating business rules.
 
@@ -38,7 +38,7 @@ refactored. The guide does not authorize unrelated cleanup.
 - Expose operations rather than public mutation; use private setters,
   read-only collections, and immutable value objects for WMS-owned aggregates.
 - Receive timestamps and user identifiers as operation inputs when needed.
-- Remain independent of application requests, EF `DbContext`, UI, and 1C
+- Remain independent of application commands, EF `DbContext`, UI, and 1C
   transport models.
 
 ### Data and integration
@@ -61,22 +61,38 @@ refactored. The guide does not authorize unrelated cleanup.
 `Warehouse` remains a simple 1C-owned import model until WMS owns a concrete
 warehouse operation that justifies more behavior.
 
-## Requests and queries
+## Application organization
 
-- A request is a typed parameter object, not a reason to introduce CQRS.
-- Use one for several related inputs, cross-field validation, or an explicit
-  editable-field boundary. Keep it immutable and beside its feature.
+- Organize application code by business feature, not under a technical
+  `Services` folder. A feature keeps its services, commands, queries, and read
+  models together.
+- Use separate command and query services when they represent distinct public
+  responsibilities. Database reads required to execute a command remain in its
+  command service.
+- A small 1C-owned catalog may keep one cohesive service for import persistence
+  and reads; splitting it merely for naming symmetry is not required.
+- Do not create a folder or handler for every operation. Introduce another
+  nesting level only when the feature folder is no longer easy to scan.
+
+## Commands and queries
+
+- A command is an immutable typed input describing an application operation
+  that changes state. It does not imply MediatR, a handler type, or full CQRS.
+- Use a command object for several related inputs, cross-field validation, or
+  an explicit editable-field boundary. Methods with a few obvious parameters
+  do not need a command class.
 - Reuse a domain value object when it already represents exactly the editable
-  state; do not create a duplicate update request.
-- Queries may project directly to list or detail models. Command/query services
-  are split only when their responsibilities are materially different.
+  state; do not create a duplicate command.
+- A query describes a read operation or its criteria and may project directly
+  to list or detail models.
+- Reserve `Request` for an actual UI, HTTP, or integration transport contract.
 
 ## Validation and operation outcomes
 
 Put a rule at the lowest layer that has all data needed to decide it:
 
 1. value object — valid construction;
-2. application request — self-consistent ranges and field combinations;
+2. application command — self-consistent ranges and field combinations;
 3. domain operation — local entity transition;
 4. application service — database, authorization, integration, or
    cross-aggregate state;

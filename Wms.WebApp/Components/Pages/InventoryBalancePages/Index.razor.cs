@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Balances;
+using Wms.Application.StockKeepingUnits;
 using Wms.Application.StorageLocations;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 
@@ -11,13 +12,13 @@ namespace Wms.WebApp.Components.Pages.InventoryBalancePages;
 public partial class Index
 {
     [Inject]
-    private InventoryBalanceService InventoryBalanceService { get; set; } = null!;
+    private InventoryBalanceQueryService InventoryBalanceQueryService { get; set; } = null!;
 
     [Inject]
     private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject]
-    private StorageLocationService StorageLocationService { get; set; } = null!;
+    private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
 
     [Inject]
     private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
@@ -45,7 +46,7 @@ public partial class Index
             Take = state.PageSize
         };
 
-        var result = await InventoryBalanceService.ListAsync(query, cancellationToken);
+        var result = await InventoryBalanceQueryService.ListAsync(query, cancellationToken);
 
         return new GridData<InventoryBalance>
         {
@@ -68,7 +69,7 @@ public partial class Index
 
     private async Task<IEnumerable<StorageLocation>> SearchStorageLocationsAsync(string? searchText, CancellationToken ct)
     {
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _warehouse?.Id,

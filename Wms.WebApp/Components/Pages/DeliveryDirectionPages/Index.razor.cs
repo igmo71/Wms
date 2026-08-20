@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application.Services;
+using Wms.Application.CatalogSynchronization;
+using Wms.Application.DeliveryDirections;
 using Wms.Domain;
 
 namespace Wms.WebApp.Components.Pages.DeliveryDirectionPages;
