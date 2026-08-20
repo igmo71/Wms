@@ -9,6 +9,11 @@ UI or HTTP endpoint
   -> application service
   -> domain operation
   -> EF Core DbContext
+
+Manual 1C synchronization UI
+  -> corresponding 1C integration service
+  -> catalog application service
+  -> EF Core DbContext
 ```
 
 Existing features move toward this structure when they are deliberately
@@ -46,6 +51,9 @@ refactored. The guide does not authorize unrelated cleanup.
 - EF configurations describe persistence, not business decisions.
 - Integration services own the 1C protocol and mapping. A WMS aggregate may
   accept a domain import snapshot, but not a 1C DTO.
+- A UI action whose explicit purpose is manual synchronization with 1C may call
+  the corresponding integration service directly. Do not add a facade that
+  only hides those concrete dependencies.
 
 ## Domain model categories
 
@@ -103,6 +111,9 @@ Put a rule at the lowest layer that has all data needed to decide it:
 application, and integration operations use them for expected outcomes such as
 invalid input, a missing record, or a business conflict. This keeps expected
 branching explicit without exception adapters.
+`OperationError` factories are intentionally non-generic: the entity type is
+not part of the error contract, and a specific subject is named in the message
+only when it helps the user.
 
 Unexpected infrastructure failures and programming errors remain exceptions.
 Do not catch every `Exception` inside domain or application operations merely
@@ -119,12 +130,17 @@ last-resort user-facing response and logging.
 
 ## Coding and verification
 
-- New and changed C# follows Microsoft's common C# conventions and the root
-  `.editorconfig`; control-flow statements use braces.
+- New and changed C# follows Microsoft's common C# conventions pragmatically,
+  with readability and consistency of the surrounding code taking priority
+  over mechanical formatting.
+- User-facing messages, expected operation errors, and log messages are written
+  in Russian. External protocol values and technical identifiers retain their
+  original spelling.
 - Names describe business intent; helpers describe one rule or step.
 - Each refactoring stage preserves documented behavior, builds the affected
   projects and complete solution, and checks EF migration drift when the model
   changes.
+- Repository-wide `dotnet format` runs are not part of ordinary feature work.
 - Automated tests are intentionally deferred for the current MVP. Do not add a
   test project until that decision changes.
 

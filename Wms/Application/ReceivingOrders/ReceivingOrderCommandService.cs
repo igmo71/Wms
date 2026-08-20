@@ -50,19 +50,17 @@ public class ReceivingOrderCommandService(
 
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Unchanged)
         {
-            logger.LogDebug("No external document changes detected");
+            logger.LogDebug("Изменения документа в 1С не обнаружены");
             return OperationResult.Success();
         }
 
         await dbContext.SaveChangesAsync(ct);
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Conflict)
         {
-            logger.LogWarning(
-                "External receiving order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
-                existingOrder.Status,
-                snapshot.Status);
+            logger.LogWarning("Изменения приходного ордера в 1С конфликтуют с локальными. Локальный статус: {LocalStatus}, статус 1С: {ExternalStatus}",
+                existingOrder.Status, snapshot.Status);
             return OperationError.Conflict(
-                "External receiving order changes conflict with local processing.");
+                "Изменения приходного ордера в 1С конфликтуют с локальной обработкой.");
         }
 
         return OperationResult.Success();
@@ -81,14 +79,14 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Not Found");
-            return OperationError.NotFound<ReceivingOrder>();
+            logger.LogError("Приходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         var transitionResult = existingOrder.SetInReceiving(DateTimeOffset.UtcNow, userId);
         if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set in receiving failed: {ErrorMessage}", transitionResult.Error?.Message);
+            logger.LogError("Не удалось перевести приходный ордер в приемку: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
@@ -96,7 +94,7 @@ public class ReceivingOrderCommandService(
 
         if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to set external document in receiving: {ErrorMessage}", externalResult.Error?.Message);
+            logger.LogError("Не удалось перевести документ 1С в приемку: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
 
@@ -118,15 +116,15 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Not Found");
-            return OperationError.NotFound<ReceivingOrder>();
+            logger.LogError("Приходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         var now = DateTimeOffset.UtcNow;
         var transitionResult = existingOrder.SetReceived(now, userId);
         if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set received failed: {ErrorMessage}", transitionResult.Error?.Message);
+            logger.LogError("Не удалось завершить приемку приходного ордера: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
@@ -151,7 +149,7 @@ public class ReceivingOrderCommandService(
 
             if (!externalItemsUpdateResult.IsSuccess)
             {
-                logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
+                logger.LogError("Не удалось обновить строки приходного ордера в 1С: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
                 return externalItemsUpdateResult;
             }
         }
@@ -160,7 +158,7 @@ public class ReceivingOrderCommandService(
 
         if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to set external document received: {ErrorMessage}", externalResult.Error?.Message);
+            logger.LogError("Не удалось завершить приемку документа в 1С: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
 
@@ -183,7 +181,7 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
 
         if (existingOrder is null)
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
 
         var updateResult = existingOrder.UpdateItemFact(lineNumber, factQuantity, comment);
         if (!updateResult.IsSuccess)
@@ -207,7 +205,7 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var validLocation = await dbContext.StorageLocations
@@ -220,7 +218,7 @@ public class ReceivingOrderCommandService(
 
         if (!validLocation)
         {
-            return OperationError.Invalid<StorageLocation>("Receiving location must belong to a receiving zone in the order warehouse.");
+            return OperationError.Invalid("Позиция приёмки должна принадлежать зоне приёмки на складе ордера.");
         }
 
         var locationResult = order.SetReceivingLocation(receivingLocationId);

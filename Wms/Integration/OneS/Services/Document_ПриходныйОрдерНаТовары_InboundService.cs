@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wms.Application.ReceivingOrders;
-using Wms.Application.ShippingOrders;
 using Wms.Common;
-using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
 
@@ -17,10 +15,10 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task ImportDocumentAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportDocumentAsync(string refKey, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ImportDocument {RefKey}", refKey);
-        using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.Import", nameof(ShippingOrderCommandService));
+        using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.Import", nameof(ReceivingOrderCommandService));
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
@@ -29,30 +27,20 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedDocument = serviceResult.Value?.Value?[0];
 
         if (fetchedDocument is null)
         {
-            return;
+            return OperationError.Failure("1С вернула некорректный ответ: приходный ордер отсутствует.");
         }
 
-        logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
+        logger.LogDebug("Получен документ {@fetchedDocument}", fetchedDocument);
 
         var snapshot = Document.MapToImportSnapshot(fetchedDocument);
-        var importResult = await receivingOrderCommandService.ImportOrderAsync(snapshot, ct);
-        if (!importResult.IsSuccess)
-        {
-            logger.LogWarning(
-                "Receiving order import was not applied. Order: {OrderId}, Error: {ErrorMessage}",
-                snapshot.Id,
-                importResult.Error?.Message);
-        }
-    }
-
-    internal async Task ImportDocumentListAsync(CancellationToken ct)
-    {
-        throw new NotImplementedException();
+        return await receivingOrderCommandService.ImportOrderAsync(snapshot, ct);
     }
 }

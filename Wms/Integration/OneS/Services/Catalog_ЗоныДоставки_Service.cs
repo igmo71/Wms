@@ -1,31 +1,37 @@
-﻿using Wms.Application.DeliveryDirections;
+using Wms.Application.DeliveryDirections;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_ЗоныДоставки_Service(
+public class Catalog_ЗоныДоставки_Service(
     OneCClient oneCClient,
     DeliveryDirectionService deliveryDirectionService)
 {
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
-        var uri = Catalog_ЗоныДоставки.GetUri(Ref_Key);
+        var uri = Catalog_ЗоныДоставки.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_ЗоныДоставки>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return;
+        {
+            return OperationError.Failure("1С вернула некорректный ответ: направление доставки отсутствует.");
+        }
 
         var deliveryDirection = MapToDeliveryDirection(fetchedItem);
 
         await deliveryDirectionService.CreateOrUpdateAsync(deliveryDirection, ct);
+
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)

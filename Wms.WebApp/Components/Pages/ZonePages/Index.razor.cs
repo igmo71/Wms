@@ -27,6 +27,7 @@ public partial class Index
     private Warehouse? _warehouse;
     private ZoneType? _zoneType;
     private bool _includeDeleted;
+    private string? _errorMessage;
 
     private async Task<GridData<Zone>> LoadServerDataAsync(
         GridState<Zone> state,
@@ -112,13 +113,25 @@ public partial class Index
 
     private async Task MarkDeleteAsync(Guid id)
     {
-        await ZoneCommandService.MarkDeleteAsync(id);
-        await _dataGrid.ReloadServerData();
+        OperationResult result = await ZoneCommandService.MarkDeleteAsync(id);
+        await HandleActionResultAsync(result);
     }
 
     private async Task UnMarkDeleteAsync(Guid id)
     {
-        await ZoneCommandService.UnMarkDeleteAsync(id);
+        OperationResult result = await ZoneCommandService.UnMarkDeleteAsync(id);
+        await HandleActionResultAsync(result);
+    }
+
+    private async Task HandleActionResultAsync(OperationResult result)
+    {
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.Error?.Message ?? "Операция не выполнена.";
+            return;
+        }
+
+        _errorMessage = null;
         await _dataGrid.ReloadServerData();
     }
 }

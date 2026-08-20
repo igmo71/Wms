@@ -242,7 +242,7 @@ public partial class Details
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         return userId is null
-            ? OperationError.Invalid<InventoryCount>("Current user cannot be determined.")
+            ? OperationError.Invalid("Не удалось определить текущего пользователя.")
             : await action(userId);
     }
 }

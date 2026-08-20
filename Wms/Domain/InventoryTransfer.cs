@@ -41,27 +41,27 @@ public class InventoryTransfer
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryTransfer>("Inventory transfer identifier is required.");
+            return OperationError.Invalid("Идентификатор перемещения обязателен.");
         }
 
         if (string.IsNullOrWhiteSpace(number))
         {
-            return OperationError.Invalid<InventoryTransfer>("Inventory transfer number is required.");
+            return OperationError.Invalid("Номер перемещения обязателен.");
         }
 
         if (date == default)
         {
-            return OperationError.Invalid<InventoryTransfer>("Inventory transfer date is required.");
+            return OperationError.Invalid("Дата перемещения обязательна.");
         }
 
         if (warehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         if (transitStorageLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>("Transit location identifier is invalid.");
+            return OperationError.Invalid("Некорректный идентификатор транзитной позиции.");
         }
 
         var auditResult = ValidateAudit(createdAtUtc, createdBy, "Creating user must be specified.");
@@ -87,8 +87,8 @@ public class InventoryTransfer
     {
         if (TransitStorageLocationId is not Guid transitStorageLocationId)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Transit location must be assigned before picking.");
+            return OperationError.Invalid(
+                "Перед отбором необходимо назначить транзитную позицию.");
         }
 
         return CreateRoute(sourceStorageLocationId, transitStorageLocationId);
@@ -98,8 +98,8 @@ public class InventoryTransfer
     {
         if (TransitStorageLocationId is not Guid transitStorageLocationId)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Transit location must be assigned before putting.");
+            return OperationError.Invalid(
+                "Перед размещением необходимо назначить транзитную позицию.");
         }
 
         return CreateRoute(transitStorageLocationId, destinationStorageLocationId);
@@ -114,8 +114,8 @@ public class InventoryTransfer
     {
         if (Status == InventoryTransferStatus.Completed)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "A completed inventory transfer cannot be changed.");
+            return OperationError.Invalid(
+                "Завершённое перемещение нельзя изменить.");
         }
 
         var auditResult = ValidateAudit(
@@ -129,8 +129,8 @@ public class InventoryTransfer
 
         if (occurredAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Movement time cannot precede inventory transfer creation.");
+            return OperationError.Invalid(
+                "Время движения не может предшествовать созданию перемещения.");
         }
 
         if (Status == InventoryTransferStatus.Draft)
@@ -148,8 +148,8 @@ public class InventoryTransfer
     {
         if (Status != InventoryTransferStatus.InProgress)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Only an inventory transfer in progress can be completed.");
+            return OperationError.Invalid(
+                "Завершить можно только перемещение в работе.");
         }
 
         var auditResult = ValidateAudit(
@@ -163,8 +163,8 @@ public class InventoryTransfer
 
         if (completedAtUtc < StartedAtUtc)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Completion time cannot precede inventory transfer start.");
+            return OperationError.Invalid(
+                "Время завершения не может предшествовать началу перемещения.");
         }
 
         Status = InventoryTransferStatus.Completed;
@@ -178,8 +178,8 @@ public class InventoryTransfer
     {
         return Status == InventoryTransferStatus.Draft
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryTransfer>(
-                "Only a draft inventory transfer can be deleted.");
+            : OperationError.Invalid(
+                "Удалить можно только черновик перемещения.");
     }
 
     private OperationResult<InventoryTransferRoute> CreateRoute(
@@ -188,20 +188,20 @@ public class InventoryTransfer
     {
         if (Status == InventoryTransferStatus.Completed)
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "A completed inventory transfer cannot be changed.");
+            return OperationError.Invalid(
+                "Завершённое перемещение нельзя изменить.");
         }
 
         if (sourceStorageLocationId == Guid.Empty || destinationStorageLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Source and destination locations must be specified.");
+            return OperationError.Invalid(
+                "Необходимо указать позиции источника и назначения.");
         }
 
         if (sourceStorageLocationId == destinationStorageLocationId)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Source and destination locations must be different.");
+            return OperationError.Invalid(
+                "Позиции источника и назначения должны различаться.");
         }
 
         return new InventoryTransferRoute(sourceStorageLocationId, destinationStorageLocationId);
@@ -214,12 +214,12 @@ public class InventoryTransfer
     {
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<InventoryTransfer>("Operation time is required.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return OperationError.Invalid<InventoryTransfer>(missingUserMessage);
+            return OperationError.Invalid(missingUserMessage);
         }
 
         return OperationResult.Success();

@@ -40,7 +40,7 @@ public class InventoryTurnover
             || stockKeepingUnitId == Guid.Empty
             || inventoryMovementId == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryTurnover>("Inventory turnover identifiers are required.");
+            return OperationError.Invalid("Идентификаторы оборота обязательны.");
         }
 
         if (!double.IsFinite(change.BalanceBefore)
@@ -51,12 +51,12 @@ public class InventoryTurnover
             || change.BalanceAfter < 0
             || change.BalanceBefore + change.QuantityDelta != change.BalanceAfter)
         {
-            return OperationError.Invalid<InventoryTurnover>("Inventory turnover balance change is invalid.");
+            return OperationError.Invalid("Изменение остатка в обороте некорректно.");
         }
 
         if (createdAtUtc == default)
         {
-            return OperationError.Invalid<InventoryTurnover>("Inventory turnover creation time is required.");
+            return OperationError.Invalid("Время создания оборота обязательно.");
         }
 
         return new InventoryTurnover

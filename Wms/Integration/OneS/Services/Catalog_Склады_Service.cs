@@ -9,23 +9,29 @@ public class Catalog_Склады_Service(
     OneCClient oneCClient,
     WarehouseService warehouseService)
 {
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
-        var uri = Catalog_Склады.GetUri(Ref_Key);
+        var uri = Catalog_Склады.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return;
+        {
+            return OperationError.Failure("1С вернула некорректный ответ: склад отсутствует.");
+        }
 
         var warehouse = MapToWarehouse(fetchedItem);
 
         await warehouseService.CreateOrUpdateAsync(warehouse, ct);
+
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)

@@ -1,6 +1,6 @@
 ﻿@if (!string.IsNullOrEmpty(DisplayMessage))
 {
-    var severity = DisplayMessage.StartsWith("Error") ? Severity.Error : Severity.Success;
+    var severity = DisplayMessage.StartsWith("Ошибка") ? Severity.Error : Severity.Success;
 
     <MudAlert Variant="Variant.Outlined" Severity="@severity">@DisplayMessage</MudAlert>
 }

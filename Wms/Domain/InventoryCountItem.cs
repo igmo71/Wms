@@ -41,17 +41,17 @@ public class InventoryCountItem
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryCountItem>("Inventory count item identifier is required.");
+            return OperationError.Invalid("Идентификатор строки инвентаризации обязателен.");
         }
 
         if (inventoryCountId == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryCount>("Inventory count identifier is required.");
+            return OperationError.Invalid("Идентификатор инвентаризации обязателен.");
         }
 
         if (lineNumber <= 0)
         {
-            return OperationError.Invalid<InventoryCountItem>("Line number must be positive.");
+            return OperationError.Invalid("Номер строки должен быть положительным.");
         }
 
         var auditResult = ValidateAudit(createdAtUtc, createdBy, "Creating user must be specified.");
@@ -80,24 +80,24 @@ public class InventoryCountItem
     {
         if (storageLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>("Storage location identifier is invalid.");
+            return OperationError.Invalid("Некорректный идентификатор складской позиции.");
         }
 
         if (stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<StockKeepingUnit>("SKU identifier is invalid.");
+            return OperationError.Invalid("Некорректный идентификатор номенклатуры.");
         }
 
         if (!double.IsFinite(expectedQuantity) || expectedQuantity < 0)
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Expected quantity must be a finite nonnegative number.");
+            return OperationError.Invalid(
+                "Ожидаемое количество должно быть конечным неотрицательным числом.");
         }
 
         if (!double.IsFinite(countedQuantity) || countedQuantity < 0)
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Counted quantity must be a finite nonnegative number.");
+            return OperationError.Invalid(
+                "Фактическое количество должно быть конечным неотрицательным числом.");
         }
 
         var auditResult = ValidateAudit(updatedAtUtc, updatedBy, "Updating user must be specified.");
@@ -108,8 +108,8 @@ public class InventoryCountItem
 
         if (updatedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Update time cannot precede inventory count item creation.");
+            return OperationError.Invalid(
+                "Время изменения не может предшествовать созданию строки инвентаризации.");
         }
 
         StorageLocationId = storageLocationId;
@@ -128,12 +128,12 @@ public class InventoryCountItem
     {
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<InventoryCountItem>("Operation time is required.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return OperationError.Invalid<InventoryCountItem>(missingUserMessage);
+            return OperationError.Invalid(missingUserMessage);
         }
 
         return OperationResult.Success();

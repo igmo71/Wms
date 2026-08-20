@@ -1,11 +1,13 @@
-﻿namespace Wms.Common;
+namespace Wms.Integration.OneS;
 
-public static class ODataCleanerExtensions
+internal static class ODataCleanerExtensions
 {
     public static string TrimODataPrefix(this string? input)
     {
         if (string.IsNullOrWhiteSpace(input))
+        {
             return string.Empty;
+        }
 
         return input.Replace("StandardODATA.", string.Empty);
     }
@@ -13,7 +15,9 @@ public static class ODataCleanerExtensions
     public static string TrimPrefixBeforeDot(this string? input)
     {
         if (string.IsNullOrWhiteSpace(input))
+        {
             return string.Empty;
+        }
 
         int dotIndex = input.IndexOf('.');
 

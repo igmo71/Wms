@@ -37,8 +37,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
 
         if (actualStatus != expectedStatus)
         {
-            logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return OperationError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            logger.LogError("1С вернула неожиданный статус. Ожидался: {ExpectedStatus}, получен: {ActualStatus}", expectedStatus, actualStatus);
+            return OperationError.Conflict($"1С вернула неожиданный статус. Ожидался «{expectedStatus}», получен «{actualStatus ?? "не указан"}».");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());

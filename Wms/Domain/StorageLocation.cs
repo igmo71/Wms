@@ -39,17 +39,17 @@ public class StorageLocation
     {
         if (number <= 0)
         {
-            return OperationError.Invalid<StorageLocation>("Location number must be positive.");
+            return OperationError.Invalid("Номер складской позиции должен быть положительным.");
         }
 
         if (segmentWidth is < 1 or > 8)
         {
-            return OperationError.Invalid<StorageLocation>("Segment width must be between 1 and 8.");
+            return OperationError.Invalid("Ширина сегмента должна быть от 1 до 8.");
         }
 
         if (maximumLength <= 0)
         {
-            return OperationError.Invalid<StorageLocation>("Maximum code length must be positive.");
+            return OperationError.Invalid("Максимальная длина кода должна быть положительной.");
         }
 
         var segment = number.ToString($"D{segmentWidth}", CultureInfo.InvariantCulture);
@@ -57,8 +57,8 @@ public class StorageLocation
 
         if (code.Length > maximumLength)
         {
-            return OperationError.Invalid<StorageLocation>(
-                $"Location code must not exceed {maximumLength} characters.");
+            return OperationError.Invalid(
+                $"Длина кода складской позиции не должна превышать {maximumLength} символов.");
         }
 
         return code;
@@ -75,37 +75,37 @@ public class StorageLocation
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>("Location identifier is required.");
+            return OperationError.Invalid("Идентификатор складской позиции обязателен.");
         }
 
         if (warehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         if (zoneId == Guid.Empty)
         {
-            return OperationError.Invalid<Zone>("Zone identifier is required.");
+            return OperationError.Invalid("Идентификатор зоны обязателен.");
         }
 
         if (parentId == id)
         {
-            return OperationError.Invalid<StorageLocation>("A location cannot be its own parent.");
+            return OperationError.Invalid("Складская позиция не может быть родительской для самой себя.");
         }
 
         if (number <= 0)
         {
-            return OperationError.Invalid<StorageLocation>("Location number must be positive.");
+            return OperationError.Invalid("Номер складской позиции должен быть положительным.");
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return OperationError.Invalid<StorageLocation>("Location code is required.");
+            return OperationError.Invalid("Код складской позиции обязателен.");
         }
 
         if (details is null)
         {
-            return OperationError.Invalid<StorageLocation>("Location details are required.");
+            return OperationError.Invalid("Параметры складской позиции обязательны.");
         }
 
         var location = new StorageLocation
@@ -126,7 +126,7 @@ public class StorageLocation
     {
         if (details is null)
         {
-            return OperationError.Invalid<StorageLocation>("Location details are required.");
+            return OperationError.Invalid("Параметры складской позиции обязательны.");
         }
 
         ApplyDetails(details);
@@ -178,17 +178,17 @@ public sealed class StorageLocationDetails
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            return OperationError.Invalid<StorageLocation>("Location name is required.");
+            return OperationError.Invalid("Наименование складской позиции обязательно.");
         }
 
         if (dimensions is null)
         {
-            return OperationError.Invalid<StorageLocation>("Location dimensions are required.");
+            return OperationError.Invalid("Размеры складской позиции обязательны.");
         }
 
         if (coordinates is null)
         {
-            return OperationError.Invalid<StorageLocation>("Location coordinates are required.");
+            return OperationError.Invalid("Координаты складской позиции обязательны.");
         }
 
         return new StorageLocationDetails(name, isFolder, dimensions, coordinates, pickSequence);
@@ -238,20 +238,20 @@ public sealed class LocationDimensions
     {
         if (!AreFinite(length, width, height, volume, volumeFactor, maxWeight))
         {
-            return OperationError.Invalid<LocationDimensions>(
-                "Dimensions and capacity must be finite numbers.");
+            return OperationError.Invalid(
+                "Размеры и вместимость должны быть конечными числами.");
         }
 
         if (length < 0 || width < 0 || height < 0 || volume < 0 || maxWeight < 0)
         {
-            return OperationError.Invalid<LocationDimensions>(
-                "Dimensions and capacity cannot be negative.");
+            return OperationError.Invalid(
+                "Размеры и вместимость не могут быть отрицательными.");
         }
 
         if (volumeFactor is <= 0 or > 1)
         {
-            return OperationError.Invalid<LocationDimensions>(
-                "Volume factor must be greater than zero and at most one.");
+            return OperationError.Invalid(
+                "Коэффициент заполнения должен быть больше нуля и не превышать единицу.");
         }
 
         return new LocationDimensions(length, width, height, volume, volumeFactor, maxWeight);
@@ -292,7 +292,7 @@ public sealed class LocationCoordinates
     {
         if (!AreFinite(x, y, z))
         {
-            return OperationError.Invalid<LocationCoordinates>("Coordinates must be finite numbers.");
+            return OperationError.Invalid("Координаты должны быть конечными числами.");
         }
 
         return new LocationCoordinates(x, y, z);

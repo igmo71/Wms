@@ -70,20 +70,20 @@
 
         if (requirePassword && !await UserManager.CheckPasswordAsync(user, Input.Password))
         {
-            message = "Error: Incorrect password.";
+            message = "Ошибка: неверный пароль.";
             return;
         }
 
         var result = await UserManager.DeleteAsync(user);
         if (!result.Succeeded)
         {
-            throw new InvalidOperationException("Unexpected error occurred deleting user.");
+            throw new InvalidOperationException("При удалении пользователя произошла непредвиденная ошибка.");
         }
 
         await SignInManager.SignOutAsync();
 
         var userId = await UserManager.GetUserIdAsync(user);
-        Logger.LogInformation("User with ID '{UserId}' deleted themselves.", userId);
+        Logger.LogInformation("Пользователь {UserId} удалил свою учетную запись.", userId);
 
         RedirectManager.RedirectToCurrentPage();
     }

@@ -62,8 +62,8 @@ public class ShippingOrder
 
         if (snapshot.Status != ShippingOrderStatus.Prepared)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "A shipping order can be created only when it is prepared.");
+            return OperationError.Invalid(
+                "Расходный ордер можно создать только в подготовленном статусе.");
         }
 
         var order = new ShippingOrder
@@ -104,8 +104,8 @@ public class ShippingOrder
     {
         if (snapshot.Id != Id)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Imported shipping order identifier does not match the existing order.");
+            return OperationError.Invalid(
+                "Идентификатор импортируемого расходного ордера не совпадает с существующим.");
         }
 
         if (!HasExternalChanges(snapshot))
@@ -127,8 +127,8 @@ public class ShippingOrder
 
         if (updatedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping order update time cannot precede its creation time.");
+            return OperationError.Invalid(
+                "Время изменения расходного ордера не может предшествовать времени его создания.");
         }
 
         OperationResult itemsResult = ReconcileItems(snapshot.Items);
@@ -153,14 +153,14 @@ public class ShippingOrder
     {
         if (shippingLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Shipping location identifier is required.");
+            return OperationError.Invalid(
+                "Идентификатор позиции отгрузки обязателен.");
         }
 
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping location can be changed only while the order is prepared.");
+            return OperationError.Invalid(
+                "Позицию отгрузки можно изменить только для подготовленного ордера.");
         }
 
         ShippingLocationId = shippingLocationId;
@@ -171,17 +171,17 @@ public class ShippingOrder
     {
         if (Status != ShippingOrderStatus.Prepared)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Only a prepared shipping order can be set ready for picking.");
+            return OperationError.Invalid(
+                "Передать в отбор можно только подготовленный расходный ордер.");
         }
 
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping location must be specified before setting the order ready for picking.");
+            return OperationError.Invalid(
+                "Перед передачей ордера в отбор необходимо указать позицию отгрузки.");
         }
 
-        OperationResult auditResult = ValidateAudit(startedAtUtc, startedBy, "Picking user must be specified.");
+        OperationResult auditResult = ValidateAudit(startedAtUtc, startedBy, "Необходимо указать пользователя отбора.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -189,8 +189,8 @@ public class ShippingOrder
 
         if (startedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Picking start time cannot precede order creation.");
+            return OperationError.Invalid(
+                "Время начала отбора не может предшествовать созданию ордера.");
         }
 
         Status = ShippingOrderStatus.ReadyForPicking;
@@ -222,7 +222,7 @@ public class ShippingOrder
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         if (item is null)
         {
-            return OperationError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound();
         }
 
         OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, null);
@@ -274,14 +274,14 @@ public class ShippingOrder
 
         if (draftMovements.All(x => x.Id != movement.Id))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Picking movement is not part of the order drafts.");
+            return OperationError.Invalid(
+                "Движение отбора не относится к черновикам этого ордера.");
         }
 
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound();
         }
 
         OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, movement.Id);
@@ -322,14 +322,14 @@ public class ShippingOrder
 
         if (draftMovements.All(x => x.Id != movement.Id))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Picking movement is not part of the order drafts.");
+            return OperationError.Invalid(
+                "Движение отбора не относится к черновикам этого ордера.");
         }
 
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound<ShippingOrderItem>();
+            return OperationError.NotFound();
         }
 
         double factQuantity = draftMovements
@@ -351,8 +351,8 @@ public class ShippingOrder
             or ShippingOrderStatus.Verified;
         if (!canSetReady)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Only a shipping order being picked or verified can be set ready for shipment.");
+            return OperationError.Invalid(
+                "Подготовить к отгрузке можно только ордер в отборе или проверке.");
         }
 
         OperationResult pickingResult = ValidatePickingCompletion(draftMovements);
@@ -361,7 +361,7 @@ public class ShippingOrder
             return pickingResult;
         }
 
-        OperationResult auditResult = ValidateAudit(readyAtUtc, readyBy, "Picking completion user must be specified.");
+        OperationResult auditResult = ValidateAudit(readyAtUtc, readyBy, "Необходимо указать пользователя, завершившего отбор.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -369,8 +369,8 @@ public class ShippingOrder
 
         if (PickingStartedAtUtc is null || readyAtUtc < PickingStartedAtUtc)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Ready-for-shipment time cannot precede picking start.");
+            return OperationError.Invalid(
+                "Время готовности к отгрузке не может предшествовать началу отбора.");
         }
 
         Status = ShippingOrderStatus.ReadyForShipment;
@@ -383,17 +383,17 @@ public class ShippingOrder
     {
         if (Status != ShippingOrderStatus.ReadyForShipment)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Only a shipping order ready for shipment can be shipped.");
+            return OperationError.Invalid(
+                "Отгрузить можно только ордер, готовый к отгрузке.");
         }
 
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping location must be specified before shipping the order.");
+            return OperationError.Invalid(
+                "Перед отгрузкой ордера необходимо указать позицию отгрузки.");
         }
 
-        OperationResult auditResult = ValidateAudit(shippedAtUtc, shippedBy, "Shipping user must be specified.");
+        OperationResult auditResult = ValidateAudit(shippedAtUtc, shippedBy, "Необходимо указать пользователя отгрузки.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -401,8 +401,8 @@ public class ShippingOrder
 
         if (ReadyForShipmentAtUtc is null || shippedAtUtc < ReadyForShipmentAtUtc)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping time cannot precede readiness for shipment.");
+            return OperationError.Invalid(
+                "Время отгрузки не может предшествовать готовности к отгрузке.");
         }
 
         Status = ShippingOrderStatus.Shipped;
@@ -420,22 +420,22 @@ public class ShippingOrder
     {
         if (Status is ShippingOrderStatus.Prepared or ShippingOrderStatus.Shipped)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Only a shipping order in progress or ready for shipment can be rolled back.");
+            return OperationError.Invalid(
+                "Откатить можно только расходный ордер в работе или готовый к отгрузке.");
         }
 
         if (PickingStartedAtUtc is null)
         {
-            return OperationError.Failure<ShippingOrder>(
-                "Shipping order has no picking start time and cannot be rolled back safely.");
+            return OperationError.Failure(
+                "У расходного ордера отсутствует время начала отбора, поэтому безопасный откат невозможен.");
         }
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return OperationError.Invalid<ShippingOrder>("Rollback reason must be specified.");
+            return OperationError.Invalid("Необходимо указать причину отката.");
         }
 
-        OperationResult auditResult = ValidateAudit(rolledBackAtUtc, userId, "Rollback user must be specified.");
+        OperationResult auditResult = ValidateAudit(rolledBackAtUtc, userId, "Необходимо указать пользователя отката.");
         if (!auditResult.IsSuccess)
         {
             return auditResult.Error!;
@@ -443,16 +443,16 @@ public class ShippingOrder
 
         if (rolledBackAtUtc < PickingStartedAtUtc)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Rollback time cannot precede picking start.");
+            return OperationError.Invalid(
+                "Время отката не может предшествовать началу отбора.");
         }
 
         if (draftMovements.Any(x => x.PostedAtUtc is not null
             || x.RecorderType != RecorderType.ShippingOrder
             || x.RecorderId != Id))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Shipping order contains an invalid draft picking movement.");
+            return OperationError.Invalid(
+                "Расходный ордер содержит некорректное черновое движение отбора.");
         }
 
         var currentCycleMovements = postedMovements
@@ -467,8 +467,8 @@ public class ShippingOrder
             || x.DestinationStorageLocationId != ShippingLocationId
             || x.RecorderLineNumber is null))
         {
-            return OperationError.Failure<ShippingOrder>(
-                "Shipping order contains movements that cannot be rolled back safely.");
+            return OperationError.Failure(
+                "Расходный ордер содержит движения, которые нельзя безопасно откатить.");
         }
 
         OperationResult<List<InventoryMovement>> compensationResult = CreateCompensationMovements(
@@ -505,14 +505,14 @@ public class ShippingOrder
             or ShippingOrderStatus.Verified;
         if (!isEditable)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Picking movements can be changed only while the shipping order is being picked or verified.");
+            return OperationError.Invalid(
+                "Движения отбора можно изменять только во время отбора или проверки ордера.");
         }
 
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping location must be specified before changing picking movements.");
+            return OperationError.Invalid(
+                "Перед изменением движений отбора необходимо указать позицию отгрузки.");
         }
 
         return OperationResult.Success();
@@ -536,8 +536,8 @@ public class ShippingOrder
             || movement.RecorderId != Id
             || movement.RecorderLineNumber is null)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement does not belong to a shipping order line.");
+            return OperationError.Invalid(
+                "Движение не относится к строке расходного ордера.");
         }
 
         return OperationResult.Success();
@@ -549,8 +549,8 @@ public class ShippingOrder
         return draftMovements.Any(x => x.PostedAtUtc is not null
             || x.RecorderType != RecorderType.ShippingOrder
             || x.RecorderId != Id)
-            ? OperationError.Invalid<InventoryMovement>(
-                "Picking contains an invalid draft movement.")
+            ? OperationError.Invalid(
+                "Отбор содержит некорректное черновое движение.")
             : OperationResult.Success();
     }
 
@@ -559,8 +559,8 @@ public class ShippingOrder
     {
         if (ShippingLocationId is null)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping location must be specified before completing picking.");
+            return OperationError.Invalid(
+                "Перед завершением отбора необходимо указать позицию отгрузки.");
         }
 
         if (draftMovements.Any(x => x.PostedAtUtc is not null
@@ -573,8 +573,8 @@ public class ShippingOrder
             || !double.IsFinite(x.Quantity)
             || x.Quantity <= 0))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Picking contains an invalid movement.");
+            return OperationError.Invalid(
+                "Отбор содержит некорректное движение.");
         }
 
         foreach (ShippingOrderItem item in _items)
@@ -585,15 +585,15 @@ public class ShippingOrder
             if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
                 || movements.Sum(x => x.Quantity) != item.FactQuantity)
             {
-                return OperationError.Invalid<ShippingOrder>(
-                    "Every shipping order line fact must match its picking movements.");
+                return OperationError.Invalid(
+                    "Факт каждой строки расходного ордера должен соответствовать движениям отбора.");
             }
         }
 
         if (draftMovements.Any(x => _items.All(item => item.LineNumber != x.RecorderLineNumber)))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Picking contains a movement for an unknown order line.");
+            return OperationError.Invalid(
+                "Отбор содержит движение для неизвестной строки ордера.");
         }
 
         return OperationResult.Success();
@@ -607,8 +607,8 @@ public class ShippingOrder
     {
         if (!double.IsFinite(quantity) || quantity <= 0)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Picking quantity must be a finite number greater than zero.");
+            return OperationError.Invalid(
+                "Количество отбора должно быть конечным числом больше нуля.");
         }
 
         double lineQuantity = draftMovements
@@ -618,8 +618,8 @@ public class ShippingOrder
 
         return lineQuantity <= item.PlanQuantity
             ? lineQuantity
-            : OperationError.Invalid<InventoryMovement>(
-                "Picking quantity exceeds the planned quantity for the shipping order line.");
+            : OperationError.Invalid(
+                "Количество отбора превышает плановое количество по строке расходного ордера.");
     }
 
     private OperationResult<List<InventoryMovement>> CreateCompensationMovements(
@@ -662,32 +662,32 @@ public class ShippingOrder
     {
         if (snapshot.Id == Guid.Empty || snapshot.WarehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<ShippingOrder>(
-                "Shipping order and warehouse identifiers are required.");
+            return OperationError.Invalid(
+                "Идентификаторы расходного ордера и склада обязательны.");
         }
 
         if (snapshot.Date == default)
         {
-            return OperationError.Invalid<ShippingOrder>("Shipping order date is required.");
+            return OperationError.Invalid("Дата расходного ордера обязательна.");
         }
 
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<ShippingOrder>("Import time is required.");
+            return OperationError.Invalid("Время импорта обязательно.");
         }
 
         if (snapshot.Items is null
             || snapshot.Items.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
         {
-            return OperationError.Invalid<ShippingOrderItem>(
-                "Shipping order item line numbers must be unique.");
+            return OperationError.Invalid(
+                "Номера строк расходного ордера не должны повторяться.");
         }
 
         if (snapshot.BaseItems is null
             || snapshot.BaseItems.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
         {
-            return OperationError.Invalid<ShippingOrderBaseItem>(
-                "Shipping order base item line numbers must be unique.");
+            return OperationError.Invalid(
+                "Номера строк основания расходного ордера не должны повторяться.");
         }
 
         foreach (ShippingOrderItemImportSnapshot itemSnapshot in snapshot.Items)
@@ -854,11 +854,11 @@ public class ShippingOrder
     {
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<ShippingOrder>("Operation time is required.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
         return string.IsNullOrWhiteSpace(userId)
-            ? OperationError.Invalid<ShippingOrder>(missingUserMessage)
+            ? OperationError.Invalid(missingUserMessage)
             : OperationResult.Success();
     }
 }

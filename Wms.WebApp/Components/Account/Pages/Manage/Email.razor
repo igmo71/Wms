@@ -83,7 +83,7 @@
     {
         if (Input.NewEmail is null || Input.NewEmail == email)
         {
-            message = "Your email is unchanged.";
+            message = "Адрес электронной почты не изменен.";
             return;
         }
 
@@ -102,7 +102,7 @@
 
         await EmailSender.SendConfirmationLinkAsync(user, Input.NewEmail, HtmlEncoder.Default.Encode(callbackUrl));
 
-        message = "Confirmation link to change email sent. Please check your email.";
+        message = "Ссылка для подтверждения смены адреса отправлена. Проверьте электронную почту.";
     }
 
     private async Task OnSendEmailVerificationAsync()
@@ -127,7 +127,7 @@
 
         await EmailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(callbackUrl));
 
-        message = "Verification email sent. Please check your email.";
+        message = "Письмо для подтверждения отправлено. Проверьте электронную почту.";
     }
 
     private sealed class InputModel

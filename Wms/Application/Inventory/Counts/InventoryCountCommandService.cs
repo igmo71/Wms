@@ -33,7 +33,7 @@ public class InventoryCountCommandService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId, ct))
         {
-            return OperationError.NotFound<Warehouse>();
+            return OperationError.NotFound();
         }
 
         var inventoryCount = countResult.Value!;
@@ -53,7 +53,7 @@ public class InventoryCountCommandService(
             .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
         if (inventoryCount is null)
         {
-            return OperationError.NotFound<InventoryCount>();
+            return OperationError.NotFound();
         }
 
         var itemResult = inventoryCount.AddItem(Guid.NewGuid(), DateTimeOffset.UtcNow, userId);
@@ -79,7 +79,7 @@ public class InventoryCountCommandService(
         var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
         if (inventoryCount is null)
         {
-            return OperationError.NotFound<InventoryCountItem>();
+            return OperationError.NotFound();
         }
 
         var contextResult = await ValidateItemContextAsync(
@@ -119,7 +119,7 @@ public class InventoryCountCommandService(
         var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
         if (inventoryCount is null)
         {
-            return OperationError.NotFound<InventoryCountItem>();
+            return OperationError.NotFound();
         }
 
         var removalResult = inventoryCount.RemoveItem(itemId, DateTimeOffset.UtcNow, userId);
@@ -143,7 +143,7 @@ public class InventoryCountCommandService(
             .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
         if (inventoryCount is null)
         {
-            return OperationError.NotFound<InventoryCount>();
+            return OperationError.NotFound();
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -209,7 +209,7 @@ public class InventoryCountCommandService(
         if (stockKeepingUnitId is Guid skuId
             && !await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == skuId, ct))
         {
-            return OperationError.NotFound<StockKeepingUnit>();
+            return OperationError.NotFound();
         }
 
         if (storageLocationId is not Guid inventoryLocationId
@@ -237,27 +237,27 @@ public class InventoryCountCommandService(
             .FirstOrDefaultAsync(x => x.Id == storageLocationId, ct);
         if (storageLocation is null)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (storageLocation.IsFolder
             || storageLocation.DeletionMark
             || storageLocation.Zone?.DeletionMark == true)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Inventory count location must be an active inventory location.");
+            return OperationError.Invalid(
+                "Позиция инвентаризации должна быть активной складской позицией.");
         }
 
         if (storageLocation.WarehouseId != warehouseId)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Storage location must belong to the inventory count warehouse.");
+            return OperationError.Invalid(
+                "Складская позиция должна принадлежать складу инвентаризации.");
         }
 
         return storageLocation.Zone?.Type == ZoneType.Storage
             ? OperationResult.Success()
-            : OperationError.Invalid<StorageLocation>(
-                "Inventory count location must belong to a storage zone.");
+            : OperationError.Invalid(
+                "Позиция инвентаризации должна принадлежать зоне хранения.");
     }
 
     private static OperationResult<List<InventoryMovement>> CreateDifferenceMovements(

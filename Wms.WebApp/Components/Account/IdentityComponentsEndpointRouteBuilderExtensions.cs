@@ -61,7 +61,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             var user = await userManager.GetUserAsync(context.User);
             if (user is null)
             {
-                return Results.NotFound($"Unable to load user with ID '{userManager.GetUserId(context.User)}'.");
+                return Results.NotFound($"Не удалось загрузить пользователя с идентификатором '{userManager.GetUserId(context.User)}'.");
             }
 
             var userId = await userManager.GetUserIdAsync(user);
@@ -119,11 +119,11 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             var user = await userManager.GetUserAsync(context.User);
             if (user is null)
             {
-                return Results.NotFound($"Unable to load user with ID '{userManager.GetUserId(context.User)}'.");
+                return Results.NotFound($"Не удалось загрузить пользователя с идентификатором '{userManager.GetUserId(context.User)}'.");
             }
 
             var userId = await userManager.GetUserIdAsync(user);
-            downloadLogger.LogInformation("User with ID '{UserId}' asked for their personal data.", userId);
+            downloadLogger.LogInformation("Пользователь {UserId} запросил свои персональные данные.", userId);
 
             // Only include personal data for download
             var personalData = new Dictionary<string, string>();

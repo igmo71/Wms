@@ -48,8 +48,8 @@ public class ShippingOrderBaseItem
 
         if (snapshot.LineNumber != LineNumber)
         {
-            return OperationError.Invalid<ShippingOrderBaseItem>(
-                "Shipping order base item line number cannot be changed.");
+            return OperationError.Invalid(
+                "Номер строки основания расходного ордера нельзя изменить.");
         }
 
         StockKeepingUnitId = snapshot.StockKeepingUnitId;
@@ -65,24 +65,24 @@ public class ShippingOrderBaseItem
     {
         if (shippingOrderId == Guid.Empty)
         {
-            return OperationError.Invalid<ShippingOrder>("Shipping order identifier is required.");
+            return OperationError.Invalid("Идентификатор расходного ордера обязателен.");
         }
 
         if (snapshot.LineNumber <= 0)
         {
-            return OperationError.Invalid<ShippingOrderBaseItem>(
-                "Shipping order base item line number must be positive.");
+            return OperationError.Invalid(
+                "Номер строки основания расходного ордера должен быть положительным.");
         }
 
         if (snapshot.StockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<StockKeepingUnit>("SKU identifier is required.");
+            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
         if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
         {
-            return OperationError.Invalid<ShippingOrderBaseItem>(
-                "Planned quantity must be a finite non-negative number.");
+            return OperationError.Invalid(
+                "Плановое количество должно быть конечным неотрицательным числом.");
         }
 
         return OperationResult.Success();

@@ -29,10 +29,8 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
             var postResult = movement.Post(now);
             if (!postResult.IsSuccess)
             {
-                logger.LogError(
-                    "Inventory movement cannot be posted. Movement: {MovementId}, Error: {ErrorMessage}",
-                    movement.Id,
-                    postResult.Error?.Message);
+                logger.LogError("Движение запасов не проведено. Движение: {MovementId}, ошибка: {ErrorMessage}",
+                    movement.Id, postResult.Error?.Message);
                 return postResult;
             }
         }
@@ -108,14 +106,14 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
         var key = (movement.WarehouseId, storageLocationId, movement.StockKeepingUnitId);
         if (!balances.TryGetValue(key, out var balance))
         {
-            logger.LogError("Source inventory balance not found. Movement: {MovementId}", movement.Id);
-            return OperationError.Failure("Source inventory balance not found.");
+            logger.LogError("Остаток в позиции-источнике не найден. Движение: {MovementId}", movement.Id);
+            return OperationError.Failure("Остаток в позиции-источнике не найден.");
         }
 
         if (balance.Quantity < movement.Quantity)
         {
-            logger.LogError("Insufficient source inventory balance. Movement: {MovementId}", movement.Id);
-            return OperationError.Failure("Insufficient source inventory balance.");
+            logger.LogError("Недостаточно остатка в позиции-источнике. Движение: {MovementId}", movement.Id);
+            return OperationError.Failure("Недостаточно остатка в позиции-источнике.");
         }
 
         var changeResult = balance.Adjust(-movement.Quantity, occurredAtUtc);
@@ -228,8 +226,8 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
                     || location.IsFolder
                     || location.WarehouseId != movement.WarehouseId)
                 {
-                    return OperationError.Invalid<StorageLocation>(
-                        "Inventory movements require non-folder locations in their warehouse.");
+                    return OperationError.Invalid(
+                        "Для движений необходимы складские позиции, не являющиеся папками и принадлежащие своему складу.");
                 }
             }
         }

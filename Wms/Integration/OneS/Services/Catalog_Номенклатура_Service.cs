@@ -6,10 +6,9 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_Номенклатура_Service(
+public class Catalog_Номенклатура_Service(
     OneCClient oneCClient,
-    StockKeepingUnitService stockKeepingUnitService,
-    ILogger<Catalog_Номенклатура_Service> logger)
+    StockKeepingUnitService stockKeepingUnitService)
 {
 
 
@@ -25,7 +24,7 @@ internal class Catalog_Номенклатура_Service(
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return OperationError.Failure("Fetched item is null.");
+            return OperationError.Failure("1С вернула некорректный ответ: позиция номенклатуры отсутствует.");
 
         var sku = MapToStockKeepingUnit(fetchedItem);
 

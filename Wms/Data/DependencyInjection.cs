@@ -6,10 +6,10 @@ namespace Wms.Data;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplicatiobDbContext(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddApplicationDbContext(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+            ?? throw new InvalidOperationException("Строка подключения 'DefaultConnection' не найдена.");
 
         services.AddDbContextFactory<ApplicationDbContext>(options =>
         {

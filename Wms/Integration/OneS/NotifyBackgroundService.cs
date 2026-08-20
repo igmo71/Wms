@@ -1,6 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Wms.Common;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
 
@@ -11,98 +12,71 @@ public class NotifyBackgroundService(
     IServiceScopeFactory scopeFactory,
     ILogger<NotifyBackgroundService> logger) : BackgroundService
 {
-
-
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         await foreach (var notifyRecord in notifyChannel.Reader.ReadAllAsync(ct))
         {
             try
             {
-                await DispatchNotification(notifyRecord, ct);
+                OperationResult result = await DispatchNotificationAsync(notifyRecord, ct);
+                if (!result.IsSuccess)
+                {
+                    logger.LogError("Уведомление 1С не обработано. Тип: {Type}, RefKey: {RefKey}, ошибка: {Error}",
+                        notifyRecord.Type, notifyRecord.Ref_Key, result.Error?.Message);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Error))
-                    logger.LogError(ex, "{Source} {Exception}", nameof(ExecuteAsync), ex.Message);
-                //throw;
+                logger.LogError(ex, "Непредвиденная ошибка обработки уведомления 1С. Тип: {Type}, RefKey: {RefKey}",
+                    notifyRecord.Type, notifyRecord.Ref_Key);
             }
         }
     }
 
-    private async Task DispatchNotification(NotifyRecord notifyRecord, CancellationToken ct)
+    private async Task<OperationResult> DispatchNotificationAsync(
+        NotifyRecord notifyRecord,
+        CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
+        using IServiceScope scope = scopeFactory.CreateScope();
+        IServiceProvider services = scope.ServiceProvider;
 
-        switch (notifyRecord.Type)
+        return notifyRecord.Type switch
         {
-            case nameof(Catalog_Номенклатура):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_Номенклатура_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Catalog_Склады):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_Склады_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Catalog_Партнеры):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_Партнеры_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Catalog_СтруктураПредприятия):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_СтруктураПредприятия_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Catalog_ФизическиеЛица):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_ФизическиеЛица_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Catalog_УпаковкиЕдиницыИзмерения):
-                {
-                    var service = scope.ServiceProvider.GetService<Catalog_УпаковкиЕдиницыИзмерения_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(Document_ПриходныйОрдерНаТовары):
-                {
-                    var service = scope.ServiceProvider.GetService<Document_ПриходныйОрдерНаТовары_InboundService>();
-                    if (service is not null)
-                        await service.ImportDocumentAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-
-            case nameof(Document_РасходныйОрдерНаТовары):
-                {
-                    var service = scope.ServiceProvider.GetService<Document_РасходныйОрдерНаТовары_InboundService>();
-                    if (service is not null)
-                        await service.ImportDocumentAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            case nameof(InformationRegister_ШтрихкодыНоменклатуры):
-                {
-                    var service = scope.ServiceProvider.GetService<InformationRegister_ШтрихкодыНоменклатуры_Service>();
-                    if (service is not null)
-                        await service.ImportAsync(notifyRecord.Ref_Key, ct);
-                    break;
-                }
-            default:
-                logger.LogError("{Source} Unsupported NotifyRecord {@NotifyRecord}", nameof(DispatchNotification), notifyRecord);
-                break;
-        }
+            nameof(Catalog_ЗоныДоставки) =>
+                await services.GetRequiredService<Catalog_ЗоныДоставки_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_Номенклатура) =>
+                await services.GetRequiredService<Catalog_Номенклатура_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_Партнеры) =>
+                await services.GetRequiredService<Catalog_Партнеры_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_Склады) =>
+                await services.GetRequiredService<Catalog_Склады_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_СтруктураПредприятия) =>
+                await services.GetRequiredService<Catalog_СтруктураПредприятия_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_УпаковкиЕдиницыИзмерения) =>
+                await services.GetRequiredService<Catalog_УпаковкиЕдиницыИзмерения_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Catalog_ФизическиеЛица) =>
+                await services.GetRequiredService<Catalog_ФизическиеЛица_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            nameof(Document_ПриходныйОрдерНаТовары) =>
+                await services.GetRequiredService<Document_ПриходныйОрдерНаТовары_InboundService>()
+                    .ImportDocumentAsync(notifyRecord.Ref_Key, ct),
+            nameof(Document_РасходныйОрдерНаТовары) =>
+                await services.GetRequiredService<Document_РасходныйОрдерНаТовары_InboundService>()
+                    .ImportDocumentAsync(notifyRecord.Ref_Key, ct),
+            nameof(InformationRegister_ШтрихкодыНоменклатуры) =>
+                await services.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>()
+                    .ImportAsync(notifyRecord.Ref_Key, ct),
+            _ => OperationError.Invalid($"Неподдерживаемый тип уведомления 1С: {notifyRecord.Type}.")
+        };
     }
 }

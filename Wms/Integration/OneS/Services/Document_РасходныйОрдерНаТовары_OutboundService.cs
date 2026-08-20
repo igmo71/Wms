@@ -41,8 +41,8 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         if (actualStatus != expectedStatus)
         {
-            logger.LogError("1C returned an unexpected status. Expected: {ExpectedStatus}, actual: {ActualStatus}", expectedStatus, actualStatus);
-            return OperationError.Conflict($"1C returned an unexpected status. Expected '{expectedStatus}', actual '{actualStatus ?? "<null>"}'.");
+            logger.LogError("1С вернула неожиданный статус. Ожидался: {ExpectedStatus}, получен: {ActualStatus}", expectedStatus, actualStatus);
+            return OperationError.Conflict($"1С вернула неожиданный статус. Ожидался «{expectedStatus}», получен «{actualStatus ?? "не указан"}».");
         }
 
         var postUri = Document.PostDocumentUri(orderId.ToString());
@@ -62,7 +62,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         var freshDocument = freshDocumentResult.Value?.Value?.SingleOrDefault();
         if (freshDocument is null)
-            return OperationError.NotFound("Shipping order was not found in 1C.");
+            return OperationError.NotFound("Расходный ордер не найден в 1С.");
 
         var patchBodyResult = CreatePatchBody(shippingOrder, freshDocument);
         if (!patchBodyResult.IsSuccess)
@@ -79,7 +79,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
             || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
         {
-            return OperationError.Conflict("Shipping order contains multiple lines for the same SKU and cannot be updated safely.");
+            return OperationError.Conflict("Расходный ордер содержит несколько строк одной номенклатуры и не может быть безопасно обновлён.");
         }
 
         var freshBaseItemsByLine = freshDocument.ТоварыПоРаспоряжениям.ToDictionary(x => x.LineNumber);
@@ -88,7 +88,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
             || freshItemsByLine.Count(x => Document.IsRegularShippingItem(x.Value)) != shippingOrder.Items.Count)
         {
-            return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+            return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
         }
 
         foreach (var localBaseItem in shippingOrder.BaseItems)
@@ -97,7 +97,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshBaseItem.Номенклатура_Key != localBaseItem.StockKeepingUnitId
                 || freshBaseItem.Количество != localBaseItem.PlanQuantity)
             {
-                return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+                return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
             }
         }
 
@@ -108,7 +108,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshItem.КоличествоУпаковок != localItem.PlanQuantity
                 || ODataEnumMapper.Parse<ShippingOrderAction>(freshItem.Действие) != ShippingOrderAction.PickUp)
             {
-                return OperationError.Conflict("Shipping order plan in 1C differs from the WMS plan.");
+                return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
             }
         }
 
@@ -123,7 +123,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
         if (!baseItemStockKeepingUnitIds.SequenceEqual(itemStockKeepingUnitIds))
         {
-            return OperationError.Conflict("Shipping order base lines and shipping lines in WMS cannot be matched safely.");
+            return OperationError.Conflict("Строки основания и строки расходного ордера в WMS нельзя однозначно сопоставить.");
         }
 
         var localItemsByStockKeepingUnit = shippingOrder.Items.ToDictionary(x => x.StockKeepingUnitId);

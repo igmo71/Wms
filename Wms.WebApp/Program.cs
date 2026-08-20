@@ -44,12 +44,13 @@ public class Program
             options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
         })
             .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddErrorDescriber<RussianIdentityErrorDescriber>()
             .AddSignInManager()
             .AddDefaultTokenProviders();
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-        builder.Services.AddApplicatiobDbContext(builder.Configuration);
+        builder.Services.AddApplicationDbContext(builder.Configuration);
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
 

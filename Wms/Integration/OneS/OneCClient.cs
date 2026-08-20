@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 using Wms.Common;
@@ -70,9 +70,9 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
                 {
                     var error = JsonSerializer.Deserialize<OneCError>(responseContent);
 
-                    _logger.LogError("1C request failed {StatusCode}: {Error}", response.StatusCode, error);
+                    _logger.LogError("Запрос к 1С завершился ошибкой {StatusCode}: {Error}", response.StatusCode, error);
 
-                    return OperationError.Failure<TResponse>($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
+                    return OperationError.Failure($"Запрос к 1С завершился ошибкой {response.StatusCode}: {error?.OdataError?.Message?.Value}");
                 }
 
                 if (string.IsNullOrWhiteSpace(responseContent))
@@ -88,15 +88,16 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "1C returned an invalid JSON response {Method} {Uri} {responseContent}", request.Method, request.RequestUri, responseContent);
+                _logger.LogError(ex, "1С вернула некорректный JSON. Метод: {Method}, адрес: {Uri}, ответ: {ResponseContent}",
+                    request.Method, request.RequestUri, responseContent);
 
-                return OperationError.Failure<TResponse>("1C returned an invalid JSON response");
+                return OperationError.Failure("1С вернула некорректный JSON.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "1C request failed: {Method} {Uri}", request.Method, request.RequestUri);
+                _logger.LogError(ex, "Не удалось выполнить запрос к 1С. Метод: {Method}, адрес: {Uri}", request.Method, request.RequestUri);
 
-                return OperationError.Failure<TResponse>($"1C request failed: {ex.Message}");
+                return OperationError.Failure($"Не удалось выполнить запрос к 1С: {ex.Message}");
             }
         }
 
@@ -127,9 +128,9 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
                 {
                     var error = JsonSerializer.Deserialize<OneCError>(responseContent);
 
-                    _logger.LogError("1C request failed {StatusCode}: {Error}", response.StatusCode, error);
+                    _logger.LogError("Запрос к 1С завершился ошибкой {StatusCode}: {Error}", response.StatusCode, error);
 
-                    return OperationError.Failure($"1C request failed {response.StatusCode}: {error?.OdataError?.Message?.Value}");
+                    return OperationError.Failure($"Запрос к 1С завершился ошибкой {response.StatusCode}: {error?.OdataError?.Message?.Value}");
                 }
 
                 return OperationResult.Success();
@@ -140,15 +141,16 @@ public class OneCClient(HttpClient httpClient, ILogger<OneCClient> logger)
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "1C returned an invalid JSON response {Method} {Uri} {responseContent}", request.Method, request.RequestUri, responseContent);
+                _logger.LogError(ex, "1С вернула некорректный JSON. Метод: {Method}, адрес: {Uri}, ответ: {ResponseContent}",
+                    request.Method, request.RequestUri, responseContent);
 
-                return OperationError.Failure("1C returned an invalid JSON response");
+                return OperationError.Failure("1С вернула некорректный JSON.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "1C request failed: {Method} {Uri}", request.Method, request.RequestUri);
+                _logger.LogError(ex, "Не удалось выполнить запрос к 1С. Метод: {Method}, адрес: {Uri}", request.Method, request.RequestUri);
 
-                return OperationError.Failure(ex.Message);
+                return OperationError.Failure($"Не удалось выполнить запрос к 1С: {ex.Message}");
             }
         }
     }

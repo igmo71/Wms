@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.CatalogSynchronization;
 using Wms.Application.SkuBarcodes;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.SkuBarcodePages;
 
 public partial class Index
 {
     [Inject] private SkuBarcodeService SkuBarcodeService { get; set; } = null!;
-    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
+    [Inject] private InformationRegister_ШтрихкодыНоменклатуры_Service CatalogImportService { get; set; } = null!;
     private MudDataGrid<SkuBarcode> _dataGrid = null!;
     private string? _searchString;
     private bool _includeDeleted;
@@ -35,7 +35,7 @@ public partial class Index
         _importMessage = null;
         try
         {
-            var result = await SynchronizedCatalogImportService.RefreshSkuBarcodesAsync();
+            var result = await CatalogImportService.ImportListAsync();
             if (!result.IsSuccess)
             {
                 _importFailed = true;

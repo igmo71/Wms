@@ -15,10 +15,10 @@ WMS is responsible for these warehouse processes:
 - picking from storage locations;
 - shipping from the warehouse.
 
-Receiving, receiving putaway, the initial shipping/picking flow,
-inventory-count backend, and the intra-warehouse transfer backend are currently
-being implemented. Outgoing orders are imported from 1C and use their own
-shipping workflow.
+The initial receiving, putaway, shipping/picking, inventory-count, and
+intra-warehouse transfer flows are implemented. They remain subject to manual
+validation and incremental MVP development. Outgoing orders are imported from
+1C and use their own shipping workflow.
 
 Shipping uses three WMS-controlled transitions: `Prepared -> ReadyForPicking`, then one of the permitted picking or verification statuses to `ReadyForShipment`, then `ReadyForShipment -> Shipped`. The picking duration KPI is always measured from `PickingStartedAtUtc` to `ReadyForShipmentAtUtc`. Draft picking movements post inventory from their source locations to the shipping location when the order is set ready for shipment; shipping then posts the issue from that location.
 
@@ -161,7 +161,7 @@ Core domain concepts:
 
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
-- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh through its 1C catalog integration service. The UI disables a refresh button and displays indeterminate progress while it runs.
 - `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse, has an explicit type, and has a required code unique within the warehouse.
 - Zone types distinguish ordinary storage, transit, receiving, and shipping.
   Receiving and shipping location selectors and command services accept only
@@ -180,7 +180,14 @@ The operator UI exposes configuration screens under the `Конфигураци�
 - `Номенклатура`, `Партнёры`, `Физические лица`, `Структура предприятия`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs. Partners, individuals, and organizational units are displayed as flat lists; their imported `ParentId` hierarchies are not visualized. Individual catalog groups are stored and shown alongside people with an explicit row type.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
-Manual list imports for 1C-synchronized catalogs return `OperationResult` through `SynchronizedCatalogImportService`. Configuration pages that expose these imports show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. Large catalogs such as SKUs and partners are loaded in independent parallel batches; completed batches are not rolled back when another batch fails, and the failure warns that the catalog may have been partially updated.
+Manual list imports for 1C-synchronized catalogs call the corresponding 1C
+integration service directly and return `OperationResult`; there is no common
+catalog-import facade. Configuration pages show an explicit success or error
+alert and reload displayed data only after a successful import. An invalid or
+failed 1C response is an import failure. Large catalogs such as SKUs and
+partners are loaded in independent parallel batches; completed batches are not
+rolled back when another batch fails, and the failure warns that the catalog
+may have been partially updated.
 Small catalogs may be fetched in one 1C request and saved through one EF Core batch operation instead of issuing one database save per catalog item. The individuals and organizational-unit imports use this approach.
 
 ## Receiving
@@ -255,6 +262,11 @@ Inbound synchronization may create and reconcile receiving orders only in `Ready
 
 The 1C OData client is configured through `OneCClient` settings. The integration uses explicit models named after 1C entities.
 
+All supported notification imports return `OperationResult`. The background
+dispatcher logs expected import failures in one place and logs unexpected
+exceptions separately. Notification delivery still uses the non-persistent
+in-memory channel described in the roadmap.
+
 `Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented.
 
 `Catalog_ФизическиеЛица_Service` imports `Catalog_ФизическиеЛица` into the local `Individual` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual record update. Catalog groups are stored with `IsFolder` and displayed in the same flat configuration list as people.
@@ -270,6 +282,8 @@ For `Document_ПриходныйОрдерНаТовары`:
   create or reconcile its local state.
 - `Document_ПриходныйОрдерНаТовары_OutboundService` changes the document status, updates item facts when needed, and posts the document in 1C.
 - `POST /api/1c/Document_ПриходныйОрдерНаТовары/notify` enqueues a notification; `NotifyBackgroundService` consumes it and imports the document asynchronously.
+- Manual batch import of receiving documents is not implemented, so no public
+  batch-import endpoint is exposed.
 
 For `Document_РасходныйОрдерНаТовары`:
 
@@ -281,6 +295,8 @@ For `Document_РасходныйОрдерНаТовары`:
   document in 1C.
 - `POST /api/1c/Document_РасходныйОрдерНаТовары/notify` enqueues a notification;
   `NotifyBackgroundService` consumes it and imports the document asynchronously.
+- Manual batch import of shipping documents is not implemented, so no public
+  batch-import endpoint is exposed.
 
 ## Working conventions
 

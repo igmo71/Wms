@@ -4,7 +4,7 @@ namespace Wms.Integration.OneS.Endpoints;
 
 public static class OneCEndpoints
 {
-    public static IEndpointRouteBuilder MapOneCEndpints(this IEndpointRouteBuilder routeBuilder)
+    public static IEndpointRouteBuilder MapOneCEndpoints(this IEndpointRouteBuilder routeBuilder)
     {
         routeBuilder.MapCatalog_ЗоныДоставки_Endpoints();
         routeBuilder.MapCatalog_Номенклатура_Endpoints();

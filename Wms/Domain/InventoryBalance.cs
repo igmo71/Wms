@@ -34,18 +34,18 @@ public class InventoryBalance
             || storageLocationId == Guid.Empty
             || stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryBalance>("Inventory balance identifiers are required.");
+            return OperationError.Invalid("Идентификаторы складского остатка обязательны.");
         }
 
         if (!double.IsFinite(quantity) || quantity < 0)
         {
-            return OperationError.Invalid<InventoryBalance>(
-                "Inventory balance quantity must be a finite non-negative number.");
+            return OperationError.Invalid(
+                "Количество остатка должно быть конечным неотрицательным числом.");
         }
 
         if (createdAtUtc == default)
         {
-            return OperationError.Invalid<InventoryBalance>("Inventory balance creation time is required.");
+            return OperationError.Invalid("Время создания складского остатка обязательно.");
         }
 
         return new InventoryBalance
@@ -65,20 +65,20 @@ public class InventoryBalance
     {
         if (!double.IsFinite(quantityDelta) || quantityDelta == 0)
         {
-            return OperationError.Invalid<InventoryBalance>(
-                "Inventory balance change must be a finite non-zero number.");
+            return OperationError.Invalid(
+                "Изменение остатка должно быть конечным ненулевым числом.");
         }
 
         if (updatedAtUtc == default || updatedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<InventoryBalance>(
-                "Inventory balance update time cannot precede its creation time.");
+            return OperationError.Invalid(
+                "Время изменения остатка не может предшествовать времени его создания.");
         }
 
         var balanceAfter = Quantity + quantityDelta;
         if (!double.IsFinite(balanceAfter) || balanceAfter < 0)
         {
-            return OperationError.Invalid<InventoryBalance>("Inventory balance cannot be negative.");
+            return OperationError.Invalid("Складской остаток не может быть отрицательным.");
         }
 
         var change = new InventoryBalanceChange(Quantity, quantityDelta, balanceAfter);

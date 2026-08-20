@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Wms.Application.CatalogSynchronization;
 using Wms.Application.DeliveryDirections;
 using Wms.Application.Individuals;
 using Wms.Application.Inventory.Balances;
@@ -54,7 +53,6 @@ public static class DependencyInjection
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<InventoryTransferCommandService>();
         services.AddScoped<InventoryTransferQueryService>();
-        services.AddScoped<SynchronizedCatalogImportService>();
         services.AddScoped<StorageLocationCommandService>();
         services.AddScoped<StorageLocationQueryService>();
         services.AddScoped<UnitOfMeasureService>();

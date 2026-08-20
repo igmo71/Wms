@@ -25,7 +25,7 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var startResult = order.StartPutaway(DateTimeOffset.UtcNow, userId);
@@ -51,7 +51,7 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -101,7 +101,7 @@ public class PutawayCommandService(
 
         if (movement is null)
         {
-            return OperationError.NotFound<InventoryMovement>();
+            return OperationError.NotFound();
         }
 
         var order = movement.RecorderId is Guid orderId
@@ -109,7 +109,7 @@ public class PutawayCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -151,7 +151,7 @@ public class PutawayCommandService(
 
         if (movement is null)
         {
-            return OperationError.NotFound<InventoryMovement>();
+            return OperationError.NotFound();
         }
 
         var order = movement.RecorderId is Guid orderId
@@ -160,7 +160,7 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var removalResult = order.ValidatePutawayMovementRemoval(movement);
@@ -184,7 +184,7 @@ public class PutawayCommandService(
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound<ReceivingOrder>();
+            return OperationError.NotFound();
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -248,7 +248,7 @@ public class PutawayCommandService(
     {
         if (destinationStorageLocationId == order.ReceivingLocationId)
         {
-            return OperationError.Invalid<StorageLocation>("Destination must differ from the receiving location.");
+            return OperationError.Invalid("Позиция назначения должна отличаться от позиции приёмки.");
         }
 
         var isValid = await dbContext.StorageLocations
@@ -261,8 +261,8 @@ public class PutawayCommandService(
 
         return isValid
             ? OperationResult.Success()
-            : OperationError.Invalid<StorageLocation>(
-                "Putaway destination must be an active storage location in the order warehouse.");
+            : OperationError.Invalid(
+                "Позиция размещения должна быть активной позицией хранения на складе ордера.");
     }
 
     private static async Task<OperationResult> ValidateSourceBalanceAsync(
@@ -286,8 +286,8 @@ public class PutawayCommandService(
 
         if (sourceBalance is null || skuQuantity > sourceBalance.Quantity)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Putaway quantity exceeds the available receiving-location balance.");
+            return OperationError.Invalid(
+                "Количество размещения превышает доступный остаток в позиции приёмки.");
         }
 
         return OperationResult.Success();
@@ -314,7 +314,7 @@ public class PutawayCommandService(
 
         return validDestinationCount == destinationIds.Length
             ? OperationResult.Success()
-            : OperationError.Invalid<StorageLocation>(
-                "Every putaway destination must remain an active storage location in the order warehouse.");
+            : OperationError.Invalid(
+                "Каждая позиция размещения должна оставаться активной позицией хранения на складе ордера.");
     }
 }

@@ -5,7 +5,7 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_ФизическиеЛица_Service(
+public class Catalog_ФизическиеЛица_Service(
     OneCClient oneCClient,
     IndividualService individualService)
 {

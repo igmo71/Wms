@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.CatalogSynchronization;
 using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.WarehousePages;
 
@@ -13,7 +13,7 @@ public partial class Index
     private WarehouseService WarehouseService { get; set; } = null!;
 
     [Inject]
-    private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
+    private Catalog_Склады_Service CatalogImportService { get; set; } = null!;
 
     private MudDataGrid<Warehouse> _dataGrid = null!;
     private string? _searchString;
@@ -68,7 +68,7 @@ public partial class Index
 
         try
         {
-            var result = await SynchronizedCatalogImportService.RefreshWarehousesAsync();
+            var result = await CatalogImportService.ImportListAsync();
             if (!result.IsSuccess)
             {
                 _importFailed = true;

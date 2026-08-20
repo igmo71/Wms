@@ -115,15 +115,15 @@ else
 
         if (!is2faTokenValid)
         {
-            message = "Error: Verification code is invalid.";
+            message = "Ошибка: неверный код подтверждения.";
             return;
         }
 
         await UserManager.SetTwoFactorEnabledAsync(user, true);
         var userId = await UserManager.GetUserIdAsync(user);
-        Logger.LogInformation("User with ID '{UserId}' has enabled 2FA with an authenticator app.", userId);
+        Logger.LogInformation("Пользователь {UserId} включил двухфакторную аутентификацию через приложение-аутентификатор.", userId);
 
-        message = "Your authenticator app has been verified.";
+        message = "Приложение-аутентификатор подтверждено.";
 
         if (await UserManager.CountRecoveryCodesAsync(user) == 0)
         {
@@ -181,7 +181,7 @@ else
     private sealed class InputModel
     {
         [Required]
-        [StringLength(7, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [StringLength(7, ErrorMessage = "Поле {0} должно содержать от {2} до {1} символов.", MinimumLength = 6)]
         [DataType(DataType.Text)]
         [Display(Name = "Verification Code")]
         public string Code { get; set; } = "";

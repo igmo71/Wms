@@ -1,10 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-internal class DeliveryDirectionCobfiguration : IEntityTypeConfiguration<DeliveryDirection>
+internal class DeliveryDirectionConfiguration : IEntityTypeConfiguration<DeliveryDirection>
 {
     public void Configure(EntityTypeBuilder<DeliveryDirection> builder)
     {

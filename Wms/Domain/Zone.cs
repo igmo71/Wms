@@ -31,7 +31,7 @@ public class Zone
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<Zone>("Zone identifier is required.");
+            return OperationError.Invalid("Идентификатор зоны обязателен.");
         }
 
         var warehouseResult = ValidateWarehouse(warehouseId);
@@ -88,17 +88,17 @@ public class Zone
     {
         if (string.IsNullOrWhiteSpace(code))
         {
-            return OperationError.Invalid<Zone>("Zone code is required.");
+            return OperationError.Invalid("Код зоны обязателен.");
         }
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            return OperationError.Invalid<Zone>("Zone name is required.");
+            return OperationError.Invalid("Наименование зоны обязательно.");
         }
 
         if (!Enum.IsDefined(type))
         {
-            return OperationError.Invalid<Zone>("Zone type is invalid.");
+            return OperationError.Invalid("Указан некорректный тип зоны.");
         }
 
         return OperationResult.Success();
@@ -115,7 +115,7 @@ public class Zone
     {
         if (warehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         return OperationResult.Success();

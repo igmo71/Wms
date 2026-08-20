@@ -24,7 +24,7 @@ public class PickingCommandService(
         ShippingOrder? order = await LoadOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound<ShippingOrder>();
+            return OperationError.NotFound();
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -73,7 +73,7 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
         if (movement is null)
         {
-            return OperationError.NotFound<InventoryMovement>();
+            return OperationError.NotFound();
         }
 
         ShippingOrder? order = movement.RecorderId is Guid orderId
@@ -81,7 +81,7 @@ public class PickingCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound<ShippingOrder>();
+            return OperationError.NotFound();
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -125,7 +125,7 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
         if (movement is null)
         {
-            return OperationError.NotFound<InventoryMovement>();
+            return OperationError.NotFound();
         }
 
         ShippingOrder? order = movement.RecorderId is Guid orderId
@@ -133,7 +133,7 @@ public class PickingCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound<ShippingOrder>();
+            return OperationError.NotFound();
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -182,8 +182,8 @@ public class PickingCommandService(
 
         return isValid
             ? OperationResult.Success()
-            : OperationError.Invalid<StorageLocation>(
-                "Picking source must be an active storage location in the order warehouse.");
+            : OperationError.Invalid(
+                "Источник отбора должен быть активной позицией хранения на складе ордера.");
     }
 
     private static async Task<OperationResult> ValidateSourceBalanceAsync(
@@ -208,7 +208,7 @@ public class PickingCommandService(
 
         return sourceBalance is not null && sourceQuantity <= sourceBalance.Quantity
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryMovement>(
-                "Picking quantity exceeds the available inventory balance in the source storage location.");
+            : OperationError.Invalid(
+                "Количество отбора превышает доступный остаток в позиции-источнике.");
     }
 }

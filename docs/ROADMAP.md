@@ -42,15 +42,14 @@ implement every item before completing the current warehouse processes.
 
 ## Process and integration backlog
 
-- Implement document-list import or remove/hide the corresponding 1C import
-  endpoints until it exists; they currently call unimplemented methods.
+- Implement manual batch import of receiving and shipping documents when its
+  operator workflow is defined. The corresponding endpoints remain unexposed
+  until then.
 - Confirm 1C quantity semantics: `Количество` versus `КоличествоУпаковок`.
 - Confirm shipping table-section behavior for `Отгружать` / `НеОтгружать`, then
   implement line splitting only after that business decision.
 - Implement recounts, reservations, and inventory tasks when their business
   rules are agreed.
-- Implement intra-warehouse transfers according to
-  `specs/intra-warehouse-transfers/spec.md`.
 
 ## Technical maintenance
 

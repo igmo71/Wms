@@ -29,7 +29,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         var code = codeResult.Value!;
         if (await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == command.ZoneId && x.Code == code, ct))
         {
-            return OperationError.Conflict<StorageLocation>("В выбранной зоне уже есть позиция с таким кодом.");
+            return OperationError.Conflict("В выбранной зоне уже есть позиция с таким кодом.");
         }
 
         OperationResult<StorageLocation> locationResult = StorageLocation.Create(
@@ -61,12 +61,12 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (!location.IsFolder && details.IsFolder && await HasBeenUsedAsync(dbContext, id, ct))
         {
-            return OperationError.Invalid<StorageLocation>("Использованную складскую позицию нельзя преобразовать в группу.");
+            return OperationError.Invalid("Использованную складскую позицию нельзя преобразовать в группу.");
         }
 
         OperationResult updateResult = location.UpdateDetails(details);
@@ -111,7 +111,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
 
         if (hasCodeConflict)
         {
-            return OperationError.Conflict<StorageLocation>("Один или несколько создаваемых кодов уже используются.");
+            return OperationError.Conflict("Один или несколько создаваемых кодов уже используются.");
         }
 
         dbContext.StorageLocations.AddRange(locations);
@@ -125,17 +125,17 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (await dbContext.StorageLocations.AnyAsync(x => x.ParentId == id && !x.DeletionMark, ct))
         {
-            return OperationError.Invalid<StorageLocation>("Сначала деактивируйте дочерние позиции.");
+            return OperationError.Invalid("Сначала деактивируйте дочерние позиции.");
         }
 
         if (!location.IsFolder && await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == id && x.Quantity > 0, ct))
         {
-            return OperationError.Invalid<StorageLocation>("Нельзя деактивировать позицию с положительным остатком.");
+            return OperationError.Invalid("Нельзя деактивировать позицию с положительным остатком.");
         }
 
         location.Deactivate();
@@ -149,13 +149,13 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (location.ParentId is Guid parentId
             && !await dbContext.StorageLocations.AnyAsync(x => x.Id == parentId && !x.DeletionMark, ct))
         {
-            return OperationError.Invalid<StorageLocation>("Сначала активируйте родительскую позицию.");
+            return OperationError.Invalid("Сначала активируйте родительскую позицию.");
         }
 
         location.Activate();
@@ -172,7 +172,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
     {
         if (!await dbContext.Zones.AnyAsync(x => x.Id == zoneId && x.WarehouseId == warehouseId && !x.DeletionMark, ct))
         {
-            return OperationError.Invalid<Zone>("Зона должна быть активна и принадлежать выбранному складу.");
+            return OperationError.Invalid("Зона должна быть активна и принадлежать выбранному складу.");
         }
 
         if (parentId is null)
@@ -183,12 +183,12 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? parent = await dbContext.StorageLocations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == parentId, ct);
         if (parent is null)
         {
-            return OperationError.NotFound<StorageLocation>("Родительская позиция не найдена.");
+            return OperationError.NotFound("Родительская позиция не найдена.");
         }
 
         if (parent.DeletionMark || parent.WarehouseId != warehouseId || parent.ZoneId != zoneId)
         {
-            return OperationError.Invalid<StorageLocation>("Родитель должен быть активен и находиться в той же зоне.");
+            return OperationError.Invalid("Родитель должен быть активен и находиться в той же зоне.");
         }
 
         return parent;

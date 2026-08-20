@@ -17,7 +17,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
 
         if (command.Id.HasValue && zone is null)
         {
-            return OperationError.NotFound<Zone>();
+            return OperationError.NotFound();
         }
 
         Guid? originalWarehouseId = zone?.WarehouseId;
@@ -49,32 +49,34 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
         return zone;
     }
 
-    public async Task<int> MarkDeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task<OperationResult> MarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         Zone? zone = await dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (zone is null)
         {
-            return 0;
+            return OperationError.NotFound();
         }
 
         zone.Deactivate();
-        return await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
     }
 
-    public async Task<int> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task<OperationResult> UnMarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         Zone? zone = await dbContext.Zones.FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (zone is null)
         {
-            return 0;
+            return OperationError.NotFound();
         }
 
         zone.Activate();
-        return await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
     }
 
     private static Task<Zone?> FindForUpdateAsync(
@@ -128,7 +130,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
 
         if (codeIsUsed)
         {
-            return OperationError.Conflict<Zone>("В выбранном складе уже есть зона с таким кодом.");
+            return OperationError.Conflict("В выбранном складе уже есть зона с таким кодом.");
         }
 
         var changesWarehouse = originalWarehouseId.HasValue
@@ -137,7 +139,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
         if (changesWarehouse
             && await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == zone.Id, ct))
         {
-            return OperationError.Invalid<Zone>(
+            return OperationError.Invalid(
                 "Зону со складскими позициями нельзя перенести в другой склад.");
         }
 

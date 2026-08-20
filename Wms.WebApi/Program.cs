@@ -31,7 +31,7 @@ public class Program
 
         builder.Services.AddProblemDetails();
 
-        builder.Services.AddApplicatiobDbContext(builder.Configuration);
+        builder.Services.AddApplicationDbContext(builder.Configuration);
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
         builder.Services.AddNotificationServices();
@@ -54,8 +54,8 @@ public class Program
 
         app.UseSerilogRequestLogging();
 
-        app.MapApplicationEndpints();
-        app.MapOneCEndpints();
+        app.MapApplicationEndpoints();
+        app.MapOneCEndpoints();
 
         app.Run();
     }

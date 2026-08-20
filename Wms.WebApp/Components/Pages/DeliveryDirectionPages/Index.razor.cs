@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Components;
-using Wms.Application.CatalogSynchronization;
 using Wms.Application.DeliveryDirections;
 using Wms.Domain;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.DeliveryDirectionPages;
 
 public partial class Index
 {
     [Inject] private DeliveryDirectionService DeliveryDirectionService { get; set; } = null!;
-    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
+    [Inject] private Catalog_ЗоныДоставки_Service CatalogImportService { get; set; } = null!;
     private List<DeliveryDirection> _items = [];
     private bool _includeDeleted;
     private bool _isLoading = true;
@@ -39,7 +39,7 @@ public partial class Index
         _importMessage = null;
         try
         {
-            var result = await SynchronizedCatalogImportService.RefreshDeliveryDirectionsAsync();
+            var result = await CatalogImportService.ImportListAsync();
             if (!result.IsSuccess)
             {
                 _importFailed = true;

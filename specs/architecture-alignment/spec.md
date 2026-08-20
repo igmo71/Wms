@@ -39,8 +39,7 @@ at the layer that has the information needed to decide it.
 
 ### Stage 1: conventions and documentation
 
-- Establish the architecture guide, root `.editorconfig`, and this staged
-  backlog.
+- Establish the architecture guide and this staged backlog.
 - Keep project context focused on product and business behavior; keep detailed
   engineering conventions in the architecture guide.
 
@@ -109,6 +108,9 @@ application and integration services.
   `Services` folder was removed. Zone and storage-location public reads were
   separated from their commands, while command-internal database checks remain
   local. Small synchronized catalogs retain cohesive services (completed).
+- The catalog-import facade was removed. Manual synchronization pages call the
+  corresponding 1C integration service directly, and OData helpers live with
+  the 1C integration code (completed).
 
 ## Acceptance criteria for a functional substage
 

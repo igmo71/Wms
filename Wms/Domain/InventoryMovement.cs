@@ -43,17 +43,17 @@ public class InventoryMovement
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryMovement>("Inventory movement identifier is required.");
+            return OperationError.Invalid("Идентификатор движения обязателен.");
         }
 
         if (warehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         if (stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<StockKeepingUnit>("SKU identifier is required.");
+            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
         var stateResult = ValidateState(sourceStorageLocationId, destinationStorageLocationId, quantity);
@@ -64,7 +64,7 @@ public class InventoryMovement
 
         if (createdAtUtc == default)
         {
-            return OperationError.Invalid<InventoryMovement>("Movement creation time is required.");
+            return OperationError.Invalid("Время создания движения обязательно.");
         }
 
         var recorderResult = ValidateRecorder(recorderType, recorderId, recorderLineNumber);
@@ -75,7 +75,7 @@ public class InventoryMovement
 
         if (confirmedBy is not null && string.IsNullOrWhiteSpace(confirmedBy))
         {
-            return OperationError.Invalid<InventoryMovement>("Confirming user cannot be empty.");
+            return OperationError.Invalid("Пользователь подтверждения не может быть пустым.");
         }
 
         return new InventoryMovement
@@ -109,7 +109,7 @@ public class InventoryMovement
 
         if (stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<StockKeepingUnit>("SKU identifier is required.");
+            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
         var stateResult = ValidateState(sourceStorageLocationId, destinationStorageLocationId, quantity);
@@ -120,8 +120,8 @@ public class InventoryMovement
 
         if (updatedAtUtc == default || updatedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement update time cannot precede its creation time.");
+            return OperationError.Invalid(
+                "Время изменения движения не может предшествовать времени его создания.");
         }
 
         SourceStorageLocationId = sourceStorageLocationId;
@@ -142,7 +142,7 @@ public class InventoryMovement
 
         if (string.IsNullOrWhiteSpace(confirmedBy))
         {
-            return OperationError.Invalid<InventoryMovement>("Confirming user must be specified.");
+            return OperationError.Invalid("Необходимо указать пользователя подтверждения.");
         }
 
         ConfirmedBy = confirmedBy.Trim();
@@ -153,7 +153,7 @@ public class InventoryMovement
     {
         if (PostedAtUtc is not null)
         {
-            return OperationError.Invalid<InventoryMovement>("Inventory movement has already been posted.");
+            return OperationError.Invalid("Движение уже проведено.");
         }
 
         var stateResult = ValidateState(SourceStorageLocationId, DestinationStorageLocationId, Quantity);
@@ -164,8 +164,8 @@ public class InventoryMovement
 
         if (postedAtUtc == default || postedAtUtc < CreatedAtUtc || postedAtUtc < UpdatedAtUtc)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement posting time cannot precede its changes.");
+            return OperationError.Invalid(
+                "Время проведения движения не может предшествовать времени его изменения.");
         }
 
         PostedAtUtc = postedAtUtc;
@@ -176,7 +176,7 @@ public class InventoryMovement
     {
         return PostedAtUtc is null
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryMovement>("Posted inventory movement cannot be changed.");
+            : OperationError.Invalid("Проведённое движение нельзя изменить.");
     }
 
     private static OperationResult ValidateState(
@@ -186,25 +186,25 @@ public class InventoryMovement
     {
         if (!double.IsFinite(quantity) || quantity <= 0)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Inventory movement quantity must be a finite number greater than zero.");
+            return OperationError.Invalid(
+                "Количество движения должно быть конечным числом больше нуля.");
         }
 
         if (sourceStorageLocationId is null && destinationStorageLocationId is null)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Inventory movement source or destination must be specified.");
+            return OperationError.Invalid(
+                "Необходимо указать источник или назначение движения.");
         }
 
         if (sourceStorageLocationId == destinationStorageLocationId)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Inventory movement source and destination must be different.");
+            return OperationError.Invalid(
+                "Источник и назначение движения должны различаться.");
         }
 
         if (sourceStorageLocationId == Guid.Empty || destinationStorageLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>("Storage location identifier cannot be empty.");
+            return OperationError.Invalid("Идентификатор складской позиции не может быть пустым.");
         }
 
         return OperationResult.Success();
@@ -219,13 +219,13 @@ public class InventoryMovement
         {
             return recorderId is null && recorderLineNumber is null
                 ? OperationResult.Success()
-                : OperationError.Invalid<InventoryMovement>(
-                    "A movement without a recorder cannot have a recorder identifier or line number.");
+                : OperationError.Invalid(
+                    "У движения без регистратора не должно быть его идентификатора или номера строки.");
         }
 
         return recorderId is not null && recorderId != Guid.Empty && recorderLineNumber > 0
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryMovement>(
-                "A recorded movement requires a recorder identifier and positive line number.");
+            : OperationError.Invalid(
+                "Для движения с регистратором обязательны его идентификатор и положительный номер строки.");
     }
 }

@@ -5,7 +5,7 @@ using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_СтруктураПредприятия_Service(
+public class Catalog_СтруктураПредприятия_Service(
     OneCClient oneCClient,
     OrganizationalUnitService organizationalUnitService)
 {

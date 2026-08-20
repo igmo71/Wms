@@ -55,7 +55,7 @@ public class InventoryTransferCommandService(
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound<InventoryTransfer>();
+            return OperationError.NotFound();
         }
 
         var deletionResult = transfer.ValidateDeletion();
@@ -130,7 +130,7 @@ public class InventoryTransferCommandService(
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound<InventoryTransfer>();
+            return OperationError.NotFound();
         }
 
         if (transfer.TransitStorageLocationId is Guid transitLocationId
@@ -138,8 +138,8 @@ public class InventoryTransferCommandService(
                 x => x.StorageLocationId == transitLocationId && x.Quantity > 0,
                 ct))
         {
-            return OperationError.Invalid<InventoryTransfer>(
-                "Transit location must be empty before completing the inventory transfer.");
+            return OperationError.Invalid(
+                "Перед завершением перемещения транзитная позиция должна быть пустой.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -165,15 +165,15 @@ public class InventoryTransferCommandService(
     {
         if (!double.IsFinite(quantity) || quantity <= 0)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement quantity must be a finite number greater than zero.");
+            return OperationError.Invalid(
+                "Количество движения должно быть конечным числом больше нуля.");
         }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound<InventoryTransfer>();
+            return OperationError.NotFound();
         }
 
         var routeResult = CreateRoute(
@@ -190,7 +190,7 @@ public class InventoryTransferCommandService(
             x => x.Id == stockKeepingUnitId && !x.DeletionMark,
             ct))
         {
-            return OperationError.NotFound<StockKeepingUnit>();
+            return OperationError.NotFound();
         }
 
         var route = routeResult.Value!;
@@ -257,7 +257,7 @@ public class InventoryTransferCommandService(
             MovementMode.Direct => transfer.CreateDirectRoute(
                 enteredSourceStorageLocationId ?? Guid.Empty,
                 enteredDestinationStorageLocationId ?? Guid.Empty),
-            _ => OperationError.Invalid<InventoryMovement>("Transfer movement mode is invalid.")
+            _ => OperationError.Invalid("Указан некорректный режим движения перемещения.")
         };
     }
 
@@ -271,7 +271,7 @@ public class InventoryTransferCommandService(
             x => x.Id == warehouseId && !x.DeletionMark,
             ct))
         {
-            return OperationError.NotFound<Warehouse>();
+            return OperationError.NotFound();
         }
 
         return transitStorageLocationId is Guid locationId
@@ -290,13 +290,13 @@ public class InventoryTransferCommandService(
             .FirstOrDefaultAsync(x => x.Id == locationId, ct);
         if (transitLocation is null)
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (transitLocation.IsFolder)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Transit location must be an inventory location.");
+            return OperationError.Invalid(
+                "Транзитная позиция должна быть складской позицией, а не папкой.");
         }
 
         if (transitLocation.DeletionMark
@@ -304,16 +304,16 @@ public class InventoryTransferCommandService(
             || transitLocation.Zone?.DeletionMark == true
             || transitLocation.Zone?.Type != ZoneType.Transit)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Transit location must be active and belong to a transit zone in the transfer warehouse.");
+            return OperationError.Invalid(
+                "Транзитная позиция должна быть активной и принадлежать транзитной зоне склада перемещения.");
         }
 
         if (await dbContext.InventoryBalances.AnyAsync(
             x => x.StorageLocationId == locationId && x.Quantity > 0,
             ct))
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Transit location must be empty before assignment.");
+            return OperationError.Invalid(
+                "Перед назначением транзитная позиция должна быть пустой.");
         }
 
         if (await dbContext.InventoryTransfers.AnyAsync(
@@ -321,8 +321,8 @@ public class InventoryTransferCommandService(
                 && x.Status != InventoryTransferStatus.Completed,
             ct))
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Transit location is already assigned to an active inventory transfer.");
+            return OperationError.Invalid(
+                "Транзитная позиция уже назначена другому активному перемещению.");
         }
 
         return OperationResult.Success();
@@ -349,7 +349,7 @@ public class InventoryTransferCommandService(
         if (!locations.TryGetValue(route.SourceStorageLocationId, out var sourceLocation)
             || !locations.TryGetValue(route.DestinationStorageLocationId, out var destinationLocation))
         {
-            return OperationError.NotFound<StorageLocation>();
+            return OperationError.NotFound();
         }
 
         if (sourceLocation.IsFolder
@@ -361,8 +361,8 @@ public class InventoryTransferCommandService(
             || sourceLocation.WarehouseId != transfer.WarehouseId
             || destinationLocation.WarehouseId != transfer.WarehouseId)
         {
-            return OperationError.Invalid<StorageLocation>(
-                "Movement locations must be active and belong to the transfer warehouse.");
+            return OperationError.Invalid(
+                "Позиции движения должны быть активными и принадлежать складу перемещения.");
         }
 
         var expectedSourceType = mode == MovementMode.Put ? ZoneType.Transit : ZoneType.Storage;
@@ -371,8 +371,8 @@ public class InventoryTransferCommandService(
         return sourceLocation.Zone?.Type == expectedSourceType
             && destinationLocation.Zone?.Type == expectedDestinationType
             ? OperationResult.Success()
-            : OperationError.Invalid<StorageLocation>(
-                "Movement locations do not match the selected transfer action.");
+            : OperationError.Invalid(
+                "Позиции движения не соответствуют выбранному действию перемещения.");
     }
 
     private enum MovementMode

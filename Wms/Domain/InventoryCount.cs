@@ -38,22 +38,22 @@ public class InventoryCount
     {
         if (id == Guid.Empty)
         {
-            return OperationError.Invalid<InventoryCount>("Inventory count identifier is required.");
+            return OperationError.Invalid("Идентификатор инвентаризации обязателен.");
         }
 
         if (string.IsNullOrWhiteSpace(number))
         {
-            return OperationError.Invalid<InventoryCount>("Inventory count number is required.");
+            return OperationError.Invalid("Номер инвентаризации обязателен.");
         }
 
         if (date == default)
         {
-            return OperationError.Invalid<InventoryCount>("Inventory count date is required.");
+            return OperationError.Invalid("Дата инвентаризации обязательна.");
         }
 
         if (warehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<Warehouse>("Warehouse identifier is required.");
+            return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
         var auditResult = ValidateAudit(createdAtUtc, createdBy, "Creating user must be specified.");
@@ -120,7 +120,7 @@ public class InventoryCount
         var item = _items.FirstOrDefault(x => x.Id == itemId);
         if (item is null)
         {
-            return OperationError.NotFound<InventoryCountItem>();
+            return OperationError.NotFound();
         }
 
         if (storageLocationId.HasValue
@@ -129,8 +129,8 @@ public class InventoryCount
                 && x.StorageLocationId == storageLocationId
                 && x.StockKeepingUnitId == stockKeepingUnitId))
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Storage location and SKU combination must be unique within the inventory count.");
+            return OperationError.Invalid(
+                "Сочетание складской позиции и номенклатуры не должно повторяться в инвентаризации.");
         }
 
         var updateResult = item.Update(
@@ -163,7 +163,7 @@ public class InventoryCount
         var item = _items.FirstOrDefault(x => x.Id == itemId);
         if (item is null)
         {
-            return OperationError.NotFound<InventoryCountItem>();
+            return OperationError.NotFound();
         }
 
         var auditResult = ValidateAudit(removedAtUtc, removedBy, "Deleting user must be specified.");
@@ -187,8 +187,8 @@ public class InventoryCount
 
         if (_items.Any(x => !x.IsComplete))
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Every inventory count item must have a storage location and SKU before posting.");
+            return OperationError.Invalid(
+                "Перед проведением в каждой строке должны быть указаны складская позиция и номенклатура.");
         }
 
         var hasDuplicates = _items
@@ -196,8 +196,8 @@ public class InventoryCount
             .Any(x => x.Count() > 1);
         if (hasDuplicates)
         {
-            return OperationError.Invalid<InventoryCountItem>(
-                "Storage location and SKU combination must be unique within the inventory count.");
+            return OperationError.Invalid(
+                "Сочетание складской позиции и номенклатуры не должно повторяться в инвентаризации.");
         }
 
         var auditResult = ValidateAudit(postedAtUtc, postedBy, "Posting user must be specified.");
@@ -209,8 +209,8 @@ public class InventoryCount
         if (postedAtUtc < CreatedAtUtc
             || _items.Any(x => x.CreatedAtUtc > postedAtUtc || x.UpdatedAtUtc > postedAtUtc))
         {
-            return OperationError.Invalid<InventoryCount>(
-                "Posting time cannot precede inventory count changes.");
+            return OperationError.Invalid(
+                "Время проведения не может предшествовать последнему изменению инвентаризации.");
         }
 
         Status = InventoryCountStatus.Posted;
@@ -224,7 +224,7 @@ public class InventoryCount
     {
         return Status == InventoryCountStatus.Draft
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryCount>(message);
+            : OperationError.Invalid(message);
     }
 
     private void Touch(DateTimeOffset updatedAtUtc, string updatedBy)
@@ -240,12 +240,12 @@ public class InventoryCount
     {
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<InventoryCount>("Operation time is required.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
         if (string.IsNullOrWhiteSpace(userId))
         {
-            return OperationError.Invalid<InventoryCount>(missingUserMessage);
+            return OperationError.Invalid(missingUserMessage);
         }
 
         return OperationResult.Success();

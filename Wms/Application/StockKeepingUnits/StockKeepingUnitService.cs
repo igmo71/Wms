@@ -52,17 +52,6 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<StockKeepingUnit?> GetAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var result = await dbContext.StockKeepingUnits
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, ct);
-
-        return result;
-    }
-
     public async Task<ListResult<StockKeepingUnit>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

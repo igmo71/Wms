@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Wms.Integration.OneS.Models;
-using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS.Endpoints;
 
@@ -15,21 +14,10 @@ public static class Document_ПриходныйОрдерНаТовары_Endpoi
             .WithTags("Document_ПриходныйОрдерНаТовары")
             .ProducesValidationProblem();
 
-        group.MapGet("/Document_ПриходныйОрдерНаТовары/import", ImportOrder)
-            .WithName("Document_ПриходныйОрдерНаТовары.Import");
         group.MapPost("/Document_ПриходныйОрдерНаТовары/notify", NotifyOrder)
             .WithName("Document_ПриходныйОрдерНаТовары.Notify");
 
         return routeBuilder;
-    }
-
-    static async Task<IResult> ImportOrder(
-        [FromServices] Document_ПриходныйОрдерНаТовары_InboundService service,
-        CancellationToken ct)
-    {
-        await service.ImportDocumentListAsync(ct);
-
-        return TypedResults.Ok();
     }
 
     static async Task<IResult> NotifyOrder(

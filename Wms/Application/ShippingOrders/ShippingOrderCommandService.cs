@@ -52,19 +52,17 @@ public class ShippingOrderCommandService(
 
         if (reconciliationResult.Value == ShippingOrderReconciliation.Unchanged)
         {
-            logger.LogDebug("No external document changes detected");
+            logger.LogDebug("Изменения документа в 1С не обнаружены");
             return OperationResult.Success();
         }
 
         await dbContext.SaveChangesAsync(ct);
         if (reconciliationResult.Value == ShippingOrderReconciliation.Conflict)
         {
-            logger.LogWarning(
-                "External shipping order changes conflict. Local status: {LocalStatus}, external status: {ExternalStatus}",
-                existingOrder.Status,
-                snapshot.Status);
+            logger.LogWarning("Изменения расходного ордера в 1С конфликтуют с локальными. Локальный статус: {LocalStatus}, статус 1С: {ExternalStatus}",
+                existingOrder.Status, snapshot.Status);
             return OperationError.Conflict(
-                "External shipping order changes conflict with local processing.");
+                "Изменения расходного ордера в 1С конфликтуют с локальной обработкой.");
         }
 
         return OperationResult.Success();
@@ -83,14 +81,14 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Not Found");
-            return OperationError.NotFound<ShippingOrder>();
+            logger.LogError("Расходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         OperationResult transitionResult = existingOrder.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
         if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set ready for picking failed: {ErrorMessage}", transitionResult.Error?.Message);
+            logger.LogError("Не удалось подготовить расходный ордер к отбору: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
@@ -98,7 +96,7 @@ public class ShippingOrderCommandService(
 
         if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to set external document ready for picking: {ErrorMessage}", externalResult.Error?.Message);
+            logger.LogError("Не удалось подготовить документ 1С к отбору: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
 
@@ -121,8 +119,8 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Not Found");
-            return OperationError.NotFound<ShippingOrder>();
+            logger.LogError("Расходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         List<InventoryMovement> draftPickingMovements = await dbContext.InventoryMovements
@@ -137,7 +135,7 @@ public class ShippingOrderCommandService(
             userId);
         if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set ready for shipment failed: {ErrorMessage}", transitionResult.Error?.Message);
+            logger.LogError("Не удалось подготовить расходный ордер к отгрузке: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
@@ -153,7 +151,7 @@ public class ShippingOrderCommandService(
 
         if (!externalItemsUpdateResult.IsSuccess)
         {
-            logger.LogError("Failed to update external order items: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
+            logger.LogError("Не удалось обновить строки расходного ордера в 1С: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
             return externalItemsUpdateResult;
         }
 
@@ -161,7 +159,7 @@ public class ShippingOrderCommandService(
 
         if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to set external document ready for shipment: {ErrorMessage}", externalResult.Error?.Message);
+            logger.LogError("Не удалось подготовить документ 1С к отгрузке: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
 
@@ -183,15 +181,15 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Not Found");
-            return OperationError.NotFound<ShippingOrder>();
+            logger.LogError("Расходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationResult transitionResult = existingOrder.SetShipped(now, userId);
         if (!transitionResult.IsSuccess)
         {
-            logger.LogError("Validation to set shipped failed: {ErrorMessage}", transitionResult.Error?.Message);
+            logger.LogError("Не удалось завершить отгрузку расходного ордера: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
@@ -216,7 +214,7 @@ public class ShippingOrderCommandService(
 
         if (!externalResult.IsSuccess)
         {
-            logger.LogError("Failed to set external document shipped: {ErrorMessage}", externalResult.Error?.Message);
+            logger.LogError("Не удалось завершить отгрузку документа в 1С: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
 
@@ -237,7 +235,7 @@ public class ShippingOrderCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound<ShippingOrder>();
+            return OperationError.NotFound();
         }
 
         bool validLocation = await dbContext.StorageLocations
@@ -250,7 +248,7 @@ public class ShippingOrderCommandService(
 
         if (!validLocation)
         {
-            return OperationError.Invalid<StorageLocation>("Shipping location must belong to a shipping zone in the order warehouse.");
+            return OperationError.Invalid("Позиция отгрузки должна принадлежать зоне отгрузки на складе ордера.");
         }
 
         OperationResult locationResult = order.SetShippingLocation(shippingLocationId);
@@ -280,8 +278,8 @@ public class ShippingOrderCommandService(
 
         if (order is null)
         {
-            logger.LogError("Shipping order not found");
-            return OperationError.NotFound<ShippingOrder>();
+            logger.LogError("Расходный ордер не найден");
+            return OperationError.NotFound();
         }
 
         List<InventoryMovement> draftMovements = await dbContext.InventoryMovements
@@ -305,7 +303,7 @@ public class ShippingOrderCommandService(
             postedMovements);
         if (!rollbackResult.IsSuccess)
         {
-            logger.LogError("Shipping order rollback validation failed: {ErrorMessage}", rollbackResult.Error?.Message);
+            logger.LogError("Не удалось отменить операцию расходного ордера: {ErrorMessage}", rollbackResult.Error?.Message);
             return rollbackResult.Error!;
         }
 
@@ -321,14 +319,14 @@ public class ShippingOrderCommandService(
 
             if (!postingResult.IsSuccess)
             {
-                logger.LogError("Shipping order rollback failed to compensate movements: {ErrorMessage}", postingResult.Error?.Message);
+                logger.LogError("При отмене операции расходного ордера не удалось компенсировать движения: {ErrorMessage}", postingResult.Error?.Message);
                 return postingResult;
             }
         }
 
         await dbContext.SaveChangesAsync(ct);
 
-        logger.LogInformation("Shipping order rolled back by {UserId}. Reason: {Reason}", userId, reason.Trim());
+        logger.LogInformation("Операция расходного ордера отменена пользователем {UserId}. Причина: {Reason}", userId, reason.Trim());
         return OperationResult.Success();
     }
 

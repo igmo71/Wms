@@ -50,8 +50,8 @@ public class ShippingOrderItem
 
         if (snapshot.LineNumber != LineNumber)
         {
-            return OperationError.Invalid<ShippingOrderItem>(
-                "Shipping order item line number cannot be changed.");
+            return OperationError.Invalid(
+                "Номер строки расходного ордера нельзя изменить.");
         }
 
         StockKeepingUnitId = snapshot.StockKeepingUnitId;
@@ -63,8 +63,8 @@ public class ShippingOrderItem
     {
         if (!double.IsFinite(factQuantity) || factQuantity < 0 || factQuantity > PlanQuantity)
         {
-            return OperationError.Invalid<ShippingOrderItem>(
-                "Fact quantity must be finite and between zero and the planned quantity.");
+            return OperationError.Invalid(
+                "Фактическое количество должно быть конечным числом от нуля до планового количества.");
         }
 
         FactQuantity = factQuantity;
@@ -82,24 +82,24 @@ public class ShippingOrderItem
     {
         if (shippingOrderId == Guid.Empty)
         {
-            return OperationError.Invalid<ShippingOrder>("Shipping order identifier is required.");
+            return OperationError.Invalid("Идентификатор расходного ордера обязателен.");
         }
 
         if (snapshot.LineNumber <= 0)
         {
-            return OperationError.Invalid<ShippingOrderItem>(
-                "Shipping order item line number must be positive.");
+            return OperationError.Invalid(
+                "Номер строки расходного ордера должен быть положительным.");
         }
 
         if (snapshot.StockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid<StockKeepingUnit>("SKU identifier is required.");
+            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
         if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
         {
-            return OperationError.Invalid<ShippingOrderItem>(
-                "Planned quantity must be a finite non-negative number.");
+            return OperationError.Invalid(
+                "Плановое количество должно быть конечным неотрицательным числом.");
         }
 
         return OperationResult.Success();

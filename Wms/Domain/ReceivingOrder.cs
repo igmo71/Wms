@@ -61,8 +61,8 @@ public class ReceivingOrder
 
         if (snapshot.Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "A receiving order can be created only when it is ready for receiving.");
+            return OperationError.Invalid(
+                "Приходный ордер можно создать только в статусе готовности к приёмке.");
         }
 
         var order = new ReceivingOrder
@@ -93,8 +93,8 @@ public class ReceivingOrder
     {
         if (snapshot.Id != Id)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Imported receiving order must match the existing order.");
+            return OperationError.Invalid(
+                "Импортируемый приходный ордер должен соответствовать существующему ордеру.");
         }
 
         if (!HasExternalChanges(snapshot))
@@ -116,8 +116,8 @@ public class ReceivingOrder
 
         if (updatedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving order update time cannot precede its creation time.");
+            return OperationError.Invalid(
+                "Время изменения приходного ордера не может предшествовать времени его создания.");
         }
 
         var itemsResult = ReconcileItems(snapshot.Items);
@@ -136,15 +136,15 @@ public class ReceivingOrder
     {
         if (receivingLocationId == Guid.Empty)
         {
-            return OperationError.Invalid<StorageLocation>("Receiving location identifier is required.");
+            return OperationError.Invalid("Идентификатор позиции приёмки обязателен.");
         }
 
         if (Status is not (ReceivingOrderStatus.ReadyForReceiving
             or ReceivingOrderStatus.InReceiving
             or ReceivingOrderStatus.ProcessingRequired))
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location can be changed only before the order is received.");
+            return OperationError.Invalid(
+                "Позицию приёмки можно изменить только до завершения приёмки ордера.");
         }
 
         ReceivingLocationId = receivingLocationId;
@@ -155,14 +155,14 @@ public class ReceivingOrder
     {
         if (Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Only a receiving order ready for receiving can be set in receiving.");
+            return OperationError.Invalid(
+                "Взять в работу можно только ордер, готовый к приёмке.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location must be specified before setting the order in receiving.");
+            return OperationError.Invalid(
+                "Перед началом приёмки необходимо указать позицию приёмки.");
         }
 
         return OperationResult.Success();
@@ -176,7 +176,7 @@ public class ReceivingOrder
             return validationResult;
         }
 
-        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Starting user must be specified.");
+        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Необходимо указать пользователя, начавшего операцию.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -184,8 +184,8 @@ public class ReceivingOrder
 
         if (startedAtUtc < CreatedAtUtc)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving start time cannot precede order creation.");
+            return OperationError.Invalid(
+                "Время начала приёмки не может предшествовать созданию ордера.");
         }
 
         Status = ReceivingOrderStatus.InReceiving;
@@ -202,13 +202,13 @@ public class ReceivingOrder
         if (Status is not (ReceivingOrderStatus.InReceiving
             or ReceivingOrderStatus.ProcessingRequired))
         {
-            return OperationError.Invalid<ReceivingOrderItem>(
-                "Fact quantity can be edited only while the receiving order is in receiving or requires processing.");
+            return OperationError.Invalid(
+                "Фактическое количество можно изменять только во время приёмки или обработки ордера.");
         }
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         return item is null
-            ? OperationError.NotFound<ReceivingOrderItem>()
+            ? OperationError.NotFound()
             : item.UpdateFact(factQuantity, comment);
     }
 
@@ -217,14 +217,14 @@ public class ReceivingOrder
         if (Status is not (ReceivingOrderStatus.InReceiving
             or ReceivingOrderStatus.ProcessingRequired))
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Only a receiving order in receiving or requiring processing can be set received.");
+            return OperationError.Invalid(
+                "Завершить приёмку можно только для ордера в приёмке или обработке.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location must be specified before receiving the order.");
+            return OperationError.Invalid(
+                "Перед завершением приёмки необходимо указать позицию приёмки.");
         }
 
         return OperationResult.Success();
@@ -238,7 +238,7 @@ public class ReceivingOrder
             return validationResult;
         }
 
-        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Completing user must be specified.");
+        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Необходимо указать пользователя, завершившего операцию.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -246,8 +246,8 @@ public class ReceivingOrder
 
         if (completedAtUtc < CreatedAtUtc || completedAtUtc < StartedAtUtc)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving completion time cannot precede earlier order operations.");
+            return OperationError.Invalid(
+                "Время завершения приёмки не может предшествовать предыдущим операциям ордера.");
         }
 
         Status = ReceivingOrderStatus.Received;
@@ -263,24 +263,24 @@ public class ReceivingOrder
     {
         if (Status != ReceivingOrderStatus.Received)
         {
-            return OperationError.Invalid<ReceivingOrder>("Only a received order can be put away.");
+            return OperationError.Invalid("Размещать можно только принятый ордер.");
         }
 
         if (PutawayStatus != PutawayStatus.Pending)
         {
-            return OperationError.Invalid<ReceivingOrder>("Only pending putaway can be started.");
+            return OperationError.Invalid("Начать можно только ожидающее размещение.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location must be specified before starting putaway.");
+            return OperationError.Invalid(
+                "Перед началом размещения необходимо указать позицию приёмки.");
         }
 
         if (!_items.Any(x => x.FactQuantity > 0))
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Putaway requires a positive received quantity.");
+            return OperationError.Invalid(
+                "Для размещения необходимо положительное принятое количество.");
         }
 
         return OperationResult.Success();
@@ -294,7 +294,7 @@ public class ReceivingOrder
             return validationResult;
         }
 
-        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Starting user must be specified.");
+        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Необходимо указать пользователя, начавшего операцию.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -302,8 +302,8 @@ public class ReceivingOrder
 
         if (startedAtUtc < CompletedAtUtc)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Putaway start time cannot precede receiving completion.");
+            return OperationError.Invalid(
+                "Время начала размещения не может предшествовать завершению приёмки.");
         }
 
         PutawayStatus = PutawayStatus.InProgress;
@@ -329,7 +329,7 @@ public class ReceivingOrder
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         if (item is null)
         {
-            return OperationError.NotFound<ReceivingOrderItem>();
+            return OperationError.NotFound();
         }
 
         var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, null);
@@ -367,7 +367,7 @@ public class ReceivingOrder
         var item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound<ReceivingOrderItem>();
+            return OperationError.NotFound();
         }
 
         var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, movement.Id);
@@ -398,7 +398,7 @@ public class ReceivingOrder
             return completionResult;
         }
 
-        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Completing user must be specified.");
+        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Необходимо указать пользователя, завершившего операцию.");
         if (!auditResult.IsSuccess)
         {
             return auditResult;
@@ -406,8 +406,8 @@ public class ReceivingOrder
 
         if (completedAtUtc < PutawayStartedAtUtc)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Putaway completion time cannot precede its start.");
+            return OperationError.Invalid(
+                "Время завершения размещения не может предшествовать его началу.");
         }
 
         PutawayStatus = PutawayStatus.Completed;
@@ -421,14 +421,14 @@ public class ReceivingOrder
         if (Status != ReceivingOrderStatus.Received
             || PutawayStatus != PutawayStatus.InProgress)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Putaway movements can be changed only while putaway is in progress.");
+            return OperationError.Invalid(
+                "Движения размещения можно изменять только во время размещения.");
         }
 
         if (ReceivingLocationId is null)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving location must be specified for putaway.");
+            return OperationError.Invalid(
+                "Для размещения необходимо указать позицию приёмки.");
         }
 
         return OperationResult.Success();
@@ -454,8 +454,8 @@ public class ReceivingOrder
             || movement.SourceStorageLocationId is null
             || movement.DestinationStorageLocationId is null)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Movement does not belong to a receiving-order putaway line.");
+            return OperationError.Invalid(
+                "Движение не относится к строке размещения приходного ордера.");
         }
 
         return OperationResult.Success();
@@ -472,7 +472,7 @@ public class ReceivingOrder
 
         if (draftMovements.Count == 0)
         {
-            return OperationError.Invalid<ReceivingOrder>("Putaway has no movements.");
+            return OperationError.Invalid("В размещении отсутствуют движения.");
         }
 
         if (draftMovements.Any(x => x.PostedAtUtc is not null
@@ -482,7 +482,7 @@ public class ReceivingOrder
             || x.SourceStorageLocationId != ReceivingLocationId
             || x.DestinationStorageLocationId is null))
         {
-            return OperationError.Invalid<InventoryMovement>("Putaway contains an invalid movement.");
+            return OperationError.Invalid("Размещение содержит некорректное движение.");
         }
 
         foreach (var item in _items)
@@ -494,15 +494,15 @@ public class ReceivingOrder
             if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
                 || movements.Sum(x => x.Quantity) != item.FactQuantity)
             {
-                return OperationError.Invalid<ReceivingOrder>(
-                    "Every received order line must be fully allocated before completing putaway.");
+                return OperationError.Invalid(
+                    "Перед завершением размещения каждая строка ордера должна быть размещена полностью.");
             }
         }
 
         if (draftMovements.Any(x => _items.All(item => item.LineNumber != x.RecorderLineNumber)))
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Putaway contains a movement for an unknown order line.");
+            return OperationError.Invalid(
+                "Размещение содержит движение для неизвестной строки ордера.");
         }
 
         return OperationResult.Success();
@@ -516,8 +516,8 @@ public class ReceivingOrder
     {
         if (!double.IsFinite(quantity) || quantity <= 0)
         {
-            return OperationError.Invalid<InventoryMovement>(
-                "Putaway quantity must be a finite number greater than zero.");
+            return OperationError.Invalid(
+                "Количество размещения должно быть конечным числом больше нуля.");
         }
 
         var lineQuantity = draftMovements
@@ -527,8 +527,8 @@ public class ReceivingOrder
 
         return lineQuantity <= item.FactQuantity
             ? OperationResult.Success()
-            : OperationError.Invalid<InventoryMovement>(
-                "Putaway quantity exceeds the received quantity for the order line.");
+            : OperationError.Invalid(
+                "Количество размещения превышает принятое количество по строке ордера.");
     }
 
     internal void SetShipper(PartyInfo? shipper)
@@ -542,25 +542,25 @@ public class ReceivingOrder
     {
         if (snapshot.Id == Guid.Empty || snapshot.WarehouseId == Guid.Empty)
         {
-            return OperationError.Invalid<ReceivingOrder>(
-                "Receiving order and warehouse identifiers are required.");
+            return OperationError.Invalid(
+                "Идентификаторы приходного ордера и склада обязательны.");
         }
 
         if (snapshot.Date == default)
         {
-            return OperationError.Invalid<ReceivingOrder>("Receiving order date is required.");
+            return OperationError.Invalid("Дата приходного ордера обязательна.");
         }
 
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<ReceivingOrder>("Import time is required.");
+            return OperationError.Invalid("Время импорта обязательно.");
         }
 
         if (snapshot.Items is null
             || snapshot.Items.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
         {
-            return OperationError.Invalid<ReceivingOrderItem>(
-                "Receiving order item line numbers must be unique.");
+            return OperationError.Invalid(
+                "Номера строк приходного ордера не должны повторяться.");
         }
 
         foreach (var itemSnapshot in snapshot.Items)
@@ -673,11 +673,11 @@ public class ReceivingOrder
     {
         if (occurredAtUtc == default)
         {
-            return OperationError.Invalid<ReceivingOrder>("Operation time is required.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
         return string.IsNullOrWhiteSpace(userId)
-            ? OperationError.Invalid<ReceivingOrder>(missingUserMessage)
+            ? OperationError.Invalid(missingUserMessage)
             : OperationResult.Success();
     }
 }

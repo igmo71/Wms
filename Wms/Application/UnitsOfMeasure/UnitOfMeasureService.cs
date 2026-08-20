@@ -21,17 +21,6 @@ public class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCont
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task<UnitOfMeasure?> GetAsync(Guid id, CancellationToken ct = default)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var result = await dbContext.UnitsOfMeasure
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, ct);
-
-        return result;
-    }
-
     public async Task<ListResult<UnitOfMeasure>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
