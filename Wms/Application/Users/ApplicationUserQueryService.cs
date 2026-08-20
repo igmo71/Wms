@@ -23,6 +23,11 @@ public class ApplicationUserQueryService(IDbContextFactory<ApplicationDbContext>
         return await dbContext.Users
             .AsNoTracking()
             .Where(x => ids.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, x => x.UserName ?? x.Id, ct);
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => string.IsNullOrWhiteSpace(x.DisplayName)
+                    ? x.UserName ?? x.Id
+                    : x.DisplayName,
+                ct);
     }
 }

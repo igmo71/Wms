@@ -1,0 +1,58 @@
+@using Wms.Application.Users
+@using Wms.Data
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField T="string"
+                          @bind-Value="_displayName"
+                          Label="Отображаемое имя"
+                          Required="true"
+                          Immediate="true"
+                          MaxLength="ApplicationUser.DisplayNameMaxLength" />
+            <MudTextField T="string"
+                          @bind-Value="_email"
+                          Label="Email"
+                          Required="true"
+                          Immediate="true"
+                          InputType="InputType.Email"
+                          Disabled="@(User is not null)" />
+            @if (User is null)
+            {
+                <MudTextField T="string"
+                              @bind-Value="_password"
+                              Label="Начальный пароль"
+                              Required="true"
+                              Immediate="true"
+                              InputType="InputType.Password" />
+            }
+            <MudSelect T="string"
+                       @bind-Value="_role"
+                       Label="Роль"
+                       Required="true">
+                <MudSelectItem T="string" Value="@ApplicationRoles.Operator">Оператор</MudSelectItem>
+                <MudSelectItem T="string" Value="@ApplicationRoles.Administrator">Администратор</MudSelectItem>
+            </MudSelect>
+            @if (User is not null)
+            {
+                <MudSwitch T="bool"
+                           @bind-Value="_isBlocked"
+                           Color="Color.Error"
+                           Label="Вход заблокирован" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@IsSaveDisabled"
+                   OnClick="SaveAsync">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>

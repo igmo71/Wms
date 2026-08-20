@@ -1,6 +1,7 @@
 ﻿@page "/Account/Register"
 
 @using System.ComponentModel.DataAnnotations
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = ApplicationRoles.Administrator)]
 @using System.Text
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
@@ -56,6 +57,7 @@
 </MudGrid>
 
 @code {
+    private static readonly bool PublicRegistrationEnabled = false;
     private IEnumerable<IdentityError>? identityErrors;
 
     [SupplyParameterFromForm]
@@ -66,10 +68,26 @@
 
     private string? Message => identityErrors is null ? null : $"Ошибка: {string.Join(", ", identityErrors.Select(error => error.Description))}";
 
-    protected override void OnInitialized() => Input ??= new();
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+
+        if (!PublicRegistrationEnabled)
+        {
+            RedirectManager.RedirectTo("users");
+            return;
+        }
+
+    }
 
     public async Task RegisterUser(EditContext editContext)
     {
+        if (!PublicRegistrationEnabled)
+        {
+            RedirectManager.RedirectTo("users");
+            return;
+        }
+
         var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);

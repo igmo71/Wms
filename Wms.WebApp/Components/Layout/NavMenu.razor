@@ -1,8 +1,11 @@
 ﻿@implements IDisposable
 
+@using Wms.Data
 @inject NavigationManager NavigationManager
 
 <MudNavMenu>
+    <AuthorizeView Roles="@ApplicationRoles.WmsUser" Context="wmsContext">
+        <Authorized>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
     <MudNavLink Href="receiving-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assignment">Приемка</MudNavLink>
     <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
@@ -16,6 +19,7 @@
     <MudNavGroup Title="Отчеты" Icon="@Icons.Material.Filled.Assessment">
         <MudNavLink Href="reports/employee-performance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Производительность сотрудников</MudNavLink>
     </MudNavGroup>
+    <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="configurationContext">
     <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">
         <MudNavLink Href="warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Склады</MudNavLink>
         <MudNavLink Href="zones" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Зоны</MudNavLink>
@@ -28,7 +32,13 @@
         <MudNavLink Href="units-of-measure" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Единицы измерения</MudNavLink>
         <MudNavLink Href="delivery-directions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Направления доставки</MudNavLink>
     </MudNavGroup>
-    @* <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink> *@
+    </AuthorizeView>
+            @* <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink> *@
+            <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="administratorContext">
+                <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ManageAccounts">Пользователи</MudNavLink>
+            </AuthorizeView>
+        </Authorized>
+    </AuthorizeView>
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="Account/Manage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
@@ -41,7 +51,6 @@
             </form>
         </Authorized>
         <NotAuthorized>
-            <MudNavLink Href="Account/Register" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">Register</MudNavLink>
             <MudNavLink Href="Account/Login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Password">Login</MudNavLink>
         </NotAuthorized>
     </AuthorizeView>

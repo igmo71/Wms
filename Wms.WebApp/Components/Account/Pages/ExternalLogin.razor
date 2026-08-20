@@ -46,6 +46,7 @@
 
 @code {
     public const string LoginCallbackAction = "LoginCallback";
+    private static readonly bool PublicRegistrationEnabled = false;
 
     private string? message;
     private ExternalLoginInfo? externalLoginInfo;
@@ -125,6 +126,15 @@
         else if (result.IsLockedOut)
         {
             RedirectManager.RedirectTo("Account/Lockout");
+            return;
+        }
+
+        if (!PublicRegistrationEnabled)
+        {
+            RedirectManager.RedirectToWithStatus(
+                "Account/Login",
+                "Самостоятельная регистрация отключена. Обратитесь к администратору WMS.",
+                HttpContext);
             return;
         }
 

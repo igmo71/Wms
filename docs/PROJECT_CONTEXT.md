@@ -131,6 +131,34 @@ user, complete timestamps, or a nonnegative duration are excluded as invalid
 audit data. The detailed rules are defined in
 `specs/employee-performance-report/spec.md`.
 
+## Authentication and users
+
+The operator web application uses ASP.NET Core Identity with two fixed WMS
+roles. `Administrator` and `Operator` may both access operational and report
+pages; only `Administrator` may access configuration catalogs and manage user accounts. Anonymous users
+may access account endpoints needed to sign in but not WMS pages. Public local
+self-registration is retained in the source for possible future use but is not
+linked publicly and requires the administrator role; creation of a new account
+through an external login is disabled.
+
+The administrator user page creates confirmed local accounts and edits their
+current display name, single WMS role, and sign-in block. An administrator
+cannot block their own account or remove their own administrator role, and the
+last active administrator cannot be blocked or demoted.
+
+`ApplicationUser.DisplayName` is the human-readable name shown in operational
+audit and employee reports. Existing accounts with an empty display name fall
+back to Identity `UserName`. Operational records continue storing only the
+Identity user identifier, so changing a display name also changes historical
+display; deleted users remain identified by their stored identifier.
+
+Roles are initialized idempotently at web application startup. Existing users
+without a WMS role become operators. The first administrator is selected with
+`IdentityBootstrap__AdministratorEmail`; when that account does not exist,
+`IdentityBootstrap__AdministratorDisplayName` and the secret
+`IdentityBootstrap__AdministratorPassword` are also required to create it.
+The bootstrap password must not be committed to application settings.
+
 ## MVP implementation principles
 
 The project favors clear, direct code and incremental enrichment over
