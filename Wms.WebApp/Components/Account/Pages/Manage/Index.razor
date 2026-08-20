@@ -19,6 +19,11 @@
 
     <MudGrid>
         <MudItem md="12">
+            <MudStaticTextField For="@(() => Input.DisplayName)" @bind-Value="Input.DisplayName"
+                                Label="Отображаемое имя" Placeholder="Иванов Иван Иванович"
+                                UserAttributes="@(new() { { "autocomplete", "name" }, { "aria-required", "true" } } )" />
+        </MudItem>
+        <MudItem md="12">
             <MudStaticTextField Value="@username" Label="Username" Disabled="true" Placeholder="Please choose your username." />
         </MudItem>
         <MudItem md="12">
@@ -36,6 +41,7 @@
     private ApplicationUser? user;
     private string? username;
     private string? phoneNumber;
+    private string? displayName;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -54,8 +60,10 @@
         }
         username = await UserManager.GetUserNameAsync(user);
         phoneNumber = await UserManager.GetPhoneNumberAsync(user);
+        displayName = user.DisplayName;
 
         Input.PhoneNumber ??= phoneNumber;
+        Input.DisplayName ??= displayName;
     }
 
     private async Task OnValidSubmitAsync()
@@ -76,12 +84,30 @@
             }
         }
 
+        if (Input.DisplayName != displayName)
+        {
+            user.DisplayName = string.Join(' ', Input.DisplayName.Split(
+                ' ', StringSplitOptions.RemoveEmptyEntries));
+            var updateResult = await UserManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                RedirectManager.RedirectToCurrentPageWithStatus(
+                    "Ошибка: не удалось сохранить отображаемое имя.", HttpContext);
+                return;
+            }
+        }
+
         await SignInManager.RefreshSignInAsync(user);
         RedirectManager.RedirectToCurrentPageWithStatus("Профиль обновлен.", HttpContext);
     }
 
     private sealed class InputModel
     {
+        [Required]
+        [StringLength(ApplicationUser.DisplayNameMaxLength)]
+        [Display(Name = "Отображаемое имя")]
+        public string DisplayName { get; set; } = string.Empty;
+
         [Phone]
         [Display(Name = "Phone number")]
         public string? PhoneNumber { get; set; }
