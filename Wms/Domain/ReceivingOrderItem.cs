@@ -1,24 +1,104 @@
-﻿using Wms.Common;
+using Wms.Common;
 
 namespace Wms.Domain;
 
 public class ReceivingOrderItem
 {
-    public Guid ReceivingOrderId { get; set; }
-    public ReceivingOrder? ReceivingOrder { get; set; }
+    private ReceivingOrderItem()
+    {
+    }
 
-    public int LineNumber { get; set; }
-
-    public Guid StockKeepingUnitId { get; set; }
-    public StockKeepingUnit? StockKeepingUnit { get; set; }
-
-    public double PlanQuantity { get; set; }
-    public double FactQuantity { get; set; }
-
-    public string? Comment { get; set; }
+    public Guid ReceivingOrderId { get; private set; }
+    public ReceivingOrder? ReceivingOrder { get; private set; }
+    public int LineNumber { get; private set; }
+    public Guid StockKeepingUnitId { get; private set; }
+    public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public double PlanQuantity { get; private set; }
+    public double FactQuantity { get; private set; }
+    public string? Comment { get; private set; }
 
     public double RemainingQuantity => PlanQuantity - FactQuantity;
     public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
     public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
+
+    internal static OperationResult<ReceivingOrderItem> Create(
+        Guid receivingOrderId,
+        ReceivingOrderItemImportSnapshot snapshot)
+    {
+        var validationResult = ValidateImport(receivingOrderId, snapshot);
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult.Error!;
+        }
+
+        return new ReceivingOrderItem
+        {
+            ReceivingOrderId = receivingOrderId,
+            LineNumber = snapshot.LineNumber,
+            StockKeepingUnitId = snapshot.StockKeepingUnitId,
+            PlanQuantity = snapshot.PlanQuantity
+        };
+    }
+
+    internal OperationResult Reconcile(ReceivingOrderItemImportSnapshot snapshot)
+    {
+        var validationResult = ValidateImport(ReceivingOrderId, snapshot);
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult;
+        }
+
+        if (snapshot.LineNumber != LineNumber)
+        {
+            return OperationError.Invalid(
+                "Номер строки приходного ордера нельзя изменить.");
+        }
+
+        StockKeepingUnitId = snapshot.StockKeepingUnitId;
+        PlanQuantity = snapshot.PlanQuantity;
+        return OperationResult.Success();
+    }
+
+    internal OperationResult UpdateFact(double factQuantity, string? comment)
+    {
+        if (!double.IsFinite(factQuantity) || factQuantity < 0)
+        {
+            return OperationError.Invalid(
+                "Фактическое количество должно быть конечным неотрицательным числом.");
+        }
+
+        FactQuantity = factQuantity;
+        Comment = comment;
+        return OperationResult.Success();
+    }
+
+    internal static OperationResult ValidateImport(
+        Guid receivingOrderId,
+        ReceivingOrderItemImportSnapshot snapshot)
+    {
+        if (receivingOrderId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификатор приходного ордера обязателен.");
+        }
+
+        if (snapshot.LineNumber <= 0)
+        {
+            return OperationError.Invalid(
+                "Номер строки приходного ордера должен быть положительным.");
+        }
+
+        if (snapshot.StockKeepingUnitId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
+        }
+
+        if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
+        {
+            return OperationError.Invalid(
+                "Плановое количество должно быть конечным неотрицательным числом.");
+        }
+
+        return OperationResult.Success();
+    }
 }

@@ -3,7 +3,7 @@ using Wms.Domain.Enums;
 
 namespace Wms.WebApp;
 
-public static class PartyDisplay
+internal static class PartyDisplay
 {
     public static string Format(PartyInfo? party, Guid id, PartyType type)
     {

@@ -4,26 +4,72 @@ namespace Wms.Domain;
 
 public class InventoryTurnover
 {
-    public Guid Id { get; set; }
+    private InventoryTurnover()
+    {
+    }
 
-    public Guid WarehouseId { get; set; }
-    public Warehouse? Warehouse { get; set; }
-
-    public Guid StorageLocationId { get; set; }
-    public StorageLocation? StorageLocation { get; set; }
-
-    public Guid StockKeepingUnitId { get; set; }
-    public StockKeepingUnit? StockKeepingUnit { get; set; }
-
-    public double QuantityDelta { get; set; }
-    public double BalanceBefore { get; set; }
-    public double BalanceAfter { get; set; }
+    public Guid Id { get; private set; }
+    public Guid WarehouseId { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public Guid StorageLocationId { get; private set; }
+    public StorageLocation? StorageLocation { get; private set; }
+    public Guid StockKeepingUnitId { get; private set; }
+    public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public double QuantityDelta { get; private set; }
+    public double BalanceBefore { get; private set; }
+    public double BalanceAfter { get; private set; }
     public double? WeightDeltaKg => WeightCalculation.CalculateKg(QuantityDelta, StockKeepingUnit);
     public double? WeightBeforeKg => WeightCalculation.CalculateKg(BalanceBefore, StockKeepingUnit);
     public double? WeightAfterKg => WeightCalculation.CalculateKg(BalanceAfter, StockKeepingUnit);
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public Guid InventoryMovementId { get; private set; }
+    public InventoryMovement? InventoryMovement { get; private set; }
 
-    public DateTimeOffset CreatedAtUtc { get; set; }
+    public static OperationResult<InventoryTurnover> Create(
+        Guid id,
+        Guid warehouseId,
+        Guid storageLocationId,
+        Guid stockKeepingUnitId,
+        InventoryBalanceChange change,
+        DateTimeOffset createdAtUtc,
+        Guid inventoryMovementId)
+    {
+        if (id == Guid.Empty
+            || warehouseId == Guid.Empty
+            || storageLocationId == Guid.Empty
+            || stockKeepingUnitId == Guid.Empty
+            || inventoryMovementId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификаторы оборота обязательны.");
+        }
 
-    public Guid InventoryMovementId { get; set; }
-    public InventoryMovement? InventoryMovement { get; set; }
+        if (!double.IsFinite(change.BalanceBefore)
+            || !double.IsFinite(change.QuantityDelta)
+            || !double.IsFinite(change.BalanceAfter)
+            || change.QuantityDelta == 0
+            || change.BalanceBefore < 0
+            || change.BalanceAfter < 0
+            || change.BalanceBefore + change.QuantityDelta != change.BalanceAfter)
+        {
+            return OperationError.Invalid("Изменение остатка в обороте некорректно.");
+        }
+
+        if (createdAtUtc == default)
+        {
+            return OperationError.Invalid("Время создания оборота обязательно.");
+        }
+
+        return new InventoryTurnover
+        {
+            Id = id,
+            WarehouseId = warehouseId,
+            StorageLocationId = storageLocationId,
+            StockKeepingUnitId = stockKeepingUnitId,
+            QuantityDelta = change.QuantityDelta,
+            BalanceBefore = change.BalanceBefore,
+            BalanceAfter = change.BalanceAfter,
+            CreatedAtUtc = createdAtUtc,
+            InventoryMovementId = inventoryMovementId
+        };
+    }
 }

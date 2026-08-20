@@ -1,6 +1,6 @@
 ﻿namespace Wms.Data.Configurations;
 
-public static class DefaultConfiguration
+internal static class DefaultConfiguration
 {
     public const int Code = 32;
     public const int Name = 200;

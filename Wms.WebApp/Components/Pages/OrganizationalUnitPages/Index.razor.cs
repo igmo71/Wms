@@ -1,15 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.OrganizationalUnits;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.OrganizationalUnitPages;
 
 public partial class Index
 {
     [Inject] private OrganizationalUnitService OrganizationalUnitService { get; set; } = null!;
-    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
+    [Inject] private Catalog_СтруктураПредприятия_Service CatalogImportService { get; set; } = null!;
 
     private MudDataGrid<OrganizationalUnit> _dataGrid = null!;
     private string? _searchString;
@@ -62,7 +63,7 @@ public partial class Index
 
         try
         {
-            var result = await SynchronizedCatalogImportService.RefreshOrganizationalUnitsAsync();
+            var result = await CatalogImportService.ImportListAsync();
             if (!result.IsSuccess)
             {
                 _importFailed = true;

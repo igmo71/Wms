@@ -55,9 +55,10 @@ prematurely.
 
 ### Changes
 
-- Implement commands to create a draft after warehouse confirmation, delete an
-  empty draft, assign or change a transit location while allowed, pick to
-  transit, put from transit, move directly, and complete a transfer.
+- Implement commands to create a draft after warehouse and optional transit
+  location confirmation, delete an empty draft, pick to transit, put from
+  transit, move directly, and complete a transfer. The selected transit
+  location is immutable after creation.
 - Validate warehouse ownership, zone types, positive quantity, distinct source
   and destination, current source balance, transfer status, and exclusive transit
   ownership.
@@ -88,7 +89,7 @@ prematurely.
 - Insufficient source or transit balance fails without partial changes.
 - Invalid warehouse or zone use fails without partial changes.
 - The first movement starts the transfer atomically.
-- A used transit location cannot be changed.
+- A transit location selected at creation cannot be changed.
 - A non-empty transit location prevents completion; emptying it does not complete
   the transfer automatically.
 - A completed transfer rejects all further mutations.
@@ -104,20 +105,20 @@ prematurely.
 
 ### Work-page states
 
-Before a warehouse is confirmed, the page shows the complete recognizable work
-layout. Warehouse selection and the primary `Start` action are enabled; transit
-selection, movement actions, completion, transit contents, and history are
-visible but disabled or empty.
+Before the transfer is started, the page shows the complete recognizable work
+layout. Warehouse selection, optional transit-location selection, and the
+primary `Start` action are enabled. Movement actions, completion, transit
+contents, and history are visible but disabled or empty.
 
-Confirming the warehouse on that page creates the draft, navigates the page to
-  the persisted transfer address if necessary, and locks warehouse selection. An
-accidental warehouse choice therefore does not create a document until the
-operator explicitly starts the transfer.
+Confirming the selections on that page creates the draft, navigates the page to
+the persisted transfer address, and locks warehouse and transit-location
+selection. Changing either selection therefore does not create a document until
+the operator explicitly starts the transfer.
 
-After warehouse confirmation:
+After transfer creation:
 
-- transit-location selection and direct movement are enabled;
-- pick and put remain disabled until a transit location is assigned;
+- direct movement is enabled;
+- pick and put are enabled only when a transit location was selected at creation;
 - the transit location is displayed as persistent transfer context and is never
   entered on individual pick or put forms;
 - pick, put, and direct movement are three explicit, visually distinct actions;

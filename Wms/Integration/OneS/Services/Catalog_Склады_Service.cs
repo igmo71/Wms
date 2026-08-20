@@ -1,4 +1,4 @@
-﻿using Wms.Application.Services;
+﻿using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
@@ -9,26 +9,32 @@ public class Catalog_Склады_Service(
     OneCClient oneCClient,
     WarehouseService warehouseService)
 {
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
-        var uri = Catalog_Склады.GetUri(Ref_Key);
+        var uri = Catalog_Склады.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_Склады>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return;
+        {
+            return OperationError.Failure("1С вернула некорректный ответ: склад отсутствует.");
+        }
 
         var warehouse = MapToWarehouse(fetchedItem);
 
         await warehouseService.CreateOrUpdateAsync(warehouse, ct);
+
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
         var uri = Catalog_Склады.GetListUri;
 
@@ -40,7 +46,7 @@ public class Catalog_Склады_Service(
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список складов отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список складов отсутствует.");
 
         foreach (var fetchedItem in fetchedItems)
         {
@@ -49,7 +55,7 @@ public class Catalog_Склады_Service(
             await warehouseService.CreateOrUpdateAsync(warehouse, ct);
         }
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static Warehouse MapToWarehouse(Catalog_Склады fetchedItem)

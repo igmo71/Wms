@@ -10,9 +10,9 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>Вход</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Log in</MudText>
+<MudText Typo="Typo.h3" GutterBottom="true">Вход</MudText>
 
 <MudGrid>
     <MudItem md="6">
@@ -20,7 +20,7 @@
         <EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login">
             <DataAnnotationsValidator />
 
-            <MudText GutterBottom="true" Typo="Typo.body1">Use a local account to log in.</MudText>
+            <MudText GutterBottom="true" Typo="Typo.body1">Для входа используйте локальную учетную запись.</MudText>
 
             <MudGrid>
                 <MudItem md="12">
@@ -30,37 +30,36 @@
                 </MudItem>
                 <MudItem md="12">
                     <MudStaticTextField For="@(() => Input.Password)" @bind-Value="Input.Password"
-                        Label="Password" InputType="InputType.Password" Placeholder="password"
+                        Label="Пароль" InputType="InputType.Password" Placeholder="password"
                         UserAttributes="@(new() { { "autocomplete", "current-password" }, { "aria-required", "true" } } )" />
                 </MudItem>
                 <MudItem md="12">
-                    <MudStaticCheckBox For="@(() => Input.RememberMe)" @bind-Value="Input.RememberMe">Remember me</MudStaticCheckBox>
+                    <MudStaticCheckBox For="@(() => Input.RememberMe)" @bind-Value="Input.RememberMe">Запомнить меня</MudStaticCheckBox>
                 </MudItem>
                 <MudItem md="12">
-                    <MudStaticButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" FormAction="FormAction.Submit">Log in</MudStaticButton>
+                    <MudStaticButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" FormAction="FormAction.Submit">Войти</MudStaticButton>
                 </MudItem>
-                <MudItem md="12">
+                @* <MudItem md="12">
                     <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email"
                                    class="mud-button-root mud-button mud-button-text mud-button-text-primary mud-button-text-size-medium mud-ripple">
                         Log in with a passkey
                     </PasskeySubmit>
-                </MudItem>
+                </MudItem> *@
             </MudGrid>
         </EditForm>
 
-        <MudGrid Class="mt-4">
+        @* <MudGrid Class="mt-4">
             <MudItem md="12">
                 <MudLink Href="Account/ForgotPassword">Forgot your password?</MudLink><br />
-                <MudLink Href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register as a new user</MudLink><br />
                 <MudLink Href="Account/ResendEmailConfirmation">Resend email confirmation</MudLink>
             </MudItem>
-        </MudGrid>
+        </MudGrid> *@
     </MudItem>
-    <MudItem md="6">
+    @* <MudItem md="6">
         <MudText GutterBottom="true" Typo="Typo.body1">Use another service to log in.</MudText>
 
         <ExternalLoginPicker />
-    </MudItem>
+    </MudItem> *@
 </MudGrid>
 
 @code {
@@ -92,7 +91,7 @@
     {
         if (!string.IsNullOrEmpty(Input.Passkey?.Error))
         {
-            errorMessage = $"Error: {Input.Passkey.Error}";
+            errorMessage = $"Ошибка: {Input.Passkey.Error}";
             return;
         }
 
@@ -117,7 +116,7 @@
 
         if (result.Succeeded)
         {
-            Logger.LogInformation("User logged in.");
+            Logger.LogInformation("Пользователь вошел в систему.");
             RedirectManager.RedirectTo(ReturnUrl);
         }
         else if (result.RequiresTwoFactor)
@@ -128,12 +127,12 @@
         }
         else if (result.IsLockedOut)
         {
-            Logger.LogWarning("User account locked out.");
+            Logger.LogWarning("Учетная запись пользователя заблокирована.");
             RedirectManager.RedirectTo("Account/Lockout");
         }
         else
         {
-            errorMessage = "Error: Invalid login attempt.";
+            errorMessage = "Ошибка: неверные данные для входа.";
         }
     }
 

@@ -1,6 +1,6 @@
 ﻿namespace Wms.Integration.OneS.Models;
 
-public class Catalog_УпаковкиЕдиницыИзмерения
+internal class Catalog_УпаковкиЕдиницыИзмерения
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }
@@ -8,8 +8,9 @@ public class Catalog_УпаковкиЕдиницыИзмерения
     public string? Description { get; set; }
     public string? НаименованиеПолное { get; set; }
     public string? МеждународноеСокращение { get; set; }
-    public double Числитель { get; set; }
-    public double Знаменатель { get; set; }
+    public double? Числитель { get; set; }
+    public double? Знаменатель { get; set; }
+    public string? ТипИзмеряемойВеличины { get; set; }
 
     public static string GetListUri => $"Catalog_УпаковкиЕдиницыИзмерения" +
         $"?$format=json" +
@@ -20,5 +21,5 @@ public class Catalog_УпаковкиЕдиницыИзмерения
         $"&$select={select}" +
         $"&$filter=Ref_Key eq guid'{refKey}'";
 
-    private static readonly string select = "Ref_Key,DeletionMark,Code,Description,НаименованиеПолное,МеждународноеСокращение,Числитель,Знаменатель";
+    private static readonly string select = "Ref_Key,DeletionMark,Code,Description,НаименованиеПолное,МеждународноеСокращение,Числитель,Знаменатель,ТипИзмеряемойВеличины";
 }

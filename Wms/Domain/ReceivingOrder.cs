@@ -1,94 +1,615 @@
-﻿using Wms.Common;
+using Wms.Common;
 using Wms.Domain.Enums;
 
 namespace Wms.Domain;
 
 public class ReceivingOrder
 {
-    public Guid Id { get; set; }
-    public bool DeletionMark { get; set; }
-    public bool Posted { get; set; }
-    public string? Number { get; set; }
-    public DateTime Date { get; set; }
+    private readonly List<ReceivingOrderItem> _items = [];
 
-    public Guid WarehouseId { get; set; }
-    public Warehouse? Warehouse { get; set; }
-
-    public Guid? ReceivingLocationId { get; set; }
-    public StorageLocation? ReceivingLocation { get; set; }
-
-    public string? Comment { get; set; }
-
-    public ReceivingOrderStatus Status { get; set; }
-    public ReceivingOrderQueue Queue { get; set; }
-    public WarehouseOperation WarehouseOperation { get; set; }
-    public BusinessOperation BusinessOperation { get; set; }
-
-    public DateTimeOffset CreatedAtUtc { get; set; }
-    public DateTimeOffset? UpdatedAtUtc { get; set; }
-    public DateTimeOffset? StartedAtUtc { get; set; }
-    public DateTimeOffset? CompletedAtUtc { get; set; }
-
-    public string? StartedBy { get; set; }
-    public string? CompletedBy { get; set; }
-
-    public PutawayStatus PutawayStatus { get; set; }
-    public DateTimeOffset? PutawayStartedAtUtc { get; set; }
-    public DateTimeOffset? PutawayCompletedAtUtc { get; set; }
-    public string? PutawayStartedBy { get; set; }
-    public string? PutawayCompletedBy { get; set; }
-
-    public bool ExternalChangeDetected { get; set; }
-
-    public Guid ShipperId { get; set; }
-    public PartyType ShipperType { get; set; }
-    public PartyInfo? Shipper { get; set; }
-
-    public Guid BaseOrderId { get; set; }
-    public string? BaseOrderType { get; set; }
-
-    public List<ReceivingOrderItem> Items { get; set; } = [];
-
-    public bool IsFullyReceived => Items.All(x => x.IsFullyReceived);
-    public bool HasPlanFactDifference => Items.Any(x => x.IsPlanFactDifference);
-    public double KnownFactWeightKg => Items.Sum(x => x.FactWeightKg ?? 0);
-    public bool IsFactWeightComplete => Items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
-
-    public bool HasExternalChanges(ReceivingOrder externalOrder)
+    private ReceivingOrder()
     {
-        if (BaseOrderId != externalOrder.BaseOrderId
-            || BaseOrderType != externalOrder.BaseOrderType
-            || Status != externalOrder.Status
-            || Queue != externalOrder.Queue
-            || BusinessOperation != externalOrder.BusinessOperation
-            || WarehouseOperation != externalOrder.WarehouseOperation
-            || Comment != externalOrder.Comment
-            || Posted != externalOrder.Posted
-            || DeletionMark != externalOrder.DeletionMark
-            || Date != externalOrder.Date
-            || Number != externalOrder.Number
-            || WarehouseId != externalOrder.WarehouseId
-            || ShipperId != externalOrder.ShipperId
-            || ShipperType != externalOrder.ShipperType)
+    }
+
+    public Guid Id { get; private set; }
+    public bool DeletionMark { get; private set; }
+    public bool Posted { get; private set; }
+    public string? Number { get; private set; }
+    public DateTime Date { get; private set; }
+    public Guid WarehouseId { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public Guid? ReceivingLocationId { get; private set; }
+    public StorageLocation? ReceivingLocation { get; private set; }
+    public string? Comment { get; private set; }
+    public ReceivingOrderStatus Status { get; private set; }
+    public ReceivingOrderQueue Queue { get; private set; }
+    public WarehouseOperation WarehouseOperation { get; private set; }
+    public BusinessOperation BusinessOperation { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public DateTimeOffset? UpdatedAtUtc { get; private set; }
+    public DateTimeOffset? StartedAtUtc { get; private set; }
+    public DateTimeOffset? CompletedAtUtc { get; private set; }
+    public string? StartedBy { get; private set; }
+    public string? CompletedBy { get; private set; }
+    public PutawayStatus PutawayStatus { get; private set; }
+    public DateTimeOffset? PutawayStartedAtUtc { get; private set; }
+    public DateTimeOffset? PutawayCompletedAtUtc { get; private set; }
+    public string? PutawayStartedBy { get; private set; }
+    public string? PutawayCompletedBy { get; private set; }
+    public bool ExternalChangeDetected { get; private set; }
+    public Guid ShipperId { get; private set; }
+    public PartyType ShipperType { get; private set; }
+    public PartyInfo? Shipper { get; private set; }
+    public Guid BaseOrderId { get; private set; }
+    public string? BaseOrderType { get; private set; }
+    public IReadOnlyCollection<ReceivingOrderItem> Items => _items;
+
+    public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
+    public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
+    public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
+    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
+
+    public static OperationResult<ReceivingOrder> Create(
+        ReceivingOrderImportSnapshot snapshot,
+        DateTimeOffset createdAtUtc)
+    {
+        var validationResult = ValidateImport(snapshot, createdAtUtc);
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult.Error!;
+        }
+
+        if (snapshot.Status != ReceivingOrderStatus.ReadyForReceiving)
+        {
+            return OperationError.Invalid(
+                "Приходный ордер можно создать только в статусе готовности к приёмке.");
+        }
+
+        var order = new ReceivingOrder
+        {
+            Id = snapshot.Id,
+            CreatedAtUtc = createdAtUtc,
+            PutawayStatus = PutawayStatus.Inactive
+        };
+
+        order.ApplyImport(snapshot);
+        foreach (var itemSnapshot in snapshot.Items)
+        {
+            var itemResult = ReceivingOrderItem.Create(order.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult.Error!;
+            }
+
+            order._items.Add(itemResult.Value!);
+        }
+
+        return order;
+    }
+
+    public OperationResult<ReceivingOrderReconciliation> Reconcile(
+        ReceivingOrderImportSnapshot snapshot,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (snapshot.Id != Id)
+        {
+            return OperationError.Invalid(
+                "Импортируемый приходный ордер должен соответствовать существующему ордеру.");
+        }
+
+        if (!HasExternalChanges(snapshot))
+        {
+            return ReceivingOrderReconciliation.Unchanged;
+        }
+
+        if (Status != ReceivingOrderStatus.ReadyForReceiving)
+        {
+            ExternalChangeDetected = true;
+            return ReceivingOrderReconciliation.Conflict;
+        }
+
+        var validationResult = ValidateImport(snapshot, updatedAtUtc);
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult.Error!;
+        }
+
+        if (updatedAtUtc < CreatedAtUtc)
+        {
+            return OperationError.Invalid(
+                "Время изменения приходного ордера не может предшествовать времени его создания.");
+        }
+
+        var itemsResult = ReconcileItems(snapshot.Items);
+        if (!itemsResult.IsSuccess)
+        {
+            return itemsResult.Error!;
+        }
+
+        ApplyImport(snapshot);
+        UpdatedAtUtc = updatedAtUtc;
+        ExternalChangeDetected = false;
+        return ReceivingOrderReconciliation.Updated;
+    }
+
+    public OperationResult SetReceivingLocation(Guid receivingLocationId)
+    {
+        if (receivingLocationId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификатор позиции приёмки обязателен.");
+        }
+
+        if (Status is not (ReceivingOrderStatus.ReadyForReceiving
+            or ReceivingOrderStatus.InReceiving
+            or ReceivingOrderStatus.ProcessingRequired))
+        {
+            return OperationError.Invalid(
+                "Позицию приёмки можно изменить только до завершения приёмки ордера.");
+        }
+
+        ReceivingLocationId = receivingLocationId;
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidateToSetInReceiving()
+    {
+        if (Status != ReceivingOrderStatus.ReadyForReceiving)
+        {
+            return OperationError.Invalid(
+                "Взять в работу можно только ордер, готовый к приёмке.");
+        }
+
+        if (ReceivingLocationId is null)
+        {
+            return OperationError.Invalid(
+                "Перед началом приёмки необходимо указать позицию приёмки.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    public OperationResult SetInReceiving(DateTimeOffset startedAtUtc, string startedBy)
+    {
+        var validationResult = ValidateToSetInReceiving();
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult;
+        }
+
+        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Необходимо указать пользователя, начавшего операцию.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (startedAtUtc < CreatedAtUtc)
+        {
+            return OperationError.Invalid(
+                "Время начала приёмки не может предшествовать созданию ордера.");
+        }
+
+        Status = ReceivingOrderStatus.InReceiving;
+        StartedAtUtc = startedAtUtc;
+        StartedBy = startedBy.Trim();
+        return OperationResult.Success();
+    }
+
+    public OperationResult UpdateItemFact(
+        int lineNumber,
+        double factQuantity,
+        string? comment)
+    {
+        if (Status is not (ReceivingOrderStatus.InReceiving
+            or ReceivingOrderStatus.ProcessingRequired))
+        {
+            return OperationError.Invalid(
+                "Фактическое количество можно изменять только во время приёмки или обработки ордера.");
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        return item is null
+            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
+            : item.UpdateFact(factQuantity, comment);
+    }
+
+    private OperationResult ValidateToSetReceived()
+    {
+        if (Status is not (ReceivingOrderStatus.InReceiving
+            or ReceivingOrderStatus.ProcessingRequired))
+        {
+            return OperationError.Invalid(
+                "Завершить приёмку можно только для ордера в приёмке или обработке.");
+        }
+
+        if (ReceivingLocationId is null)
+        {
+            return OperationError.Invalid(
+                "Перед завершением приёмки необходимо указать позицию приёмки.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    public OperationResult SetReceived(DateTimeOffset completedAtUtc, string completedBy)
+    {
+        var validationResult = ValidateToSetReceived();
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult;
+        }
+
+        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Необходимо указать пользователя, завершившего операцию.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (completedAtUtc < CreatedAtUtc || completedAtUtc < StartedAtUtc)
+        {
+            return OperationError.Invalid(
+                "Время завершения приёмки не может предшествовать предыдущим операциям ордера.");
+        }
+
+        Status = ReceivingOrderStatus.Received;
+        CompletedAtUtc = completedAtUtc;
+        CompletedBy = completedBy.Trim();
+        PutawayStatus = _items.Any(x => x.FactQuantity > 0)
+            ? PutawayStatus.Pending
+            : PutawayStatus.Inactive;
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidateToStartPutaway()
+    {
+        if (Status != ReceivingOrderStatus.Received)
+        {
+            return OperationError.Invalid("Размещать можно только принятый ордер.");
+        }
+
+        if (PutawayStatus != PutawayStatus.Pending)
+        {
+            return OperationError.Invalid("Начать можно только ожидающее размещение.");
+        }
+
+        if (ReceivingLocationId is null)
+        {
+            return OperationError.Invalid(
+                "Перед началом размещения необходимо указать позицию приёмки.");
+        }
+
+        if (!_items.Any(x => x.FactQuantity > 0))
+        {
+            return OperationError.Invalid(
+                "Для размещения необходимо положительное принятое количество.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    public OperationResult StartPutaway(DateTimeOffset startedAtUtc, string startedBy)
+    {
+        var validationResult = ValidateToStartPutaway();
+        if (!validationResult.IsSuccess)
+        {
+            return validationResult;
+        }
+
+        var auditResult = ValidateAudit(startedAtUtc, startedBy, "Необходимо указать пользователя, начавшего операцию.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (startedAtUtc < CompletedAtUtc)
+        {
+            return OperationError.Invalid(
+                "Время начала размещения не может предшествовать завершению приёмки.");
+        }
+
+        PutawayStatus = PutawayStatus.InProgress;
+        PutawayStartedAtUtc = startedAtUtc;
+        PutawayStartedBy = startedBy.Trim();
+        return OperationResult.Success();
+    }
+
+    public OperationResult<InventoryMovement> CreatePutawayMovement(
+        Guid movementId,
+        int lineNumber,
+        Guid destinationStorageLocationId,
+        double quantity,
+        DateTimeOffset createdAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult.Error!;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
+        }
+
+        var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, null);
+        if (!quantityResult.IsSuccess)
+        {
+            return quantityResult.Error!;
+        }
+
+        return InventoryMovement.Create(
+            movementId,
+            WarehouseId,
+            ReceivingLocationId,
+            destinationStorageLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            createdAtUtc,
+            RecorderType.ReceivingOrder,
+            Id,
+            item.LineNumber);
+    }
+
+    public OperationResult UpdatePutawayMovement(
+        InventoryMovement movement,
+        Guid destinationStorageLocationId,
+        double quantity,
+        DateTimeOffset updatedAtUtc,
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        var movementResult = ValidatePutawayMovementChange(movement);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {movement.RecorderLineNumber} приходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
+        }
+
+        var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, movement.Id);
+        if (!quantityResult.IsSuccess)
+        {
+            return quantityResult;
+        }
+
+        return movement.UpdateDraft(
+            ReceivingLocationId,
+            destinationStorageLocationId,
+            item.StockKeepingUnitId,
+            quantity,
+            updatedAtUtc);
+    }
+
+    public OperationResult ValidatePutawayMovementRemoval(InventoryMovement movement) =>
+        ValidatePutawayMovementChange(movement);
+
+    public OperationResult CompletePutaway(
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        DateTimeOffset completedAtUtc,
+        string completedBy)
+    {
+        var completionResult = ValidatePutawayCompletion(draftMovements);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult;
+        }
+
+        var auditResult = ValidateAudit(completedAtUtc, completedBy, "Необходимо указать пользователя, завершившего операцию.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (completedAtUtc < PutawayStartedAtUtc)
+        {
+            return OperationError.Invalid(
+                "Время завершения размещения не может предшествовать его началу.");
+        }
+
+        PutawayStatus = PutawayStatus.Completed;
+        PutawayCompletedAtUtc = completedAtUtc;
+        PutawayCompletedBy = completedBy.Trim();
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayEditing()
+    {
+        if (Status != ReceivingOrderStatus.Received
+            || PutawayStatus != PutawayStatus.InProgress)
+        {
+            return OperationError.Invalid(
+                "Движения размещения можно изменять только во время размещения.");
+        }
+
+        if (ReceivingLocationId is null)
+        {
+            return OperationError.Invalid(
+                "Для размещения необходимо указать позицию приёмки.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayMovementChange(InventoryMovement movement)
+    {
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        var draftResult = movement.ValidateDraft();
+        if (!draftResult.IsSuccess)
+        {
+            return draftResult;
+        }
+
+        if (movement.RecorderType != RecorderType.ReceivingOrder
+            || movement.RecorderId != Id
+            || movement.RecorderLineNumber is null
+            || movement.SourceStorageLocationId is null
+            || movement.DestinationStorageLocationId is null)
+        {
+            return OperationError.Invalid(
+                "Движение не относится к строке размещения приходного ордера.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidatePutawayCompletion(
+        IReadOnlyCollection<InventoryMovement> draftMovements)
+    {
+        var editingResult = ValidatePutawayEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        if (draftMovements.Count == 0)
+        {
+            return OperationError.Invalid("В размещении отсутствуют движения.");
+        }
+
+        if (draftMovements.Any(x => x.PostedAtUtc is not null
+            || x.RecorderType != RecorderType.ReceivingOrder
+            || x.RecorderId != Id
+            || x.WarehouseId != WarehouseId
+            || x.SourceStorageLocationId != ReceivingLocationId
+            || x.DestinationStorageLocationId is null))
+        {
+            return OperationError.Invalid("Размещение содержит некорректное движение.");
+        }
+
+        foreach (var item in _items)
+        {
+            var movements = draftMovements
+                .Where(x => x.RecorderLineNumber == item.LineNumber)
+                .ToList();
+
+            if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
+                || movements.Sum(x => x.Quantity) != item.FactQuantity)
+            {
+                return OperationError.Invalid(
+                    "Перед завершением размещения каждая строка ордера должна быть размещена полностью.");
+            }
+        }
+
+        if (draftMovements.Any(x => _items.All(item => item.LineNumber != x.RecorderLineNumber)))
+        {
+            return OperationError.Invalid(
+                "Размещение содержит движение для неизвестной строки ордера.");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private static OperationResult ValidatePutawayLineQuantity(
+        ReceivingOrderItem item,
+        double quantity,
+        IReadOnlyCollection<InventoryMovement> draftMovements,
+        Guid? excludedMovementId)
+    {
+        if (!double.IsFinite(quantity) || quantity <= 0)
+        {
+            return OperationError.Invalid(
+                "Количество размещения должно быть конечным числом больше нуля.");
+        }
+
+        var lineQuantity = draftMovements
+            .Where(x => x.Id != excludedMovementId
+                && x.RecorderLineNumber == item.LineNumber)
+            .Sum(x => x.Quantity) + quantity;
+
+        return lineQuantity <= item.FactQuantity
+            ? OperationResult.Success()
+            : OperationError.Invalid(
+                "Количество размещения превышает принятое количество по строке ордера.");
+    }
+
+    internal void SetShipper(PartyInfo? shipper)
+    {
+        Shipper = shipper;
+    }
+
+    private static OperationResult ValidateImport(
+        ReceivingOrderImportSnapshot snapshot,
+        DateTimeOffset occurredAtUtc)
+    {
+        if (snapshot.Id == Guid.Empty || snapshot.WarehouseId == Guid.Empty)
+        {
+            return OperationError.Invalid(
+                "Идентификаторы приходного ордера и склада обязательны.");
+        }
+
+        if (snapshot.Date == default)
+        {
+            return OperationError.Invalid("Дата приходного ордера обязательна.");
+        }
+
+        if (occurredAtUtc == default)
+        {
+            return OperationError.Invalid("Время импорта обязательно.");
+        }
+
+        if (snapshot.Items is null
+            || snapshot.Items.GroupBy(x => x.LineNumber).Any(x => x.Count() > 1))
+        {
+            return OperationError.Invalid(
+                "Номера строк приходного ордера не должны повторяться.");
+        }
+
+        foreach (var itemSnapshot in snapshot.Items)
+        {
+            var itemResult = ReceivingOrderItem.ValidateImport(snapshot.Id, itemSnapshot);
+            if (!itemResult.IsSuccess)
+            {
+                return itemResult;
+            }
+        }
+
+        return OperationResult.Success();
+    }
+
+    private bool HasExternalChanges(ReceivingOrderImportSnapshot snapshot)
+    {
+        if (snapshot.Items is null)
         {
             return true;
         }
 
-
-        if (Items.Count != externalOrder.Items.Count)
-            return true;
-
-        var externalItemsByLineNumber = externalOrder.Items.ToDictionary(x => x.LineNumber);
-
-        foreach (var existingItem in Items)
+        if (BaseOrderId != snapshot.BaseOrderId
+            || BaseOrderType != snapshot.BaseOrderType
+            || Status != snapshot.Status
+            || Queue != snapshot.Queue
+            || BusinessOperation != snapshot.BusinessOperation
+            || WarehouseOperation != snapshot.WarehouseOperation
+            || Comment != snapshot.Comment
+            || Posted != snapshot.Posted
+            || DeletionMark != snapshot.DeletionMark
+            || Date != snapshot.Date
+            || Number != snapshot.Number
+            || WarehouseId != snapshot.WarehouseId
+            || ShipperId != snapshot.ShipperId
+            || ShipperType != snapshot.ShipperType
+            || _items.Count != snapshot.Items.Count)
         {
-            if (!externalItemsByLineNumber.TryGetValue(existingItem.LineNumber, out var external))
-            {
-                return true;
-            }
+            return true;
+        }
 
-            if (existingItem.StockKeepingUnitId != external.StockKeepingUnitId
-                || existingItem.PlanQuantity != external.PlanQuantity)
+        var importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
+        foreach (var existingItem in _items)
+        {
+            var importedLine = importedItems[existingItem.LineNumber].ToList();
+            if (importedLine.Count != 1
+                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
+                || existingItem.PlanQuantity != importedLine[0].PlanQuantity)
             {
                 return true;
             }
@@ -97,137 +618,68 @@ public class ReceivingOrder
         return false;
     }
 
-    public void UpdateOrder(ReceivingOrder externalOrder)
+    private OperationResult ReconcileItems(
+        IReadOnlyCollection<ReceivingOrderItemImportSnapshot> snapshots)
     {
-        DeletionMark = externalOrder.DeletionMark;
-        Posted = externalOrder.Posted;
-        Number = externalOrder.Number;
-        Date = externalOrder.Date;
-        WarehouseId = externalOrder.WarehouseId;
-        WarehouseOperation = externalOrder.WarehouseOperation;
-        Comment = externalOrder.Comment;
-        Status = externalOrder.Status;
-        Queue = externalOrder.Queue;
-        WarehouseOperation = externalOrder.WarehouseOperation;
-        BusinessOperation = externalOrder.BusinessOperation;
-        ShipperId = externalOrder.ShipperId;
-        ShipperType = externalOrder.ShipperType;
-        BaseOrderId = externalOrder.BaseOrderId;
-        BaseOrderType = externalOrder.BaseOrderType;
+        var importedItems = snapshots.ToDictionary(x => x.LineNumber);
+        _items.RemoveAll(existingItem => !importedItems.ContainsKey(existingItem.LineNumber));
 
-        UpdateOrderItems(externalOrder.Items);
-    }
-
-    private void UpdateOrderItems(List<ReceivingOrderItem> externalOrderItems)
-    {
-        var externalByLineNumber = externalOrderItems.ToDictionary(item => item.LineNumber);
-
-        Items.RemoveAll(existing => !externalByLineNumber.ContainsKey(existing.LineNumber));
-
-        var existingByLineNumber = Items.ToDictionary(item => item.LineNumber);
-
-        foreach (var external in externalOrderItems)
+        var existingItems = _items.ToDictionary(x => x.LineNumber);
+        foreach (var snapshot in snapshots)
         {
-            if (existingByLineNumber.TryGetValue(external.LineNumber, out var existing))
+            if (existingItems.TryGetValue(snapshot.LineNumber, out var existingItem))
             {
-                existing.StockKeepingUnitId = external.StockKeepingUnitId;
-                existing.PlanQuantity = external.PlanQuantity;
+                var itemResult = existingItem.Reconcile(snapshot);
+                if (!itemResult.IsSuccess)
+                {
+                    return itemResult;
+                }
             }
             else
             {
-                Items.Add(new ReceivingOrderItem
+                var itemResult = ReceivingOrderItem.Create(Id, snapshot);
+                if (!itemResult.IsSuccess)
                 {
-                    ReceivingOrderId = Id,
-                    LineNumber = external.LineNumber,
-                    StockKeepingUnitId = external.StockKeepingUnitId,
-                    PlanQuantity = external.PlanQuantity,
-                    FactQuantity = 0
-                });
+                    return itemResult.Error!;
+                }
+
+                _items.Add(itemResult.Value!);
             }
         }
+
+        return OperationResult.Success();
     }
 
-    public ServiceResult ValidateToSetInReceiving()
+    private void ApplyImport(ReceivingOrderImportSnapshot snapshot)
     {
-        if (Status != ReceivingOrderStatus.ReadyForReceiving)
+        DeletionMark = snapshot.DeletionMark;
+        Posted = snapshot.Posted;
+        Number = snapshot.Number;
+        Date = snapshot.Date;
+        WarehouseId = snapshot.WarehouseId;
+        Comment = snapshot.Comment;
+        Status = snapshot.Status;
+        Queue = snapshot.Queue;
+        WarehouseOperation = snapshot.WarehouseOperation;
+        BusinessOperation = snapshot.BusinessOperation;
+        ShipperId = snapshot.ShipperId;
+        ShipperType = snapshot.ShipperType;
+        BaseOrderId = snapshot.BaseOrderId;
+        BaseOrderType = snapshot.BaseOrderType;
+    }
+
+    private static OperationResult ValidateAudit(
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        string missingUserMessage)
+    {
+        if (occurredAtUtc == default)
         {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order ready for receiving can be set in receiving.");
+            return OperationError.Invalid("Время операции обязательно.");
         }
 
-        if (ReceivingLocationId is null)
-        {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before setting the order in receiving.");
-        }
-
-        return ServiceResult.Success();
-    }
-
-    public void SetInReceiving(string userId)
-    {
-        Status = ReceivingOrderStatus.InReceiving;
-
-        StartedAtUtc = DateTimeOffset.UtcNow;
-
-        StartedBy = userId;
-    }
-
-    public ServiceResult ValidateToSetReceived()
-    {
-        var canSetReceived = Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
-
-        if (!canSetReceived)
-        {
-            return ServiceError.Invalid<ReceivingOrder>("Only a receiving order in receiving or requiring processing can be set received.");
-        }
-
-        if (ReceivingLocationId is null)
-        {
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before receiving the order.");
-        }
-
-        return ServiceResult.Success();
-    }
-
-    public void SetReceived(string userId)
-    {
-        Status = ReceivingOrderStatus.Received;
-
-        CompletedAtUtc = DateTimeOffset.UtcNow;
-
-        CompletedBy = userId;
-
-        if (Items.Any(x => x.FactQuantity > 0))
-            PutawayStatus = PutawayStatus.Pending;
-    }
-
-    public ServiceResult ValidateToStartPutaway()
-    {
-        if (Status != ReceivingOrderStatus.Received)
-            return ServiceError.Invalid<ReceivingOrder>("Only a received order can be put away.");
-
-        if (PutawayStatus != PutawayStatus.Pending)
-            return ServiceError.Invalid<ReceivingOrder>("Only pending putaway can be started.");
-
-        if (ReceivingLocationId is null)
-            return ServiceError.Invalid<ReceivingOrder>("Receiving location must be specified before starting putaway.");
-
-        if (!Items.Any(x => x.FactQuantity > 0))
-            return ServiceError.Invalid<ReceivingOrder>("Putaway requires a positive received quantity.");
-
-        return ServiceResult.Success();
-    }
-
-    public void StartPutaway(string userId)
-    {
-        PutawayStatus = PutawayStatus.InProgress;
-        PutawayStartedAtUtc = DateTimeOffset.UtcNow;
-        PutawayStartedBy = userId;
-    }
-
-    public void CompletePutaway(string userId)
-    {
-        PutawayStatus = PutawayStatus.Completed;
-        PutawayCompletedAtUtc = DateTimeOffset.UtcNow;
-        PutawayCompletedBy = userId;
+        return string.IsNullOrWhiteSpace(userId)
+            ? OperationError.Invalid(missingUserMessage)
+            : OperationResult.Success();
     }
 }

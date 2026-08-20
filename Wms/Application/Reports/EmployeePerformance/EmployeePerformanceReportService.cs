@@ -158,7 +158,9 @@ public sealed class EmployeePerformanceReportService(
         var userName = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => x.UserName)
+            .Select(x => string.IsNullOrWhiteSpace(x.DisplayName)
+                ? x.UserName
+                : x.DisplayName)
             .SingleOrDefaultAsync(ct);
 
         return userName ?? GetDeletedUserName(userId);
@@ -185,7 +187,9 @@ public sealed class EmployeePerformanceReportService(
                 WarehouseId = order.WarehouseId,
                 WarehouseName = order.Warehouse!.Name ?? string.Empty,
                 UserId = order.CompletedBy!,
-                UserName = user != null && user.UserName != null
+                UserName = user != null && !string.IsNullOrWhiteSpace(user.DisplayName)
+                    ? user.DisplayName
+                    : user != null && user.UserName != null
                     ? user.UserName
                     : "Удаленный пользователь (" + order.CompletedBy + ")",
                 PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),
@@ -216,7 +220,9 @@ public sealed class EmployeePerformanceReportService(
                 WarehouseId = order.WarehouseId,
                 WarehouseName = order.Warehouse!.Name ?? string.Empty,
                 UserId = order.ReadyForShipmentBy!,
-                UserName = user != null && user.UserName != null
+                UserName = user != null && !string.IsNullOrWhiteSpace(user.DisplayName)
+                    ? user.DisplayName
+                    : user != null && user.UserName != null
                     ? user.UserName
                     : "Удаленный пользователь (" + order.ReadyForShipmentBy + ")",
                 PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),

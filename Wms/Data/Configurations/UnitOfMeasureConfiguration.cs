@@ -4,7 +4,7 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-public class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
+internal class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure>
 {
     public void Configure(EntityTypeBuilder<UnitOfMeasure> builder)
     {
@@ -13,6 +13,7 @@ public class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasure
         builder.Property(x => x.Code).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.Abbreviation).HasMaxLength(DefaultConfiguration.Code);
+        builder.Property(x => x.MeasurementType).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.Description).HasMaxLength(DefaultConfiguration.Description);
     }
 }

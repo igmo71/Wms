@@ -1,3 +1,3 @@
 ﻿namespace Wms.Integration.OneS;
 
-public record NotifyRecord(string Ref_Key, string Type);
+internal record NotifyRecord(string Ref_Key, string Type);

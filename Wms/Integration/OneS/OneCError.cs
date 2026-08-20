@@ -2,13 +2,13 @@
 
 namespace Wms.Integration.OneS;
 
-public class OneCError
+internal class OneCError
 {
     [JsonPropertyName("odata.error")]
     public OdataError? OdataError { get; set; }
 }
 
-public class OdataError
+internal class OdataError
 {
     [JsonPropertyName("code")]
     public string? Code { get; set; }
@@ -16,7 +16,7 @@ public class OdataError
     public Message? Message { get; set; }
 }
 
-public class Message
+internal class Message
 {
     [JsonPropertyName("lang")]
     public string? Lang { get; set; }

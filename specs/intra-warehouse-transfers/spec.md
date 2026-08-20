@@ -84,13 +84,14 @@ movement into or out of a transit location is not allowed; transit inventory is
 handled only by the pick and put actions of the active transfer that owns it.
 
 The transit location is optional because a transfer may contain direct movements
-only. If it is needed, it is selected once and becomes transfer context:
+only. If it is needed, it is selected during creation and becomes immutable
+transfer context:
 
 - the operator does not select it again for every pick or put;
 - it must have no positive inventory balance when assigned;
 - it can belong to only one non-completed inventory transfer at a time;
 - a transfer can use at most one transit location;
-- after the first movement through it, it cannot be changed or removed.
+- it cannot be changed or removed after transfer creation.
 
 These restrictions make the physical inventory in a transit location
 unambiguously attributable to one active inventory transfer. Multiple trolleys
@@ -154,27 +155,26 @@ dimensions are introduced.
 ## Operator experience
 
 The initial web UI uses one full transfer work page for both initialization and
-subsequent work. Before the warehouse is confirmed, the page already shows the
-recognizable work layout, but only warehouse selection and the explicit start
-action are enabled. Confirming the warehouse creates the draft and locks the
-warehouse; merely changing the selected value does not create a document. A
-separate creation dialog or warehouse-only page is not used.
+subsequent work. Before the transfer is started, the page already shows the
+recognizable work layout. The operator selects a warehouse and may select one
+available empty transit location. The explicit start action creates the draft
+and locks both fields; merely changing either selection does not create a
+document. A separate creation dialog or warehouse-only page is not used.
 
-After warehouse confirmation, the web UI exposes separate, explicit commands:
+After transfer creation, the web UI exposes separate, explicit commands:
 
 - pick to trolley;
 - put from trolley;
 - move directly.
 
-When a transit location is assigned, it remains visible as transfer context and is
-filled automatically for pick and put actions. The work page shows the current
-transit inventory by SKU and the immutable movement history in execution order.
-It permits pick and put actions to be freely interleaved.
+When a transit location was selected at creation, it remains visible as transfer
+context and is filled automatically for pick and put actions. The work page
+shows the current transit inventory by SKU and the immutable movement history
+in execution order. It permits pick and put actions to be freely interleaved.
 
-Without a transit location, direct movement and transit selection are available,
-while pick and put are disabled. The layout and process vocabulary should remain
-recognizable for a future mobile client without copying a mobile layout into the
-web application.
+Without a transit location, only direct movement is available; pick and put are
+disabled. The layout and process vocabulary should remain recognizable for a
+future mobile client without copying a mobile layout into the web application.
 
 A future mobile client may scan a transit location to open its active transfer or
 offer to create a new transfer when the location is free. That shortcut is not
@@ -215,9 +215,9 @@ collapse posted movements.
    `InProgress`.
 4. An operator can directly move an available SKU quantity between two ordinary
    locations, and balances and turnovers change immediately.
-5. An operator can assign an empty, free location from a transit zone once, pick
-   inventory to it, and put inventory from it without entering that location on
-   each action.
+5. An operator can select an empty, free location from a transit zone while
+   creating a transfer, pick inventory to it, and put inventory from it without
+   entering that location on each action.
 6. Pick, put, and direct actions can be interleaved in any chronological order.
 7. The same SKU can be picked from multiple locations, put in partial quantities,
    and distributed among multiple locations without exceeding its current
@@ -234,8 +234,8 @@ collapse posted movements.
 
 ## Technical decisions
 
-- Transfer commands follow the existing MVP application-service style: read
-  the required data, validate the business rules, change tracked entities, and
+- Transfer commands follow the direct MVP application-service style: read and
+  validate external state, invoke domain operations, stage inventory facts, and
   call `SaveChangesAsync` once. Explicit transactions and special concurrency
   handling are deferred until an observed case requires them.
 - Transfer numbers use the local creation time in `yyMMdd-HHmmss` format. A
@@ -244,8 +244,8 @@ collapse posted movements.
 - Application identity continues to use the existing string user identifier.
   Each movement stores it in `ConfirmedBy`; transfer creation, start, and
   completion retain their corresponding audit users and timestamps.
-- The exact web page component layout remains a Stage 4 decision within the
-  operator-experience rules above.
+- The web workflow uses one work page. Warehouse and optional transit location
+  are selected before creation and remain immutable afterward.
 
 The staged implementation plan is defined in `implementation-plan.md` in this
 specification directory.

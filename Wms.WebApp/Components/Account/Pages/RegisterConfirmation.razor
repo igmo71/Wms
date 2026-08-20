@@ -20,7 +20,7 @@
 {
     <p>
         This app does not currently have a real email sender registered, see <a class="mud-link mud-primary-text mud-link-underline-hover" href="https://aka.ms/aspaccountconf">these docs</a> for how to configure a real email sender.
-        Normally this would be emailed: <a class="mud-link mud-primary-text mud-link-underline-hover" href="@emailConfirmationLink">Click here to confirm your account</a>
+        Обычно ссылка отправляется по электронной почте: <a class="mud-link mud-primary-text mud-link-underline-hover" href="@emailConfirmationLink">подтвердить учетную запись</a>
     </p>
 }
 else
@@ -53,7 +53,7 @@ else
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = "Error finding user for unspecified email";
+            statusMessage = "Ошибка: не удалось найти пользователя для указанного адреса электронной почты.";
         }
         else if (EmailSender is IdentityNoOpEmailSender)
         {

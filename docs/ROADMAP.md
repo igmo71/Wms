@@ -103,9 +103,15 @@ The accepted architecture and staged implementation are specified under
 
 ## Process and integration backlog
 
-- Implement document-list import or remove/hide the corresponding 1C import
-  endpoints until it exists; they currently call unimplemented methods.
+- Implement manual batch import of receiving and shipping documents when its
+  operator workflow is defined. The corresponding endpoints remain unexposed
+  until then.
 - Confirm 1C quantity semantics: `Количество` versus `КоличествоУпаковок`.
+- Implement storage-location capacity display and enforcement using normalized
+  SKU weight and volume after the missing-data policy is confirmed for the
+  operational pilot.
+- Confirm characteristic and packaging identity using real 1C catalog,
+  document-line, and barcode-register examples before changing inventory keys.
 - Confirm shipping table-section behavior for `Отгружать` / `НеОтгружать`, then
   implement line splitting only after that business decision.
 - Implement recounts, reservations, and inventory tasks when their business

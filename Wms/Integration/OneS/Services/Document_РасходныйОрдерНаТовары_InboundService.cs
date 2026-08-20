@@ -1,8 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Wms.Application.Services.ShippingOrders;
+using Wms.Application.ShippingOrders;
 using Wms.Common;
-using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
@@ -16,10 +15,10 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task ImportDocumentAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportDocumentAsync(string refKey, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ImportDocument {RefKey}", refKey);
-        using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.Inport", nameof(ShippingOrderCommandService));
+        using var activity = AppTracing.StartActivity("Document_РасходныйОрдерНаТовары.Import", nameof(ShippingOrderCommandService));
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
@@ -28,34 +27,29 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedDocument = serviceResult.Value?.Value?[0];
 
         if (fetchedDocument is null)
         {
-            return;
+            return OperationError.Failure("1С вернула некорректный ответ: расходный ордер отсутствует.");
         }
 
-        logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
+        logger.LogDebug("Получен документ {@fetchedDocument}", fetchedDocument);
 
         var unexpectedPreparedItemActions = Document.GetUnexpectedPreparedItemActions(fetchedDocument);
         if (unexpectedPreparedItemActions.Count > 0)
         {
-            logger.LogWarning(
-                "Prepared shipping order {OrderId} was not imported because its regular item actions differ from PickUp: {@UnexpectedActions}",
-                fetchedDocument.Ref_Key,
-                unexpectedPreparedItemActions.Select(x => new { x.LineNumber, x.Действие }).ToList());
-            return;
+            logger.LogWarning("Подготовленный расходный ордер {OrderId} не импортирован: действия обычных строк отличаются от PickUp: {@UnexpectedActions}",
+                fetchedDocument.Ref_Key, unexpectedPreparedItemActions.Select(x => new { x.LineNumber, x.Действие }).ToList());
+            return OperationError.Conflict(
+                "Расходный ордер не импортирован: действие одной или нескольких строк отличается от 'К отбору'.");
         }
 
-        ShippingOrder order = Document.MapToShippingOrder(fetchedDocument);
-
-        await shippingOrderCommandService.ImportOrderAsync(order, ct);
-    }
-
-    internal async Task ImportDocumentListAsync(CancellationToken ct)
-    {
-        throw new NotImplementedException();
+        var snapshot = Document.MapToImportSnapshot(fetchedDocument);
+        return await shippingOrderCommandService.ImportOrderAsync(snapshot, ct);
     }
 }

@@ -188,6 +188,13 @@ namespace Wms.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -970,6 +977,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<double?>("VolumeM3")
+                        .HasColumnType("float");
+
                     b.Property<double?>("WeightKg")
                         .HasColumnType("float");
 
@@ -986,12 +996,30 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsFolder")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long?>("PickSequence")
+                        .HasColumnType("bigint");
 
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uniqueidentifier");
@@ -1001,9 +1029,12 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ParentId");
+
                     b.HasIndex("WarehouseId");
 
-                    b.HasIndex("ZoneId");
+                    b.HasIndex("ZoneId", "Code")
+                        .IsUnique();
 
                     b.ToTable("StorageLocations");
                 });
@@ -1025,18 +1056,22 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
-                    b.Property<double>("Denominator")
+                    b.Property<double?>("Denominator")
                         .HasColumnType("float");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("MeasurementType")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Name")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<double>("Numerator")
+                    b.Property<double?>("Numerator")
                         .HasColumnType("float");
 
                     b.HasKey("Id");
@@ -1068,10 +1103,16 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
                     b.Property<string>("Name")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
@@ -1083,7 +1124,8 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("WarehouseId");
+                    b.HasIndex("WarehouseId", "Code")
+                        .IsUnique();
 
                     b.ToTable("Zones");
                 });
@@ -1462,6 +1504,11 @@ namespace Wms.Data.Migrations
 
             modelBuilder.Entity("Wms.Domain.StorageLocation", b =>
                 {
+                    b.HasOne("Wms.Domain.StorageLocation", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
                         .WithMany("StorageLocations")
                         .HasForeignKey("WarehouseId")
@@ -1473,6 +1520,67 @@ namespace Wms.Data.Migrations
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.OwnsOne("Wms.Domain.LocationCoordinates", "Coordinates", b1 =>
+                        {
+                            b1.Property<Guid>("StorageLocationId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<double?>("X")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("Y")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("Z")
+                                .HasColumnType("float");
+
+                            b1.HasKey("StorageLocationId");
+
+                            b1.ToTable("StorageLocations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageLocationId");
+                        });
+
+                    b.OwnsOne("Wms.Domain.LocationDimensions", "Dimensions", b1 =>
+                        {
+                            b1.Property<Guid>("StorageLocationId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<double?>("Height")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("Length")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("MaxWeight")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("Volume")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("VolumeFactor")
+                                .HasColumnType("float");
+
+                            b1.Property<double?>("Width")
+                                .HasColumnType("float");
+
+                            b1.HasKey("StorageLocationId");
+
+                            b1.ToTable("StorageLocations");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageLocationId");
+                        });
+
+                    b.Navigation("Coordinates")
+                        .IsRequired();
+
+                    b.Navigation("Dimensions")
+                        .IsRequired();
+
+                    b.Navigation("Parent");
 
                     b.Navigation("Warehouse");
 
@@ -1510,6 +1618,11 @@ namespace Wms.Data.Migrations
             modelBuilder.Entity("Wms.Domain.StockKeepingUnit", b =>
                 {
                     b.Navigation("Barcodes");
+                });
+
+            modelBuilder.Entity("Wms.Domain.StorageLocation", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Wms.Domain.Warehouse", b =>

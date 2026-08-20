@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.ReceivingOrders;
+using Wms.Application.ReceivingOrders;
+using Wms.Application.StorageLocations;
+using Wms.Application.Users;
+using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -23,9 +25,9 @@ public partial class Details
     [Inject]
     private PutawayCommandService PutawayCommandService { get; set; } = null!;
     [Inject]
-    private StorageLocationService StorageLocationService { get; set; } = null!;
+    private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject]
-    private ZoneService ZoneService { get; set; } = null!;
+    private ZoneQueryService ZoneQueryService { get; set; } = null!;
     [Inject]
     private NavigationManager NavigationManager { get; set; } = null!;
     [Inject]
@@ -74,7 +76,7 @@ public partial class Details
         if (_order is null)
             return [];
 
-        var result = await ZoneService.ListAsync(new ZoneListQuery
+        var result = await ZoneQueryService.ListAsync(new ZoneListQuery
         {
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,
@@ -91,7 +93,7 @@ public partial class Details
         if (_order is null || _receivingZone is null)
             return [];
 
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _order.WarehouseId,

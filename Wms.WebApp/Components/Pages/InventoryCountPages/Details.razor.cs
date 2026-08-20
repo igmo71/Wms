@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Counts;
+using Wms.Application.StockKeepingUnits;
+using Wms.Application.StorageLocations;
+using Wms.Application.Users;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -17,7 +19,7 @@ public partial class Details
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
@@ -49,7 +51,7 @@ public partial class Details
         if (_inventoryCount is null)
             return [];
 
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _inventoryCount.WarehouseId,
@@ -235,12 +237,12 @@ public partial class Details
     private string GetItemAuditTooltip(InventoryCountItem item) =>
         $"Создана: {FormatOperation(item.CreatedAtUtc, item.CreatedBy)}\nИзменена: {FormatOperation(item.UpdatedAtUtc, item.UpdatedBy)}";
 
-    private async Task<ServiceResult> RunAsCurrentUserAsync(Func<string, Task<ServiceResult>> action)
+    private async Task<OperationResult> RunAsCurrentUserAsync(Func<string, Task<OperationResult>> action)
     {
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         return userId is null
-            ? ServiceError.Invalid<InventoryCount>("Current user cannot be determined.")
+            ? OperationError.Invalid("Не удалось определить текущего пользователя.")
             : await action(userId);
     }
 }

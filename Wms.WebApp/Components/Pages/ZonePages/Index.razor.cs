@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.Warehouses;
+using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -10,7 +11,10 @@ namespace Wms.WebApp.Components.Pages.ZonePages;
 public partial class Index
 {
     [Inject]
-    private ZoneService ZoneService { get; set; } = null!;
+    private ZoneCommandService ZoneCommandService { get; set; } = null!;
+
+    [Inject]
+    private ZoneQueryService ZoneQueryService { get; set; } = null!;
 
     [Inject]
     private WarehouseService WarehouseService { get; set; } = null!;
@@ -23,6 +27,7 @@ public partial class Index
     private Warehouse? _warehouse;
     private ZoneType? _zoneType;
     private bool _includeDeleted;
+    private string? _errorMessage;
 
     private async Task<GridData<Zone>> LoadServerDataAsync(
         GridState<Zone> state,
@@ -41,7 +46,7 @@ public partial class Index
             Take = state.PageSize
         };
 
-        var result = await ZoneService.ListAsync(query, cancellationToken);
+        var result = await ZoneQueryService.ListAsync(query, cancellationToken);
 
         return new GridData<Zone>
         {
@@ -108,13 +113,25 @@ public partial class Index
 
     private async Task MarkDeleteAsync(Guid id)
     {
-        await ZoneService.MarkDeleteAsync(id);
-        await _dataGrid.ReloadServerData();
+        OperationResult result = await ZoneCommandService.MarkDeleteAsync(id);
+        await HandleActionResultAsync(result);
     }
 
     private async Task UnMarkDeleteAsync(Guid id)
     {
-        await ZoneService.UnMarkDeleteAsync(id);
+        OperationResult result = await ZoneCommandService.UnMarkDeleteAsync(id);
+        await HandleActionResultAsync(result);
+    }
+
+    private async Task HandleActionResultAsync(OperationResult result)
+    {
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.Error?.Message ?? "Операция не выполнена.";
+            return;
+        }
+
+        _errorMessage = null;
         await _dataGrid.ReloadServerData();
     }
 }

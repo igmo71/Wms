@@ -46,6 +46,7 @@
 
 @code {
     public const string LoginCallbackAction = "LoginCallback";
+    private static readonly bool PublicRegistrationEnabled = false;
 
     private string? message;
     private ExternalLoginInfo? externalLoginInfo;
@@ -73,14 +74,14 @@
 
         if (RemoteError is not null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login", $"Ошибка внешнего поставщика входа: {RemoteError}", HttpContext);
             return;
         }
 
         var info = await SignInManager.GetExternalLoginInfoAsync();
         if (info is null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login", "Ошибка: не удалось загрузить сведения для внешнего входа.", HttpContext);
             return;
         }
 
@@ -104,7 +105,7 @@
     {
         if (externalLoginInfo is null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login", "Ошибка: не удалось загрузить сведения для внешнего входа.", HttpContext);
             return;
         }
 
@@ -117,16 +118,23 @@
 
         if (result.Succeeded)
         {
-            Logger.LogInformation(
-                "{Name} logged in with {LoginProvider} provider.",
-                externalLoginInfo.Principal.Identity?.Name,
-                externalLoginInfo.LoginProvider);
+            Logger.LogInformation("Пользователь {Name} вошел через поставщика {LoginProvider}.",
+                externalLoginInfo.Principal.Identity?.Name, externalLoginInfo.LoginProvider);
             RedirectManager.RedirectTo(ReturnUrl);
             return;
         }
         else if (result.IsLockedOut)
         {
             RedirectManager.RedirectTo("Account/Lockout");
+            return;
+        }
+
+        if (!PublicRegistrationEnabled)
+        {
+            RedirectManager.RedirectToWithStatus(
+                "Account/Login",
+                "Самостоятельная регистрация отключена. Обратитесь к администратору WMS.",
+                HttpContext);
             return;
         }
 
@@ -141,7 +149,7 @@
     {
         if (externalLoginInfo is null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login", "Ошибка: не удалось загрузить сведения для внешнего входа при подтверждении.", HttpContext);
             return;
         }
 
@@ -157,7 +165,7 @@
             result = await UserManager.AddLoginAsync(user, externalLoginInfo);
             if (result.Succeeded)
             {
-                Logger.LogInformation("User created an account using {Name} provider.", externalLoginInfo.LoginProvider);
+                Logger.LogInformation("Пользователь создал учетную запись через поставщика {Name}.", externalLoginInfo.LoginProvider);
 
                 var userId = await UserManager.GetUserIdAsync(user);
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
@@ -182,7 +190,7 @@
         }
         else
         {
-            message = $"Error: {string.Join(",", result.Errors.Select(error => error.Description))}";
+            message = $"Ошибка: {string.Join(",", result.Errors.Select(error => error.Description))}";
         }
     }
 
@@ -194,8 +202,8 @@
         }
         catch
         {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor");
+            throw new InvalidOperationException($"Не удалось создать экземпляр '{nameof(ApplicationUser)}'. " +
+                $"Убедитесь, что '{nameof(ApplicationUser)}' не является абстрактным классом и имеет конструктор без параметров.");
         }
     }
 
@@ -203,7 +211,7 @@
     {
         if (!UserManager.SupportsUserEmail)
         {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
+            throw new NotSupportedException("Стандартный интерфейс требует хранилище пользователей с поддержкой электронной почты.");
         }
         return (IUserEmailStore<ApplicationUser>)UserStore;
     }

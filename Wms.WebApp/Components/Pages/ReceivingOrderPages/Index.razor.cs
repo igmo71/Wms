@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Options;
 using MudBlazor;
-using Wms.Application.Services.ReceivingOrders;
-using Wms.Application.Services;
+using Wms.Application.ReceivingOrders;
+using Wms.Application.Users;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;

@@ -1,38 +1,49 @@
-﻿using Wms.Application.Services;
+﻿using Wms.Application.SkuBarcodes;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class InformationRegister_ШтрихкодыНоменклатуры_Service(
+public class InformationRegister_ШтрихкодыНоменклатуры_Service(
     OneCClient oneCClient,
     SkuBarcodeService skuBarcodeService)
 {
-    public async Task ImportAsync(string refKey, CancellationToken ct)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<InformationRegister_ШтрихкодыНоменклатуры>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return;
+        {
+            return OperationError.Failure("1С вернула некорректный ответ: штрихкоды номенклатуры отсутствуют.");
+        }
 
-        await skuBarcodeService.DeleteRangeAsync(Guid.Parse(refKey), ct);
+        if (!Guid.TryParse(refKey, out var skuId))
+        {
+            return OperationError.Invalid("Некорректный идентификатор номенклатуры в уведомлении 1С.");
+        }
+
+        await skuBarcodeService.DeleteRangeAsync(skuId, ct);
 
         var newItems = fetchedItems
             .Select(x => CreateNew(x))
             .ToList();
 
         await skuBarcodeService.CreateListAsync(newItems, ct);
+
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
 
         var uri = InformationRegister_ШтрихкодыНоменклатуры.GetListUri;
@@ -45,7 +56,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список штрихкодов отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список штрихкодов отсутствует.");
 
         await skuBarcodeService.DeleteAllAsync(ct);
 
@@ -55,7 +66,7 @@ internal class InformationRegister_ШтрихкодыНоменклатуры_Se
 
         await skuBarcodeService.CreateListAsync(newItems, ct);
 
-        return ServiceResult.Success();
+        return OperationResult.Success();
     }
 
     private static SkuBarcode CreateNew(InformationRegister_ШтрихкодыНоменклатуры fetchedItem)

@@ -10,11 +10,23 @@ internal class ZonesConfiguration : IEntityTypeConfiguration<Zone>
     {
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name);
+        builder.Property(x => x.Code).HasMaxLength(DefaultConfiguration.Code).IsRequired();
+        builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name).IsRequired();
         builder.Property(x => x.Type).HasConversion<int>();
 
         builder.HasOne(x => x.Warehouse).WithMany(x => x.Zones)
             .HasForeignKey(x => x.WarehouseId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(x => x.StorageLocations).WithOne(x => x.Zone)
+            .HasForeignKey(x => x.ZoneId).HasPrincipalKey(x => x.Id)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.StorageLocations)
+            .HasField("_storageLocations")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasIndex(x => new { x.WarehouseId, x.Code }).IsUnique();
     }
 }

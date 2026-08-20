@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Turnovers;
+using Wms.Application.StockKeepingUnits;
+using Wms.Application.StorageLocations;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -10,9 +12,9 @@ namespace Wms.WebApp.Components.Pages.InventoryTurnoverPages;
 
 public partial class Index
 {
-    [Inject] private InventoryTurnoverService InventoryTurnoverService { get; set; } = null!;
+    [Inject] private InventoryTurnoverQueryService InventoryTurnoverQueryService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private StorageLocationService StorageLocationService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
 
     private MudDataGrid<InventoryTurnoverListItem> _dataGrid = null!;
@@ -28,7 +30,7 @@ public partial class Index
         CancellationToken cancellationToken)
     {
         var sortDefinition = state.SortDefinitions.FirstOrDefault();
-        var result = await InventoryTurnoverService.ListAsync(new InventoryTurnoverListQuery
+        var result = await InventoryTurnoverQueryService.ListAsync(new InventoryTurnoverListQuery
         {
             DateFrom = _dateFrom,
             DateTo = _dateTo,
@@ -63,7 +65,7 @@ public partial class Index
 
     private async Task<IEnumerable<StorageLocation>> SearchStorageLocationsAsync(string? searchText, CancellationToken ct)
     {
-        var result = await StorageLocationService.ListAsync(new StorageLocationListQuery
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
         {
             SearchString = searchText,
             WarehouseId = _warehouse?.Id,

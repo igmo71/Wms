@@ -37,7 +37,7 @@ An unfinished shipping order may be rolled back locally to `Prepared`. Draft pic
 
 Picking reads expose draft movements by order line and source locations with a positive current physical balance for that line's SKU. The picking UI and command service prevent the current shipping order's draft movements from exceeding either the line plan or a source location's physical balance for the SKU; drafts of other orders are not reservations and remain subject to the final posting check.
 
-The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
+The initial shipping UI has a filtered, paged list of shipping orders, a details page, and a picking work page. A prepared order requires the operator to select a shipping zone and location within the order warehouse before it can be set ready for picking; that location is fixed once picking starts. The picking page lets an operator select an order line, create, edit, and delete draft movements from available source locations, then set the order ready for shipment.
 
 The operator UI exposes a paged inventory-balance list. It shows the current SKU quantity in each storage location and supports filtering by warehouse, storage location, and SKU; it does not aggregate balances or account for reservations.
 
@@ -54,19 +54,7 @@ display.
 The operator UI exposes a separate paged list of posted inventory movements. It supports filtering by date period, warehouse, storage location, SKU, and by the number of a receiving order, shipping order, inventory count, or transfer, with the current day as default. It shows source and destination storage locations and links a movement to its source document with its number and date when known. Draft movements are deliberately excluded.
 
 Inventory counts are local WMS documents. They use a local `yyMMdd-HHmmss` number and the creation date. A draft may contain incomplete rows while an operator records the count. Each document and row timestamp is accompanied by the user who performed that operation. When posted, each completed row creates a receipt or issue `InventoryMovement` for its positive or negative counted-versus-expected difference; the common posting service updates balances and turnovers in the same save operation, and records the posting user as the movement confirmer. The operator UI provides a list, creates a count for a selected warehouse, and directly edits draft rows. Recounts, reservations, and inventory tasks are not implemented.
-
-`InventoryTransfer` is a local WMS inventory document without planned item lines
-or 1C synchronization. It groups an unrestricted chronological sequence of
-direct storage-location movements and movements through one optional transit
-location, such as a trolley. Each operator-confirmed physical action is
-immediately posted through the common inventory service; pick, put, and direct
-actions may be freely interleaved. A transit location is selected once as
-transfer context, starts empty, and belongs exclusively to one active transfer.
-A draft without movements may be deleted, the first movement starts the
-transfer, and it may be completed explicitly only after its transit location is
-empty.
-Posted movements and completed documents are immutable. The detailed process is
-defined in `specs/intra-warehouse-transfers/spec.md`.
+Detailed rules are defined in `specs/inventory-count-backend/spec.md`.
 
 Inventory-transfer commands immediately post every confirmed direct, pick, or put action
 together with balance and turnover changes in one `SaveChangesAsync` call,
@@ -77,14 +65,18 @@ command and query backend and the operator web UI are implemented. The UI has a
 filtered, paged transfer list and one work page for both initialization and
 continued work. At start, the operator selects a warehouse and, when needed, an
 empty transit location from that warehouse; both are then fixed for the
-document. The transit selector offers only empty, unassigned transit locations
-and states when none are available. Before confirmation, movement controls are visible but disabled.
+document. The transit location belongs exclusively to one active transfer.
+The transit selector offers only empty, unassigned locations and states when
+none are available. Before confirmation, movement controls are visible but disabled.
 Pick, put, and direct movement remain separate freely interleaved actions.
 Draft and in-progress documents open on the work page; completed documents open
 on a separate read-only details page with their movement history.
 The work page always shows the completion action for an unfinished document;
 it is enabled only after a movement has started the transfer and, when a
 transit location is used, only after it is empty.
+Drafts without movements may be deleted. Posted movements and completed
+documents are immutable. The detailed process is defined in
+`specs/intra-warehouse-transfers/spec.md`.
 
 ## Document list UI convention
 
@@ -146,16 +138,44 @@ user, complete timestamps, or a nonnegative duration are excluded as invalid
 audit data. The detailed rules are defined in
 `specs/employee-performance-report/spec.md`.
 
+## Authentication and users
+
+The operator web application uses ASP.NET Core Identity with two fixed WMS
+roles. `Administrator` and `Operator` may both access operational and report
+pages; only `Administrator` may access configuration catalogs and manage user accounts. Anonymous users
+may access account endpoints needed to sign in but not WMS pages. Public local
+self-registration is retained in the source for possible future use but is not
+linked publicly and requires the administrator role; creation of a new account
+through an external login is disabled.
+
+The administrator user page creates confirmed local accounts and edits their
+current display name, single WMS role, and sign-in block. An administrator
+cannot block their own account or remove their own administrator role, and the
+last active administrator cannot be blocked or demoted.
+
+`ApplicationUser.DisplayName` is the human-readable name shown in operational
+audit and employee reports. Existing accounts with an empty display name fall
+back to Identity `UserName`. Operational records continue storing only the
+Identity user identifier, so changing a display name also changes historical
+display; deleted users remain identified by their stored identifier.
+
+Roles are initialized idempotently at web application startup. Existing users
+without a WMS role become operators. The first administrator is selected with
+`IdentityBootstrap__AdministratorEmail`; when that account does not exist,
+`IdentityBootstrap__AdministratorDisplayName` and the secret
+`IdentityBootstrap__AdministratorPassword` are also required to create it.
+The bootstrap password must not be committed to application settings.
+
 ## MVP implementation principles
 
-The project deliberately favors clear, direct code and fast iteration over enterprise-level generalization.
-
-- UI and HTTP endpoints may call application services directly.
-- CQRS, DTO layers, repositories, and additional abstractions are optional tools, not mandatory architecture.
-- Detailed validation, resilience, and stabilization are added when they become useful for the MVP, not preemptively.
-- Existing code and the explicitly stated business flow take priority over speculative future needs.
-
-These principles can change as the product and its constraints mature.
+The project favors clear, direct code and incremental enrichment over
+enterprise-level generalization. Layer responsibilities, validation placement,
+operation outcomes, coding conventions, and architectural non-goals are defined
+once in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). The ordered refactoring
+backlog is kept in
+[`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/spec.md).
+Existing code and documented business behavior take priority over speculative
+future needs.
 
 ## Mobile WMS
 
@@ -227,21 +247,52 @@ Core domain concepts:
 - inventory movement: an editable draft of a warehouse movement, which becomes historical when posted;
 - inventory turnover: an immutable balance change recording before/after and its originating inventory movement.
 
+SKU physical properties are normalized during 1C import to WMS units:
+kilograms per canonical SKU unit for weight and cubic meters per canonical SKU
+unit for volume. Refreshing the SKU catalog first refreshes the referenced 1C
+units and uses their measurement type and nullable numerator/denominator, so it
+does not depend on the order of manual catalog refreshes. Invalid enabled
+physical properties become unknown rather than zero; the catalog UI warns how
+many weight and volume values could not be imported.
+Inventory remains expressed in one canonical unit per SKU. A 1C packaging is a
+quantity-conversion/input representation rather than a separate inventory
+balance, while a 1C characteristic that distinguishes stock forms part of SKU
+identity. The current importer has not yet implemented packaging conversion or
+characteristic-aware SKU identity. Storage-location capacity enforcement is
+also a later increment. Those boundaries and the required source examples are specified in
+[`specs/sku-physical-properties/spec.md`](../specs/sku-physical-properties/spec.md).
+
 ## Configuration UI
 
 The operator UI exposes configuration screens under the `Конфигурация` navigation group.
 
-- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh from 1C through `SynchronizedCatalogImportService`. The UI disables a refresh button and displays indeterminate progress while it runs.
-- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse and has an explicit type.
+- `Склады` supports server-side name search, sorting, pagination, inclusion of deactivated records, and a user-triggered refresh through its 1C catalog integration service. The UI disables a refresh button and displays indeterminate progress while it runs.
+- `Зоны` supports server-side name search, sorting, pagination, warehouse filtering, inclusion of deactivated zones, and creation/editing in a dialog. A zone always belongs to one warehouse, has an explicit type, and has a required code unique within the warehouse.
 - Zone types distinguish ordinary storage, transit, receiving, and shipping.
   Receiving and shipping location selectors and command services accept only
   their corresponding zone types; picking and inventory counts use ordinary
   storage zones.
-- `Ячейки хранения` supports server-side name search, sorting, pagination, warehouse and zone filtering, inclusion of deactivated locations, and creation/editing in a dialog. A storage location always belongs to one warehouse and one zone. Selecting a zone automatically selects its warehouse; selecting a warehouse limits the zone choices to that warehouse.
+- Storage locations form an arbitrary-depth tree inside a zone. Structural
+  nodes use `IsFolder`; only non-folder nodes may participate in inventory and
+  warehouse documents. Each location stores a materialized numeric path code
+  unique inside its zone, while the displayed full address combines the zone
+  code and location code. The configuration UI loads the complete tree for a
+  selected zone and supports single-node editing and transactional generation
+  of immediate children. Subtree moves are outside the MVP. Locations may have
+  nullable dimensions, capacity, absolute warehouse coordinates, and a simple
+  picking sequence. Detailed rules are in
+  `specs/storage-location-topology/spec.md`.
 - `Номенклатура`, `Партнёры`, `Физические лица`, `Структура предприятия`, `Штрихкоды` and `Единицы измерения` are 1C-synchronized catalogs with server-side search, sorting, pagination, an option to include deactivated records, and a user-triggered refresh from 1C. The UI disables a refresh button and displays indeterminate progress while it runs. Partners, individuals, and organizational units are displayed as flat lists; their imported `ParentId` hierarchies are not visualized. Individual catalog groups are stored and shown alongside people with an explicit row type.
 - `Направления доставки` is a 1C-synchronized hierarchical catalog. It is displayed as an unpaginated tree built from `ParentId`; it deliberately has no search, so the complete hierarchy always remains visible. The UI also permits a user-triggered 1C refresh with indeterminate progress.
 
-Manual list imports for 1C-synchronized catalogs return `ServiceResult` through `SynchronizedCatalogImportService`. Configuration pages that expose these imports show an explicit success or error alert and reload displayed data only after a successful import. An invalid or failed 1C response is an import failure. Large catalogs such as SKUs and partners are loaded in independent parallel batches; completed batches are not rolled back when another batch fails, and the failure warns that the catalog may have been partially updated.
+Manual list imports for 1C-synchronized catalogs call the corresponding 1C
+integration service directly and return `OperationResult`; there is no common
+catalog-import facade. Configuration pages show an explicit success or error
+alert and reload displayed data only after a successful import. An invalid or
+failed 1C response is an import failure. Large catalogs such as SKUs and
+partners are loaded in independent parallel batches; completed batches are not
+rolled back when another batch fails, and the failure warns that the catalog
+may have been partially updated.
 Small catalogs may be fetched in one 1C request and saved through one EF Core batch operation instead of issuing one database save per catalog item. The individuals and organizational-unit imports use this approach.
 
 ## Receiving
@@ -307,7 +358,7 @@ are not implemented.
 - `PutawayCommandService` starts and completes putaway and manages its draft
   movements; `PutawayQueryService` reads putaway movements and valid storage
   destinations.
-- `BalanceAndTurnoverService` records inventory movements and updates balances
+- `InventoryPostingService` records inventory movements and updates balances
   when receiving or putaway is completed.
 
 Inbound synchronization may create and reconcile receiving orders only in `ReadyForReceiving` and shipping orders only in `Prepared`. Once WMS work has started, any inbound difference leaves the local order unchanged, sets `ExternalChangeDetected`, and logs the conflict. Receiving facts are editable only in `InReceiving` or `ProcessingRequired`; shipping facts are editable only while picking or verification is in progress.
@@ -316,19 +367,41 @@ Inbound synchronization may create and reconcile receiving orders only in `Ready
 
 The 1C OData client is configured through `OneCClient` settings. The integration uses explicit models named after 1C entities.
 
-`Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented; partner resolution through `PartyService` is not yet implemented.
+All supported notification imports return `OperationResult`. The background
+dispatcher logs expected import failures in one place and logs unexpected
+exceptions separately. Notification delivery still uses the non-persistent
+in-memory channel described in the roadmap.
+
+`Catalog_Партнеры_Service` imports `Catalog_Партнеры` into the local `Partner` catalog. Full synchronization reads `$count` and processes batches of 1000 records with at most 10 batches in parallel. A 1C notification triggers an individual partner update. The backend import, diagnostic endpoints, and partner configuration page are implemented.
 
 `Catalog_ФизическиеЛица_Service` imports `Catalog_ФизическиеЛица` into the local `Individual` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual record update. Catalog groups are stored with `IsFolder` and displayed in the same flat configuration list as people.
 
 `Catalog_СтруктураПредприятия_Service` imports `Catalog_СтруктураПредприятия` into the local `OrganizationalUnit` catalog. Full synchronization fetches the complete small catalog in one request and persists it in one EF Core batch save; a 1C notification triggers an individual organizational-unit update. The imported hierarchy is retained in `ParentId`, while the configuration UI displays a flat list.
 
-Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyService` resolves that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Its batch `GetManyAsync` groups distinct references by type and performs at most one local database query per represented type, avoiding N+1 queries on order lists. It never calls 1C on demand, includes deactivated catalog records for historical display, and excludes individual-catalog folders. Receiving and shipping query services enrich both individual orders and paged lists with non-persisted `Shipper` or `Receiver` information. Missing local records remain visible as unresolved in the UI; party sorting and filtering are not implemented.
+Receiving and shipping orders retain a party reference as a 1C identifier plus `PartyType`. `PartyQueryService` resolves that polymorphic reference to a common `PartyInfo` across warehouses, partners, individuals, and organizational units; EF polymorphic foreign keys and a duplicated common party table are deliberately avoided. Its batch `GetManyAsync` groups distinct references by type and performs at most one local database query per represented type, avoiding N+1 queries on order lists. It never calls 1C on demand, includes deactivated catalog records for historical display, and excludes individual-catalog folders. Receiving and shipping query services enrich both individual orders and paged lists with non-persisted `Shipper` or `Receiver` information. Missing local records remain visible as unresolved in the UI; party sorting and filtering are not implemented.
 
 For `Document_ПриходныйОрдерНаТовары`:
 
-- `Document_ПриходныйОрдерНаТовары_InboundService` fetches a document by `Ref_Key`, maps it to `ReceivingOrder`, and imports it.
+- `Document_ПриходныйОрдерНаТовары_InboundService` fetches a document by
+  `Ref_Key`, maps it to a domain import snapshot, and lets `ReceivingOrder`
+  create or reconcile its local state.
 - `Document_ПриходныйОрдерНаТовары_OutboundService` changes the document status, updates item facts when needed, and posts the document in 1C.
 - `POST /api/1c/Document_ПриходныйОрдерНаТовары/notify` enqueues a notification; `NotifyBackgroundService` consumes it and imports the document asynchronously.
+- Manual batch import of receiving documents is not implemented, so no public
+  batch-import endpoint is exposed.
+
+For `Document_РасходныйОрдерНаТовары`:
+
+- `Document_РасходныйОрдерНаТовары_InboundService` fetches a document by
+  `Ref_Key`, maps it to a domain import snapshot, and lets `ShippingOrder`
+  create or reconcile its local state.
+- `Document_РасходныйОрдерНаТовары_OutboundService` changes the document
+  status, updates its table sections from WMS picking facts, and posts the
+  document in 1C.
+- `POST /api/1c/Document_РасходныйОрдерНаТовары/notify` enqueues a notification;
+  `NotifyBackgroundService` consumes it and imports the document asynchronously.
+- Manual batch import of shipping documents is not implemented, so no public
+  batch-import endpoint is exposed.
 
 ## Working conventions
 

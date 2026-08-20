@@ -1,6 +1,6 @@
 ﻿namespace Wms.Integration.OneS.Models;
 
-public class Catalog_Склады
+internal class Catalog_Склады
 {
     public Guid Ref_Key { get; set; }
     public bool DeletionMark { get; set; }

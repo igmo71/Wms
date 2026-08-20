@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.Inventory;
+using Wms.Application.Inventory.Counts;
+using Wms.Application.Users;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 

@@ -15,7 +15,7 @@ public static class DependencyInjection
         services.AddHttpClient<OneCClient>(client =>
         {
             var config = configuration.GetSection(OneCClientConfig.Section).Get<OneCClientConfig>()
-                ?? throw new InvalidOperationException($"Configuration section '{OneCClientConfig.Section}' is missing.");
+                ?? throw new InvalidOperationException($"Раздел конфигурации '{OneCClientConfig.Section}' отсутствует.");
 
             client.BaseAddress = new Uri(config.BaseAddress);
 

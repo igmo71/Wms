@@ -1,15 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
-using Wms.Application.Services;
+using Wms.Application.UnitsOfMeasure;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.UnitOfMeasurePages;
 
 public partial class Index
 {
     [Inject] private UnitOfMeasureService UnitOfMeasureService { get; set; } = null!;
-    [Inject] private SynchronizedCatalogImportService SynchronizedCatalogImportService { get; set; } = null!;
+    [Inject] private Catalog_УпаковкиЕдиницыИзмерения_Service CatalogImportService { get; set; } = null!;
     private MudDataGrid<UnitOfMeasure> _dataGrid = null!;
     private string? _searchString;
     private bool _includeDeleted;
@@ -34,7 +35,7 @@ public partial class Index
         _importMessage = null;
         try
         {
-            var result = await SynchronizedCatalogImportService.RefreshUnitsOfMeasureAsync();
+            var result = await CatalogImportService.ImportListAsync();
             if (!result.IsSuccess)
             {
                 _importFailed = true;

@@ -1,55 +1,64 @@
-﻿using Wms.Application.Services;
+﻿using Wms.Application.UnitsOfMeasure;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
 
 namespace Wms.Integration.OneS.Services;
 
-internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
+public class Catalog_УпаковкиЕдиницыИзмерения_Service(
     OneCClient oneCClient,
     UnitOfMeasureService unitOfMeasureService)
 {
-    public async Task ImportAsync(string Ref_Key, CancellationToken ct = default)
+    public async Task<OperationResult> ImportAsync(string refKey, CancellationToken ct = default)
     {
-        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(Ref_Key);
+        var uri = Catalog_УпаковкиЕдиницыИзмерения.GetUri(refKey);
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return;
+        {
+            return OperationError.Failure("1С вернула некорректный ответ: единица измерения отсутствует.");
+        }
 
         var uom = MapToUnitOfMeasure(fetchedItem);
 
         await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
+
+        return OperationResult.Success();
     }
 
-    public async Task<ServiceResult> ImportListAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ImportListAsync(CancellationToken ct = default) =>
+        await ImportListAndGetAsync(ct);
+
+    internal async Task<OperationResult<IReadOnlyDictionary<Guid, UnitOfMeasure>>> ImportListAndGetAsync(
+        CancellationToken ct = default)
     {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return serviceResult;
+            return serviceResult.Error!;
 
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
-            return ServiceError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
 
-        foreach (var fetchedItem in fetchedItems)
-        {
-            var uom = MapToUnitOfMeasure(fetchedItem);
+        var units = fetchedItems
+            .Select(MapToUnitOfMeasure)
+            .ToList();
 
-            await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
-        }
+        await unitOfMeasureService.CreateOrUpdateBatchAsync(units, ct);
 
-        return ServiceResult.Success();
+        return units.ToDictionary(x => x.Id);
     }
 
     private static UnitOfMeasure MapToUnitOfMeasure(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)
@@ -62,6 +71,7 @@ internal class Catalog_УпаковкиЕдиницыИзмерения_Service(
             DeletionMark = fetchedItem.DeletionMark,
             Description = fetchedItem.Description,
             Name = fetchedItem.НаименованиеПолное,
+            MeasurementType = fetchedItem.ТипИзмеряемойВеличины,
             Numerator = fetchedItem.Числитель,
             Denominator = fetchedItem.Знаменатель
         };

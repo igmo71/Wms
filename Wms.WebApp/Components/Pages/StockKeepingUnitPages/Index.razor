@@ -1,4 +1,5 @@
 @page "/stock-keeping-units"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @using Wms.Common
 @using Wms.Domain
 
@@ -23,6 +24,10 @@ else if (_importSucceeded)
 {
     <MudAlert Severity="Severity.Success" Class="mb-4">@_importMessage</MudAlert>
 }
+else if (_importWarning)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">@_importMessage</MudAlert>
+}
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row="true" AlignItems="AlignItems.Center">
@@ -36,7 +41,12 @@ else if (_importSucceeded)
         <PropertyColumn Property="x => x.Code" Title="Код" Sortable="true" />
         <PropertyColumn Property="x => x.Name" Title="Наименование" Sortable="true" />
         <PropertyColumn Property="x => x.BaseUnitOfMeasure!.Name" Title="Базовая единица" Sortable="true" />
-        <PropertyColumn Property="x => x.WeightKg" Title="Вес, кг" Sortable="true" />
+        <PropertyColumn Property="x => x.WeightKg" Title="Вес, кг" Sortable="true">
+            <CellTemplate>@(context.Item.WeightKg is double weight ? weight.ToString("0.###") : "—")</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.VolumeM3" Title="Объём, м³" Sortable="true">
+            <CellTemplate>@(context.Item.VolumeM3 is double volume ? volume.ToString("0.######") : "—")</CellTemplate>
+        </PropertyColumn>
         <TemplateColumn Title="Статус" Sortable="false"><CellTemplate><MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирована" : "Активна")"><MudIcon Icon="@(context.Item.DeletionMark ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)" Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" /></MudTooltip></CellTemplate></TemplateColumn>
     </Columns>
     <PagerContent><MudDataGridPager T="StockKeepingUnit" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>

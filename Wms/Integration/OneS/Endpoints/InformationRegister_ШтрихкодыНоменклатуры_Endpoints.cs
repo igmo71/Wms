@@ -7,7 +7,7 @@ using Wms.Integration.OneS.Services;
 
 namespace Wms.Integration.OneS.Endpoints;
 
-public static class InformationRegister_ШтрихкодыНоменклатуры_Endpoints
+internal static class InformationRegister_ШтрихкодыНоменклатуры_Endpoints
 {
     public static IEndpointRouteBuilder MapInformationRegister_ШтрихкодыНоменклатуры_Endpoints(this IEndpointRouteBuilder routeBuilder)
     {

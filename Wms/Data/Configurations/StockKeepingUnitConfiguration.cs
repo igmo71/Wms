@@ -4,7 +4,7 @@ using Wms.Domain;
 
 namespace Wms.Data.Configurations;
 
-public class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepingUnit>
+internal class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepingUnit>
 {
     public void Configure(EntityTypeBuilder<StockKeepingUnit> builder)
     {
@@ -16,5 +16,9 @@ public class StockKeepingUnitConfiguration : IEntityTypeConfiguration<StockKeepi
         builder.HasOne(x => x.BaseUnitOfMeasure).WithMany()
             .HasForeignKey(x => x.BaseUnitOfMeasureId).HasPrincipalKey(x => x.Id)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(x => x.Barcodes)
+            .HasField("_barcodes")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

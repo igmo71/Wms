@@ -1,9 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
-using System.Security.Claims;
-using Wms.Application.Services;
-using Wms.Application.Services.ShippingOrders;
+using Wms.Application.ShippingOrders;
+using Wms.Application.Users;
+using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -93,7 +94,7 @@ public partial class Picking
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"
-        : _userNames.TryGetValue(userId, out var userName)
+        : _userNames.TryGetValue(userId, out string? userName)
             ? userName
             : "Пользователь не найден";
 
@@ -107,7 +108,9 @@ public partial class Picking
         }
 
         if (_expandedLineNumber is not null)
+        {
             await _orderItemsGrid.CollapseAllHierarchy();
+        }
 
         _operationFailed = false;
         _selectedLine = line;
@@ -129,7 +132,9 @@ public partial class Picking
     private async Task LoadSelectedLineDataAsync()
     {
         if (_selectedLine is null)
+        {
             return;
+        }
 
         _movements = await PickingQueryService.GetPickingMovementsAsync(Id, _selectedLine.LineNumber);
         _availableSourceLocations = await PickingQueryService.GetAvailableSourceLocationsAsync(Id, _selectedLine.LineNumber);
@@ -144,7 +149,7 @@ public partial class Picking
 
     private double GetEditedMovementQuantityForSelectedSource()
     {
-        var editingMovement = _editingMovement;
+        InventoryMovement? editingMovement = _editingMovement;
 
         return editingMovement is not null && editingMovement.SourceStorageLocationId == _selectedSourceLocation?.Id
             ? editingMovement.Quantity
@@ -166,10 +171,12 @@ public partial class Picking
     private async Task SaveMovementAsync()
     {
         if (_selectedLine is null || _selectedSourceLocation is null)
+        {
             return;
+        }
 
         _operationFailed = false;
-        var result = _editingMovement is null
+        OperationResult result = _editingMovement is null
             ? await PickingCommandService.AddPickingMovementAsync(Id, _selectedLine.LineNumber, _selectedSourceLocation.Id, _movementQuantity)
             : await PickingCommandService.UpdatePickingMovementAsync(_editingMovement.Id, _selectedSourceLocation.Id, _movementQuantity);
 
@@ -186,7 +193,7 @@ public partial class Picking
     private async Task DeleteMovementAsync(InventoryMovement movement)
     {
         _operationFailed = false;
-        var result = await PickingCommandService.DeletePickingMovementAsync(movement.Id);
+        OperationResult result = await PickingCommandService.DeletePickingMovementAsync(movement.Id);
         if (!result.IsSuccess)
         {
             SetError(result.Error?.Message ?? "Не удалось удалить отбор.");
@@ -194,7 +201,9 @@ public partial class Picking
         }
 
         if (_editingMovement?.Id == movement.Id)
+        {
             CancelEditing();
+        }
 
         await ReloadSelectedLineDataAsync();
     }
@@ -202,10 +211,21 @@ public partial class Picking
     private async Task ReloadSelectedLineDataAsync()
     {
         if (_selectedLine is null)
+        {
             return;
+        }
+
+        int lineNumber = _selectedLine.LineNumber;
+        _order = await OrderQueryService.GetOrderAsync(Id);
+        _selectedLine = _order?.Items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        if (_selectedLine is null)
+        {
+            ClearSelectedLine();
+            SetError("Не удалось обновить строку заказа.");
+            return;
+        }
 
         await LoadSelectedLineDataAsync();
-        _selectedLine.FactQuantity = _movements.Sum(x => x.Quantity);
     }
 
     private async Task SetReadyForShipmentAsync()
@@ -215,14 +235,14 @@ public partial class Picking
 
         try
         {
-            var userId = await GetCurrentUserIdAsync();
+            string? userId = await GetCurrentUserIdAsync();
             if (userId is null)
             {
                 SetError("Не удалось определить текущего пользователя.");
                 return;
             }
 
-            var result = await OrderCommandService.SetReadyForShipmentAsync(Id, userId);
+            OperationResult result = await OrderCommandService.SetReadyForShipmentAsync(Id, userId);
             if (!result.IsSuccess)
             {
                 SetError(result.Error?.Message ?? "Не удалось подготовить ордер к отгрузке.");
@@ -243,25 +263,27 @@ public partial class Picking
 
     private async Task ShowRollbackDialogAsync()
     {
-        var dialog = await DialogService.ShowAsync<RollbackDialog>("Откатить расходный ордер");
-        var dialogResult = await dialog.Result;
+        IDialogReference dialog = await DialogService.ShowAsync<RollbackDialog>("Откатить расходный ордер");
+        DialogResult? dialogResult = await dialog.Result;
 
         if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not string reason)
+        {
             return;
+        }
 
         _isRollingBack = true;
         _operationFailed = false;
 
         try
         {
-            var userId = await GetCurrentUserIdAsync();
+            string? userId = await GetCurrentUserIdAsync();
             if (userId is null)
             {
                 SetError("Не удалось определить текущего пользователя.");
                 return;
             }
 
-            var result = await OrderCommandService.RollbackAsync(Id, reason, userId);
+            OperationResult result = await OrderCommandService.RollbackAsync(Id, reason, userId);
             if (!result.IsSuccess)
             {
                 SetError(result.Error?.Message ?? "Не удалось откатить расходный ордер.");
@@ -288,7 +310,7 @@ public partial class Picking
 
     private async Task<string?> GetCurrentUserIdAsync()
     {
-        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        AuthenticationState authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         return authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
     }
 }

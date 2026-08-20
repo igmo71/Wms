@@ -1,9 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Wms.Application.Services.ReceivingOrders;
-using Wms.Application.Services.ShippingOrders;
+using Wms.Application.ReceivingOrders;
 using Wms.Common;
-using Wms.Domain;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
 
@@ -17,10 +15,10 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
-    public async Task ImportDocumentAsync(string refKey, CancellationToken ct = default)
+    public async Task<OperationResult> ImportDocumentAsync(string refKey, CancellationToken ct = default)
     {
         using var scope = logger.BeginScope("ImportDocument {RefKey}", refKey);
-        using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.Import", nameof(ShippingOrderCommandService));
+        using var activity = AppTracing.StartActivity("Document_ПриходныйОрдерНаТовары.Import", nameof(ReceivingOrderCommandService));
 
         await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
@@ -29,24 +27,20 @@ internal class Document_ПриходныйОрдерНаТовары_InboundServ
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Document>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return;
+        {
+            return serviceResult;
+        }
 
         var fetchedDocument = serviceResult.Value?.Value?[0];
 
         if (fetchedDocument is null)
         {
-            return;
+            return OperationError.Failure("1С вернула некорректный ответ: приходный ордер отсутствует.");
         }
 
-        logger.LogDebug("Fetched document {@fetchedDocument}", fetchedDocument);
+        logger.LogDebug("Получен документ {@fetchedDocument}", fetchedDocument);
 
-        ReceivingOrder order = Document.MapToReceivingOrder(fetchedDocument);
-
-        await receivingOrderCommandService.ImportOrderAsync(order, ct);
-    }
-
-    internal async Task ImportDocumentListAsync(CancellationToken ct)
-    {
-        throw new NotImplementedException();
+        var snapshot = Document.MapToImportSnapshot(fetchedDocument);
+        return await receivingOrderCommandService.ImportOrderAsync(snapshot, ct);
     }
 }
