@@ -79,8 +79,8 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Приходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Приходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var transitionResult = existingOrder.SetInReceiving(DateTimeOffset.UtcNow, userId);
@@ -116,8 +116,8 @@ public class ReceivingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Приходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Приходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -181,7 +181,9 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
 
         if (existingOrder is null)
-            return OperationError.NotFound();
+        {
+            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
+        }
 
         var updateResult = existingOrder.UpdateItemFact(lineNumber, factQuantity, comment);
         if (!updateResult.IsSuccess)
@@ -205,7 +207,7 @@ public class ReceivingOrderCommandService(
             .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
         }
 
         var validLocation = await dbContext.StorageLocations

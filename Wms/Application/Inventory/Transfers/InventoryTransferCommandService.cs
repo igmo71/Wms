@@ -55,7 +55,7 @@ public class InventoryTransferCommandService(
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Перемещение '{transferId}' не найдено.");
         }
 
         var deletionResult = transfer.ValidateDeletion();
@@ -130,7 +130,7 @@ public class InventoryTransferCommandService(
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Перемещение '{transferId}' не найдено.");
         }
 
         if (transfer.TransitStorageLocationId is Guid transitLocationId
@@ -173,7 +173,7 @@ public class InventoryTransferCommandService(
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Перемещение '{transferId}' не найдено.");
         }
 
         var routeResult = CreateRoute(
@@ -190,7 +190,8 @@ public class InventoryTransferCommandService(
             x => x.Id == stockKeepingUnitId && !x.DeletionMark,
             ct))
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Активная номенклатура '{stockKeepingUnitId}' не найдена.");
         }
 
         var route = routeResult.Value!;
@@ -271,7 +272,7 @@ public class InventoryTransferCommandService(
             x => x.Id == warehouseId && !x.DeletionMark,
             ct))
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Активный склад '{warehouseId}' не найден.");
         }
 
         return transitStorageLocationId is Guid locationId
@@ -290,7 +291,7 @@ public class InventoryTransferCommandService(
             .FirstOrDefaultAsync(x => x.Id == locationId, ct);
         if (transitLocation is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Транзитная складская позиция '{locationId}' не найдена.");
         }
 
         if (transitLocation.IsFolder)
@@ -349,7 +350,8 @@ public class InventoryTransferCommandService(
         if (!locations.TryGetValue(route.SourceStorageLocationId, out var sourceLocation)
             || !locations.TryGetValue(route.DestinationStorageLocationId, out var destinationLocation))
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Не найдена складская позиция маршрута перемещения: источник '{route.SourceStorageLocationId}', назначение '{route.DestinationStorageLocationId}'.");
         }
 
         if (sourceLocation.IsFolder

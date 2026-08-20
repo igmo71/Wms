@@ -81,8 +81,8 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Расходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Расходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
         OperationResult transitionResult = existingOrder.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
@@ -119,8 +119,8 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Расходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Расходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
         List<InventoryMovement> draftPickingMovements = await dbContext.InventoryMovements
@@ -181,8 +181,8 @@ public class ShippingOrderCommandService(
 
         if (existingOrder is null)
         {
-            logger.LogError("Расходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Расходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -235,7 +235,7 @@ public class ShippingOrderCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Расходный ордер '{shippingOrderId}' не найден.");
         }
 
         bool validLocation = await dbContext.StorageLocations
@@ -278,8 +278,8 @@ public class ShippingOrderCommandService(
 
         if (order is null)
         {
-            logger.LogError("Расходный ордер не найден");
-            return OperationError.NotFound();
+            logger.LogError("Расходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
         List<InventoryMovement> draftMovements = await dbContext.InventoryMovements

@@ -24,7 +24,7 @@ public class PickingCommandService(
         ShippingOrder? order = await LoadOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -73,7 +73,7 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
         if (movement is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Движение отбора '{movementId}' не найдено.");
         }
 
         ShippingOrder? order = movement.RecorderId is Guid orderId
@@ -81,7 +81,8 @@ public class PickingCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Расходный ордер '{movement.RecorderId}' для движения отбора '{movementId}' не найден.");
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -125,7 +126,7 @@ public class PickingCommandService(
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
         if (movement is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Движение отбора '{movementId}' не найдено.");
         }
 
         ShippingOrder? order = movement.RecorderId is Guid orderId
@@ -133,7 +134,8 @@ public class PickingCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Расходный ордер '{movement.RecorderId}' для движения отбора '{movementId}' не найден.");
         }
 
         List<InventoryMovement> draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);

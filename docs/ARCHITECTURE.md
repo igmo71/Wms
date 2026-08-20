@@ -112,8 +112,9 @@ application, and integration operations use them for expected outcomes such as
 invalid input, a missing record, or a business conflict. This keeps expected
 branching explicit without exception adapters.
 `OperationError` factories are intentionally non-generic: the entity type is
-not part of the error contract, and a specific subject is named in the message
-only when it helps the user.
+not part of the error contract. Every error requires an informative message;
+for a missing record it names the object and includes its identifier when one
+is available in the operation context.
 
 Unexpected infrastructure failures and programming errors remain exceptions.
 Do not catch every `Exception` inside domain or application operations merely

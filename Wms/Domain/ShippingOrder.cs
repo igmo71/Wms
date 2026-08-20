@@ -222,7 +222,8 @@ public class ShippingOrder
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка {lineNumber} расходного ордера '{Id}' не найдена.");
         }
 
         OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, null);
@@ -281,7 +282,8 @@ public class ShippingOrder
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка {movement.RecorderLineNumber} расходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
         }
 
         OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, movement.Id);
@@ -329,7 +331,8 @@ public class ShippingOrder
         ShippingOrderItem? item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка {movement.RecorderLineNumber} расходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
         }
 
         double factQuantity = draftMovements

@@ -120,7 +120,8 @@ public class InventoryCount
         var item = _items.FirstOrDefault(x => x.Id == itemId);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка инвентаризации '{itemId}' в документе '{Id}' не найдена.");
         }
 
         if (storageLocationId.HasValue
@@ -163,7 +164,8 @@ public class InventoryCount
         var item = _items.FirstOrDefault(x => x.Id == itemId);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка инвентаризации '{itemId}' в документе '{Id}' не найдена.");
         }
 
         var auditResult = ValidateAudit(removedAtUtc, removedBy, "Deleting user must be specified.");

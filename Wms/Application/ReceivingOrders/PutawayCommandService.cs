@@ -25,7 +25,7 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var startResult = order.StartPutaway(DateTimeOffset.UtcNow, userId);
@@ -51,7 +51,7 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -101,7 +101,7 @@ public class PutawayCommandService(
 
         if (movement is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Движение размещения '{movementId}' не найдено.");
         }
 
         var order = movement.RecorderId is Guid orderId
@@ -109,7 +109,8 @@ public class PutawayCommandService(
             : null;
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Приходный ордер '{movement.RecorderId}' для движения размещения '{movementId}' не найден.");
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);
@@ -151,7 +152,7 @@ public class PutawayCommandService(
 
         if (movement is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Движение размещения '{movementId}' не найдено.");
         }
 
         var order = movement.RecorderId is Guid orderId
@@ -160,7 +161,8 @@ public class PutawayCommandService(
 
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Приходный ордер '{movement.RecorderId}' для движения размещения '{movementId}' не найден.");
         }
 
         var removalResult = order.ValidatePutawayMovementRemoval(movement);
@@ -184,7 +186,7 @@ public class PutawayCommandService(
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var draftMovements = await LoadDraftMovementsAsync(dbContext, order.Id, ct);

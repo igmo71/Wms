@@ -61,7 +61,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Складская позиция '{id}' не найдена.");
         }
 
         if (!location.IsFolder && details.IsFolder && await HasBeenUsedAsync(dbContext, id, ct))
@@ -125,7 +125,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Складская позиция '{id}' не найдена.");
         }
 
         if (await dbContext.StorageLocations.AnyAsync(x => x.ParentId == id && !x.DeletionMark, ct))
@@ -149,7 +149,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Складская позиция '{id}' не найдена.");
         }
 
         if (location.ParentId is Guid parentId
@@ -183,7 +183,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         StorageLocation? parent = await dbContext.StorageLocations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == parentId, ct);
         if (parent is null)
         {
-            return OperationError.NotFound("Родительская позиция не найдена.");
+            return OperationError.NotFound($"Родительская складская позиция '{parentId}' не найдена.");
         }
 
         if (parent.DeletionMark || parent.WarehouseId != warehouseId || parent.ZoneId != zoneId)

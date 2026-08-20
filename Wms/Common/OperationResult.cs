@@ -22,7 +22,7 @@ public class OperationResult
 
     public static OperationResult Failure(OperationError error) => new(error);
 
-    public static OperationResult Failure(OperationErrorType errorType, string? message) =>
+    public static OperationResult Failure(OperationErrorType errorType, string message) =>
         new(new OperationError(errorType, message));
 
     public static implicit operator OperationResult(OperationError error) => Failure(error);
@@ -46,7 +46,7 @@ public class OperationResult<TValue> : OperationResult
 
     public static new OperationResult<TValue> Failure(OperationError error) => new(error);
 
-    public static new OperationResult<TValue> Failure(OperationErrorType errorType, string? message) =>
+    public static new OperationResult<TValue> Failure(OperationErrorType errorType, string message) =>
         new(new OperationError(errorType, message));
 
     public static implicit operator OperationResult<TValue>(TValue value) => Success(value);

@@ -17,7 +17,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
 
         if (command.Id.HasValue && zone is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Зона '{command.Id}' не найдена.");
         }
 
         Guid? originalWarehouseId = zone?.WarehouseId;
@@ -56,7 +56,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
 
         if (zone is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Зона '{id}' не найдена.");
         }
 
         zone.Deactivate();
@@ -71,7 +71,7 @@ public class ZoneCommandService(IDbContextFactory<ApplicationDbContext> dbContex
 
         if (zone is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound($"Зона '{id}' не найдена.");
         }
 
         zone.Activate();

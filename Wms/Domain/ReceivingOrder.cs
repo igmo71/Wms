@@ -208,7 +208,7 @@ public class ReceivingOrder
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         return item is null
-            ? OperationError.NotFound()
+            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
             : item.UpdateFact(factQuantity, comment);
     }
 
@@ -329,7 +329,8 @@ public class ReceivingOrder
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
         }
 
         var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, null);
@@ -367,7 +368,8 @@ public class ReceivingOrder
         var item = _items.FirstOrDefault(x => x.LineNumber == movement.RecorderLineNumber);
         if (item is null)
         {
-            return OperationError.NotFound();
+            return OperationError.NotFound(
+                $"Строка {movement.RecorderLineNumber} приходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
         }
 
         var quantityResult = ValidatePutawayLineQuantity(item, quantity, draftMovements, movement.Id);
