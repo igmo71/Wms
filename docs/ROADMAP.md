@@ -46,6 +46,12 @@ implement every item before completing the current warehouse processes.
   operator workflow is defined. The corresponding endpoints remain unexposed
   until then.
 - Confirm 1C quantity semantics: `Количество` versus `КоличествоУпаковок`.
+- Resolve the referenced 1C base, weight, and volume units before importing SKU
+  volume or treating an existing weight ratio as kilograms. Then implement the
+  staged SKU physical-property and capacity rules from
+  `specs/sku-physical-properties/spec.md`.
+- Confirm characteristic and packaging identity using real 1C catalog,
+  document-line, and barcode-register examples before changing inventory keys.
 - Confirm shipping table-section behavior for `Отгружать` / `НеОтгружать`, then
   implement line splitting only after that business decision.
 - Implement recounts, reservations, and inventory tasks when their business
