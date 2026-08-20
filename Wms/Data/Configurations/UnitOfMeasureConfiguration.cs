@@ -13,6 +13,7 @@ internal class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOfMeasu
         builder.Property(x => x.Code).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.Abbreviation).HasMaxLength(DefaultConfiguration.Code);
+        builder.Property(x => x.MeasurementType).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.Description).HasMaxLength(DefaultConfiguration.Description);
     }
 }

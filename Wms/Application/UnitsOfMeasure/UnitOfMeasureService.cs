@@ -21,6 +21,38 @@ public class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCont
         await dbContext.SaveChangesAsync(ct);
     }
 
+    public async Task CreateOrUpdateBatchAsync(
+        IReadOnlyCollection<UnitOfMeasure> items,
+        CancellationToken ct = default)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var incomingIds = items.Select(x => x.Id).ToList();
+        var existingIds = await dbContext.UnitsOfMeasure
+            .Where(x => incomingIds.Contains(x.Id))
+            .Select(x => x.Id)
+            .ToHashSetAsync(ct);
+
+        foreach (var item in items)
+        {
+            if (existingIds.Contains(item.Id))
+            {
+                dbContext.UnitsOfMeasure.Update(item);
+            }
+            else
+            {
+                dbContext.UnitsOfMeasure.Add(item);
+            }
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
     public async Task<ListResult<UnitOfMeasure>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -68,6 +100,7 @@ public class UnitOfMeasureService(IDbContextFactory<ApplicationDbContext> dbCont
             "Description" => sortDescending ? query.OrderByDescending(x => x.Description) : query.OrderBy(x => x.Description),
             "Numerator" => sortDescending ? query.OrderByDescending(x => x.Numerator) : query.OrderBy(x => x.Numerator),
             "Denominator" => sortDescending ? query.OrderByDescending(x => x.Denominator) : query.OrderBy(x => x.Denominator),
+            "MeasurementType" => sortDescending ? query.OrderByDescending(x => x.MeasurementType) : query.OrderBy(x => x.MeasurementType),
             "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
             _ => query.OrderBy(x => x.Name),
         };

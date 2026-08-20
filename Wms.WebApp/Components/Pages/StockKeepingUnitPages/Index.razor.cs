@@ -17,6 +17,7 @@ public partial class Index
     private bool _isImporting;
     private bool _importFailed;
     private bool _importSucceeded;
+    private bool _importWarning;
     private string? _importMessage;
 
     private async Task<GridData<StockKeepingUnit>> LoadServerDataAsync(GridState<StockKeepingUnit> state, CancellationToken ct)
@@ -34,6 +35,7 @@ public partial class Index
         _isImporting = true;
         _importFailed = false;
         _importSucceeded = false;
+        _importWarning = false;
         _importMessage = null;
         try
         {
@@ -46,8 +48,19 @@ public partial class Index
             }
 
             await _dataGrid.ReloadServerData();
-            _importSucceeded = true;
-            _importMessage = "Номенклатура успешно обновлена из 1С.";
+            var summary = result.Value!;
+            if (summary.HasWarnings)
+            {
+                _importWarning = true;
+                _importMessage = $"Номенклатура обновлена, но часть физических свойств не импортирована: " +
+                    $"вес — {summary.InvalidWeightCount}, объём — {summary.InvalidVolumeCount}. " +
+                    "Подробности записаны в журнал.";
+            }
+            else
+            {
+                _importSucceeded = true;
+                _importMessage = "Номенклатура и единицы измерения успешно обновлены из 1С.";
+            }
         }
         catch
         {

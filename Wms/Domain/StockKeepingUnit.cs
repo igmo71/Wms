@@ -13,6 +13,7 @@ public class StockKeepingUnit
     public UnitOfMeasure? BaseUnitOfMeasure { get; set; }
 
     public double? WeightKg { get; set; }
+    public double? VolumeM3 { get; set; }
 
     public IReadOnlyCollection<SkuBarcode> Barcodes => _barcodes;
 }

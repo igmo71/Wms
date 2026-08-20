@@ -36,26 +36,35 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
 
     public async Task<OperationResult> ImportListAsync(CancellationToken ct = default)
     {
+        var result = await ImportListAndGetAsync(ct);
+
+        return result.IsSuccess
+            ? OperationResult.Success()
+            : OperationResult.Failure(result.Error!);
+    }
+
+    internal async Task<OperationResult<IReadOnlyDictionary<Guid, UnitOfMeasure>>> ImportListAndGetAsync(
+        CancellationToken ct = default)
+    {
         var uri = Catalog_УпаковкиЕдиницыИзмерения.GetListUri;
 
         var serviceResult = await oneCClient.GetValueAsync<RootObject<Catalog_УпаковкиЕдиницыИзмерения>>(uri, ct);
 
         if (!serviceResult.IsSuccess)
-            return serviceResult;
+            return OperationResult<IReadOnlyDictionary<Guid, UnitOfMeasure>>.Failure(serviceResult.Error!);
 
         var fetchedItems = serviceResult.Value?.Value;
 
         if (fetchedItems is null)
             return OperationError.Failure("1С вернула некорректный ответ: список единиц измерения отсутствует.");
 
-        foreach (var fetchedItem in fetchedItems)
-        {
-            var uom = MapToUnitOfMeasure(fetchedItem);
+        var units = fetchedItems
+            .Select(MapToUnitOfMeasure)
+            .ToList();
 
-            await unitOfMeasureService.CreateOrUpdateAsync(uom, ct);
-        }
+        await unitOfMeasureService.CreateOrUpdateBatchAsync(units, ct);
 
-        return OperationResult.Success();
+        return units.ToDictionary(x => x.Id);
     }
 
     private static UnitOfMeasure MapToUnitOfMeasure(Catalog_УпаковкиЕдиницыИзмерения fetchedItem)
@@ -68,6 +77,7 @@ public class Catalog_УпаковкиЕдиницыИзмерения_Service(
             DeletionMark = fetchedItem.DeletionMark,
             Description = fetchedItem.Description,
             Name = fetchedItem.НаименованиеПолное,
+            MeasurementType = fetchedItem.ТипИзмеряемойВеличины,
             Numerator = fetchedItem.Числитель,
             Denominator = fetchedItem.Знаменатель
         };

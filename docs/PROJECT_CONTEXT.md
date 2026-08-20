@@ -185,14 +185,19 @@ Core domain concepts:
 - inventory movement: an editable draft of a warehouse movement, which becomes historical when posted;
 - inventory turnover: an immutable balance change recording before/after and its originating inventory movement.
 
-SKU physical properties are normalized to WMS units before they are compared
-with storage-location limits: kilograms for weight and cubic meters for volume.
+SKU physical properties are normalized during 1C import to WMS units:
+kilograms per canonical SKU unit for weight and cubic meters per canonical SKU
+unit for volume. Refreshing the SKU catalog first refreshes the referenced 1C
+units and uses their measurement type and nullable numerator/denominator, so it
+does not depend on the order of manual catalog refreshes. Invalid enabled
+physical properties become unknown rather than zero; the catalog UI warns how
+many weight and volume values could not be imported.
 Inventory remains expressed in one canonical unit per SKU. A 1C packaging is a
 quantity-conversion/input representation rather than a separate inventory
 balance, while a 1C characteristic that distinguishes stock forms part of SKU
 identity. The current importer has not yet implemented packaging conversion or
-characteristic-aware SKU identity; those boundaries and the required source
-examples are specified in
+characteristic-aware SKU identity. Storage-location capacity enforcement is
+also a later increment. Those boundaries and the required source examples are specified in
 [`specs/sku-physical-properties/spec.md`](../specs/sku-physical-properties/spec.md).
 
 ## Configuration UI
