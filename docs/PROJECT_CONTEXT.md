@@ -174,12 +174,13 @@ posted movements, and turnovers; drafts are excluded from the posted-movement
 list. Reservations and aggregated available-to-promise quantities are not
 modeled.
 
-Before mobile inventory commands are released, transfer state will use targeted
-optimistic concurrency. Existing balance row versions and database uniqueness
-remain the final inventory guards, while the application boundary translates
-only recognized transfer and balance races into business conflicts. Append-only
-turnovers and 1C-owned catalogs do not receive version columns by default. The
-active increment is defined in
+Transfer state uses targeted optimistic concurrency through
+`InventoryTransfer.RowVersion`. Balance row versions, a named balance
+business-key index, and a filtered unique transfer-line index are the final
+inventory guards. The transfer application boundary translates only recognized
+transfer and balance races into business conflicts; unrelated persistence
+errors remain exceptions. Append-only turnovers and 1C-owned catalogs do not
+receive version columns by default. The increment is defined in
 [`specs/2026-08-21-inventory-transfer-concurrency/spec.md`](../specs/2026-08-21-inventory-transfer-concurrency/spec.md).
 
 ## Operational workflows

@@ -15,6 +15,7 @@ internal class InventoryTransferConfiguration : IEntityTypeConfiguration<Invento
         builder.Property(x => x.CreatedBy).HasMaxLength(DefaultConfiguration.Guid).IsRequired();
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.RowVersion).IsRowVersion();
 
         builder.HasOne(x => x.Warehouse)
             .WithMany()

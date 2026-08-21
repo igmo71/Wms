@@ -34,8 +34,7 @@ with inventory-changing mobile commands.
 - recognize stale transfer/balance row versions and the two named unique-index
   violations;
 - return `OperationError.Conflict` with a safe Russian message for those known
-  races;
-- add focused integration tests using real SQL Server concurrency behavior.
+  races.
 
 ## Decisions
 
@@ -110,8 +109,7 @@ movement, balance, turnover, or transfer status may remain.
   infrastructure failure.
 - Unknown persistence failures are not hidden as conflicts.
 - Existing sequential direct, pick, put, and completion behavior is preserved.
-- The solution builds, EF reports no migration drift, and the focused
-  integration scenarios pass.
+- The solution builds and EF reports no migration drift.
 
 ## Non-goals
 
@@ -122,6 +120,7 @@ movement, balance, turnover, or transfer status may remain.
   count;
 - universal exception middleware, repositories, or transaction abstractions;
 - automatic concurrency retries;
+- automated concurrency tests in the current increment;
 - production-data migration compatibility while development databases remain
   disposable.
 

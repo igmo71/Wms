@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Data.Configurations;
 
@@ -32,5 +33,15 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
             .HasForeignKey(x => x.StockKeepingUnitId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        builder.HasIndex(x => new
+            {
+                x.RecorderType,
+                x.RecorderId,
+                x.RecorderLineNumber
+            })
+            .IsUnique()
+            .HasDatabaseName("UX_InventoryMovements_TransferLine")
+            .HasFilter($"[RecorderType] = {(int)RecorderType.InventoryTransfer}");
     }
 }

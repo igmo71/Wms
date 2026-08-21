@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Inventory;
+using Wms.Application.Inventory.Movements;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
-
-using Wms.Application.Inventory.Movements;
 
 namespace Wms.Application.Inventory.Transfers;
 
@@ -65,8 +65,7 @@ public class InventoryTransferCommandService(
         }
 
         dbContext.InventoryTransfers.Remove(transfer);
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await SaveChangesAsync(dbContext, ct);
     }
 
     public Task<OperationResult> PickAsync(
@@ -149,8 +148,7 @@ public class InventoryTransferCommandService(
             return completionResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await SaveChangesAsync(dbContext, ct);
     }
 
     private async Task<OperationResult> PostMovementAsync(
@@ -241,8 +239,23 @@ public class InventoryTransferCommandService(
             return postingResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await SaveChangesAsync(dbContext, ct);
+    }
+
+    private static async Task<OperationResult> SaveChangesAsync(
+        ApplicationDbContext dbContext,
+        CancellationToken ct)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+            return OperationResult.Success();
+        }
+        catch (DbUpdateException exception)
+            when (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
+        {
+            return error;
+        }
     }
 
     private static OperationResult<InventoryTransferRoute> CreateRoute(

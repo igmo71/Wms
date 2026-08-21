@@ -30,6 +30,8 @@ public class InventoryTransfer
     public string? StartedBy { get; private set; }
     public string? CompletedBy { get; private set; }
 
+    public byte[] RowVersion { get; private set; } = [];
+
     public static OperationResult<InventoryTransfer> Create(
         Guid id,
         string number,
