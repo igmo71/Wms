@@ -130,7 +130,7 @@ After transfer creation:
 
 The page shows current transit contents aggregated by SKU and immutable movement
 history in actual execution order. Its interaction vocabulary should remain
-recognizable for a future mobile client without copying a mobile layout into the
+recognizable for the mobile client without copying a mobile layout into the
 web application.
 
 ### Verification

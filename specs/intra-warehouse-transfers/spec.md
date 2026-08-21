@@ -174,9 +174,10 @@ in execution order. It permits pick and put actions to be freely interleaved.
 
 Without a transit location, only direct movement is available; pick and put are
 disabled. The layout and process vocabulary should remain recognizable for a
-future mobile client without copying a mobile layout into the web application.
+A mobile client can reuse the same workflow without copying a mobile layout
+into the web application.
 
-A future mobile client may scan a transit location to open its active transfer or
+A mobile client may scan a transit location to open its active transfer or
 offer to create a new transfer when the location is free. That shortcut is not
 required for the initial web UI.
 

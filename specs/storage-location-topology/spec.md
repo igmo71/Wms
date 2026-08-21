@@ -44,7 +44,9 @@ arbitrary-depth tree inside an existing typed warehouse zone.
 - `PickSequence` is nullable and ordered inside a zone. Duplicate values are
   permitted; code is the stable secondary sort.
 - The technical barcode value is generated from the identifier as
-  `WMSL:{Id:N}` and is not persisted separately.
+  `WMSL:{Id:N}` and is not persisted separately. This is also the canonical
+  payload for the mobile location QR; the client must not invent a second
+  location-code format.
 
 ## Batch generation
 

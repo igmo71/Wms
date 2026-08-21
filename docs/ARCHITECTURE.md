@@ -128,6 +128,12 @@ last-resort user-facing response and logging.
 - One operation normally has one explicit `SaveChangesAsync` boundary.
 - Persistent invariant changes include a migration.
 - Read-only domain collections use explicit EF backing-field configuration.
+- Optimistic concurrency is added to mutable aggregate roots or rows only when
+  a stale save can break a documented lifecycle or inventory invariant. Do not
+  put `RowVersion` on a universal base entity merely for consistency.
+- Expected concurrency failures and violations of specifically named
+  concurrency-related constraints may become `OperationResult.Conflict` at the
+  application save boundary. Unrecognized database failures remain exceptions.
 
 ## Coding and verification
 
@@ -146,8 +152,10 @@ last-resort user-facing response and logging.
   projects and complete solution, and checks EF migration drift when the model
   changes.
 - Repository-wide `dotnet format` runs are not part of ordinary feature work.
-- Automated tests are intentionally deferred for the current MVP. Do not add a
-  test project until that decision changes.
+- Broad automated coverage remains deferred for the current MVP. Focused
+  integration tests are required where behavior depends on authentication,
+  idempotency, optimistic concurrency, transactions, or database constraints
+  and cannot be established reliably by static inspection or mock-only tests.
 
 ## Deliberate non-goals
 

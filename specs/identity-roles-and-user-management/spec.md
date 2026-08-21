@@ -52,8 +52,8 @@ a human-readable current display name in audit and employee reports.
 ## Acceptance criteria
 
 - Anonymous users are redirected to login from WMS operational pages.
-- Operators can use operational, catalog, and report pages but cannot open user
-  management.
+- Operators can use operational and report pages but cannot open configuration
+  catalogs or user management.
 - Administrators can create an operator or administrator with email, display
   name, and initial password.
 - Administrators can change another account's display name, WMS role, and
