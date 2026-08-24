@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using BarcodeScanning;
+using Microsoft.Extensions.Logging;
 using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
@@ -12,6 +13,7 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
+            .UseBarcodeScanning()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -24,6 +26,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<AndroidIntentBarcodeScanner>();
         builder.Services.AddSingleton<ILifecycleBarcodeScanner>(serviceProvider =>
             serviceProvider.GetRequiredService<AndroidIntentBarcodeScanner>());
+        builder.Services.AddSingleton<CameraBarcodeScanner>();
+        builder.Services.AddSingleton<ICameraBarcodeScanner>(serviceProvider =>
+            serviceProvider.GetRequiredService<CameraBarcodeScanner>());
 
         builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
         builder.Services.AddSingleton<IMobileSessionStore, SecureStorageMobileSessionStore>();

@@ -1,3 +1,4 @@
+using BarcodeScanning;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
@@ -8,17 +9,20 @@ public partial class MainPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly ICameraBarcodeScanner _cameraScanner;
     private readonly Queue<BarcodeScanEvent> _recentScans = new();
     private bool _scannerSubscribed;
     private bool _sessionChecked;
 
     public MainPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner)
+        ILifecycleBarcodeScanner intentScanner,
+        ICameraBarcodeScanner cameraScanner)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _intentScanner = intentScanner;
+        _cameraScanner = cameraScanner;
     }
 
     protected override async void OnAppearing()
@@ -27,6 +31,7 @@ public partial class MainPage : ContentPage
         if (!_scannerSubscribed)
         {
             _intentScanner.ScanReceived += OnScanReceived;
+            _cameraScanner.ScanReceived += OnScanReceived;
             _scannerSubscribed = true;
         }
 
@@ -41,9 +46,11 @@ public partial class MainPage : ContentPage
 
     protected override void OnDisappearing()
     {
+        StopCamera();
         if (_scannerSubscribed)
         {
             _intentScanner.ScanReceived -= OnScanReceived;
+            _cameraScanner.ScanReceived -= OnScanReceived;
             _scannerSubscribed = false;
         }
 
@@ -61,9 +68,54 @@ public partial class MainPage : ContentPage
 
     private void OnLogoutClicked(object? sender, EventArgs e)
     {
+        StopCamera();
         _apiClient.Logout();
         ShowLoggedOut();
         StatusLabel.Text = "Сессия завершена на устройстве.";
+    }
+
+    private async void OnCameraClicked(object? sender, EventArgs e)
+    {
+        if (CameraScannerView.CameraEnabled)
+        {
+            StopCamera();
+            return;
+        }
+
+        if (!_cameraScanner.IsAvailable)
+        {
+            CameraStatusLabel.Text = "На устройстве не обнаружена камера.";
+            return;
+        }
+
+        var permission = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        if (permission != PermissionStatus.Granted)
+        {
+            permission = await Permissions.RequestAsync<Permissions.Camera>();
+        }
+
+        if (permission != PermissionStatus.Granted)
+        {
+            CameraStatusLabel.Text =
+                "Доступ к камере не предоставлен. Встроенный сканер продолжает работать.";
+            return;
+        }
+
+        CameraScannerView.IsVisible = true;
+        CameraScannerView.CameraEnabled = true;
+        CameraButton.Text = "Выключить камеру";
+        CameraStatusLabel.Text = "Наведите заднюю камеру на штрихкод или QR-код.";
+    }
+
+    private void OnCameraDetectionFinished(object? sender, OnDetectionFinishedEventArg e)
+    {
+        var result = e.BarcodeResults.FirstOrDefault();
+        if (!_cameraScanner.TryAccept(result?.DisplayValue, symbology: null))
+        {
+            return;
+        }
+
+        MainThread.BeginInvokeOnMainThread(StopCamera);
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
@@ -136,6 +188,14 @@ public partial class MainPage : ContentPage
         ProgressIndicator.IsVisible = isBusy;
         ProgressIndicator.IsRunning = isBusy;
         LoginButton.IsEnabled = !isBusy;
+    }
+
+    private void StopCamera()
+    {
+        CameraScannerView.CameraEnabled = false;
+        CameraScannerView.IsVisible = false;
+        CameraButton.Text = "Включить камеру";
+        CameraStatusLabel.Text = "Камера выключена.";
     }
 
     private static string GetSourceName(BarcodeScanSource source) => source switch

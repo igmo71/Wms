@@ -272,8 +272,11 @@ request id.
 
 Scanning stays vendor-neutral. Storage locations use the existing
 `WMSL:{storage-location-guid-N}` payload; SKU barcodes remain imported strings
-from 1C. The first vertical is direct intra-warehouse movement, followed by the
-transit workflow.
+from 1C. The verified Urovo TD50 path uses ScanWedge intent output behind the
+neutral scanner interface. The Android camera fallback uses Google ML Kit via
+`BarcodeScanning.Native.Maui` and is activated only by an explicit user action.
+The first vertical is direct intra-warehouse movement, followed by the transit
+workflow.
 
 The accepted scope and delivery order are under
 [`specs/mobile-wms/`](../specs/mobile-wms/). Those documents describe the active
