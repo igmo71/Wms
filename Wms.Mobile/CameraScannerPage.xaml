@@ -1,0 +1,38 @@
+<ContentPage
+    x:Class="Wms.Mobile.CameraScannerPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:scanner="clr-namespace:BarcodeScanning;assembly=BarcodeScanning.Native.Maui"
+    BackgroundColor="Black"
+    Title="Сканирование камерой">
+
+    <Grid>
+        <scanner:CameraView
+            x:Name="CameraView"
+            BarcodeSymbologies="All"
+            CameraEnabled="False"
+            OnDetectionFinished="OnDetectionFinished"
+            VibrationOnDetected="False" />
+
+        <VerticalStackLayout
+            Margin="20,36"
+            Spacing="12"
+            VerticalOptions="Start">
+            <Border
+                BackgroundColor="#99000000"
+                Padding="12">
+                <Label
+                    x:Name="InstructionLabel"
+                    Text="Наведите заднюю камеру на штрихкод или QR-код."
+                    TextColor="White" />
+            </Border>
+        </VerticalStackLayout>
+
+        <Button
+            Margin="20,36"
+            Clicked="OnCancelClicked"
+            Text="Отмена"
+            VerticalOptions="End" />
+    </Grid>
+
+</ContentPage>
