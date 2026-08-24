@@ -9,6 +9,7 @@
     <Grid>
         <scanner:CameraView
             x:Name="CameraView"
+            AimMode="True"
             BarcodeSymbologies="All"
             CameraEnabled="False"
             OnDetectionFinished="OnDetectionFinished"
@@ -23,7 +24,7 @@
                 Padding="12">
                 <Label
                     x:Name="InstructionLabel"
-                    Text="Наведите заднюю камеру на штрихкод или QR-код."
+                    Text="Совместите нужный код с красной точкой."
                     TextColor="White" />
             </Border>
         </VerticalStackLayout>
