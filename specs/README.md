@@ -38,12 +38,11 @@ scope must be split or the user must choose their order.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
-| 2026-08-21 | **Active** | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
-| 2026-08-19 | Queued | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
+| 2026-08-19 | **Active** | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
+| 2026-08-21 | Frozen reference | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
 
-The mobile work resumes after the active stabilization acceptance criteria are
-met. Read-only mobile foundation work may proceed only when explicitly selected
-as the current task.
+The mobile foundation and first vertical are the single active workstream.
+Authentication and the API boundary precede the direct-transfer workflow.
 
 ## Legacy reference ledger
 

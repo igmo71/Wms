@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
 
@@ -17,6 +18,19 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<AppShell>();
+        builder.Services.AddTransient<MainPage>();
+
+        builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
+        builder.Services.AddSingleton<IMobileSessionStore, SecureStorageMobileSessionStore>();
+        builder.Services.AddSingleton<MobileAuthenticationHandler>();
+        builder.Services.AddSingleton(MobileApiSettings.Load());
+        builder.Services.AddSingleton(serviceProvider => new HttpClient(
+            serviceProvider.GetRequiredService<MobileAuthenticationHandler>())
+        {
+            BaseAddress = new Uri(
+                serviceProvider.GetRequiredService<MobileApiSettings>().BaseAddress)
+        });
+        builder.Services.AddSingleton<MobileApiClient>();
 
 #if DEBUG
         builder.Logging.AddDebug();

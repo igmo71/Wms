@@ -55,17 +55,16 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
 - `Wms` contains domain models, application services, EF Core persistence, and
   1C integration.
 - `Wms.WebApp` is the authenticated Blazor/MudBlazor operator application.
-- `Wms.WebApi` currently hosts development application endpoints and 1C
-  integration endpoints. It is not yet an authenticated mobile API and must not
-  be exposed as a trusted operator boundary before its authentication and
-  caller-verification work is complete.
-- `Wms.Contracts` is currently a placeholder for future versioned HTTP wire
-  contracts.
-- `Wms.Mobile` is currently the Android .NET MAUI template shell.
+- `Wms.WebApi` hosts the authenticated mobile V1 identity boundary, protected
+  development application endpoints, and separate 1C integration endpoints.
+  Verification of 1C callers is still unfinished.
+- `Wms.Contracts` contains the first versioned mobile identity wire contracts.
+- `Wms.Mobile` is an Android .NET MAUI shell with login, secure token storage,
+  refresh handling, and current-user session display.
 
-Mobile development is the current resumed workstream. The project shells exist,
-but mobile business workflows, authentication, shared contracts, API client,
-idempotency, and scanning are still to be implemented.
+Mobile development is the current resumed workstream. Authentication and the
+first shared contracts/API client are present, but mobile business workflows,
+idempotency, scanning, and device validation are still to be implemented.
 
 ## Authentication and authorization
 
@@ -92,9 +91,11 @@ without a WMS role become operators. The bootstrap administrator is selected by
 also requires `IdentityBootstrap__AdministratorDisplayName` and the secret
 `IdentityBootstrap__AdministratorPassword`; the password must not be committed.
 
-These role rules currently protect `Wms.WebApp`, not the separate
-`Wms.WebApi`/1C integration boundary. API authentication and verification of 1C
-callers remain pilot prerequisites. Detailed web-role behavior is in
+These role rules protect `Wms.WebApp`, mobile V1 endpoints, and the development
+application endpoints in `Wms.WebApi`. Mobile bearer login reuses the same
+confirmed accounts; command authors come from the authenticated principal.
+Verification of 1C callers remains a separate pilot prerequisite. Detailed
+web-role behavior is in
 [`specs/identity-roles-and-user-management/spec.md`](../specs/identity-roles-and-user-management/spec.md).
 
 ## Storage topology and capacity data
@@ -180,7 +181,7 @@ business-key index, and a filtered unique transfer-line index are the final
 inventory guards. The transfer application boundary translates only recognized
 transfer and balance races into business conflicts; unrelated persistence
 errors remain exceptions. Append-only turnovers and 1C-owned catalogs do not
-receive version columns by default. The increment is defined in
+receive version columns by default. The completed stabilization record is in
 [`specs/2026-08-21-inventory-transfer-concurrency/spec.md`](../specs/2026-08-21-inventory-transfer-concurrency/spec.md).
 
 ## Operational workflows

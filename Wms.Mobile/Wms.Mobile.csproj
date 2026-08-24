@@ -30,11 +30,17 @@
 		<MauiFont Include="Resources\Fonts\*" />
 
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<MauiAsset Remove="Resources\Raw\mobile-api.json" />
+		<EmbeddedResource Include="Resources\Raw\mobile-api.json" LogicalName="Wms.Mobile.mobile-api.json" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Wms.Contracts\Wms.Contracts.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

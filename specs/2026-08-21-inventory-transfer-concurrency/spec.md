@@ -1,6 +1,6 @@
 # Inventory-transfer concurrency stabilization
 
-Status: **Active**  
+Status: **Frozen reference**
 Created: **2026-08-21**
 
 ## Business outcome

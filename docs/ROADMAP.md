@@ -9,15 +9,10 @@ in `specs/`.
 - Resume mobile development from the contracts and authenticated API
   foundation, then deliver direct intra-warehouse movement as the first
   scanning-oriented vertical.
-- Complete the active transfer and balance concurrency increment defined in
-  `specs/2026-08-21-inventory-transfer-concurrency/` before releasing a mobile
-  inventory command.
 - Manually validate and harden the implemented web workflows after the
   rich-model, authorization, storage-topology, and SKU-import refactoring.
 - Prove that existing databases can be migrated safely to required zone and
   storage-location codes before an operational pilot.
-- Close the unauthenticated `Wms.WebApi` application-command boundary before it
-  becomes the mobile operator API.
 - Continue capacity work from stored geometry/weight limits and normalized SKU
   weight/volume after the missing-data policy is accepted.
 
@@ -25,10 +20,8 @@ in `specs/`.
 
 ### Security and external boundaries
 
-- Add token authentication to mobile/operator endpoints in `Wms.WebApi`, derive
-  the acting user from claims, and remove the temporary fixed user id.
-- Define stable problem responses and require `Operator` or `Administrator` for
-  mobile warehouse operations.
+- Finish the stable problem-code mapping for upcoming mobile business
+  endpoints; identity failures already use mobile V1 wire errors.
 - Authenticate or otherwise verify 1C webhook/import callers before exposing
   their endpoints outside a trusted network.
 - Define session lifetime, refresh, and operational revocation for a lost or
@@ -63,22 +56,22 @@ and per-warehouse assignments remain deferred until a pilot needs them.
 ## Mobile WMS — active delivery path
 
 The accepted architecture and detailed stages are under `specs/mobile-wms/`.
-Current code contains project shells: `Wms.Contracts` still has its template
-type, `Wms.WebApi` and `Wms.Mobile` do not reference it, and no mobile session,
-scanner, resolver, idempotency store, or business workflow exists yet.
+The mobile identity slice now shares V1 contracts, exposes bearer login,
+refresh, and `/me`, stores tokens in Android secure storage, and derives server
+users from claims. Scanner, resolver, idempotency store, and business workflow
+are still absent; the packaged `mobile-api.json` address must be replaced with
+the reachable trusted HTTPS endpoint for a physical device.
 
 Delivery order:
 
-1. Wire `Wms.Contracts` into `Wms.WebApi` and `Wms.Mobile`; add versioned
-   contracts and authenticated `/api/mobile/v1` login/refresh and `/me`.
-2. Add stable problem responses, server-side current-user resolution, and
-   the targeted concurrency stabilization for transfers and balances.
-3. Build vendor-neutral diagnostic scanning on the chosen TSD and a smartphone.
-4. Add server resolvers for `WMSL:{storage-location-guid-N}` and imported 1C SKU
+1. Validate login, refresh, session restoration, and `/me` against a reachable
+   trusted HTTPS endpoint on the emulator and pilot device.
+2. Build vendor-neutral diagnostic scanning on the chosen TSD and a smartphone.
+3. Add server resolvers for `WMSL:{storage-location-guid-N}` and imported 1C SKU
    barcodes, then physically verify a location label.
-5. Add atomic request idempotency and deliver direct intra-warehouse movement,
+4. Add atomic request idempotency and deliver direct intra-warehouse movement,
    then the transit-location workflow.
-6. Specify and deliver receiving, putaway, picking/shipping, and count flows in
+5. Specify and deliver receiving, putaway, picking/shipping, and count flows in
    the order justified by pilot feedback.
 
 External inputs still required: 1C document-barcode control examples, verified
