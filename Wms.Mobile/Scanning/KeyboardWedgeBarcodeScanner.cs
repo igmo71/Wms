@@ -10,8 +10,6 @@ public sealed class KeyboardWedgeBarcodeScanner : IKeyboardWedgeBarcodeScanner
 
     public BarcodeScanSource Source => BarcodeScanSource.KeyboardWedge;
 
-    public bool IsAvailable => true;
-
     public event EventHandler<BarcodeScanEvent>? ScanReceived;
 
     public bool TryAccept(string? rawValue)

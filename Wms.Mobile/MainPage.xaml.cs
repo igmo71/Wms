@@ -9,6 +9,7 @@ public partial class MainPage : ContentPage
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
     private readonly Queue<BarcodeScanEvent> _recentScans = new();
+    private bool _scannerSubscribed;
     private bool _sessionChecked;
 
     public MainPage(
@@ -18,12 +19,17 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _apiClient = apiClient;
         _intentScanner = intentScanner;
-        _intentScanner.ScanReceived += OnScanReceived;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        if (!_scannerSubscribed)
+        {
+            _intentScanner.ScanReceived += OnScanReceived;
+            _scannerSubscribed = true;
+        }
+
         if (_sessionChecked)
         {
             return;
@@ -31,6 +37,17 @@ public partial class MainPage : ContentPage
 
         _sessionChecked = true;
         await RunAsync(() => _apiClient.GetCurrentUserAsync(), ignoreMissingSession: true);
+    }
+
+    protected override void OnDisappearing()
+    {
+        if (_scannerSubscribed)
+        {
+            _intentScanner.ScanReceived -= OnScanReceived;
+            _scannerSubscribed = false;
+        }
+
+        base.OnDisappearing();
     }
 
     private async void OnLoginClicked(object? sender, EventArgs e)

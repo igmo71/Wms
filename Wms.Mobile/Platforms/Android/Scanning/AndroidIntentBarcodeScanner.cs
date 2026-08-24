@@ -6,6 +6,14 @@ namespace Wms.Mobile.Scanning;
 
 public sealed class AndroidIntentBarcodeScanner : ILifecycleBarcodeScanner
 {
+    private static readonly IReadOnlyDictionary<string, string> TechnicalDetails =
+        new Dictionary<string, string>
+        {
+            ["profile"] = UrovoIntentScannerProfile.Name,
+            ["action"] = UrovoIntentScannerProfile.Action,
+            ["stringExtra"] = UrovoIntentScannerProfile.BarcodeStringExtra
+        };
+
     private readonly Context _context;
     private readonly ScannerBroadcastReceiver _receiver;
     private bool _registered;
@@ -17,8 +25,6 @@ public sealed class AndroidIntentBarcodeScanner : ILifecycleBarcodeScanner
     }
 
     public BarcodeScanSource Source => BarcodeScanSource.EmbeddedScanner;
-
-    public bool IsAvailable => true;
 
     public event EventHandler<BarcodeScanEvent>? ScanReceived;
 
@@ -73,12 +79,7 @@ public sealed class AndroidIntentBarcodeScanner : ILifecycleBarcodeScanner
                 symbology,
                 DateTimeOffset.UtcNow,
                 Source,
-                new Dictionary<string, string>
-                {
-                    ["profile"] = UrovoIntentScannerProfile.Name,
-                    ["action"] = UrovoIntentScannerProfile.Action,
-                    ["stringExtra"] = UrovoIntentScannerProfile.BarcodeStringExtra
-                }));
+                TechnicalDetails));
     }
 
     private sealed class ScannerBroadcastReceiver(AndroidIntentBarcodeScanner scanner)
