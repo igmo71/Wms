@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="Wms.Contracts/Wms.Contracts.csproj" Id="b647bbdb-d5ff-4d28-8503-70ec50ad1ac7" />
-  <Project Path="Wms.Mobile/Wms.Mobile.csproj" Id="385ccb43-3e36-4711-9bbe-1f07597a1604" />
+  <Project Path="Wms.Mobile/Wms.Mobile.csproj" Id="385ccb43-3e36-4711-9bbe-1f07597a1604">
+    <Deploy Solution="Debug|*" />
+  </Project>
   <Project Path="Wms.WebApi/Wms.WebApi.csproj" />
   <Project Path="Wms.WebApp/Wms.WebApp.csproj" />
   <Project Path="Wms/Wms.csproj" Id="1ad728c4-5535-4315-a7f8-96625fec8b7d" />

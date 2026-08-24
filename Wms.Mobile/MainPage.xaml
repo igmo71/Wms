@@ -4,10 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     Title="WMS">
 
-    <VerticalStackLayout
-        Padding="24"
-        Spacing="16"
-        VerticalOptions="Center">
+    <ScrollView>
+      <VerticalStackLayout
+          Padding="24"
+          Spacing="16">
 
         <Label
             Text="WMS Mobile"
@@ -46,6 +46,27 @@
                 FontSize="18"
                 HorizontalOptions="Center" />
 
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="10">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="20"
+                        Text="Диагностика сканера" />
+
+                    <Label
+                        Text="Основной режим: Output via intent. Профиль Urovo Default: action android.intent.ACTION_DECODE_DATA, string extra barcode_string." />
+
+                    <Label
+                        x:Name="ScannerStatusLabel"
+                        Text="Ожидание сканирования…" />
+
+                    <Label
+                        x:Name="ScanHistoryLabel"
+                        FontFamily="monospace"
+                        LineBreakMode="CharacterWrap" />
+                </VerticalStackLayout>
+            </Border>
+
             <Button
                 Clicked="OnLogoutClicked"
                 Text="Выйти" />
@@ -62,6 +83,7 @@
             HorizontalTextAlignment="Center"
             TextColor="Red" />
 
-    </VerticalStackLayout>
+      </VerticalStackLayout>
+    </ScrollView>
 
 </ContentPage>

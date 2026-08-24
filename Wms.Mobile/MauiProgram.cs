@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
@@ -19,6 +20,17 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<MainPage>();
+
+        builder.Services.AddSingleton<KeyboardWedgeBarcodeScanner>();
+        builder.Services.AddSingleton<IKeyboardWedgeBarcodeScanner>(serviceProvider =>
+            serviceProvider.GetRequiredService<KeyboardWedgeBarcodeScanner>());
+        builder.Services.AddSingleton<IBarcodeScanner>(serviceProvider =>
+            serviceProvider.GetRequiredService<KeyboardWedgeBarcodeScanner>());
+        builder.Services.AddSingleton<AndroidIntentBarcodeScanner>();
+        builder.Services.AddSingleton<ILifecycleBarcodeScanner>(serviceProvider =>
+            serviceProvider.GetRequiredService<AndroidIntentBarcodeScanner>());
+        builder.Services.AddSingleton<IBarcodeScanner>(serviceProvider =>
+            serviceProvider.GetRequiredService<AndroidIntentBarcodeScanner>());
 
         builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
         builder.Services.AddSingleton<IMobileSessionStore, SecureStorageMobileSessionStore>();

@@ -1,4 +1,5 @@
 using Wms.Contracts.Mobile.V1;
+using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
@@ -6,12 +7,18 @@ namespace Wms.Mobile;
 public partial class MainPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
+    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly Queue<BarcodeScanEvent> _recentScans = new();
     private bool _sessionChecked;
 
-    public MainPage(MobileApiClient apiClient)
+    public MainPage(
+        MobileApiClient apiClient,
+        ILifecycleBarcodeScanner intentScanner)
     {
         InitializeComponent();
         _apiClient = apiClient;
+        _intentScanner = intentScanner;
+        _intentScanner.ScanReceived += OnScanReceived;
     }
 
     protected override async void OnAppearing()
@@ -40,6 +47,25 @@ public partial class MainPage : ContentPage
         _apiClient.Logout();
         ShowLoggedOut();
         StatusLabel.Text = "Сессия завершена на устройстве.";
+    }
+
+    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _recentScans.Enqueue(scanEvent);
+            while (_recentScans.Count > 5)
+            {
+                _recentScans.Dequeue();
+            }
+
+            ScannerStatusLabel.Text =
+                $"Получено: {scanEvent.ReceivedAt.ToLocalTime():HH:mm:ss} · {GetSourceName(scanEvent.Source)}";
+            ScanHistoryLabel.Text = string.Join(
+                Environment.NewLine,
+                _recentScans.Reverse().Select(scan =>
+                    $"{scan.ReceivedAt.ToLocalTime():HH:mm:ss}  [{scan.Value}]"));
+        });
     }
 
     private async Task RunAsync(
@@ -94,4 +120,12 @@ public partial class MainPage : ContentPage
         ProgressIndicator.IsRunning = isBusy;
         LoginButton.IsEnabled = !isBusy;
     }
+
+    private static string GetSourceName(BarcodeScanSource source) => source switch
+    {
+        BarcodeScanSource.EmbeddedScanner => "встроенный сканер",
+        BarcodeScanSource.Camera => "камера",
+        BarcodeScanSource.KeyboardWedge => "keyboard wedge",
+        _ => source.ToString()
+    };
 }
