@@ -30,7 +30,9 @@ public static class MauiProgram
             BaseAddress = new Uri(
                 serviceProvider.GetRequiredService<MobileApiSettings>().BaseAddress)
         });
-        builder.Services.AddSingleton<MobileApiClient>();
+        builder.Services.AddSingleton(serviceProvider => new MobileApiClient(
+            serviceProvider.GetRequiredService<HttpClient>(),
+            serviceProvider.GetRequiredService<IMobileSessionStore>()));
 
 #if DEBUG
         builder.Logging.AddDebug();
