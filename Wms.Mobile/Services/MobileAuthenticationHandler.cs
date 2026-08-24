@@ -5,7 +5,7 @@ using Wms.Contracts.Mobile.V1;
 namespace Wms.Mobile.Services;
 
 internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionStore)
-    : DelegatingHandler(new HttpClientHandler())
+    : DelegatingHandler(CreateInnerHandler())
 {
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromMinutes(1);
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
@@ -97,4 +97,25 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
 
     private static bool IsAnonymousRoute(Uri? uri) =>
         uri?.AbsolutePath is MobileApiRoutes.Login or MobileApiRoutes.Refresh;
+
+    private static HttpMessageHandler CreateInnerHandler()
+    {
+        var handler = new HttpClientHandler();
+
+#if DEBUG
+        handler.ServerCertificateCustomValidationCallback =
+            (request, certificate, _, errors) =>
+                errors == System.Net.Security.SslPolicyErrors.None
+                || (request.RequestUri?.IsLoopback == true
+                    && certificate is not null
+                    && string.Equals(
+                        certificate.GetNameInfo(
+                            System.Security.Cryptography.X509Certificates.X509NameType.DnsName,
+                            forIssuer: false),
+                        "localhost",
+                        StringComparison.OrdinalIgnoreCase));
+#endif
+
+        return handler;
+    }
 }
