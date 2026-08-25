@@ -85,7 +85,7 @@ public partial class MainPage : ContentPage
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
             _recentScans.Enqueue(scanEvent);
             while (_recentScans.Count > 5)
@@ -99,7 +99,37 @@ public partial class MainPage : ContentPage
                 Environment.NewLine,
                 _recentScans.Reverse().Select(scan =>
                     $"{scan.ReceivedAt.ToLocalTime():HH:mm:ss}  [{scan.Value}]"));
+
+            await ResolveScanAsync(scanEvent.Value);
         });
+    }
+
+    private async Task ResolveScanAsync(string barcode)
+    {
+        ResolvedBarcodeLabel.Text = "Поиск в WMS…";
+
+        try
+        {
+            if (ScanContextPicker.SelectedIndex == 1)
+            {
+                var sku = await _apiClient.ResolveSkuAsync(barcode);
+                ResolvedBarcodeLabel.Text = $"Товар: {sku.Name}\nКод: {sku.Code}";
+            }
+            else
+            {
+                var location = await _apiClient.ResolveStorageLocationAsync(barcode);
+                ResolvedBarcodeLabel.Text =
+                    $"Ячейка: {location.Address} · {location.Name}\nСклад: {location.WarehouseName}";
+            }
+        }
+        catch (MobileApiException exception)
+        {
+            ResolvedBarcodeLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ResolvedBarcodeLabel.Text = "Сервер WMS недоступен.";
+        }
     }
 
     private async Task RunAsync(
@@ -146,6 +176,7 @@ public partial class MainPage : ContentPage
         LoginPanel.IsVisible = true;
         SessionPanel.IsVisible = false;
         CurrentUserLabel.Text = string.Empty;
+        ResolvedBarcodeLabel.Text = string.Empty;
     }
 
     private void SetBusy(bool isBusy)

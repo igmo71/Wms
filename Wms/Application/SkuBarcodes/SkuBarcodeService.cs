@@ -10,6 +10,43 @@ public class SkuBarcodeService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     ILogger<SkuBarcodeService> logger)
 {
+    public async Task<OperationResult<StockKeepingUnit>> ResolveAsync(
+        string? barcode,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(barcode))
+        {
+            return OperationError.Invalid("Штрихкод товара не указан.");
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var matches = await dbContext.SkuBarcodes
+            .AsNoTracking()
+            .Where(x => x.Value == barcode)
+            .Select(x => x.Sku!)
+            .Include(x => x.BaseUnitOfMeasure)
+            .Take(2)
+            .ToListAsync(ct);
+
+        if (matches.Count == 0)
+        {
+            return OperationError.NotFound("Товар с таким штрихкодом не найден.");
+        }
+
+        if (matches.Count > 1)
+        {
+            return OperationError.Conflict("Штрихкод соответствует нескольким товарам.");
+        }
+
+        var sku = matches[0];
+        if (sku.DeletionMark)
+        {
+            return OperationError.Invalid("Товар недоступен.");
+        }
+
+        return sku;
+    }
+
     public async Task<ListResult<SkuBarcode>> ListAsync(ListQuery listQuery, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

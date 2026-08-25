@@ -57,6 +57,48 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректные сведения о пользователе.");
     }
 
+    public async Task<MobileStorageLocationResponse> ResolveStorageLocationAsync(
+        string barcode,
+        CancellationToken ct = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            MobileApiRoutes.ResolveStorageLocation,
+            new MobileResolveStorageLocationRequest(barcode),
+            ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MobileStorageLocationResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_storage_location_response",
+                "Сервер вернул некорректные сведения о ячейке.");
+    }
+
+    public async Task<MobileSkuResponse> ResolveSkuAsync(
+        string barcode,
+        CancellationToken ct = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            MobileApiRoutes.ResolveSku,
+            new MobileResolveSkuRequest(barcode),
+            ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MobileSkuResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_sku_response",
+                "Сервер вернул некорректные сведения о товаре.");
+    }
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

@@ -2,11 +2,64 @@ using Microsoft.EntityFrameworkCore;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Application.StorageLocations;
 
 public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<OperationResult<StorageLocation>> ResolveBarcodeAsync(
+        string? barcode,
+        Guid? expectedWarehouseId,
+        ZoneType? expectedZoneType,
+        CancellationToken ct = default)
+    {
+        if (!StorageLocation.TryParseBarcode(barcode, out var locationId))
+        {
+            return OperationError.Invalid("Некорректный QR-код ячейки.");
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var location = await dbContext.StorageLocations
+            .AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.Zone)
+            .SingleOrDefaultAsync(x => x.Id == locationId, ct);
+
+        if (location is null)
+        {
+            return OperationError.NotFound("Ячейка не найдена.");
+        }
+
+        if (location.DeletionMark
+            || location.Warehouse is null
+            || location.Warehouse.DeletionMark
+            || location.Zone is null
+            || location.Zone.DeletionMark)
+        {
+            return OperationError.Invalid("Ячейка недоступна.");
+        }
+
+        if (location.IsFolder)
+        {
+            return OperationError.Invalid("Отсканированная позиция является группой, а не ячейкой.");
+        }
+
+        if (expectedWarehouseId is Guid warehouseId
+            && location.WarehouseId != warehouseId)
+        {
+            return OperationError.Invalid("Ячейка принадлежит другому складу.");
+        }
+
+        if (expectedZoneType is ZoneType zoneType
+            && location.Zone.Type != zoneType)
+        {
+            return OperationError.Invalid("Ячейка не подходит для текущей операции.");
+        }
+
+        return location;
+    }
+
     public async Task<IReadOnlyList<StorageLocation>> GetTreeAsync(
         Guid zoneId,
         bool includeDeleted,

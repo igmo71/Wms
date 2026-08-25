@@ -53,6 +53,13 @@
                         FontSize="20"
                         Text="Диагностика сканера" />
 
+                    <Picker x:Name="ScanContextPicker" SelectedIndex="0">
+                        <Picker.Items>
+                            <x:String>Ячейка</x:String>
+                            <x:String>Товар</x:String>
+                        </Picker.Items>
+                    </Picker>
+
                     <Button
                         x:Name="CameraButton"
                         Clicked="OnCameraClicked"
@@ -61,6 +68,10 @@
                     <Label
                         x:Name="ScannerStatusLabel"
                         Text="Ожидание сканирования…" />
+
+                    <Label
+                        x:Name="ResolvedBarcodeLabel"
+                        FontAttributes="Bold" />
 
                     <Label
                         x:Name="ScanHistoryLabel"

@@ -59,12 +59,14 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   development application endpoints, and separate 1C integration endpoints.
   Verification of 1C callers is still unfinished.
 - `Wms.Contracts` contains the first versioned mobile identity wire contracts.
-- `Wms.Mobile` is an Android .NET MAUI shell with login, secure token storage,
-  refresh handling, and current-user session display.
+- `Wms.Mobile` is an Android .NET MAUI client with login, secure token storage,
+  refresh handling, intent and camera scanning, and diagnostic server-side
+  resolution of storage-location and SKU barcodes.
 
-Mobile development is the current resumed workstream. Authentication and the
-first shared contracts/API client are present, but mobile business workflows,
-idempotency, scanning, and device validation are still to be implemented.
+Mobile development is the current resumed workstream. Authentication, shared
+contracts/API client, diagnostic scanning, and contextual barcode resolvers are
+present, but mobile business workflows and command idempotency are still to be
+implemented.
 
 ## Authentication and authorization
 

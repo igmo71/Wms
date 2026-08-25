@@ -31,6 +31,16 @@ public class StorageLocation
 
     public string Barcode => $"WMSL:{Id:N}";
 
+    public static bool TryParseBarcode(string? value, out Guid id)
+    {
+        const string prefix = "WMSL:";
+
+        id = Guid.Empty;
+        return value is not null
+            && value.StartsWith(prefix, StringComparison.Ordinal)
+            && Guid.TryParseExact(value[prefix.Length..], "N", out id);
+    }
+
     public static OperationResult<string> BuildCode(
         string? parentCode,
         int number,

@@ -74,6 +74,7 @@ public class Program
 
         app.MapApplicationEndpoints();
         app.MapMobileIdentityEndpoints();
+        app.MapMobileBarcodeEndpoints();
         app.MapOneCEndpoints();
 
         app.Run();
