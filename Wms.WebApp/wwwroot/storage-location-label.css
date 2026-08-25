@@ -1,0 +1,102 @@
+.storage-location-label {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6mm;
+    background: white;
+    color: black;
+    text-align: center;
+}
+
+.storage-location-label__warehouse {
+    font-size: 16pt;
+    font-weight: 700;
+}
+
+.storage-location-label__zone {
+    font-size: 12pt;
+}
+
+.storage-location-label__qr svg {
+    display: block;
+    width: 42mm;
+    height: 42mm;
+    margin: 3mm auto;
+}
+
+.storage-location-label__address {
+    font-size: 26pt;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.storage-location-label__name {
+    margin-top: 2mm;
+    font-size: 12pt;
+}
+
+@media print {
+    @page {
+        margin: 0;
+    }
+
+    body * {
+        visibility: hidden !important;
+    }
+
+    html,
+    body {
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+    }
+
+    .mud-dialog-container {
+        position: fixed !important;
+        inset: 0 !important;
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .mud-dialog {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .mud-dialog-content {
+        display: block !important;
+        max-height: none !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .mud-dialog-actions {
+        display: none !important;
+    }
+
+    .storage-location-label,
+    .storage-location-label * {
+        visibility: visible !important;
+    }
+
+    .storage-location-label {
+        position: static;
+        width: 100%;
+        break-inside: avoid;
+        box-shadow: none;
+    }
+
+    .storage-location-label__qr,
+    .storage-location-label__qr svg {
+        break-inside: avoid;
+        overflow: visible;
+    }
+}

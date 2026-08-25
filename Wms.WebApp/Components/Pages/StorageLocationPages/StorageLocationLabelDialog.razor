@@ -1,0 +1,53 @@
+@using QRCoder
+@using Wms.Domain
+
+<MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <DialogContent>
+        <div class="storage-location-label">
+            <div class="storage-location-label__warehouse">@Warehouse.Name</div>
+            <div class="storage-location-label__zone">@Zone.Name</div>
+            <div class="storage-location-label__qr">@((MarkupString)_qrSvg)</div>
+            <div class="storage-location-label__address">@Zone.Code-@StorageLocation.Code</div>
+            <div class="storage-location-label__name">@StorageLocation.Name</div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Закрыть</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Print"
+                   OnClick="PrintAsync">Печать</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Warehouse Warehouse { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Zone Zone { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public StorageLocation StorageLocation { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
+
+    private string _qrSvg = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        using var qrData = QRCodeGenerator.GenerateQrCode(
+            StorageLocation.Barcode,
+            QRCodeGenerator.ECCLevel.Q);
+        using var qrCode = new SvgQRCode(qrData);
+        _qrSvg = qrCode.GetGraphic(10);
+    }
+
+    private void Close() => MudDialog.Cancel();
+
+    private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+}

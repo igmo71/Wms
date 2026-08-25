@@ -88,6 +88,21 @@ public partial class Index
     private Task CreateChildAsync() => ShowLocationDialogAsync(null, _selectedLocation);
     private Task EditSelectedAsync() => ShowLocationDialogAsync(_selectedLocation, null);
 
+    private async Task ShowLabelAsync()
+    {
+        if (_warehouse is null || _zone is null || _selectedLocation is null)
+            return;
+
+        var parameters = new DialogParameters<StorageLocationLabelDialog>
+        {
+            { x => x.Warehouse, _warehouse },
+            { x => x.Zone, _zone },
+            { x => x.StorageLocation, _selectedLocation }
+        };
+
+        await DialogService.ShowAsync<StorageLocationLabelDialog>("Этикетка ячейки", parameters);
+    }
+
     private async Task ShowLocationDialogAsync(StorageLocation? location, StorageLocation? parent)
     {
         if (_warehouse is null || _zone is null)

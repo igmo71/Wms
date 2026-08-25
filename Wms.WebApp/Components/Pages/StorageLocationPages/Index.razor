@@ -78,6 +78,12 @@ else
                         <MudText><b>Порядок отбора:</b> @(_selectedLocation.PickSequence?.ToString() ?? "—")</MudText>
                         <MudStack Row="true" Class="mt-2">
                             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditSelectedAsync">Изменить</MudButton>
+                            @if (!_selectedLocation.IsFolder && !_selectedLocation.DeletionMark)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           StartIcon="@Icons.Material.Filled.QrCode2"
+                                           OnClick="ShowLabelAsync">Этикетка</MudButton>
+                            }
                             @if (_selectedLocation.DeletionMark)
                             {
                                 <MudButton Color="Color.Success" Variant="Variant.Outlined" OnClick="ActivateSelectedAsync">Активировать</MudButton>

@@ -16,6 +16,7 @@
     </PackageReference>
     <PackageReference Include="MudBlazor" Version="9.*" />
     <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="4.*" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
   </ItemGroup>
 
 
