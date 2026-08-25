@@ -30,6 +30,10 @@
                         x:Name="QuantityPanel"
                         IsVisible="False"
                         Spacing="10">
+                        <Label
+                            x:Name="AvailableQuantityLabel"
+                            FontAttributes="Bold"
+                            FontSize="20" />
                         <Entry
                             x:Name="QuantityEntry"
                             FontSize="22"
@@ -53,6 +57,24 @@
                         IsVisible="False"
                         Loaded="OnConfirmButtonLoaded"
                         Text="Подтвердить перемещение" />
+
+                    <VerticalStackLayout
+                        x:Name="SuccessPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Label
+                            FontAttributes="Bold"
+                            FontSize="20"
+                            Text="Движение успешно проведено"
+                            TextColor="Green" />
+                        <Label
+                            x:Name="SuccessLabel"
+                            FontSize="17" />
+                        <Button
+                            Clicked="OnNextMovementClicked"
+                            HeightRequest="56"
+                            Text="Следующее действие" />
+                    </VerticalStackLayout>
 
                     <ActivityIndicator
                         x:Name="ProgressIndicator"
@@ -112,27 +134,6 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border
-                x:Name="SuccessCard"
-                BackgroundColor="#1B5E20"
-                IsVisible="False"
-                Padding="16">
-                <VerticalStackLayout Spacing="10">
-                    <Label
-                        FontAttributes="Bold"
-                        FontSize="22"
-                        Text="Перемещение выполнено"
-                        TextColor="White" />
-                    <Label
-                        x:Name="SuccessLabel"
-                        FontSize="17"
-                        TextColor="White" />
-                    <Button
-                        Clicked="OnNextMovementClicked"
-                        HeightRequest="56"
-                        Text="Следующее действие" />
-                </VerticalStackLayout>
-            </Border>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

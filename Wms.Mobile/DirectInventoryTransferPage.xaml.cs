@@ -102,8 +102,9 @@ public partial class DirectInventoryTransferPage : ContentPage
                 var unit = string.IsNullOrWhiteSpace(_sku.UnitOfMeasure)
                     ? string.Empty
                     : $" {_sku.UnitOfMeasure}";
-                SkuLabel.Text =
-                    $"{_sku.Name}\nКод: {_sku.Code}\nДоступно: {_sku.AvailableQuantity:0.###}{unit}";
+                SkuLabel.Text = $"{_sku.Name}\nКод: {_sku.Code}";
+                AvailableQuantityLabel.Text =
+                    $"Доступно: {_sku.AvailableQuantity:0.###}{unit}";
                 SkuCard.IsVisible = true;
                 QuantityPanel.IsVisible = true;
                 StepLabel.Text = "3. Количество";
@@ -224,12 +225,14 @@ public partial class DirectInventoryTransferPage : ContentPage
             _pendingMoveRequestId = null;
             ConfirmButton.IsVisible = false;
             SuccessLabel.Text =
-                $"Строка: {_confirmedMovement.LineNumber}\n" +
+                $"Товар: {_confirmedMovement.SkuName}\n" +
+                $"Из: {_confirmedMovement.Source.Address} · {_confirmedMovement.Source.Name}\n" +
+                $"В: {_confirmedMovement.Destination.Address} · {_confirmedMovement.Destination.Name}\n" +
                 $"Количество: {_confirmedMovement.Quantity:0.###}\n" +
                 $"Проведено: {_confirmedMovement.PostedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}";
-            SuccessCard.IsVisible = true;
+            SuccessPanel.IsVisible = true;
             StepLabel.Text = "Готово";
-            InstructionLabel.Text = "Сервер подтвердил движение и изменение остатков.";
+            InstructionLabel.Text = "Остатки и обороты обновлены.";
             TransferContextLabel.Text =
                 $"Склад: {_transfer.WarehouseName}\nСтатус: {GetStatusText(_confirmedMovement.TransferStatus)}";
         }
@@ -262,7 +265,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         SourceCard.IsVisible = false;
         SkuCard.IsVisible = false;
         DestinationCard.IsVisible = false;
-        SuccessCard.IsVisible = false;
+        SuccessPanel.IsVisible = false;
         QuantityPanel.IsVisible = false;
         SelectedQuantityLabel.IsVisible = false;
         ConfirmButton.IsVisible = false;
