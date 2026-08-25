@@ -7,6 +7,45 @@ namespace Wms.Application.StockKeepingUnits;
 
 public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<OperationResult<StockKeepingUnit>> ResolveByBarcodeAsync(
+        string? barcode,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(barcode))
+        {
+            return OperationError.Invalid("Штрихкод товара не указан.");
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var barcodeMatches = await dbContext.SkuBarcodes
+            .AsNoTracking()
+            .Include(x => x.Sku)
+            .ThenInclude(x => x!.BaseUnitOfMeasure)
+            .Where(x => x.Value == barcode)
+            .Take(2)
+            .ToListAsync(ct);
+
+        var matches = barcodeMatches.Select(x => x.Sku!).ToList();
+
+        if (matches.Count == 0)
+        {
+            return OperationError.NotFound("Товар с таким штрихкодом не найден.");
+        }
+
+        if (matches.Count > 1)
+        {
+            return OperationError.Conflict("Штрихкод соответствует нескольким товарам.");
+        }
+
+        var sku = matches[0];
+        if (sku.DeletionMark)
+        {
+            return OperationError.Invalid("Товар недоступен.");
+        }
+
+        return sku;
+    }
+
     public async Task CreateOrUpdateAsync(StockKeepingUnit item, CancellationToken ct = default)
     {
         using var activity = AppTracing.StartActivity("StockKeepingUnit CreateOrUpdate", nameof(StockKeepingUnitService));

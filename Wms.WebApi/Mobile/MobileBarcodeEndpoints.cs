@@ -1,4 +1,4 @@
-using Wms.Application.SkuBarcodes;
+using Wms.Application.StockKeepingUnits;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
@@ -69,10 +69,10 @@ internal static class MobileBarcodeEndpoints
 
     private static async Task<IResult> ResolveSkuAsync(
         MobileResolveSkuRequest request,
-        SkuBarcodeService barcodeService,
+        StockKeepingUnitService skuService,
         CancellationToken ct)
     {
-        var result = await barcodeService.ResolveAsync(request.Barcode, ct);
+        var result = await skuService.ResolveByBarcodeAsync(request.Barcode, ct);
         if (!result.IsSuccess)
         {
             return ResolutionProblem("sku", result.Error!);
