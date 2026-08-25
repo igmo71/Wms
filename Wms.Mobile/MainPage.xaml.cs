@@ -1,5 +1,4 @@
 using Wms.Contracts.Mobile.V1;
-using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
@@ -7,32 +6,21 @@ namespace Wms.Mobile;
 public partial class MainPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
-    private readonly ICameraBarcodeScanner _cameraScanner;
-    private readonly Queue<BarcodeScanEvent> _recentScans = new();
-    private bool _scannerSubscribed;
+    private readonly IServiceProvider _services;
     private bool _sessionChecked;
 
     public MainPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
-        ICameraBarcodeScanner cameraScanner)
+        IServiceProvider services)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
-        _cameraScanner = cameraScanner;
+        _services = services;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (!_scannerSubscribed)
-        {
-            _intentScanner.ScanReceived += OnScanReceived;
-            _scannerSubscribed = true;
-        }
-
         if (_sessionChecked)
         {
             return;
@@ -40,17 +28,6 @@ public partial class MainPage : ContentPage
 
         _sessionChecked = true;
         await RunAsync(() => _apiClient.GetCurrentUserAsync(), ignoreMissingSession: true);
-    }
-
-    protected override void OnDisappearing()
-    {
-        if (_scannerSubscribed)
-        {
-            _intentScanner.ScanReceived -= OnScanReceived;
-            _scannerSubscribed = false;
-        }
-
-        base.OnDisappearing();
     }
 
     private async void OnLoginClicked(object? sender, EventArgs e)
@@ -69,68 +46,11 @@ public partial class MainPage : ContentPage
         StatusLabel.Text = "Сессия завершена на устройстве.";
     }
 
-    private async void OnCameraClicked(object? sender, EventArgs e)
-    {
-        if (!_cameraScanner.IsAvailable)
-        {
-            ScannerStatusLabel.Text = "На устройстве не обнаружена камера.";
-            return;
-        }
+    private async void OnInventoryTransferClicked(object? sender, EventArgs e) =>
+        await Navigation.PushAsync(_services.GetRequiredService<InventoryTransferPage>());
 
-        var cameraPage = new CameraScannerPage(_cameraScanner);
-        cameraPage.ScanCompleted += OnScanReceived;
-
-        await Navigation.PushModalAsync(cameraPage);
-    }
-
-    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            _recentScans.Enqueue(scanEvent);
-            while (_recentScans.Count > 5)
-            {
-                _recentScans.Dequeue();
-            }
-
-            ScannerStatusLabel.Text =
-                $"Получено: {scanEvent.ReceivedAt.ToLocalTime():HH:mm:ss} · {GetSourceName(scanEvent.Source)}";
-            ScanHistoryLabel.Text = string.Join(
-                Environment.NewLine,
-                _recentScans.Reverse().Select(scan =>
-                    $"{scan.ReceivedAt.ToLocalTime():HH:mm:ss}  [{scan.Value}]"));
-
-            await ResolveScanAsync(scanEvent.Value);
-        });
-    }
-
-    private async Task ResolveScanAsync(string barcode)
-    {
-        ResolvedBarcodeLabel.Text = "Поиск в WMS…";
-
-        try
-        {
-            if (ScanContextPicker.SelectedIndex == 1)
-            {
-                var sku = await _apiClient.ResolveSkuAsync(barcode);
-                ResolvedBarcodeLabel.Text = $"Товар: {sku.Name}\nКод: {sku.Code}";
-            }
-            else
-            {
-                var location = await _apiClient.ResolveStorageLocationAsync(barcode);
-                ResolvedBarcodeLabel.Text =
-                    $"Ячейка: {location.Address} · {location.Name}\nСклад: {location.WarehouseName}";
-            }
-        }
-        catch (MobileApiException exception)
-        {
-            ResolvedBarcodeLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ResolvedBarcodeLabel.Text = "Сервер WMS недоступен.";
-        }
-    }
+    private async void OnScannerDiagnosticsClicked(object? sender, EventArgs e) =>
+        await Navigation.PushAsync(_services.GetRequiredService<ScannerDiagnosticsPage>());
 
     private async Task RunAsync(
         Func<Task<MobileCurrentUserResponse>> action,
@@ -176,7 +96,6 @@ public partial class MainPage : ContentPage
         LoginPanel.IsVisible = true;
         SessionPanel.IsVisible = false;
         CurrentUserLabel.Text = string.Empty;
-        ResolvedBarcodeLabel.Text = string.Empty;
     }
 
     private void SetBusy(bool isBusy)
@@ -186,11 +105,4 @@ public partial class MainPage : ContentPage
         LoginButton.IsEnabled = !isBusy;
     }
 
-    private static string GetSourceName(BarcodeScanSource source) => source switch
-    {
-        BarcodeScanSource.EmbeddedScanner => "встроенный сканер",
-        BarcodeScanSource.Camera => "камера",
-        BarcodeScanSource.KeyboardWedge => "keyboard wedge",
-        _ => source.ToString()
-    };
 }

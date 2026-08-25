@@ -1,0 +1,40 @@
+<ContentPage
+    x:Class="Wms.Mobile.ScannerDiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Диагностика сканера">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label
+                FontAttributes="Bold"
+                FontSize="24"
+                Text="Диагностика сканера" />
+
+            <Picker x:Name="ScanContextPicker" SelectedIndex="0">
+                <Picker.Items>
+                    <x:String>Ячейка</x:String>
+                    <x:String>Товар</x:String>
+                </Picker.Items>
+            </Picker>
+
+            <Button
+                Clicked="OnCameraClicked"
+                HeightRequest="56"
+                Text="Сканировать камерой" />
+
+            <Label
+                x:Name="ScannerStatusLabel"
+                Text="Ожидание сканирования…" />
+
+            <Label
+                x:Name="ResolvedBarcodeLabel"
+                FontAttributes="Bold" />
+
+            <Label
+                x:Name="ScanHistoryLabel"
+                FontFamily="monospace"
+                LineBreakMode="CharacterWrap" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

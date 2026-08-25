@@ -39,46 +39,29 @@
         <VerticalStackLayout
             x:Name="SessionPanel"
             IsVisible="False"
-            Spacing="12">
+            Spacing="16">
 
             <Label
                 x:Name="CurrentUserLabel"
                 FontSize="18"
                 HorizontalOptions="Center" />
 
-            <Border Padding="16">
-                <VerticalStackLayout Spacing="10">
-                    <Label
-                        FontAttributes="Bold"
-                        FontSize="20"
-                        Text="Диагностика сканера" />
+            <Label
+                FontAttributes="Bold"
+                FontSize="20"
+                Text="Выберите действие" />
 
-                    <Picker x:Name="ScanContextPicker" SelectedIndex="0">
-                        <Picker.Items>
-                            <x:String>Ячейка</x:String>
-                            <x:String>Товар</x:String>
-                        </Picker.Items>
-                    </Picker>
+            <Button
+                Clicked="OnInventoryTransferClicked"
+                FontSize="18"
+                HeightRequest="64"
+                Text="Перемещение" />
 
-                    <Button
-                        x:Name="CameraButton"
-                        Clicked="OnCameraClicked"
-                        Text="Сканировать камерой" />
-
-                    <Label
-                        x:Name="ScannerStatusLabel"
-                        Text="Ожидание сканирования…" />
-
-                    <Label
-                        x:Name="ResolvedBarcodeLabel"
-                        FontAttributes="Bold" />
-
-                    <Label
-                        x:Name="ScanHistoryLabel"
-                        FontFamily="monospace"
-                        LineBreakMode="CharacterWrap" />
-                </VerticalStackLayout>
-            </Border>
+            <Button
+                Clicked="OnScannerDiagnosticsClicked"
+                FontSize="16"
+                HeightRequest="56"
+                Text="Диагностика сканера" />
 
             <Button
                 Clicked="OnLogoutClicked"

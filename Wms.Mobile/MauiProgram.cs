@@ -22,6 +22,8 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<MainPage>();
+        builder.Services.AddTransient<InventoryTransferPage>();
+        builder.Services.AddTransient<ScannerDiagnosticsPage>();
 
         builder.Services.AddSingleton<AndroidIntentBarcodeScanner>();
         builder.Services.AddSingleton<ILifecycleBarcodeScanner>(serviceProvider =>

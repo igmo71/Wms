@@ -1,0 +1,35 @@
+<ContentPage
+    x:Class="Wms.Mobile.InventoryTransferPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Перемещение">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label
+                FontAttributes="Bold"
+                FontSize="28"
+                Text="Перемещение" />
+
+            <Label
+                FontSize="18"
+                Text="Товар между ячейками одного склада" />
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label FontAttributes="Bold" Text="Порядок работы" />
+                    <Label Text="1. Исходная ячейка" />
+                    <Label Text="2. Товар" />
+                    <Label Text="3. Указать количество" />
+                    <Label Text="4. Ячейка назначения" />
+                    <Label Text="5. Проверить и подтвердить" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label
+                HorizontalTextAlignment="Center"
+                Text="Операция пока недоступна."
+                TextColor="Gray" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
