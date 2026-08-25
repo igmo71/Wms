@@ -8,6 +8,8 @@ public static class MobileApiRoutes
     public const string Me = Base + "/me";
     public const string ResolveStorageLocation = Base + "/barcodes/storage-location/resolve";
     public const string ResolveSku = Base + "/barcodes/sku/resolve";
+    public const string Warehouses = Base + "/warehouses";
+    public const string InventoryTransfers = Base + "/inventory-transfers";
 }
 
 public sealed record MobileLoginRequest(string Email, string Password);
@@ -58,3 +60,22 @@ public sealed record MobileSkuResponse(
     string Code,
     string Name,
     string? UnitOfMeasure);
+
+public sealed record MobileWarehouseResponse(Guid Id, string Name);
+
+public enum MobileInventoryTransferStatus
+{
+    Draft = 0,
+    InProgress = 1,
+    Completed = 2
+}
+
+public sealed record MobileInventoryTransferSummaryResponse(
+    Guid Id,
+    string Number,
+    DateTime Date,
+    Guid WarehouseId,
+    string WarehouseName,
+    MobileInventoryTransferStatus Status,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? UpdatedAtUtc);

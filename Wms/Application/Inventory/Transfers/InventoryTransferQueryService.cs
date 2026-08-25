@@ -8,6 +8,23 @@ namespace Wms.Application.Inventory.Transfers;
 
 public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<IReadOnlyList<InventoryTransfer>> ListActiveAsync(
+        Guid warehouseId,
+        int take,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        return await dbContext.InventoryTransfers
+            .AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Where(x => x.WarehouseId == warehouseId
+                && x.Status != InventoryTransferStatus.Completed)
+            .OrderByDescending(x => x.UpdatedAtUtc ?? x.CreatedAtUtc)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
     public async Task<InventoryTransfer?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

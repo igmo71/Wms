@@ -99,6 +99,41 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректные сведения о товаре.");
     }
 
+    public async Task<IReadOnlyList<MobileWarehouseResponse>> GetWarehousesAsync(
+        CancellationToken ct = default)
+    {
+        using var response = await _httpClient.GetAsync(MobileApiRoutes.Warehouses, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content.ReadFromJsonAsync<List<MobileWarehouseResponse>>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_warehouses_response",
+                "Сервер вернул некорректный список складов.");
+    }
+
+    public async Task<IReadOnlyList<MobileInventoryTransferSummaryResponse>> GetInventoryTransfersAsync(
+        Guid warehouseId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}?warehouseId={warehouseId:D}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<List<MobileInventoryTransferSummaryResponse>>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_inventory_transfers_response",
+                "Сервер вернул некорректный список перемещений.");
+    }
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

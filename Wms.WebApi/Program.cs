@@ -75,6 +75,7 @@ public class Program
         app.MapApplicationEndpoints();
         app.MapMobileIdentityEndpoints();
         app.MapMobileBarcodeEndpoints();
+        app.MapMobileInventoryTransferEndpoints();
         app.MapOneCEndpoints();
 
         app.Run();
