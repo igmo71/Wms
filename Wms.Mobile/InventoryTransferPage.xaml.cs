@@ -7,6 +7,8 @@ public partial class InventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private bool _loaded;
+    private Guid? _pendingCreateRequestId;
+    private Guid? _pendingCreateWarehouseId;
 
     public InventoryTransferPage(MobileApiClient apiClient)
     {
@@ -64,6 +66,46 @@ public partial class InventoryTransferPage : ContentPage
         await LoadTransfersAsync();
     }
 
+    private async void OnCreateClicked(object? sender, EventArgs e)
+    {
+        if (WarehousePicker.SelectedItem is not MobileWarehouseResponse selectedWarehouse)
+        {
+            ErrorLabel.Text = "Выберите склад.";
+            return;
+        }
+
+        var warehouseId = _pendingCreateWarehouseId ?? selectedWarehouse.Id;
+        _pendingCreateRequestId ??= Guid.NewGuid();
+        _pendingCreateWarehouseId ??= warehouseId;
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+
+        try
+        {
+            await _apiClient.CreateInventoryTransferAsync(
+                warehouseId,
+                _pendingCreateRequestId.Value);
+            ClearPendingCreate();
+            await LoadTransfersAsync();
+        }
+        catch (MobileApiException exception)
+        {
+            ClearPendingCreate();
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text =
+                "Ответ сервера не получен. Нажмите «Повторить создание».";
+            NewTransferButton.Text = "Повторить создание";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async Task LoadTransfersAsync()
     {
         if (WarehousePicker.SelectedItem is not MobileWarehouseResponse warehouse)
@@ -103,8 +145,16 @@ public partial class InventoryTransferPage : ContentPage
     {
         ProgressIndicator.IsVisible = isBusy;
         ProgressIndicator.IsRunning = isBusy;
-        WarehousePicker.IsEnabled = !isBusy;
+        WarehousePicker.IsEnabled = !isBusy && _pendingCreateRequestId is null;
         RefreshButton.IsEnabled = !isBusy;
+        NewTransferButton.IsEnabled = !isBusy;
+    }
+
+    private void ClearPendingCreate()
+    {
+        _pendingCreateRequestId = null;
+        _pendingCreateWarehouseId = null;
+        NewTransferButton.Text = "Новое перемещение";
     }
 
     private static string GetStatusText(MobileInventoryTransferStatus status) => status switch

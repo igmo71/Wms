@@ -283,3 +283,11 @@ workflow.
 The accepted scope and delivery order are under
 [`specs/mobile-wms/`](../specs/mobile-wms/). Those documents describe the active
 development target, not already implemented behavior.
+
+Changing mobile commands use persisted command receipts. The idempotency key is
+the authenticated user, stable command type, and client-generated request id;
+the receipt stores a deterministic request hash and result resource id. A
+receipt and its WMS change are saved by the same `ApplicationDbContext` and
+`SaveChangesAsync`, so a retry or concurrent duplicate cannot commit a second
+warehouse action. Reusing the key with different input is a conflict. The first
+implementation protects creation of a direct inventory-transfer draft.

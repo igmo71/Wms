@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Wms.Application.Inventory.Transfers;
 using Wms.Application.Warehouses;
 using Wms.Common;
@@ -20,6 +21,13 @@ internal static class MobileInventoryTransferEndpoints
 
         group.MapGet("/inventory-transfers", ListTransfersAsync)
             .Produces<IReadOnlyList<MobileInventoryTransferSummaryResponse>>();
+
+        group.MapPost("/inventory-transfers", CreateTransferAsync)
+            .Produces<MobileInventoryTransferSummaryResponse>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
+            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 
         return endpoints;
     }
@@ -55,15 +63,66 @@ internal static class MobileInventoryTransferEndpoints
 
         var transfers = await queryService.ListActiveAsync(warehouseId, 50, ct);
         return TypedResults.Ok<IReadOnlyList<MobileInventoryTransferSummaryResponse>>(
-            transfers.Select(x => new MobileInventoryTransferSummaryResponse(
-                x.Id,
-                x.Number,
-                x.Date,
-                x.WarehouseId,
-                x.Warehouse?.Name ?? string.Empty,
-                MapStatus(x.Status),
-                x.CreatedAtUtc,
-                x.UpdatedAtUtc)).ToList());
+            transfers.Select(MapTransfer).ToList());
+    }
+
+    private static async Task<IResult> CreateTransferAsync(
+        MobileCreateInventoryTransferRequest request,
+        ClaimsPrincipal principal,
+        MobileInventoryTransferCommandService commandService,
+        InventoryTransferQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.CreateDraftAsync(
+            request.WarehouseId,
+            request.ClientRequestId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return CommandProblem(result.Error!);
+        }
+
+        var transfer = await queryService.GetAsync(result.Value, ct);
+        if (transfer is null)
+        {
+            throw new InvalidOperationException(
+                "Созданное мобильной командой перемещение не найдено.");
+        }
+
+        return TypedResults.Ok(MapTransfer(transfer));
+    }
+
+    private static MobileInventoryTransferSummaryResponse MapTransfer(
+        Wms.Domain.InventoryTransfer transfer) => new(
+            transfer.Id,
+            transfer.Number,
+            transfer.Date,
+            transfer.WarehouseId,
+            transfer.Warehouse?.Name ?? string.Empty,
+            MapStatus(transfer.Status),
+            transfer.CreatedAtUtc,
+            transfer.UpdatedAtUtc);
+
+    private static IResult CommandProblem(OperationError error)
+    {
+        var (statusCode, code) = error.Type switch
+        {
+            OperationErrorType.NotFound => (StatusCodes.Status404NotFound, "resource_not_found"),
+            OperationErrorType.Conflict => (StatusCodes.Status409Conflict, "request_conflict"),
+            OperationErrorType.Invalid => (StatusCodes.Status422UnprocessableEntity, "invalid_command"),
+            _ => (StatusCodes.Status400BadRequest, "command_failed")
+        };
+
+        return Results.Json(
+            new MobileProblemResponse(code, error.Message),
+            statusCode: statusCode);
     }
 
     private static MobileInventoryTransferStatus MapStatus(InventoryTransferStatus status) =>

@@ -6,7 +6,7 @@
 
     <Grid
         Padding="24"
-        RowDefinitions="Auto,Auto,Auto,Auto,*"
+        RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
         RowSpacing="14">
         <VerticalStackLayout Grid.Row="0" Spacing="4">
             <Label
@@ -23,13 +23,20 @@
             Title="Выберите склад" />
 
         <Button
-            x:Name="RefreshButton"
+            x:Name="NewTransferButton"
             Grid.Row="2"
+            Clicked="OnCreateClicked"
+            HeightRequest="56"
+            Text="Новое перемещение" />
+
+        <Button
+            x:Name="RefreshButton"
+            Grid.Row="3"
             Clicked="OnRefreshClicked"
             HeightRequest="52"
             Text="Обновить" />
 
-        <VerticalStackLayout Grid.Row="3" Spacing="8">
+        <VerticalStackLayout Grid.Row="4" Spacing="8">
             <ActivityIndicator
                 x:Name="ProgressIndicator"
                 IsRunning="False"
@@ -43,7 +50,7 @@
 
         <CollectionView
             x:Name="TransfersView"
-            Grid.Row="4"
+            Grid.Row="5"
             Margin="0,4,0,0">
             <CollectionView.EmptyView>
                 <Label

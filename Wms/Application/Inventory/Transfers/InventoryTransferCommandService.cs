@@ -18,6 +18,29 @@ public class InventoryTransferCommandService(
         string userId,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var transferResult = await StageCreateAsync(
+            dbContext,
+            warehouseId,
+            transitStorageLocationId,
+            userId,
+            ct);
+        if (!transferResult.IsSuccess)
+        {
+            return transferResult.Error!;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return transferResult.Value!;
+    }
+
+    internal async Task<OperationResult<InventoryTransfer>> StageCreateAsync(
+        ApplicationDbContext dbContext,
+        Guid warehouseId,
+        Guid? transitStorageLocationId,
+        string userId,
+        CancellationToken ct)
+    {
         var now = DateTimeOffset.UtcNow;
         var transferResult = InventoryTransfer.Create(
             Guid.NewGuid(),
@@ -32,7 +55,6 @@ public class InventoryTransferCommandService(
             return transferResult.Error!;
         }
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var contextResult = await ValidateCreationContextAsync(
             dbContext,
             warehouseId,
@@ -45,7 +67,6 @@ public class InventoryTransferCommandService(
 
         var transfer = transferResult.Value!;
         dbContext.InventoryTransfers.Add(transfer);
-        await dbContext.SaveChangesAsync(ct);
         return transfer;
     }
 

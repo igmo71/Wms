@@ -134,6 +134,28 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректный список перемещений.");
     }
 
+    public async Task<MobileInventoryTransferSummaryResponse> CreateInventoryTransferAsync(
+        Guid warehouseId,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            MobileApiRoutes.InventoryTransfers,
+            new MobileCreateInventoryTransferRequest(clientRequestId, warehouseId),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileInventoryTransferSummaryResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_inventory_transfer_response",
+                "Сервер вернул некорректное перемещение.");
+    }
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

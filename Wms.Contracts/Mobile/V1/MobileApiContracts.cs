@@ -79,3 +79,7 @@ public sealed record MobileInventoryTransferSummaryResponse(
     MobileInventoryTransferStatus Status,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc);
+
+public sealed record MobileCreateInventoryTransferRequest(
+    Guid ClientRequestId,
+    Guid WarehouseId);
