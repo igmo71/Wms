@@ -83,3 +83,40 @@ public sealed record MobileInventoryTransferSummaryResponse(
 public sealed record MobileCreateInventoryTransferRequest(
     Guid ClientRequestId,
     Guid WarehouseId);
+
+public sealed record MobileResolveDirectTransferSkuRequest(
+    string Barcode,
+    Guid SourceStorageLocationId);
+
+public sealed record MobileDirectTransferSkuResponse(
+    Guid Id,
+    string Code,
+    string Name,
+    string? UnitOfMeasure,
+    double AvailableQuantity);
+
+public sealed record MobileMoveDirectInventoryTransferRequest(
+    Guid ClientRequestId,
+    Guid SourceStorageLocationId,
+    Guid DestinationStorageLocationId,
+    Guid StockKeepingUnitId,
+    double Quantity);
+
+public sealed record MobileInventoryMovementLocationResponse(
+    Guid Id,
+    string Address,
+    string Name);
+
+public sealed record MobileMoveDirectInventoryTransferResponse(
+    Guid MovementId,
+    Guid TransferId,
+    int LineNumber,
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    double Quantity,
+    MobileInventoryMovementLocationResponse Source,
+    MobileInventoryMovementLocationResponse Destination,
+    DateTimeOffset PostedAtUtc,
+    MobileInventoryTransferStatus TransferStatus);

@@ -158,6 +158,61 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректное перемещение.");
     }
 
+    public async Task<MobileDirectTransferSkuResponse> ResolveDirectTransferSkuAsync(
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        string barcode,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/direct/sku/resolve";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileResolveDirectTransferSkuRequest(barcode, sourceStorageLocationId),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MobileDirectTransferSkuResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_direct_transfer_sku_response",
+                "Сервер вернул некорректные сведения о товаре и остатке.");
+    }
+
+    public async Task<MobileMoveDirectInventoryTransferResponse> MoveDirectAsync(
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        Guid destinationStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/direct-movements";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileMoveDirectInventoryTransferRequest(
+                clientRequestId,
+                sourceStorageLocationId,
+                destinationStorageLocationId,
+                stockKeepingUnitId,
+                quantity),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileMoveDirectInventoryTransferResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_direct_movement_response",
+                "Сервер вернул некорректный результат перемещения.");
+    }
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

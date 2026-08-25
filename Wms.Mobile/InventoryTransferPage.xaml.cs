@@ -8,20 +8,17 @@ public partial class InventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
-    private readonly ICameraBarcodeScanner _cameraScanner;
     private bool _loaded;
     private Guid? _pendingCreateRequestId;
     private Guid? _pendingCreateWarehouseId;
 
     public InventoryTransferPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
-        ICameraBarcodeScanner cameraScanner)
+        ILifecycleBarcodeScanner intentScanner)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _intentScanner = intentScanner;
-        _cameraScanner = cameraScanner;
     }
 
     protected override async void OnAppearing()
@@ -182,7 +179,6 @@ public partial class InventoryTransferPage : ContentPage
         Navigation.PushAsync(new DirectInventoryTransferPage(
             _apiClient,
             _intentScanner,
-            _cameraScanner,
             transfer));
 
     private static string GetStatusText(MobileInventoryTransferStatus status) => status switch

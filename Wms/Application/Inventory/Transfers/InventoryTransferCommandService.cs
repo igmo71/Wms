@@ -141,6 +141,26 @@ public class InventoryTransferCommandService(
             userId,
             ct);
 
+    internal Task<OperationResult<InventoryMovement>> StageDirectMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        Guid destinationStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        string userId,
+        CancellationToken ct) =>
+        StageMovementAsync(
+            dbContext,
+            transferId,
+            MovementMode.Direct,
+            sourceStorageLocationId,
+            destinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
+
     public async Task<OperationResult> CompleteAsync(
         Guid transferId,
         string userId,
@@ -182,13 +202,42 @@ public class InventoryTransferCommandService(
         string userId,
         CancellationToken ct)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var movementResult = await StageMovementAsync(
+            dbContext,
+            transferId,
+            mode,
+            enteredSourceStorageLocationId,
+            enteredDestinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
+        if (!movementResult.IsSuccess)
+        {
+            return movementResult.Error!;
+        }
+
+        return await SaveChangesAsync(dbContext, ct);
+    }
+
+    private async Task<OperationResult<InventoryMovement>> StageMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid transferId,
+        MovementMode mode,
+        Guid? enteredSourceStorageLocationId,
+        Guid? enteredDestinationStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        string userId,
+        CancellationToken ct)
+    {
         if (!double.IsFinite(quantity) || quantity <= 0)
         {
             return OperationError.Invalid(
                 "Количество движения должно быть конечным числом больше нуля.");
         }
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
@@ -217,7 +266,7 @@ public class InventoryTransferCommandService(
         var locationsResult = await ValidateLocationsAsync(dbContext, transfer, route, mode, ct);
         if (!locationsResult.IsSuccess)
         {
-            return locationsResult;
+            return locationsResult.Error!;
         }
 
         var lineNumber = (await dbContext.InventoryMovements
@@ -229,7 +278,7 @@ public class InventoryTransferCommandService(
         var movementResult = transfer.RecordMovement(now, userId);
         if (!movementResult.IsSuccess)
         {
-            return movementResult;
+            return movementResult.Error!;
         }
 
         var inventoryMovementResult = InventoryMovement.Create(
@@ -257,10 +306,10 @@ public class InventoryTransferCommandService(
             ct);
         if (!postingResult.IsSuccess)
         {
-            return postingResult;
+            return postingResult.Error!;
         }
 
-        return await SaveChangesAsync(dbContext, ct);
+        return movement;
     }
 
     private static async Task<OperationResult> SaveChangesAsync(

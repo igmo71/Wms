@@ -26,11 +26,33 @@
                         FontSize="18"
                         Text="Отсканируйте QR исходной ячейки." />
 
+                    <VerticalStackLayout
+                        x:Name="QuantityPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Entry
+                            x:Name="QuantityEntry"
+                            FontSize="22"
+                            Keyboard="Numeric"
+                            Placeholder="Введите количество" />
+                        <Button
+                            x:Name="AcceptQuantityButton"
+                            Clicked="OnAcceptQuantityClicked"
+                            HeightRequest="56"
+                            Text="Продолжить" />
+                        <Label
+                            x:Name="QuantityErrorLabel"
+                            HorizontalTextAlignment="Center"
+                            TextColor="Red" />
+                    </VerticalStackLayout>
+
                     <Button
-                        x:Name="CameraButton"
-                        Clicked="OnCameraClicked"
-                        HeightRequest="56"
-                        Text="Сканировать камерой" />
+                        x:Name="ConfirmButton"
+                        Clicked="OnConfirmClicked"
+                        HeightRequest="60"
+                        IsVisible="False"
+                        Loaded="OnConfirmButtonLoaded"
+                        Text="Подтвердить перемещение" />
 
                     <ActivityIndicator
                         x:Name="ProgressIndicator"
@@ -69,6 +91,46 @@
                     <Label
                         x:Name="SkuLabel"
                         FontSize="18" />
+                    <Label
+                        x:Name="SelectedQuantityLabel"
+                        FontSize="18"
+                        IsVisible="False" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                x:Name="DestinationCard"
+                IsVisible="False"
+                Padding="16">
+                <VerticalStackLayout Spacing="4">
+                    <Label
+                        FontAttributes="Bold"
+                        Text="Ячейка назначения" />
+                    <Label
+                        x:Name="DestinationLocationLabel"
+                        FontSize="18" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                x:Name="SuccessCard"
+                BackgroundColor="#1B5E20"
+                IsVisible="False"
+                Padding="16">
+                <VerticalStackLayout Spacing="10">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="22"
+                        Text="Перемещение выполнено"
+                        TextColor="White" />
+                    <Label
+                        x:Name="SuccessLabel"
+                        FontSize="17"
+                        TextColor="White" />
+                    <Button
+                        Clicked="OnNextMovementClicked"
+                        HeightRequest="56"
+                        Text="Следующее действие" />
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>

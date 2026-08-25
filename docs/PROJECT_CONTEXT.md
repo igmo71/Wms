@@ -276,7 +276,9 @@ Scanning stays vendor-neutral. Storage locations use the existing
 `WMSL:{storage-location-guid-N}` payload; SKU barcodes remain imported strings
 from 1C. The verified Urovo TD50 path uses ScanWedge intent output behind the
 neutral scanner interface. The Android camera fallback uses Google ML Kit via
-`BarcodeScanning.Native.Maui` and is activated only by an explicit user action.
+`BarcodeScanning.Native.Maui`. Operational screens should automatically prefer
+an available embedded scanner and use the camera when no embedded scanner is
+available, without requiring the operator to switch scanning mechanisms.
 The first vertical is direct intra-warehouse movement, followed by the transit
 workflow.
 
@@ -289,5 +291,6 @@ the authenticated user, stable command type, and client-generated request id;
 the receipt stores a deterministic request hash and result resource id. A
 receipt and its WMS change are saved by the same `ApplicationDbContext` and
 `SaveChangesAsync`, so a retry or concurrent duplicate cannot commit a second
-warehouse action. Reusing the key with different input is a conflict. The first
-implementation protects creation of a direct inventory-transfer draft.
+warehouse action. Reusing the key with different input is a conflict. The
+current implementation protects creation of a direct inventory-transfer draft
+and confirmation of a direct inventory movement.

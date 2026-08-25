@@ -1,3 +1,4 @@
+using System.Globalization;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
@@ -8,23 +9,24 @@ public partial class DirectInventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
-    private readonly ICameraBarcodeScanner _cameraScanner;
     private readonly MobileInventoryTransferSummaryResponse _transfer;
     private MobileStorageLocationResponse? _sourceLocation;
-    private MobileSkuResponse? _sku;
+    private MobileDirectTransferSkuResponse? _sku;
+    private double? _quantity;
+    private MobileStorageLocationResponse? _destinationLocation;
+    private MobileMoveDirectInventoryTransferResponse? _confirmedMovement;
+    private Guid? _pendingMoveRequestId;
     private bool _scannerSubscribed;
     private bool _resolving;
 
     public DirectInventoryTransferPage(
         MobileApiClient apiClient,
         ILifecycleBarcodeScanner intentScanner,
-        ICameraBarcodeScanner cameraScanner,
         MobileInventoryTransferSummaryResponse transfer)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _intentScanner = intentScanner;
-        _cameraScanner = cameraScanner;
         _transfer = transfer;
 
         TransferNumberLabel.Text = $"Перемещение {transfer.Number}";
@@ -54,19 +56,6 @@ public partial class DirectInventoryTransferPage : ContentPage
         base.OnDisappearing();
     }
 
-    private async void OnCameraClicked(object? sender, EventArgs e)
-    {
-        if (!_cameraScanner.IsAvailable)
-        {
-            ErrorLabel.Text = "На устройстве не обнаружена камера.";
-            return;
-        }
-
-        var cameraPage = new CameraScannerPage(_cameraScanner);
-        cameraPage.ScanCompleted += OnScanReceived;
-        await Navigation.PushModalAsync(cameraPage);
-    }
-
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
     {
         MainThread.BeginInvokeOnMainThread(async () => await ResolveScanAsync(scanEvent.Value));
@@ -74,8 +63,14 @@ public partial class DirectInventoryTransferPage : ContentPage
 
     private async Task ResolveScanAsync(string barcode)
     {
-        if (_resolving || _sku is not null)
+        if (_resolving || _destinationLocation is not null)
         {
+            return;
+        }
+
+        if (_sku is not null && _quantity is null)
+        {
+            ErrorLabel.Text = "Сначала укажите количество.";
             return;
         }
 
@@ -98,14 +93,45 @@ public partial class DirectInventoryTransferPage : ContentPage
                 StepLabel.Text = "2. Товар";
                 InstructionLabel.Text = "Отсканируйте штрихкод товара.";
             }
+            else if (_sku is null)
+            {
+                _sku = await _apiClient.ResolveDirectTransferSkuAsync(
+                    _transfer.Id,
+                    _sourceLocation.Id,
+                    barcode);
+                var unit = string.IsNullOrWhiteSpace(_sku.UnitOfMeasure)
+                    ? string.Empty
+                    : $" {_sku.UnitOfMeasure}";
+                SkuLabel.Text =
+                    $"{_sku.Name}\nКод: {_sku.Code}\nДоступно: {_sku.AvailableQuantity:0.###}{unit}";
+                SkuCard.IsVisible = true;
+                QuantityPanel.IsVisible = true;
+                StepLabel.Text = "3. Количество";
+                InstructionLabel.Text = "Введите количество перемещения.";
+                QuantityEntry.Focus();
+            }
             else
             {
-                _sku = await _apiClient.ResolveSkuAsync(barcode);
-                SkuLabel.Text = $"{_sku.Name}\nКод: {_sku.Code}";
-                SkuCard.IsVisible = true;
-                StepLabel.Text = "Товар выбран";
-                InstructionLabel.Text = "Следующий шаг — ввод количества.";
-                CameraButton.IsVisible = false;
+                var destinationLocation = await _apiClient.ResolveStorageLocationAsync(
+                    barcode,
+                    _transfer.WarehouseId,
+                    MobileStorageLocationContext.Storage);
+                if (destinationLocation.Id == _sourceLocation.Id)
+                {
+                    ErrorLabel.Text =
+                        "Ячейка назначения должна отличаться от исходной ячейки.";
+                    return;
+                }
+
+                _destinationLocation = destinationLocation;
+                DestinationLocationLabel.Text =
+                    $"{destinationLocation.Address} · {destinationLocation.Name}";
+                DestinationCard.IsVisible = true;
+                StepLabel.Text = "Проверьте перемещение";
+                InstructionLabel.Text =
+                    "До подтверждения складские остатки не изменены.";
+                ConfirmButton.IsVisible = true;
+                ConfirmButton.Unfocus();
             }
         }
         catch (MobileApiException exception)
@@ -127,7 +153,138 @@ public partial class DirectInventoryTransferPage : ContentPage
     {
         ProgressIndicator.IsVisible = isBusy;
         ProgressIndicator.IsRunning = isBusy;
-        CameraButton.IsEnabled = !isBusy;
+        AcceptQuantityButton.IsEnabled = !isBusy && _quantity is null;
+        ConfirmButton.IsEnabled = !isBusy
+            && _destinationLocation is not null
+            && _confirmedMovement is null;
+    }
+
+    private void OnAcceptQuantityClicked(object? sender, EventArgs e)
+    {
+        if (_sku is null)
+        {
+            return;
+        }
+
+        var value = QuantityEntry.Text?.Trim().Replace(',', '.');
+        QuantityErrorLabel.Text = string.Empty;
+        if (!double.TryParse(
+                value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var quantity)
+            || !double.IsFinite(quantity)
+            || quantity <= 0)
+        {
+            QuantityErrorLabel.Text = "Введите количество больше нуля.";
+            return;
+        }
+
+        if (quantity > _sku.AvailableQuantity)
+        {
+            QuantityErrorLabel.Text =
+                $"Недостаточно товара. Доступно: {_sku.AvailableQuantity:0.###}.";
+            return;
+        }
+
+        _quantity = quantity;
+        ErrorLabel.Text = string.Empty;
+        QuantityErrorLabel.Text = string.Empty;
+        QuantityEntry.Unfocus();
+        QuantityPanel.IsVisible = false;
+        SelectedQuantityLabel.Text = $"Количество: {quantity:0.###}";
+        SelectedQuantityLabel.IsVisible = true;
+        StepLabel.Text = "4. Ячейка назначения";
+        InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
+    }
+
+    private async void OnConfirmClicked(object? sender, EventArgs e)
+    {
+        if (_sourceLocation is null
+            || _sku is null
+            || _quantity is not double quantity
+            || _destinationLocation is null)
+        {
+            return;
+        }
+
+        _pendingMoveRequestId ??= Guid.NewGuid();
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+
+        try
+        {
+            _confirmedMovement = await _apiClient.MoveDirectAsync(
+                _transfer.Id,
+                _sourceLocation.Id,
+                _destinationLocation.Id,
+                _sku.Id,
+                quantity,
+                _pendingMoveRequestId.Value);
+            _pendingMoveRequestId = null;
+            ConfirmButton.IsVisible = false;
+            SuccessLabel.Text =
+                $"Строка: {_confirmedMovement.LineNumber}\n" +
+                $"Количество: {_confirmedMovement.Quantity:0.###}\n" +
+                $"Проведено: {_confirmedMovement.PostedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}";
+            SuccessCard.IsVisible = true;
+            StepLabel.Text = "Готово";
+            InstructionLabel.Text = "Сервер подтвердил движение и изменение остатков.";
+            TransferContextLabel.Text =
+                $"Склад: {_transfer.WarehouseName}\nСтатус: {GetStatusText(_confirmedMovement.TransferStatus)}";
+        }
+        catch (MobileApiException exception)
+        {
+            _pendingMoveRequestId = null;
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text =
+                "Ответ сервера не получен. Повторите подтверждение.";
+            ConfirmButton.Text = "Повторить подтверждение";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void OnNextMovementClicked(object? sender, EventArgs e)
+    {
+        _sourceLocation = null;
+        _sku = null;
+        _quantity = null;
+        _destinationLocation = null;
+        _confirmedMovement = null;
+        _pendingMoveRequestId = null;
+
+        SourceCard.IsVisible = false;
+        SkuCard.IsVisible = false;
+        DestinationCard.IsVisible = false;
+        SuccessCard.IsVisible = false;
+        QuantityPanel.IsVisible = false;
+        SelectedQuantityLabel.IsVisible = false;
+        ConfirmButton.IsVisible = false;
+        ConfirmButton.Text = "Подтвердить перемещение";
+        QuantityEntry.Text = string.Empty;
+        QuantityEntry.IsEnabled = true;
+        AcceptQuantityButton.Text = "Продолжить";
+        ErrorLabel.Text = string.Empty;
+        QuantityErrorLabel.Text = string.Empty;
+        StepLabel.Text = "1. Исходная ячейка";
+        InstructionLabel.Text = "Отсканируйте QR исходной ячейки.";
+    }
+
+    private void OnConfirmButtonLoaded(object? sender, EventArgs e)
+    {
+#if ANDROID
+        if (ConfirmButton.Handler?.PlatformView is Android.Widget.Button button)
+        {
+            button.Focusable = false;
+            button.FocusableInTouchMode = false;
+        }
+#endif
     }
 
     private static string GetStatusText(MobileInventoryTransferStatus status) => status switch

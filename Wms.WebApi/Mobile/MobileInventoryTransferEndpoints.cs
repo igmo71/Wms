@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Wms.Application.Inventory.Transfers;
+using Wms.Application.StockKeepingUnits;
 using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
@@ -25,6 +26,22 @@ internal static class MobileInventoryTransferEndpoints
         group.MapPost("/inventory-transfers", CreateTransferAsync)
             .Produces<MobileInventoryTransferSummaryResponse>()
             .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
+            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost(
+                "/inventory-transfers/{transferId:guid}/direct/sku/resolve",
+                ResolveDirectSkuAsync)
+            .Produces<MobileDirectTransferSkuResponse>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
+            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost(
+                "/inventory-transfers/{transferId:guid}/direct-movements",
+                MoveDirectAsync)
+            .Produces<MobileMoveDirectInventoryTransferResponse>()
             .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
             .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
             .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
@@ -98,6 +115,100 @@ internal static class MobileInventoryTransferEndpoints
 
         return TypedResults.Ok(MapTransfer(transfer));
     }
+
+    private static async Task<IResult> ResolveDirectSkuAsync(
+        Guid transferId,
+        MobileResolveDirectTransferSkuRequest request,
+        StockKeepingUnitService skuService,
+        InventoryTransferQueryService transferQueryService,
+        CancellationToken ct)
+    {
+        var skuResult = await skuService.ResolveByBarcodeAsync(request.Barcode, ct);
+        if (!skuResult.IsSuccess)
+        {
+            return CommandProblem(skuResult.Error!);
+        }
+
+        var sku = skuResult.Value!;
+        var quantityResult = await transferQueryService.GetAvailableDirectQuantityAsync(
+            transferId,
+            request.SourceStorageLocationId,
+            sku.Id,
+            ct);
+        if (!quantityResult.IsSuccess)
+        {
+            return CommandProblem(quantityResult.Error!);
+        }
+
+        return TypedResults.Ok(new MobileDirectTransferSkuResponse(
+            sku.Id,
+            sku.Code ?? string.Empty,
+            sku.Name ?? string.Empty,
+            sku.BaseUnitOfMeasure?.Name,
+            quantityResult.Value));
+    }
+
+    private static async Task<IResult> MoveDirectAsync(
+        Guid transferId,
+        MobileMoveDirectInventoryTransferRequest request,
+        ClaimsPrincipal principal,
+        MobileInventoryTransferCommandService commandService,
+        InventoryTransferQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.MoveDirectAsync(
+            transferId,
+            request.SourceStorageLocationId,
+            request.DestinationStorageLocationId,
+            request.StockKeepingUnitId,
+            request.Quantity,
+            request.ClientRequestId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return CommandProblem(result.Error!);
+        }
+
+        var movement = await queryService.GetMovementAsync(transferId, result.Value, ct);
+        var transfer = await queryService.GetAsync(transferId, ct);
+        if (movement?.SourceStorageLocation?.Zone is null
+            || movement.DestinationStorageLocation?.Zone is null
+            || movement.StockKeepingUnit is null
+            || movement.RecorderLineNumber is null
+            || movement.PostedAtUtc is null
+            || transfer is null)
+        {
+            throw new InvalidOperationException(
+                "Результат мобильного прямого перемещения не найден.");
+        }
+
+        return TypedResults.Ok(new MobileMoveDirectInventoryTransferResponse(
+            movement.Id,
+            transferId,
+            movement.RecorderLineNumber.Value,
+            movement.StockKeepingUnitId,
+            movement.StockKeepingUnit.Code ?? string.Empty,
+            movement.StockKeepingUnit.Name ?? string.Empty,
+            movement.StockKeepingUnit.BaseUnitOfMeasure?.Name,
+            movement.Quantity,
+            MapLocation(movement.SourceStorageLocation),
+            MapLocation(movement.DestinationStorageLocation),
+            movement.PostedAtUtc.Value,
+            MapStatus(transfer.Status)));
+    }
+
+    private static MobileInventoryMovementLocationResponse MapLocation(
+        Wms.Domain.StorageLocation location) => new(
+            location.Id,
+            $"{location.Zone!.Code}-{location.Code}",
+            location.Name);
 
     private static MobileInventoryTransferSummaryResponse MapTransfer(
         Wms.Domain.InventoryTransfer transfer) => new(

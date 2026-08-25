@@ -37,6 +37,79 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .FirstOrDefaultAsync(x => x.Id == id, ct);
     }
 
+    public async Task<OperationResult<double>> GetAvailableDirectQuantityAsync(
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        Guid stockKeepingUnitId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var transfer = await dbContext.InventoryTransfers
+            .AsNoTracking()
+            .Where(x => x.Id == transferId)
+            .Select(x => new { x.WarehouseId, x.Status })
+            .FirstOrDefaultAsync(ct);
+        if (transfer is null)
+        {
+            return OperationError.NotFound($"Перемещение '{transferId}' не найдено.");
+        }
+
+        if (transfer.Status == InventoryTransferStatus.Completed)
+        {
+            return OperationError.Invalid("Завершенное перемещение нельзя изменять.");
+        }
+
+        var sourceLocation = await dbContext.StorageLocations
+            .AsNoTracking()
+            .Include(x => x.Zone)
+            .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
+        if (sourceLocation is null)
+        {
+            return OperationError.NotFound(
+                $"Исходная складская позиция '{sourceStorageLocationId}' не найдена.");
+        }
+
+        if (sourceLocation.IsFolder
+            || sourceLocation.DeletionMark
+            || sourceLocation.Zone?.DeletionMark == true
+            || sourceLocation.WarehouseId != transfer.WarehouseId
+            || sourceLocation.Zone?.Type != ZoneType.Storage)
+        {
+            return OperationError.Invalid(
+                "Исходная ячейка должна быть активной обычной ячейкой склада перемещения.");
+        }
+
+        return await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Where(x => x.WarehouseId == transfer.WarehouseId
+                && x.StorageLocationId == sourceStorageLocationId
+                && x.StockKeepingUnitId == stockKeepingUnitId)
+            .Select(x => (double?)x.Quantity)
+            .SingleOrDefaultAsync(ct) ?? 0;
+    }
+
+    public async Task<InventoryMovement?> GetMovementAsync(
+        Guid transferId,
+        Guid movementId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        return await dbContext.InventoryMovements
+            .AsNoTracking()
+            .Include(x => x.SourceStorageLocation)
+                .ThenInclude(x => x!.Zone)
+            .Include(x => x.DestinationStorageLocation)
+                .ThenInclude(x => x!.Zone)
+            .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
+            .SingleOrDefaultAsync(x => x.Id == movementId
+                && x.RecorderType == RecorderType.InventoryTransfer
+                && x.RecorderId == transferId,
+                ct);
+    }
+
     public async Task<ListResult<InventoryTransfer>> ListAsync(
         InventoryTransferListQuery listQuery,
         CancellationToken ct = default)
