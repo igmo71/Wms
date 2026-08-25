@@ -59,11 +59,13 @@ public sealed class MobileApiClient
 
     public async Task<MobileStorageLocationResponse> ResolveStorageLocationAsync(
         string barcode,
+        Guid? expectedWarehouseId = null,
+        MobileStorageLocationContext context = MobileStorageLocationContext.AnyOperational,
         CancellationToken ct = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
             MobileApiRoutes.ResolveStorageLocation,
-            new MobileResolveStorageLocationRequest(barcode),
+            new MobileResolveStorageLocationRequest(barcode, expectedWarehouseId, context),
             ct);
 
         if (!response.IsSuccessStatusCode)

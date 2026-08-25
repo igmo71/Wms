@@ -38,13 +38,12 @@ scope must be split or the user must choose their order.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
-| 2026-08-25 | **Active** | Atomic idempotency for mobile inventory-transfer commands | [`2026-08-25-mobile-command-idempotency/spec.md`](2026-08-25-mobile-command-idempotency/spec.md) |
-| 2026-08-19 | Queued | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
+| 2026-08-19 | **Active** | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
+| 2026-08-25 | Frozen reference | Atomic idempotency for mobile inventory-transfer commands | [`2026-08-25-mobile-command-idempotency/spec.md`](2026-08-25-mobile-command-idempotency/spec.md) |
 | 2026-08-21 | Frozen reference | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
 
-Mobile command idempotency is the focused active increment required before the
-first changing endpoint. The parent mobile workstream resumes immediately after
-this decision is implemented and frozen.
+The parent mobile workstream has resumed after atomic command receipts were
+implemented for creation of the first inventory-transfer draft.
 
 ## Legacy reference ledger
 

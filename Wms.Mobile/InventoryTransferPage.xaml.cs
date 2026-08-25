@@ -1,4 +1,5 @@
 using Wms.Contracts.Mobile.V1;
+using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
@@ -6,14 +7,21 @@ namespace Wms.Mobile;
 public partial class InventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
+    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly ICameraBarcodeScanner _cameraScanner;
     private bool _loaded;
     private Guid? _pendingCreateRequestId;
     private Guid? _pendingCreateWarehouseId;
 
-    public InventoryTransferPage(MobileApiClient apiClient)
+    public InventoryTransferPage(
+        MobileApiClient apiClient,
+        ILifecycleBarcodeScanner intentScanner,
+        ICameraBarcodeScanner cameraScanner)
     {
         InitializeComponent();
         _apiClient = apiClient;
+        _intentScanner = intentScanner;
+        _cameraScanner = cameraScanner;
     }
 
     protected override async void OnAppearing()
@@ -83,11 +91,12 @@ public partial class InventoryTransferPage : ContentPage
 
         try
         {
-            await _apiClient.CreateInventoryTransferAsync(
+            var transfer = await _apiClient.CreateInventoryTransferAsync(
                 warehouseId,
                 _pendingCreateRequestId.Value);
             ClearPendingCreate();
             await LoadTransfersAsync();
+            await OpenTransferAsync(transfer);
         }
         catch (MobileApiException exception)
         {
@@ -121,6 +130,7 @@ public partial class InventoryTransferPage : ContentPage
         {
             var transfers = await _apiClient.GetInventoryTransfersAsync(warehouse.Id);
             TransfersView.ItemsSource = transfers.Select(x => new TransferListItem(
+                x,
                 x.Number,
                 x.Date.ToString("dd.MM.yyyy"),
                 GetStatusText(x.Status))).ToList();
@@ -157,6 +167,24 @@ public partial class InventoryTransferPage : ContentPage
         NewTransferButton.Text = "Новое перемещение";
     }
 
+    private async void OnTransferSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is not TransferListItem selected)
+        {
+            return;
+        }
+
+        TransfersView.SelectedItem = null;
+        await OpenTransferAsync(selected.Transfer);
+    }
+
+    private Task OpenTransferAsync(MobileInventoryTransferSummaryResponse transfer) =>
+        Navigation.PushAsync(new DirectInventoryTransferPage(
+            _apiClient,
+            _intentScanner,
+            _cameraScanner,
+            transfer));
+
     private static string GetStatusText(MobileInventoryTransferStatus status) => status switch
     {
         MobileInventoryTransferStatus.Draft => "Черновик",
@@ -165,5 +193,9 @@ public partial class InventoryTransferPage : ContentPage
         _ => status.ToString()
     };
 
-    private sealed record TransferListItem(string Number, string Date, string Status);
+    private sealed record TransferListItem(
+        MobileInventoryTransferSummaryResponse Transfer,
+        string Number,
+        string Date,
+        string Status);
 }

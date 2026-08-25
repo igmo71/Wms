@@ -1,6 +1,6 @@
 # Atomic idempotency for mobile inventory-transfer commands
 
-Status: **Active**
+Status: **Frozen reference**
 Created: **2026-08-25**
 
 ## Business outcome
