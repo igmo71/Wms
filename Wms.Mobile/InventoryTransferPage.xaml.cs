@@ -72,7 +72,7 @@ public partial class InventoryTransferPage : ContentPage
         await LoadTransfersAsync();
     }
 
-    private async void OnCreateClicked(object? sender, EventArgs e)
+    private async void OnCreateDirectClicked(object? sender, EventArgs e)
     {
         if (WarehousePicker.SelectedItem is not MobileWarehouseResponse selectedWarehouse)
         {
@@ -105,12 +105,26 @@ public partial class InventoryTransferPage : ContentPage
         {
             ErrorLabel.Text =
                 "Ответ сервера не получен. Нажмите «Повторить создание».";
-            NewTransferButton.Text = "Повторить создание";
+            NewDirectTransferButton.Text = "Повторить";
         }
         finally
         {
             SetBusy(false);
         }
+    }
+
+    private async void OnOpenTransitClicked(object? sender, EventArgs e)
+    {
+        if (WarehousePicker.SelectedItem is not MobileWarehouseResponse warehouse)
+        {
+            ErrorLabel.Text = "Выберите склад.";
+            return;
+        }
+
+        await Navigation.PushAsync(new TransitInventoryTransferStartPage(
+            _apiClient,
+            _intentScanner,
+            warehouse));
     }
 
     private async Task LoadTransfersAsync()
@@ -131,7 +145,11 @@ public partial class InventoryTransferPage : ContentPage
                 x,
                 x.Number,
                 x.Date.ToString("dd.MM.yyyy"),
-                GetStatusText(x.Status))).ToList();
+                GetStatusText(x.Status),
+                x.TransitStorageLocation is null
+                    ? "Напрямую"
+                    : $"Транзит: {x.TransitStorageLocation.Address}"))
+                .ToList();
         }
         catch (MobileApiException exception)
         {
@@ -155,14 +173,14 @@ public partial class InventoryTransferPage : ContentPage
         ProgressIndicator.IsRunning = isBusy;
         WarehousePicker.IsEnabled = !isBusy && _pendingCreateRequestId is null;
         RefreshButton.IsEnabled = !isBusy;
-        NewTransferButton.IsEnabled = !isBusy;
+        NewDirectTransferButton.IsEnabled = !isBusy;
     }
 
     private void ClearPendingCreate()
     {
         _pendingCreateRequestId = null;
         _pendingCreateWarehouseId = null;
-        NewTransferButton.Text = "Новое перемещение";
+        NewDirectTransferButton.Text = "+ Напрямую";
     }
 
     private async void OnTransferSelected(object? sender, SelectionChangedEventArgs e)
@@ -194,5 +212,6 @@ public partial class InventoryTransferPage : ContentPage
         MobileInventoryTransferSummaryResponse Transfer,
         string Number,
         string Date,
-        string Status);
+        string Status,
+        string Context);
 }

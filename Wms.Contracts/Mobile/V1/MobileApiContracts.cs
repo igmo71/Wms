@@ -78,7 +78,8 @@ public sealed record MobileInventoryTransferSummaryResponse(
     string WarehouseName,
     MobileInventoryTransferStatus Status,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? UpdatedAtUtc);
+    DateTimeOffset? UpdatedAtUtc,
+    MobileStorageLocationResponse? TransitStorageLocation);
 
 public sealed record MobileInventoryTransferMovementResponse(
     Guid MovementId,
@@ -92,11 +93,20 @@ public sealed record MobileInventoryTransferMovementResponse(
 
 public sealed record MobileInventoryTransferDetailsResponse(
     MobileInventoryTransferSummaryResponse Transfer,
-    IReadOnlyList<MobileInventoryTransferMovementResponse> Movements);
+    IReadOnlyList<MobileInventoryTransferMovementResponse> Movements,
+    IReadOnlyList<MobileInventoryTransferSkuBalanceResponse> TransitBalances);
+
+public sealed record MobileInventoryTransferSkuBalanceResponse(
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    double Quantity);
 
 public sealed record MobileCreateInventoryTransferRequest(
     Guid ClientRequestId,
-    Guid WarehouseId);
+    Guid WarehouseId,
+    Guid? TransitStorageLocationId = null);
 
 public sealed record MobileResolveDirectTransferSkuRequest(
     string Barcode,
@@ -116,6 +126,25 @@ public sealed record MobileDirectTransferSkuSearchResponse(
     string? UnitOfMeasure,
     double AvailableQuantity,
     bool IsExactMatch);
+
+public sealed record MobileResolveTransitTransferSkuRequest(string Barcode);
+
+public sealed record MobilePickToTransitRequest(
+    Guid ClientRequestId,
+    Guid SourceStorageLocationId,
+    Guid StockKeepingUnitId,
+    double Quantity);
+
+public sealed record MobilePutFromTransitRequest(
+    Guid ClientRequestId,
+    Guid DestinationStorageLocationId,
+    Guid StockKeepingUnitId,
+    double Quantity);
+
+public sealed record MobileTransitInventoryTransferMovementResponse(
+    Guid MovementId,
+    Guid TransferId,
+    MobileInventoryTransferStatus TransferStatus);
 
 public sealed record MobileMoveDirectInventoryTransferRequest(
     Guid ClientRequestId,

@@ -9,6 +9,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
     private MobileInventoryTransferSummaryResponse _transfer;
+    private IReadOnlyList<MobileInventoryTransferSkuBalanceResponse> _transitBalances = [];
     private Guid? _highlightMovementId;
     private Guid? _pendingCompleteRequestId;
     private bool _busy;
@@ -43,12 +44,12 @@ public partial class InventoryTransferDetailsPage : ContentPage
         {
             var details = await _apiClient.GetInventoryTransferAsync(_transfer.Id);
             _transfer = details.Transfer;
+            _transitBalances = details.TransitBalances;
             _detailsLoaded = true;
             ShowTransferHeader();
+            ShowTransitBalances();
 
-            var items = details.Movements
-                .Select(MapMovement)
-                .ToList();
+            var items = details.Movements.Select(MapMovement).ToList();
             BindableLayout.SetItemsSource(MovementsLayout, items);
             EmptyHistoryLabel.IsVisible = items.Count == 0;
             MovementsTitleLabel.Text = $"История движений · {items.Count}";
@@ -56,14 +57,12 @@ public partial class InventoryTransferDetailsPage : ContentPage
         catch (MobileApiException exception)
         {
             ErrorLabel.Text = exception.Message;
-            BindableLayout.SetItemsSource(MovementsLayout, null);
-            EmptyHistoryLabel.IsVisible = false;
+            ClearDetails();
         }
         catch (HttpRequestException)
         {
             ErrorLabel.Text = "Сервер WMS недоступен.";
-            BindableLayout.SetItemsSource(MovementsLayout, null);
-            EmptyHistoryLabel.IsVisible = false;
+            ClearDetails();
         }
         finally
         {
@@ -71,7 +70,34 @@ public partial class InventoryTransferDetailsPage : ContentPage
         }
     }
 
+    private void ClearDetails()
+    {
+        _transitBalances = [];
+        TransitBalancesLayout.Children.Clear();
+        BindableLayout.SetItemsSource(MovementsLayout, null);
+        EmptyTransitContentsLabel.IsVisible = false;
+        EmptyHistoryLabel.IsVisible = false;
+    }
+
     private async void OnAddMovementClicked(object? sender, EventArgs e)
+    {
+        if (_transfer.TransitStorageLocation is null)
+        {
+            await OpenDirectMovementAsync();
+        }
+        else
+        {
+            await OpenTransitMovementAsync(TransitInventoryTransferMovementMode.Pick);
+        }
+    }
+
+    private async void OnPutFromTransitClicked(object? sender, EventArgs e) =>
+        await OpenTransitMovementAsync(TransitInventoryTransferMovementMode.Put);
+
+    private async void OnDirectMovementClicked(object? sender, EventArgs e) =>
+        await OpenDirectMovementAsync();
+
+    private async Task OpenDirectMovementAsync()
     {
         if (_busy || _transfer.Status == MobileInventoryTransferStatus.Completed)
         {
@@ -86,10 +112,41 @@ public partial class InventoryTransferDetailsPage : ContentPage
             OnMovementCompleted));
     }
 
-    private void OnMovementCompleted(MobileMoveDirectInventoryTransferResponse movement)
+    private async Task OpenTransitMovementAsync(
+        TransitInventoryTransferMovementMode mode,
+        MobileInventoryTransferSkuBalanceResponse? selectedSku = null)
     {
-        _highlightMovementId = movement.MovementId;
-        _transfer = _transfer with { Status = movement.TransferStatus };
+        if (_busy
+            || _transfer.Status == MobileInventoryTransferStatus.Completed
+            || _transfer.TransitStorageLocation is null)
+        {
+            return;
+        }
+
+        _highlightMovementId = null;
+        await Navigation.PushAsync(new TransitInventoryTransferMovementPage(
+            _apiClient,
+            _intentScanner,
+            _transfer,
+            mode,
+            _transitBalances,
+            selectedSku,
+            OnTransitMovementCompleted));
+    }
+
+    private void OnMovementCompleted(MobileMoveDirectInventoryTransferResponse movement) =>
+        RememberMovement(movement.MovementId, movement.TransferStatus);
+
+    private void OnTransitMovementCompleted(
+        MobileTransitInventoryTransferMovementResponse movement) =>
+        RememberMovement(movement.MovementId, movement.TransferStatus);
+
+    private void RememberMovement(
+        Guid movementId,
+        MobileInventoryTransferStatus transferStatus)
+    {
+        _highlightMovementId = movementId;
+        _transfer = _transfer with { Status = transferStatus };
     }
 
     private async void OnCompleteTransferClicked(object? sender, EventArgs e)
@@ -137,8 +194,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
         }
         catch (HttpRequestException)
         {
-            ErrorLabel.Text =
-                "Ответ сервера не получен. Нажмите «Повторить».";
+            ErrorLabel.Text = "Ответ сервера не получен. Нажмите «Повторить».";
             CompleteTransferButton.Text = "Повторить";
         }
         finally
@@ -147,10 +203,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
         }
     }
 
-    private async void OnRefreshClicked(object? sender, EventArgs e)
-    {
-        await LoadAsync();
-    }
+    private async void OnRefreshClicked(object? sender, EventArgs e) => await LoadAsync();
 
     private void SetBusy(bool isBusy)
     {
@@ -162,9 +215,12 @@ public partial class InventoryTransferDetailsPage : ContentPage
 
     private void SetAvailableActions()
     {
-        AddMovementButton.IsEnabled = !_busy
+        var canMove = !_busy
             && _detailsLoaded
             && _transfer.Status != MobileInventoryTransferStatus.Completed;
+        AddMovementButton.IsEnabled = canMove;
+        PutFromTransitButton.IsEnabled = canMove && _transitBalances.Count > 0;
+        DirectMovementButton.IsEnabled = canMove;
         CompleteTransferButton.IsEnabled = !_busy
             && _detailsLoaded
             && _transfer.Status == MobileInventoryTransferStatus.InProgress;
@@ -174,7 +230,64 @@ public partial class InventoryTransferDetailsPage : ContentPage
     {
         TransferNumberLabel.Text = $"Перемещение {_transfer.Number}";
         TransferContextLabel.Text = $"Статус: {GetStatusText(_transfer.Status)}";
+
+        var hasTransit = _transfer.TransitStorageLocation is not null;
+        TransitLocationCard.IsVisible = hasTransit;
+        TransitContentsSection.IsVisible = hasTransit;
+        PutFromTransitButton.IsVisible = hasTransit;
+        DirectMovementButton.IsVisible = hasTransit;
+        AddMovementButton.Text = hasTransit ? "В транзит" : "+ Переместить";
+        Grid.SetRow(CompleteTransferButton, hasTransit ? 1 : 0);
+
+        if (_transfer.TransitStorageLocation is { } transitLocation)
+        {
+            TransitLocationLabel.Text = $"{transitLocation.Address} · {transitLocation.Name}";
+        }
+
         SetAvailableActions();
+    }
+
+    private void ShowTransitBalances()
+    {
+        TransitBalancesLayout.Children.Clear();
+        TransitContentsTitleLabel.Text =
+            $"Содержимое транзитной ячейки · {_transitBalances.Count}";
+        EmptyTransitContentsLabel.IsVisible = _transitBalances.Count == 0;
+
+        foreach (var balance in _transitBalances)
+        {
+            var unit = string.IsNullOrWhiteSpace(balance.UnitOfMeasure)
+                ? string.Empty
+                : $" {balance.UnitOfMeasure}";
+            var layout = new Grid { ColumnSpacing = 8 };
+            layout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            layout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+            var nameLabel = new Label
+            {
+                Text = balance.SkuName,
+                FontAttributes = FontAttributes.Bold,
+                FontSize = 17,
+                LineBreakMode = LineBreakMode.TailTruncation
+            };
+            var quantityLabel = new Label
+            {
+                Text = $"{balance.Quantity:0.###}{unit}",
+                FontAttributes = FontAttributes.Bold,
+                FontSize = 17
+            };
+            Grid.SetColumn(quantityLabel, 1);
+            layout.Children.Add(nameLabel);
+            layout.Children.Add(quantityLabel);
+
+            var card = new Border { Padding = 12, Content = layout };
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += async (_, _) => await OpenTransitMovementAsync(
+                TransitInventoryTransferMovementMode.Put,
+                balance);
+            card.GestureRecognizers.Add(tap);
+            TransitBalancesLayout.Children.Add(card);
+        }
     }
 
     private MovementListItem MapMovement(MobileInventoryTransferMovementResponse movement)

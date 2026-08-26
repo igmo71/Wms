@@ -139,12 +139,42 @@ public sealed class MobileApiClient
     public async Task<MobileInventoryTransferSummaryResponse> CreateInventoryTransferAsync(
         Guid warehouseId,
         Guid clientRequestId,
+        Guid? transitStorageLocationId = null,
         CancellationToken ct = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
             MobileApiRoutes.InventoryTransfers,
-            new MobileCreateInventoryTransferRequest(clientRequestId, warehouseId),
+            new MobileCreateInventoryTransferRequest(
+                clientRequestId,
+                warehouseId,
+                transitStorageLocationId),
             ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileInventoryTransferSummaryResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_inventory_transfer_response",
+                "Сервер вернул некорректное перемещение.");
+    }
+
+    public async Task<MobileInventoryTransferSummaryResponse?>
+        GetInventoryTransferByTransitStorageLocationAsync(
+            Guid transitStorageLocationId,
+            CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/by-transit-location/"
+            + transitStorageLocationId.ToString("D");
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+        {
+            return null;
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             await ThrowApiExceptionAsync(response, ct);
@@ -224,6 +254,50 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректные результаты поиска товара.");
     }
 
+    public async Task<MobileDirectTransferSkuResponse> ResolveTransitTransferSkuAsync(
+        Guid transferId,
+        string barcode,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/transit/sku/resolve";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileResolveTransitTransferSkuRequest(barcode),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content.ReadFromJsonAsync<MobileDirectTransferSkuResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_transit_transfer_sku_response",
+                "Сервер вернул некорректные сведения о товаре в транзитной ячейке.");
+    }
+
+    public async Task<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>
+        SearchTransitTransferSkusAsync(
+            Guid transferId,
+            string query,
+            CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/transit/skus"
+            + $"?query={Uri.EscapeDataString(query)}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<List<MobileDirectTransferSkuSearchResponse>>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_transit_transfer_sku_search_response",
+                "Сервер вернул некорректные результаты поиска товара.");
+    }
+
     public async Task<MobileMoveDirectInventoryTransferResponse> MoveDirectAsync(
         Guid transferId,
         Guid sourceStorageLocationId,
@@ -254,6 +328,66 @@ public sealed class MobileApiClient
                 response.StatusCode,
                 "invalid_direct_movement_response",
                 "Сервер вернул некорректный результат перемещения.");
+    }
+
+    public async Task<MobileTransitInventoryTransferMovementResponse> PickToTransitAsync(
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/pick-to-transit";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobilePickToTransitRequest(
+                clientRequestId,
+                sourceStorageLocationId,
+                stockKeepingUnitId,
+                quantity),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileTransitInventoryTransferMovementResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_pick_to_transit_response",
+                "Сервер вернул некорректный результат перемещения в транзитную ячейку.");
+    }
+
+    public async Task<MobileTransitInventoryTransferMovementResponse> PutFromTransitAsync(
+        Guid transferId,
+        Guid destinationStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/put-from-transit";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobilePutFromTransitRequest(
+                clientRequestId,
+                destinationStorageLocationId,
+                stockKeepingUnitId,
+                quantity),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileTransitInventoryTransferMovementResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_put_from_transit_response",
+                "Сервер вернул некорректный результат перемещения из транзитной ячейки.");
     }
 
     public async Task<MobileCompleteInventoryTransferResponse> CompleteInventoryTransferAsync(

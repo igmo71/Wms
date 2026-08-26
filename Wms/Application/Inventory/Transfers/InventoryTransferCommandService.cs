@@ -161,6 +161,44 @@ public class InventoryTransferCommandService(
             userId,
             ct);
 
+    internal Task<OperationResult<InventoryMovement>> StagePickMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        string userId,
+        CancellationToken ct) =>
+        StageMovementAsync(
+            dbContext,
+            transferId,
+            MovementMode.Pick,
+            sourceStorageLocationId,
+            null,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
+
+    internal Task<OperationResult<InventoryMovement>> StagePutMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid transferId,
+        Guid destinationStorageLocationId,
+        Guid stockKeepingUnitId,
+        double quantity,
+        string userId,
+        CancellationToken ct) =>
+        StageMovementAsync(
+            dbContext,
+            transferId,
+            MovementMode.Put,
+            null,
+            destinationStorageLocationId,
+            stockKeepingUnitId,
+            quantity,
+            userId,
+            ct);
+
     public async Task<OperationResult> CompleteAsync(
         Guid transferId,
         string userId,

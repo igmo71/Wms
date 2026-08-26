@@ -1,0 +1,164 @@
+<ContentPage
+    x:Class="Wms.Mobile.TransitInventoryTransferMovementPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Транзитное перемещение">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label
+                x:Name="TransferNumberLabel"
+                FontAttributes="Bold"
+                FontSize="20"
+                MaxLines="1" />
+
+            <Border Padding="14">
+                <VerticalStackLayout Spacing="4">
+                    <Label FontAttributes="Bold" Text="Транзитная ячейка" />
+                    <Label x:Name="TransitLocationLabel" FontSize="18" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label
+                        x:Name="StepLabel"
+                        FontAttributes="Bold"
+                        FontSize="22" />
+                    <Label
+                        x:Name="InstructionLabel"
+                        FontSize="18" />
+
+                    <Border
+                        x:Name="SkuSearchPrompt"
+                        BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
+                        IsVisible="False"
+                        Padding="14">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenSkuSearchTapped" />
+                        </Border.GestureRecognizers>
+                        <Label
+                            FontSize="17"
+                            HorizontalTextAlignment="Center"
+                            Text="Не удаётся отсканировать — найти товар" />
+                    </Border>
+
+                    <VerticalStackLayout
+                        x:Name="SkuSearchPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Entry
+                                x:Name="SkuSearchEntry"
+                                ClearButtonVisibility="WhileEditing"
+                                FontSize="18"
+                                Placeholder="Наименование, код или штрихкод"
+                                TextChanged="OnSkuSearchTextChanged" />
+                            <Label
+                                Grid.Column="1"
+                                FontSize="16"
+                                Text="Отмена"
+                                VerticalTextAlignment="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnCancelSkuSearchTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Grid>
+                        <ActivityIndicator
+                            x:Name="SkuSearchIndicator"
+                            IsRunning="False"
+                            IsVisible="False" />
+                        <Label
+                            x:Name="SkuSearchStatusLabel"
+                            FontSize="15"
+                            HorizontalTextAlignment="Center" />
+                        <VerticalStackLayout
+                            x:Name="SkuSearchResults"
+                            Spacing="8" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout
+                        x:Name="TransitSkuChoicesPanel"
+                        IsVisible="False"
+                        Spacing="8">
+                        <Label
+                            FontAttributes="Bold"
+                            Text="Выберите из содержимого" />
+                        <VerticalStackLayout
+                            x:Name="TransitSkuChoices"
+                            Spacing="8" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout
+                        x:Name="QuantityPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Label
+                            x:Name="AvailableQuantityLabel"
+                            FontAttributes="Bold"
+                            FontSize="20" />
+                        <Entry
+                            x:Name="QuantityEntry"
+                            FontSize="22"
+                            Keyboard="Numeric"
+                            Placeholder="Введите количество" />
+                        <Button
+                            x:Name="AcceptQuantityButton"
+                            Clicked="OnAcceptQuantityClicked"
+                            HeightRequest="56"
+                            Loaded="OnActionButtonLoaded"
+                            Text="Продолжить" />
+                        <Label
+                            x:Name="QuantityErrorLabel"
+                            HorizontalTextAlignment="Center"
+                            TextColor="Red" />
+                    </VerticalStackLayout>
+
+                    <Button
+                        x:Name="ConfirmButton"
+                        Clicked="OnConfirmClicked"
+                        HeightRequest="60"
+                        IsVisible="False"
+                        Loaded="OnActionButtonLoaded"
+                        Text="Подтвердить" />
+                    <ActivityIndicator
+                        x:Name="ProgressIndicator"
+                        IsRunning="False"
+                        IsVisible="False" />
+                    <Label
+                        x:Name="ErrorLabel"
+                        HorizontalTextAlignment="Center"
+                        TextColor="Red" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                x:Name="StorageLocationCard"
+                IsVisible="False"
+                Padding="16">
+                <VerticalStackLayout Spacing="4">
+                    <Label
+                        x:Name="StorageLocationTitleLabel"
+                        FontAttributes="Bold" />
+                    <Label
+                        x:Name="StorageLocationLabel"
+                        FontSize="18" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                x:Name="SkuCard"
+                IsVisible="False"
+                Padding="16">
+                <VerticalStackLayout Spacing="4">
+                    <Label FontAttributes="Bold" Text="Товар" />
+                    <Label x:Name="SkuLabel" FontSize="18" />
+                    <Label
+                        x:Name="SelectedQuantityLabel"
+                        FontSize="18"
+                        IsVisible="False" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

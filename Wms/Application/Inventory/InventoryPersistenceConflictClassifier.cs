@@ -9,6 +9,8 @@ internal static class InventoryPersistenceConflictClassifier
 {
     private const string BalanceBusinessKeyIndex = "UX_InventoryBalances_BusinessKey";
     private const string TransferLineIndex = "UX_InventoryMovements_TransferLine";
+    private const string ActiveTransitLocationIndex =
+        "IX_InventoryTransfers_TransitStorageLocationId";
 
     private static readonly OperationError BalanceConflict = OperationError.Conflict(
         "Остаток изменился. Обновите данные и повторите операцию.");
@@ -44,6 +46,15 @@ internal static class InventoryPersistenceConflictClassifier
             if (sqlException.Message.Contains(TransferLineIndex, StringComparison.Ordinal))
             {
                 error = TransferConflict;
+                return true;
+            }
+
+            if (sqlException.Message.Contains(
+                    ActiveTransitLocationIndex,
+                    StringComparison.Ordinal))
+            {
+                error = OperationError.Conflict(
+                    "Транзитная позиция уже назначена другому активному перемещению.");
                 return true;
             }
         }

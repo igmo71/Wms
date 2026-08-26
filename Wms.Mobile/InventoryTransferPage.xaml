@@ -22,12 +22,18 @@
             SelectedIndexChanged="OnWarehouseChanged"
             Title="Выберите склад" />
 
-        <Button
-            x:Name="NewTransferButton"
-            Grid.Row="2"
-            Clicked="OnCreateClicked"
-            HeightRequest="56"
-            Text="Новое перемещение" />
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button
+                x:Name="NewDirectTransferButton"
+                Clicked="OnCreateDirectClicked"
+                HeightRequest="56"
+                Text="+ Напрямую" />
+            <Button
+                Grid.Column="1"
+                Clicked="OnOpenTransitClicked"
+                HeightRequest="56"
+                Text="Транзит" />
+        </Grid>
 
         <Button
             x:Name="RefreshButton"
@@ -63,7 +69,7 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <Border Margin="0,0,0,10" Padding="14">
-                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                             <Label
                                 FontAttributes="Bold"
                                 FontSize="18"
@@ -73,9 +79,14 @@
                                 Text="{Binding Status}" />
                             <Label
                                 Grid.Row="1"
+                                Grid.ColumnSpan="2"
+                                Margin="0,4,0,0"
+                                Text="{Binding Context}" />
+                            <Label
+                                Grid.Row="2"
                                 Text="{Binding Date}" />
                             <Label
-                                Grid.Row="1"
+                                Grid.Row="2"
                                 Grid.Column="1"
                                 Text="Открыть ›"
                                 TextColor="Gray" />

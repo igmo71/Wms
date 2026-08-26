@@ -61,12 +61,13 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
 - `Wms.Contracts` contains the first versioned mobile identity wire contracts.
 - `Wms.Mobile` is an Android .NET MAUI client with login, secure token storage,
   refresh handling, intent and camera scanning, and diagnostic server-side
-  resolution of storage-location and SKU barcodes.
+  resolution of storage-location and SKU barcodes. Its first operational
+  workflow covers direct and transit intra-warehouse movements.
 
 Mobile development is the current resumed workstream. Authentication, shared
-contracts/API client, diagnostic scanning, and contextual barcode resolvers are
-present, but mobile business workflows and command idempotency are still to be
-implemented.
+contracts/API client, diagnostic scanning, contextual barcode resolvers, and
+the intra-warehouse transfer workflow are present. Device acceptance and the
+remaining mobile foundation checks still determine pilot readiness.
 
 ## Authentication and authorization
 
@@ -279,13 +280,20 @@ neutral scanner interface. The Android camera fallback uses Google ML Kit via
 `BarcodeScanning.Native.Maui`. Operational screens should automatically prefer
 an available embedded scanner and use the camera when no embedded scanner is
 available, without requiring the operator to switch scanning mechanisms.
-The first vertical is direct intra-warehouse movement, followed by the transit
-workflow.
+The first vertical is intra-warehouse movement, including direct actions and
+actions through one transfer-owned transit location.
 
 An active mobile transfer opens as a server-backed movement history. Starting
 a new movement opens a separate sequential scanning screen; a successful
 command returns to the refreshed history and highlights the new movement, while
 a rejected or uncertain command remains on the scanning screen.
+
+A transit transfer is created or reopened through an explicitly scanned transit
+location. Its document screen keeps pick, put, direct, and completion actions
+above the current transit balance and movement history. Pick and put use
+separate sequential screens; a transit SKU may also be selected directly from
+the displayed positive balance. The transit location remains immutable and the
+server rejects completion while it has positive inventory.
 
 On the SKU step, scanning remains the primary path. If a label cannot be read,
 the operator may explicitly open an inline search by name, code, or barcode.
