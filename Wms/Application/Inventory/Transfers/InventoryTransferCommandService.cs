@@ -167,6 +167,21 @@ public class InventoryTransferCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var completionResult = await StageCompleteAsync(dbContext, transferId, userId, ct);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult.Error!;
+        }
+
+        return await SaveChangesAsync(dbContext, ct);
+    }
+
+    internal async Task<OperationResult<InventoryTransfer>> StageCompleteAsync(
+        ApplicationDbContext dbContext,
+        Guid transferId,
+        string userId,
+        CancellationToken ct)
+    {
         var transfer = await dbContext.InventoryTransfers.FirstOrDefaultAsync(x => x.Id == transferId, ct);
         if (transfer is null)
         {
@@ -186,10 +201,10 @@ public class InventoryTransferCommandService(
         var completionResult = transfer.Complete(now, userId);
         if (!completionResult.IsSuccess)
         {
-            return completionResult;
+            return completionResult.Error!;
         }
 
-        return await SaveChangesAsync(dbContext, ct);
+        return transfer;
     }
 
     private async Task<OperationResult> PostMovementAsync(

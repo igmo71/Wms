@@ -46,6 +46,14 @@ internal static class MobileInventoryTransferEndpoints
             .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
             .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapPost(
+                "/inventory-transfers/{transferId:guid}/complete",
+                CompleteTransferAsync)
+            .Produces<MobileCompleteInventoryTransferResponse>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
+            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+
         return endpoints;
     }
 
@@ -209,6 +217,43 @@ internal static class MobileInventoryTransferEndpoints
             location.Id,
             $"{location.Zone!.Code}-{location.Code}",
             location.Name);
+
+    private static async Task<IResult> CompleteTransferAsync(
+        Guid transferId,
+        MobileCompleteInventoryTransferRequest request,
+        ClaimsPrincipal principal,
+        MobileInventoryTransferCommandService commandService,
+        InventoryTransferQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.CompleteAsync(
+            transferId,
+            request.ClientRequestId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return CommandProblem(result.Error!);
+        }
+
+        var transfer = await queryService.GetAsync(result.Value, ct);
+        if (transfer?.CompletedAtUtc is null)
+        {
+            throw new InvalidOperationException(
+                "Результат завершения мобильного перемещения не найден.");
+        }
+
+        return TypedResults.Ok(new MobileCompleteInventoryTransferResponse(
+            transfer.Id,
+            MapStatus(transfer.Status),
+            transfer.CompletedAtUtc.Value));
+    }
 
     private static MobileInventoryTransferSummaryResponse MapTransfer(
         Wms.Domain.InventoryTransfer transfer) => new(

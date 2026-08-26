@@ -15,6 +15,7 @@ public sealed class MobileInventoryTransferCommandService(
 {
     private const string CreateDraftCommand = "inventory-transfer.create-draft";
     private const string MoveDirectCommand = "inventory-transfer.move-direct";
+    private const string CompleteCommand = "inventory-transfer.complete";
     private const string ReceiptPrimaryKey = "PK_MobileCommandReceipts";
 
     public async Task<OperationResult<Guid>> CreateDraftAsync(
@@ -185,6 +186,84 @@ public sealed class MobileInventoryTransferCommandService(
         }
     }
 
+    public async Task<OperationResult<Guid>> CompleteAsync(
+        Guid transferId,
+        Guid clientRequestId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        if (clientRequestId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификатор запроса обязателен.");
+        }
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return OperationError.Invalid("Пользователь команды не определён.");
+        }
+
+        var requestHash = ComputeCompleteHash(transferId);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existingReceipt = await FindReceiptAsync(
+            dbContext,
+            userId,
+            CompleteCommand,
+            clientRequestId,
+            ct);
+        if (existingReceipt is not null)
+        {
+            return ResolveReceipt(existingReceipt, requestHash);
+        }
+
+        var completionResult = await transferCommandService.StageCompleteAsync(
+            dbContext,
+            transferId,
+            userId,
+            ct);
+        if (!completionResult.IsSuccess)
+        {
+            return completionResult.Error!;
+        }
+
+        dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
+        {
+            UserId = userId,
+            CommandType = CompleteCommand,
+            ClientRequestId = clientRequestId,
+            RequestHash = requestHash,
+            ResultResourceId = transferId,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+            return transferId;
+        }
+        catch (DbUpdateException exception)
+        {
+            await using var retryContext = await dbContextFactory.CreateDbContextAsync(ct);
+            var winningReceipt = await FindReceiptAsync(
+                retryContext,
+                userId,
+                CompleteCommand,
+                clientRequestId,
+                ct);
+            if (winningReceipt is not null)
+            {
+                return ResolveReceipt(winningReceipt, requestHash);
+            }
+
+            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
+            {
+                return error;
+            }
+
+            throw;
+        }
+    }
+
     private static Task<MobileCommandReceipt?> FindReceiptAsync(
         ApplicationDbContext dbContext,
         string userId,
@@ -227,6 +306,12 @@ public sealed class MobileInventoryTransferCommandService(
             stockKeepingUnitId.ToString("N"),
             quantity.ToString("R", CultureInfo.InvariantCulture));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)));
+    }
+
+    private static string ComputeCompleteHash(Guid transferId)
+    {
+        var payload = Encoding.UTF8.GetBytes(transferId.ToString("N"));
+        return Convert.ToHexString(SHA256.HashData(payload));
     }
 
     private static bool IsReceiptDuplicate(DbUpdateException exception)

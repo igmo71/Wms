@@ -213,6 +213,29 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректный результат перемещения.");
     }
 
+    public async Task<MobileCompleteInventoryTransferResponse> CompleteInventoryTransferAsync(
+        Guid transferId,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/complete";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileCompleteInventoryTransferRequest(clientRequestId),
+            ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileCompleteInventoryTransferResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_inventory_transfer_completion_response",
+                "Сервер вернул некорректный результат завершения перемещения.");
+    }
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

@@ -26,6 +26,7 @@ public partial class InventoryTransferPage : ContentPage
         base.OnAppearing();
         if (_loaded)
         {
+            await LoadTransfersAsync();
             return;
         }
 

@@ -73,7 +73,14 @@
                         <Button
                             Clicked="OnNextMovementClicked"
                             HeightRequest="56"
+                            Loaded="OnActionButtonLoaded"
                             Text="Следующее действие" />
+                        <Button
+                            x:Name="CompleteTransferButton"
+                            Clicked="OnCompleteTransferClicked"
+                            HeightRequest="56"
+                            Loaded="OnActionButtonLoaded"
+                            Text="Завершить документ" />
                     </VerticalStackLayout>
 
                     <ActivityIndicator

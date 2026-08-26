@@ -120,3 +120,10 @@ public sealed record MobileMoveDirectInventoryTransferResponse(
     MobileInventoryMovementLocationResponse Destination,
     DateTimeOffset PostedAtUtc,
     MobileInventoryTransferStatus TransferStatus);
+
+public sealed record MobileCompleteInventoryTransferRequest(Guid ClientRequestId);
+
+public sealed record MobileCompleteInventoryTransferResponse(
+    Guid TransferId,
+    MobileInventoryTransferStatus Status,
+    DateTimeOffset CompletedAtUtc);

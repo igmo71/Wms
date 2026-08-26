@@ -16,6 +16,7 @@ public partial class DirectInventoryTransferPage : ContentPage
     private MobileStorageLocationResponse? _destinationLocation;
     private MobileMoveDirectInventoryTransferResponse? _confirmedMovement;
     private Guid? _pendingMoveRequestId;
+    private Guid? _pendingCompleteRequestId;
     private bool _scannerSubscribed;
     private bool _resolving;
 
@@ -158,6 +159,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         ConfirmButton.IsEnabled = !isBusy
             && _destinationLocation is not null
             && _confirmedMovement is null;
+        CompleteTransferButton.IsEnabled = !isBusy;
     }
 
     private void OnAcceptQuantityClicked(object? sender, EventArgs e)
@@ -279,10 +281,78 @@ public partial class DirectInventoryTransferPage : ContentPage
         InstructionLabel.Text = "Отсканируйте QR исходной ячейки.";
     }
 
-    private void OnConfirmButtonLoaded(object? sender, EventArgs e)
+    private async void OnCompleteTransferClicked(object? sender, EventArgs e)
+    {
+        if (_confirmedMovement is null)
+        {
+            return;
+        }
+
+        if (_pendingCompleteRequestId is null)
+        {
+            var confirmed = await DisplayAlertAsync(
+                "Завершить документ?",
+                $"Перемещение {_transfer.Number} больше нельзя будет изменить.",
+                "Завершить",
+                "Отмена");
+            if (!confirmed)
+            {
+                return;
+            }
+
+            _pendingCompleteRequestId = Guid.NewGuid();
+        }
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+
+        try
+        {
+            var completion = await _apiClient.CompleteInventoryTransferAsync(
+                _transfer.Id,
+                _pendingCompleteRequestId.Value);
+            _pendingCompleteRequestId = null;
+            TransferContextLabel.Text =
+                $"Склад: {_transfer.WarehouseName}\nСтатус: {GetStatusText(completion.Status)}";
+            await DisplayAlertAsync(
+                "Документ завершён",
+                $"Перемещение {_transfer.Number} успешно завершено.",
+                "К списку");
+            await Navigation.PopAsync();
+        }
+        catch (MobileApiException exception)
+        {
+            _pendingCompleteRequestId = null;
+            CompleteTransferButton.Text = "Завершить документ";
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text =
+                "Ответ сервера не получен. Нажмите «Повторить завершение».";
+            CompleteTransferButton.Text = "Повторить завершение";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void OnConfirmButtonLoaded(object? sender, EventArgs e) =>
+        DisableAndroidButtonFocus(ConfirmButton);
+
+    private void OnActionButtonLoaded(object? sender, EventArgs e)
+    {
+        if (sender is Button button)
+        {
+            DisableAndroidButtonFocus(button);
+        }
+    }
+
+    private static void DisableAndroidButtonFocus(Button mauiButton)
     {
 #if ANDROID
-        if (ConfirmButton.Handler?.PlatformView is Android.Widget.Button button)
+        if (mauiButton.Handler?.PlatformView is Android.Widget.Button button)
         {
             button.Focusable = false;
             button.FocusableInTouchMode = false;
