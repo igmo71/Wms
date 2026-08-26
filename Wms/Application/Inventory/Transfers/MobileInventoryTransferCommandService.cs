@@ -18,89 +18,30 @@ public sealed class MobileInventoryTransferCommandService(
     private const string PutFromTransitCommand = "inventory-transfer.put-from-transit";
     private const string CompleteCommand = "inventory-transfer.complete";
 
-    public async Task<OperationResult<Guid>> CreateDraftAsync(
+    public Task<OperationResult<Guid>> CreateDraftAsync(
         Guid warehouseId,
         Guid? transitStorageLocationId,
         Guid clientRequestId,
         string userId,
-        CancellationToken ct = default)
-    {
-        if (clientRequestId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор запроса обязателен.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid("Пользователь команды не определён.");
-        }
-
-        var requestHash = ComputeCreateDraftHash(warehouseId, transitStorageLocationId);
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingReceipt = await FindReceiptAsync(
-            dbContext,
-            userId,
+        CancellationToken ct = default) =>
+        ExecuteIdempotentAsync(
             CreateDraftCommand,
             clientRequestId,
-            ct);
-        if (existingReceipt is not null)
-        {
-            return ResolveReceipt(existingReceipt, requestHash);
-        }
-
-        var transferResult = await transferCommandService.StageCreateAsync(
-            dbContext,
-            warehouseId,
-            transitStorageLocationId,
+            ComputeCreateDraftHash(warehouseId, transitStorageLocationId),
             userId,
+            async (dbContext, token) =>
+            {
+                var result = await transferCommandService.StageCreateAsync(
+                    dbContext,
+                    warehouseId,
+                    transitStorageLocationId,
+                    userId,
+                    token);
+                return result.IsSuccess ? result.Value!.Id : result.Error!;
+            },
             ct);
-        if (!transferResult.IsSuccess)
-        {
-            return transferResult.Error!;
-        }
 
-        var transfer = transferResult.Value!;
-        dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
-        {
-            UserId = userId,
-            CommandType = CreateDraftCommand,
-            ClientRequestId = clientRequestId,
-            RequestHash = requestHash,
-            ResultResourceId = transfer.Id,
-            CompletedAtUtc = DateTimeOffset.UtcNow
-        });
-
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-            return transfer.Id;
-        }
-        catch (DbUpdateException exception)
-        {
-            await using var retryContext = await dbContextFactory.CreateDbContextAsync(ct);
-            var winningReceipt = await FindReceiptAsync(
-                retryContext,
-                userId,
-                CreateDraftCommand,
-                clientRequestId,
-                ct);
-
-            if (winningReceipt is not null)
-            {
-                return ResolveReceipt(winningReceipt, requestHash);
-            }
-
-            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
-            {
-                return error;
-            }
-
-            throw;
-        }
-    }
-
-    public async Task<OperationResult<Guid>> MoveDirectAsync(
+    public Task<OperationResult<Guid>> MoveDirectAsync(
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
@@ -108,89 +49,31 @@ public sealed class MobileInventoryTransferCommandService(
         double quantity,
         Guid clientRequestId,
         string userId,
-        CancellationToken ct = default)
-    {
-        if (clientRequestId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор запроса обязателен.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid("Пользователь команды не определён.");
-        }
-
-        var requestHash = ComputeMoveDirectHash(
-            transferId,
-            sourceStorageLocationId,
-            destinationStorageLocationId,
-            stockKeepingUnitId,
-            quantity);
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingReceipt = await FindReceiptAsync(
-            dbContext,
-            userId,
+        CancellationToken ct = default) =>
+        ExecuteIdempotentAsync(
             MoveDirectCommand,
             clientRequestId,
-            ct);
-        if (existingReceipt is not null)
-        {
-            return ResolveReceipt(existingReceipt, requestHash);
-        }
-
-        var movementResult = await transferCommandService.StageDirectMovementAsync(
-            dbContext,
-            transferId,
-            sourceStorageLocationId,
-            destinationStorageLocationId,
-            stockKeepingUnitId,
-            quantity,
+            ComputeMoveDirectHash(
+                transferId,
+                sourceStorageLocationId,
+                destinationStorageLocationId,
+                stockKeepingUnitId,
+                quantity),
             userId,
+            async (dbContext, token) =>
+            {
+                var result = await transferCommandService.StageDirectMovementAsync(
+                    dbContext,
+                    transferId,
+                    sourceStorageLocationId,
+                    destinationStorageLocationId,
+                    stockKeepingUnitId,
+                    quantity,
+                    userId,
+                    token);
+                return result.IsSuccess ? result.Value!.Id : result.Error!;
+            },
             ct);
-        if (!movementResult.IsSuccess)
-        {
-            return movementResult.Error!;
-        }
-
-        var movement = movementResult.Value!;
-        dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
-        {
-            UserId = userId,
-            CommandType = MoveDirectCommand,
-            ClientRequestId = clientRequestId,
-            RequestHash = requestHash,
-            ResultResourceId = movement.Id,
-            CompletedAtUtc = DateTimeOffset.UtcNow
-        });
-
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-            return movement.Id;
-        }
-        catch (DbUpdateException exception)
-        {
-            await using var retryContext = await dbContextFactory.CreateDbContextAsync(ct);
-            var winningReceipt = await FindReceiptAsync(
-                retryContext,
-                userId,
-                MoveDirectCommand,
-                clientRequestId,
-                ct);
-            if (winningReceipt is not null)
-            {
-                return ResolveReceipt(winningReceipt, requestHash);
-            }
-
-            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
-            {
-                return error;
-            }
-
-            throw;
-        }
-    }
 
     public Task<OperationResult<Guid>> PickToTransitAsync(
         Guid transferId,
@@ -230,7 +113,28 @@ public sealed class MobileInventoryTransferCommandService(
             isPick: false,
             ct);
 
-    private async Task<OperationResult<Guid>> MoveTransitAsync(
+    public Task<OperationResult<Guid>> CompleteAsync(
+        Guid transferId,
+        Guid clientRequestId,
+        string userId,
+        CancellationToken ct = default) =>
+        ExecuteIdempotentAsync(
+            CompleteCommand,
+            clientRequestId,
+            ComputeCompleteHash(transferId),
+            userId,
+            async (dbContext, token) =>
+            {
+                var result = await transferCommandService.StageCompleteAsync(
+                    dbContext,
+                    transferId,
+                    userId,
+                    token);
+                return result.IsSuccess ? transferId : result.Error!;
+            },
+            ct);
+
+    private Task<OperationResult<Guid>> MoveTransitAsync(
         string commandType,
         Guid transferId,
         Guid enteredStorageLocationId,
@@ -239,6 +143,45 @@ public sealed class MobileInventoryTransferCommandService(
         Guid clientRequestId,
         string userId,
         bool isPick,
+        CancellationToken ct) =>
+        ExecuteIdempotentAsync(
+            commandType,
+            clientRequestId,
+            ComputeTransitMovementHash(
+                transferId,
+                enteredStorageLocationId,
+                stockKeepingUnitId,
+                quantity),
+            userId,
+            async (dbContext, token) =>
+            {
+                var result = isPick
+                    ? await transferCommandService.StagePickMovementAsync(
+                        dbContext,
+                        transferId,
+                        enteredStorageLocationId,
+                        stockKeepingUnitId,
+                        quantity,
+                        userId,
+                        token)
+                    : await transferCommandService.StagePutMovementAsync(
+                        dbContext,
+                        transferId,
+                        enteredStorageLocationId,
+                        stockKeepingUnitId,
+                        quantity,
+                        userId,
+                        token);
+                return result.IsSuccess ? result.Value!.Id : result.Error!;
+            },
+            ct);
+
+    private async Task<OperationResult<Guid>> ExecuteIdempotentAsync(
+        string commandType,
+        Guid clientRequestId,
+        string requestHash,
+        string userId,
+        Func<ApplicationDbContext, CancellationToken, Task<OperationResult<Guid>>> stageAction,
         CancellationToken ct)
     {
         if (clientRequestId == Guid.Empty)
@@ -251,13 +194,7 @@ public sealed class MobileInventoryTransferCommandService(
             return OperationError.Invalid("Пользователь команды не определён.");
         }
 
-        var requestHash = ComputeTransitMovementHash(
-            transferId,
-            enteredStorageLocationId,
-            stockKeepingUnitId,
-            quantity);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
         var existingReceipt = await FindReceiptAsync(
             dbContext,
             userId,
@@ -269,43 +206,26 @@ public sealed class MobileInventoryTransferCommandService(
             return ResolveReceipt(existingReceipt, requestHash);
         }
 
-        var movementResult = isPick
-            ? await transferCommandService.StagePickMovementAsync(
-                dbContext,
-                transferId,
-                enteredStorageLocationId,
-                stockKeepingUnitId,
-                quantity,
-                userId,
-                ct)
-            : await transferCommandService.StagePutMovementAsync(
-                dbContext,
-                transferId,
-                enteredStorageLocationId,
-                stockKeepingUnitId,
-                quantity,
-                userId,
-                ct);
-        if (!movementResult.IsSuccess)
+        var result = await stageAction(dbContext, ct);
+        if (!result.IsSuccess)
         {
-            return movementResult.Error!;
+            return result.Error!;
         }
 
-        var movement = movementResult.Value!;
         dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
         {
             UserId = userId,
             CommandType = commandType,
             ClientRequestId = clientRequestId,
             RequestHash = requestHash,
-            ResultResourceId = movement.Id,
+            ResultResourceId = result.Value,
             CompletedAtUtc = DateTimeOffset.UtcNow
         });
 
         try
         {
             await dbContext.SaveChangesAsync(ct);
-            return movement.Id;
+            return result.Value;
         }
         catch (DbUpdateException exception)
         {
@@ -314,84 +234,6 @@ public sealed class MobileInventoryTransferCommandService(
                 retryContext,
                 userId,
                 commandType,
-                clientRequestId,
-                ct);
-            if (winningReceipt is not null)
-            {
-                return ResolveReceipt(winningReceipt, requestHash);
-            }
-
-            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
-            {
-                return error;
-            }
-
-            throw;
-        }
-    }
-
-    public async Task<OperationResult<Guid>> CompleteAsync(
-        Guid transferId,
-        Guid clientRequestId,
-        string userId,
-        CancellationToken ct = default)
-    {
-        if (clientRequestId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор запроса обязателен.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid("Пользователь команды не определён.");
-        }
-
-        var requestHash = ComputeCompleteHash(transferId);
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingReceipt = await FindReceiptAsync(
-            dbContext,
-            userId,
-            CompleteCommand,
-            clientRequestId,
-            ct);
-        if (existingReceipt is not null)
-        {
-            return ResolveReceipt(existingReceipt, requestHash);
-        }
-
-        var completionResult = await transferCommandService.StageCompleteAsync(
-            dbContext,
-            transferId,
-            userId,
-            ct);
-        if (!completionResult.IsSuccess)
-        {
-            return completionResult.Error!;
-        }
-
-        dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
-        {
-            UserId = userId,
-            CommandType = CompleteCommand,
-            ClientRequestId = clientRequestId,
-            RequestHash = requestHash,
-            ResultResourceId = transferId,
-            CompletedAtUtc = DateTimeOffset.UtcNow
-        });
-
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-            return transferId;
-        }
-        catch (DbUpdateException exception)
-        {
-            await using var retryContext = await dbContextFactory.CreateDbContextAsync(ct);
-            var winningReceipt = await FindReceiptAsync(
-                retryContext,
-                userId,
-                CompleteCommand,
                 clientRequestId,
                 ct);
             if (winningReceipt is not null)
@@ -436,8 +278,7 @@ public sealed class MobileInventoryTransferCommandService(
         var value = transitStorageLocationId is Guid locationId
             ? $"{warehouseId:N}|{locationId:N}"
             : warehouseId.ToString("N");
-        var payload = Encoding.UTF8.GetBytes(value);
-        return Convert.ToHexString(SHA256.HashData(payload));
+        return ComputeHash(value);
     }
 
     private static string ComputeMoveDirectHash(
@@ -445,37 +286,30 @@ public sealed class MobileInventoryTransferCommandService(
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity)
-    {
-        var canonicalRequest = string.Join(
+        double quantity) =>
+        ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             sourceStorageLocationId.ToString("N"),
             destinationStorageLocationId.ToString("N"),
             stockKeepingUnitId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)));
-    }
-
-    private static string ComputeCompleteHash(Guid transferId)
-    {
-        var payload = Encoding.UTF8.GetBytes(transferId.ToString("N"));
-        return Convert.ToHexString(SHA256.HashData(payload));
-    }
+            quantity.ToString("R", CultureInfo.InvariantCulture)));
 
     private static string ComputeTransitMovementHash(
         Guid transferId,
         Guid enteredStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity)
-    {
-        var canonicalRequest = string.Join(
+        double quantity) =>
+        ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             enteredStorageLocationId.ToString("N"),
             stockKeepingUnitId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)));
-    }
+            quantity.ToString("R", CultureInfo.InvariantCulture)));
 
+    private static string ComputeCompleteHash(Guid transferId) =>
+        ComputeHash(transferId.ToString("N"));
+
+    private static string ComputeHash(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }

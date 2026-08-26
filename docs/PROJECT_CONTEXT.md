@@ -311,5 +311,8 @@ the receipt stores a deterministic request hash and result resource id. A
 receipt and its WMS change are saved by the same `ApplicationDbContext` and
 `SaveChangesAsync`, so a retry or concurrent duplicate cannot commit a second
 warehouse action. Reusing the key with different input is a conflict. The
-current implementation protects creation of a direct inventory-transfer draft,
-confirmation of a direct inventory movement, and completion of the transfer.
+current implementation protects creation of direct and transit
+inventory-transfer drafts, direct movement, pick to transit, put from transit,
+and completion of the transfer. The repeated receipt lifecycle is centralized
+inside the mobile transfer command service while each business action remains
+an explicit internal staged operation.

@@ -82,6 +82,11 @@ warehouse operation that justifies more behavior.
 - Do not create a folder or handler for every operation. Introduce another
   nesting level only when the feature folder is no longer easy to scan.
 
+The MAUI client keeps pages under `Pages`, grouped by operator workflow. Shared
+scanner adapters, HTTP/session services, platform code, and resources remain in
+their corresponding top-level folders. Physical page folders do not require a
+namespace per folder while the client remains small.
+
 ## Commands and queries
 
 - A command is an immutable typed input describing an application operation
@@ -126,6 +131,12 @@ last-resort user-facing response and logging.
 - Application services use `ApplicationDbContext` directly; EF Core is the
   unit-of-work boundary, so repositories are not added by default.
 - One operation normally has one explicit `SaveChangesAsync` boundary.
+- When a persisted mobile command receipt must be atomic with an existing WMS
+  change, the command service may expose an internal `Stage...Async` operation
+  that mutates a caller-owned `ApplicationDbContext` without saving. The mobile
+  orchestration stages the business change and receipt in that context and
+  performs one `SaveChangesAsync`; repositories or cross-context transactions
+  are not introduced for this purpose.
 - Persistent invariant changes include a migration.
 - Read-only domain collections use explicit EF backing-field configuration.
 - Optimistic concurrency is added to mutable aggregate roots or rows only when
