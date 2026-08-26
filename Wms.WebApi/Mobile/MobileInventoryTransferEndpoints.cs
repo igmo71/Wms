@@ -23,6 +23,10 @@ internal static class MobileInventoryTransferEndpoints
         group.MapGet("/inventory-transfers", ListTransfersAsync)
             .Produces<IReadOnlyList<MobileInventoryTransferSummaryResponse>>();
 
+        group.MapGet("/inventory-transfers/{transferId:guid}", GetTransferAsync)
+            .Produces<MobileInventoryTransferDetailsResponse>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound);
+
         group.MapPost("/inventory-transfers", CreateTransferAsync)
             .Produces<MobileInventoryTransferSummaryResponse>()
             .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
@@ -122,6 +126,47 @@ internal static class MobileInventoryTransferEndpoints
         }
 
         return TypedResults.Ok(MapTransfer(transfer));
+    }
+
+    private static async Task<IResult> GetTransferAsync(
+        Guid transferId,
+        InventoryTransferQueryService queryService,
+        CancellationToken ct)
+    {
+        var transfer = await queryService.GetAsync(transferId, ct);
+        if (transfer is null)
+        {
+            return CommandProblem(
+                OperationError.NotFound($"Перемещение '{transferId}' не найдено."));
+        }
+
+        var movements = await queryService.GetMovementsAsync(transferId, ct);
+        var mobileMovements = new List<MobileInventoryTransferMovementResponse>(movements.Count);
+        foreach (var movement in movements.OrderByDescending(x => x.RecorderLineNumber))
+        {
+            if (movement.SourceStorageLocation?.Zone is null
+                || movement.DestinationStorageLocation?.Zone is null
+                || movement.StockKeepingUnit is null
+                || movement.RecorderLineNumber is null)
+            {
+                throw new InvalidOperationException(
+                    "История движений мобильного перемещения содержит неполные данные.");
+            }
+
+            mobileMovements.Add(new MobileInventoryTransferMovementResponse(
+                movement.Id,
+                movement.StockKeepingUnitId,
+                movement.StockKeepingUnit.Code ?? string.Empty,
+                movement.StockKeepingUnit.Name ?? string.Empty,
+                movement.StockKeepingUnit.BaseUnitOfMeasure?.Description,
+                movement.Quantity,
+                MapLocation(movement.SourceStorageLocation),
+                MapLocation(movement.DestinationStorageLocation)));
+        }
+
+        return TypedResults.Ok(new MobileInventoryTransferDetailsResponse(
+            MapTransfer(transfer),
+            mobileMovements));
     }
 
     private static async Task<IResult> ResolveDirectSkuAsync(

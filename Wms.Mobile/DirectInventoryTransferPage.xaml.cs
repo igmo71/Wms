@@ -10,25 +10,27 @@ public partial class DirectInventoryTransferPage : ContentPage
     private readonly MobileApiClient _apiClient;
     private readonly ILifecycleBarcodeScanner _intentScanner;
     private readonly MobileInventoryTransferSummaryResponse _transfer;
+    private readonly Action<MobileMoveDirectInventoryTransferResponse> _movementCompleted;
     private MobileStorageLocationResponse? _sourceLocation;
     private MobileDirectTransferSkuResponse? _sku;
     private double? _quantity;
     private MobileStorageLocationResponse? _destinationLocation;
     private MobileMoveDirectInventoryTransferResponse? _confirmedMovement;
     private Guid? _pendingMoveRequestId;
-    private Guid? _pendingCompleteRequestId;
     private bool _scannerSubscribed;
     private bool _resolving;
 
     public DirectInventoryTransferPage(
         MobileApiClient apiClient,
         ILifecycleBarcodeScanner intentScanner,
-        MobileInventoryTransferSummaryResponse transfer)
+        MobileInventoryTransferSummaryResponse transfer,
+        Action<MobileMoveDirectInventoryTransferResponse> movementCompleted)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _intentScanner = intentScanner;
         _transfer = transfer;
+        _movementCompleted = movementCompleted;
 
         TransferNumberLabel.Text = $"Перемещение {transfer.Number}";
         TransferContextLabel.Text = $"Склад: {transfer.WarehouseName}\nСтатус: {GetStatusText(transfer.Status)}";
@@ -159,7 +161,6 @@ public partial class DirectInventoryTransferPage : ContentPage
         ConfirmButton.IsEnabled = !isBusy
             && _destinationLocation is not null
             && _confirmedMovement is null;
-        CompleteTransferButton.IsEnabled = !isBusy;
     }
 
     private void OnAcceptQuantityClicked(object? sender, EventArgs e)
@@ -225,18 +226,8 @@ public partial class DirectInventoryTransferPage : ContentPage
                 quantity,
                 _pendingMoveRequestId.Value);
             _pendingMoveRequestId = null;
-            ConfirmButton.IsVisible = false;
-            SuccessLabel.Text =
-                $"Товар: {_confirmedMovement.SkuName}\n" +
-                $"Из: {_confirmedMovement.Source.Address} · {_confirmedMovement.Source.Name}\n" +
-                $"В: {_confirmedMovement.Destination.Address} · {_confirmedMovement.Destination.Name}\n" +
-                $"Количество: {_confirmedMovement.Quantity:0.###}\n" +
-                $"Проведено: {_confirmedMovement.PostedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}";
-            SuccessPanel.IsVisible = true;
-            StepLabel.Text = "Готово";
-            InstructionLabel.Text = "Остатки и обороты обновлены.";
-            TransferContextLabel.Text =
-                $"Склад: {_transfer.WarehouseName}\nСтатус: {GetStatusText(_confirmedMovement.TransferStatus)}";
+            _movementCompleted(_confirmedMovement);
+            await Navigation.PopAsync();
         }
         catch (MobileApiException exception)
         {
@@ -255,99 +246,8 @@ public partial class DirectInventoryTransferPage : ContentPage
         }
     }
 
-    private void OnNextMovementClicked(object? sender, EventArgs e)
-    {
-        _sourceLocation = null;
-        _sku = null;
-        _quantity = null;
-        _destinationLocation = null;
-        _confirmedMovement = null;
-        _pendingMoveRequestId = null;
-
-        SourceCard.IsVisible = false;
-        SkuCard.IsVisible = false;
-        DestinationCard.IsVisible = false;
-        SuccessPanel.IsVisible = false;
-        QuantityPanel.IsVisible = false;
-        SelectedQuantityLabel.IsVisible = false;
-        ConfirmButton.IsVisible = false;
-        ConfirmButton.Text = "Подтвердить перемещение";
-        QuantityEntry.Text = string.Empty;
-        QuantityEntry.IsEnabled = true;
-        AcceptQuantityButton.Text = "Продолжить";
-        ErrorLabel.Text = string.Empty;
-        QuantityErrorLabel.Text = string.Empty;
-        StepLabel.Text = "1. Исходная ячейка";
-        InstructionLabel.Text = "Отсканируйте QR исходной ячейки.";
-    }
-
-    private async void OnCompleteTransferClicked(object? sender, EventArgs e)
-    {
-        if (_confirmedMovement is null)
-        {
-            return;
-        }
-
-        if (_pendingCompleteRequestId is null)
-        {
-            var confirmed = await DisplayAlertAsync(
-                "Завершить документ?",
-                $"Перемещение {_transfer.Number} больше нельзя будет изменить.",
-                "Завершить",
-                "Отмена");
-            if (!confirmed)
-            {
-                return;
-            }
-
-            _pendingCompleteRequestId = Guid.NewGuid();
-        }
-
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-
-        try
-        {
-            var completion = await _apiClient.CompleteInventoryTransferAsync(
-                _transfer.Id,
-                _pendingCompleteRequestId.Value);
-            _pendingCompleteRequestId = null;
-            TransferContextLabel.Text =
-                $"Склад: {_transfer.WarehouseName}\nСтатус: {GetStatusText(completion.Status)}";
-            await DisplayAlertAsync(
-                "Документ завершён",
-                $"Перемещение {_transfer.Number} успешно завершено.",
-                "К списку");
-            await Navigation.PopAsync();
-        }
-        catch (MobileApiException exception)
-        {
-            _pendingCompleteRequestId = null;
-            CompleteTransferButton.Text = "Завершить документ";
-            ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text =
-                "Ответ сервера не получен. Нажмите «Повторить завершение».";
-            CompleteTransferButton.Text = "Повторить завершение";
-        }
-        finally
-        {
-            SetBusy(false);
-        }
-    }
-
     private void OnConfirmButtonLoaded(object? sender, EventArgs e) =>
         DisableAndroidButtonFocus(ConfirmButton);
-
-    private void OnActionButtonLoaded(object? sender, EventArgs e)
-    {
-        if (sender is Button button)
-        {
-            DisableAndroidButtonFocus(button);
-        }
-    }
 
     private static void DisableAndroidButtonFocus(Button mauiButton)
     {

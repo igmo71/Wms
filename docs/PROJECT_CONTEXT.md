@@ -282,6 +282,11 @@ available, without requiring the operator to switch scanning mechanisms.
 The first vertical is direct intra-warehouse movement, followed by the transit
 workflow.
 
+An active mobile transfer opens as a server-backed movement history. Starting
+a new movement opens a separate sequential scanning screen; a successful
+command returns to the refreshed history and highlights the new movement, while
+a rejected or uncertain command remains on the scanning screen.
+
 The accepted scope and delivery order are under
 [`specs/mobile-wms/`](../specs/mobile-wms/). Those documents describe the active
 development target, not already implemented behavior.

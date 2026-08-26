@@ -80,6 +80,20 @@ public sealed record MobileInventoryTransferSummaryResponse(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc);
 
+public sealed record MobileInventoryTransferMovementResponse(
+    Guid MovementId,
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    double Quantity,
+    MobileInventoryMovementLocationResponse Source,
+    MobileInventoryMovementLocationResponse Destination);
+
+public sealed record MobileInventoryTransferDetailsResponse(
+    MobileInventoryTransferSummaryResponse Transfer,
+    IReadOnlyList<MobileInventoryTransferMovementResponse> Movements);
+
 public sealed record MobileCreateInventoryTransferRequest(
     Guid ClientRequestId,
     Guid WarehouseId);

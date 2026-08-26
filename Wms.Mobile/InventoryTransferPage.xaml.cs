@@ -177,7 +177,7 @@ public partial class InventoryTransferPage : ContentPage
     }
 
     private Task OpenTransferAsync(MobileInventoryTransferSummaryResponse transfer) =>
-        Navigation.PushAsync(new DirectInventoryTransferPage(
+        Navigation.PushAsync(new InventoryTransferDetailsPage(
             _apiClient,
             _intentScanner,
             transfer));

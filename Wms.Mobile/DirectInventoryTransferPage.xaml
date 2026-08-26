@@ -58,31 +58,6 @@
                         Loaded="OnConfirmButtonLoaded"
                         Text="Подтвердить перемещение" />
 
-                    <VerticalStackLayout
-                        x:Name="SuccessPanel"
-                        IsVisible="False"
-                        Spacing="10">
-                        <Label
-                            FontAttributes="Bold"
-                            FontSize="20"
-                            Text="Движение успешно проведено"
-                            TextColor="Green" />
-                        <Label
-                            x:Name="SuccessLabel"
-                            FontSize="17" />
-                        <Button
-                            Clicked="OnNextMovementClicked"
-                            HeightRequest="56"
-                            Loaded="OnActionButtonLoaded"
-                            Text="Следующее действие" />
-                        <Button
-                            x:Name="CompleteTransferButton"
-                            Clicked="OnCompleteTransferClicked"
-                            HeightRequest="56"
-                            Loaded="OnActionButtonLoaded"
-                            Text="Завершить документ" />
-                    </VerticalStackLayout>
-
                     <ActivityIndicator
                         x:Name="ProgressIndicator"
                         IsRunning="False"

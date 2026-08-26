@@ -1,0 +1,104 @@
+<ContentPage
+    x:Class="Wms.Mobile.InventoryTransferDetailsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="История перемещения">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14">
+        <VerticalStackLayout Spacing="4">
+            <Label
+                x:Name="TransferNumberLabel"
+                FontAttributes="Bold"
+                FontSize="18"
+                MaxLines="1" />
+            <Label
+                x:Name="TransferContextLabel"
+                FontSize="16" />
+        </VerticalStackLayout>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button
+                x:Name="AddMovementButton"
+                Clicked="OnAddMovementClicked"
+                HeightRequest="56"
+                Loaded="OnActionButtonLoaded"
+                Text="+ Переместить" />
+            <Button
+                x:Name="CompleteTransferButton"
+                Grid.Column="1"
+                Clicked="OnCompleteTransferClicked"
+                HeightRequest="56"
+                Loaded="OnActionButtonLoaded"
+                Text="Завершить" />
+        </Grid>
+
+        <VerticalStackLayout Spacing="8">
+            <ActivityIndicator
+                x:Name="ProgressIndicator"
+                IsRunning="False"
+                IsVisible="False" />
+            <Label
+                x:Name="ErrorLabel"
+                HorizontalTextAlignment="Center"
+                TextColor="Red" />
+        </VerticalStackLayout>
+
+        <Grid ColumnDefinitions="*,Auto">
+            <Label
+                x:Name="MovementsTitleLabel"
+                FontAttributes="Bold"
+                FontSize="20"
+                Text="История движений" />
+            <Button
+                Grid.Column="1"
+                Clicked="OnRefreshClicked"
+                Loaded="OnActionButtonLoaded"
+                Padding="14,6"
+                Text="Обновить" />
+        </Grid>
+
+        <Label
+            x:Name="EmptyHistoryLabel"
+            Margin="0,24,0,0"
+            HorizontalTextAlignment="Center"
+            IsVisible="False"
+            Text="В документе пока нет движений.&#10;Нажмите «Добавить перемещение»."
+            TextColor="Gray" />
+
+        <VerticalStackLayout
+            x:Name="MovementsLayout"
+            Margin="0,2,0,0"
+            Spacing="0">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate>
+                    <Border
+                        Margin="0,0,0,10"
+                        Padding="14"
+                        Stroke="{Binding BorderColor}"
+                        StrokeThickness="{Binding BorderThickness}">
+                        <VerticalStackLayout Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label
+                                    FontAttributes="Bold"
+                                    FontSize="18"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding SkuName}" />
+                                <Label
+                                    Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    FontAttributes="Bold"
+                                    FontSize="18"
+                                    Text="{Binding Quantity}" />
+                            </Grid>
+                            <Label
+                                FontSize="16"
+                                Text="{Binding Route}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

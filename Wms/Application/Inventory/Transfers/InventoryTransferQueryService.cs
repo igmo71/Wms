@@ -185,9 +185,11 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
         return await dbContext.InventoryMovements
             .AsNoTracking()
             .Include(x => x.SourceStorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.DestinationStorageLocation)
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Where(x => x.RecorderType == RecorderType.InventoryTransfer
                 && x.RecorderId == transferId)
             .OrderBy(x => x.RecorderLineNumber)

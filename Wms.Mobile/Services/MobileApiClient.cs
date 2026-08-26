@@ -158,6 +158,25 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректное перемещение.");
     }
 
+    public async Task<MobileInventoryTransferDetailsResponse> GetInventoryTransferAsync(
+        Guid transferId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<MobileInventoryTransferDetailsResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_inventory_transfer_details_response",
+                "Сервер вернул некорректную историю перемещения.");
+    }
+
     public async Task<MobileDirectTransferSkuResponse> ResolveDirectTransferSkuAsync(
         Guid transferId,
         Guid sourceStorageLocationId,
