@@ -14,7 +14,7 @@ public enum TransitInventoryTransferMovementMode
 public partial class TransitInventoryTransferMovementPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly IOperationalBarcodeScanner _scanner;
     private readonly MobileInventoryTransferSummaryResponse _transfer;
     private readonly TransitInventoryTransferMovementMode _mode;
     private readonly Action<MobileTransitInventoryTransferMovementResponse> _completed;
@@ -28,7 +28,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
 
     public TransitInventoryTransferMovementPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
+        IOperationalBarcodeScanner scanner,
         MobileInventoryTransferSummaryResponse transfer,
         TransitInventoryTransferMovementMode mode,
         IReadOnlyList<MobileInventoryTransferSkuBalanceResponse> transitBalances,
@@ -37,10 +37,11 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
+        _scanner = scanner;
         _transfer = transfer;
         _mode = mode;
         _completed = completed;
+        CameraScannerView.Configure(scanner);
 
         var transitLocation = transfer.TransitStorageLocation
             ?? throw new ArgumentException("У перемещения нет транзитной ячейки.", nameof(transfer));
@@ -73,17 +74,19 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
             return;
         }
 
-        _intentScanner.ScanReceived += OnScanReceived;
+        _scanner.ScanReceived += OnScanReceived;
         _scannerSubscribed = true;
+        _ = UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
         _searchCancellation?.Cancel();
         SkuSearchEntry.Unfocus();
+        CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
-            _intentScanner.ScanReceived -= OnScanReceived;
+            _scanner.ScanReceived -= OnScanReceived;
             _scannerSubscribed = false;
         }
 
@@ -92,6 +95,40 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
         MainThread.BeginInvokeOnMainThread(async () => await ResolveScanAsync(scanEvent.Value));
+
+    private bool IsScanExpected()
+    {
+        if (_busy
+            || ConfirmButton.IsVisible
+            || SkuSearchPanel.IsVisible
+            || (_sku is not null && _quantity is null))
+        {
+            return false;
+        }
+
+        return _mode == TransitInventoryTransferMovementMode.Pick
+            ? _storageLocation is null || _sku is null
+            : _sku is null || (_quantity is not null && _storageLocation is null);
+    }
+
+    private async Task UpdateCameraAsync()
+    {
+        if (_scanner.ActiveSource is null)
+        {
+            CameraScannerView.Stop();
+            ErrorLabel.Text = "На устройстве не найден доступный сканер.";
+            return;
+        }
+
+        if (_scanner.ActiveSource == BarcodeScanSource.Camera && IsScanExpected())
+        {
+            await CameraScannerView.StartAsync();
+        }
+        else
+        {
+            CameraScannerView.Stop();
+        }
+    }
 
     private async Task ResolveScanAsync(string barcode)
     {
@@ -153,6 +190,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         finally
         {
             SetBusy(false);
+            await UpdateCameraAsync();
         }
     }
 
@@ -224,6 +262,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         }
 
         _sku = sku;
+        CameraScannerView.Stop();
         CloseSkuSearch(showPrompt: false);
         TransitSkuChoicesPanel.IsVisible = false;
 
@@ -244,7 +283,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         }
     }
 
-    private void OnAcceptQuantityClicked(object? sender, EventArgs e)
+    private async void OnAcceptQuantityClicked(object? sender, EventArgs e)
     {
         if (_sku is null)
         {
@@ -281,6 +320,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         {
             StepLabel.Text = "3. Ячейка назначения";
             InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
+            await UpdateCameraAsync();
         }
     }
 
@@ -359,13 +399,17 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         SkuSearchPrompt.IsVisible = false;
         SkuSearchPanel.IsVisible = true;
         TransitSkuChoicesPanel.IsVisible = false;
+        CameraScannerView.Stop();
         InstructionLabel.Text = "Введите наименование, код или штрихкод.";
         SkuSearchStatusLabel.Text = "Введите не менее двух символов.";
         Dispatcher.Dispatch(() => SkuSearchEntry.Focus());
     }
 
-    private void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e) =>
+    private async void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e)
+    {
         CloseSkuSearch(showPrompt: true);
+        await UpdateCameraAsync();
+    }
 
     private async void OnSkuSearchTextChanged(object? sender, TextChangedEventArgs e)
     {

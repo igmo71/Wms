@@ -8,7 +8,7 @@ namespace Wms.Mobile;
 public partial class DirectInventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly IOperationalBarcodeScanner _scanner;
     private readonly MobileInventoryTransferSummaryResponse _transfer;
     private readonly Action<MobileMoveDirectInventoryTransferResponse> _movementCompleted;
     private MobileStorageLocationResponse? _sourceLocation;
@@ -23,15 +23,16 @@ public partial class DirectInventoryTransferPage : ContentPage
 
     public DirectInventoryTransferPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
+        IOperationalBarcodeScanner scanner,
         MobileInventoryTransferSummaryResponse transfer,
         Action<MobileMoveDirectInventoryTransferResponse> movementCompleted)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
+        _scanner = scanner;
         _transfer = transfer;
         _movementCompleted = movementCompleted;
+        CameraScannerView.Configure(scanner);
 
         TransferNumberLabel.Text = $"Перемещение {transfer.Number}";
         TransferContextLabel.Text = $"Склад: {transfer.WarehouseName}\nСтатус: {GetStatusText(transfer.Status)}";
@@ -45,18 +46,20 @@ public partial class DirectInventoryTransferPage : ContentPage
             return;
         }
 
-        _intentScanner.ScanReceived += OnScanReceived;
+        _scanner.ScanReceived += OnScanReceived;
         _scannerSubscribed = true;
+        _ = UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
         _skuSearchCancellation?.Cancel();
         SkuSearchEntry.Unfocus();
+        CameraScannerView.Stop();
 
         if (_scannerSubscribed)
         {
-            _intentScanner.ScanReceived -= OnScanReceived;
+            _scanner.ScanReceived -= OnScanReceived;
             _scannerSubscribed = false;
         }
 
@@ -66,6 +69,32 @@ public partial class DirectInventoryTransferPage : ContentPage
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
     {
         MainThread.BeginInvokeOnMainThread(async () => await ResolveScanAsync(scanEvent.Value));
+    }
+
+    private bool IsScanExpected() => !_resolving
+        && _destinationLocation is null
+        && !SkuSearchPanel.IsVisible
+        && (_sourceLocation is null
+            || _sku is null
+            || (_quantity is not null && _destinationLocation is null));
+
+    private async Task UpdateCameraAsync()
+    {
+        if (_scanner.ActiveSource is null)
+        {
+            CameraScannerView.Stop();
+            ErrorLabel.Text = "На устройстве не найден доступный сканер.";
+            return;
+        }
+
+        if (_scanner.ActiveSource == BarcodeScanSource.Camera && IsScanExpected())
+        {
+            await CameraScannerView.StartAsync();
+        }
+        else
+        {
+            CameraScannerView.Stop();
+        }
     }
 
     private async Task ResolveScanAsync(string barcode)
@@ -145,6 +174,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         {
             SetBusy(false);
             _resolving = false;
+            await UpdateCameraAsync();
         }
     }
 
@@ -157,13 +187,17 @@ public partial class DirectInventoryTransferPage : ContentPage
 
         SkuSearchPrompt.IsVisible = false;
         SkuSearchPanel.IsVisible = true;
+        CameraScannerView.Stop();
         InstructionLabel.Text = "Введите наименование, код или штрихкод.";
         SkuSearchStatusLabel.Text = "Введите не менее двух символов.";
         Dispatcher.Dispatch(() => SkuSearchEntry.Focus());
     }
 
-    private void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e) =>
+    private async void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e)
+    {
         CloseSkuSearch(showPrompt: true);
+        await UpdateCameraAsync();
+    }
 
     private async void OnSkuSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
@@ -353,7 +387,7 @@ public partial class DirectInventoryTransferPage : ContentPage
             && _confirmedMovement is null;
     }
 
-    private void OnAcceptQuantityClicked(object? sender, EventArgs e)
+    private async void OnAcceptQuantityClicked(object? sender, EventArgs e)
     {
         if (_sku is null)
         {
@@ -390,6 +424,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         SelectedQuantityLabel.IsVisible = true;
         StepLabel.Text = "4. Ячейка назначения";
         InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
+        await UpdateCameraAsync();
     }
 
     private async void OnConfirmClicked(object? sender, EventArgs e)

@@ -31,6 +31,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<CameraBarcodeScanner>();
         builder.Services.AddSingleton<ICameraBarcodeScanner>(serviceProvider =>
             serviceProvider.GetRequiredService<CameraBarcodeScanner>());
+        builder.Services.AddSingleton<IOperationalBarcodeScanner, OperationalBarcodeScanner>();
 
         builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
         builder.Services.AddSingleton<IMobileSessionStore, SecureStorageMobileSessionStore>();

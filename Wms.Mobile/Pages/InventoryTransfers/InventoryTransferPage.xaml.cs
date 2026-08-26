@@ -7,18 +7,18 @@ namespace Wms.Mobile;
 public partial class InventoryTransferPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly IOperationalBarcodeScanner _scanner;
     private bool _loaded;
     private Guid? _pendingCreateRequestId;
     private Guid? _pendingCreateWarehouseId;
 
     public InventoryTransferPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner)
+        IOperationalBarcodeScanner scanner)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
+        _scanner = scanner;
     }
 
     protected override async void OnAppearing()
@@ -123,7 +123,7 @@ public partial class InventoryTransferPage : ContentPage
 
         await Navigation.PushAsync(new TransitInventoryTransferStartPage(
             _apiClient,
-            _intentScanner,
+            _scanner,
             warehouse));
     }
 
@@ -197,7 +197,7 @@ public partial class InventoryTransferPage : ContentPage
     private Task OpenTransferAsync(MobileInventoryTransferSummaryResponse transfer) =>
         Navigation.PushAsync(new InventoryTransferDetailsPage(
             _apiClient,
-            _intentScanner,
+            _scanner,
             transfer));
 
     private static string GetStatusText(MobileInventoryTransferStatus status) => status switch

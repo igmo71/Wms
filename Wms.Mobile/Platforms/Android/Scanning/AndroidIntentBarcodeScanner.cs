@@ -6,6 +6,8 @@ namespace Wms.Mobile.Scanning;
 
 public sealed class AndroidIntentBarcodeScanner : ILifecycleBarcodeScanner
 {
+    private const string ScannerApiClassName = "android.device.ScanManager";
+
     private static readonly IReadOnlyDictionary<string, string> TechnicalDetails =
         new Dictionary<string, string>
         {
@@ -26,11 +28,27 @@ public sealed class AndroidIntentBarcodeScanner : ILifecycleBarcodeScanner
 
     public BarcodeScanSource Source => BarcodeScanSource.EmbeddedScanner;
 
+    public bool IsAvailable
+    {
+        get
+        {
+            try
+            {
+                using var scannerClass = Java.Lang.Class.ForName(ScannerApiClassName);
+                return scannerClass is not null;
+            }
+            catch (Java.Lang.Throwable)
+            {
+                return false;
+            }
+        }
+    }
+
     public event EventHandler<BarcodeScanEvent>? ScanReceived;
 
     public void Start()
     {
-        if (_registered)
+        if (_registered || !IsAvailable)
         {
             return;
         }

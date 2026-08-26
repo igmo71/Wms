@@ -7,7 +7,7 @@ namespace Wms.Mobile;
 public partial class InventoryTransferDetailsPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly IOperationalBarcodeScanner _scanner;
     private MobileInventoryTransferSummaryResponse _transfer;
     private IReadOnlyList<MobileInventoryTransferSkuBalanceResponse> _transitBalances = [];
     private Guid? _highlightMovementId;
@@ -17,12 +17,12 @@ public partial class InventoryTransferDetailsPage : ContentPage
 
     public InventoryTransferDetailsPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
+        IOperationalBarcodeScanner scanner,
         MobileInventoryTransferSummaryResponse transfer)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
+        _scanner = scanner;
         _transfer = transfer;
         ShowTransferHeader();
         SetAvailableActions();
@@ -107,7 +107,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
         _highlightMovementId = null;
         await Navigation.PushAsync(new DirectInventoryTransferPage(
             _apiClient,
-            _intentScanner,
+            _scanner,
             _transfer,
             OnMovementCompleted));
     }
@@ -126,7 +126,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
         _highlightMovementId = null;
         await Navigation.PushAsync(new TransitInventoryTransferMovementPage(
             _apiClient,
-            _intentScanner,
+            _scanner,
             _transfer,
             mode,
             _transitBalances,

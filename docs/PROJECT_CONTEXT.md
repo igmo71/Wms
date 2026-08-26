@@ -280,6 +280,11 @@ neutral scanner interface. The Android camera fallback uses Google ML Kit via
 `BarcodeScanning.Native.Maui`. Operational screens should automatically prefer
 an available embedded scanner and use the camera when no embedded scanner is
 available, without requiring the operator to switch scanning mechanisms.
+The current Urovo adapter detects the embedded scanner through the runtime
+presence of `android.device.ScanManager`, not a manufacturer or model string;
+the device profile must still be configured for intent output. On a camera-only
+device, the preview is embedded in the current step card below its instruction
+and is hidden while the operator enters quantity or reviews confirmation.
 The first vertical is intra-warehouse movement, including direct actions and
 actions through one transfer-owned transit location.
 

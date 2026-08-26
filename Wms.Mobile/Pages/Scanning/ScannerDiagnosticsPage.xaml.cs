@@ -32,6 +32,11 @@ public partial class ScannerDiagnosticsPage : ContentPage
 
         _intentScanner.ScanReceived += OnScanReceived;
         _scannerSubscribed = true;
+        ScannerStatusLabel.Text = _intentScanner.IsAvailable
+            ? "Автовыбор: встроенный сканер."
+            : _cameraScanner.IsAvailable
+                ? "Автовыбор: камера."
+                : "Доступные источники сканирования не обнаружены.";
     }
 
     protected override void OnDisappearing()

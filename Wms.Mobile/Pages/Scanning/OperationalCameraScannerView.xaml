@@ -1,0 +1,31 @@
+<ContentView
+    x:Class="Wms.Mobile.OperationalCameraScannerView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:scanner="clr-namespace:BarcodeScanning;assembly=BarcodeScanning.Native.Maui"
+    IsVisible="False">
+
+    <Grid
+        BackgroundColor="Black"
+        HeightRequest="280">
+        <scanner:CameraView
+            x:Name="CameraView"
+            AimMode="True"
+            BarcodeSymbologies="All"
+            CameraEnabled="False"
+            OnDetectionFinished="OnDetectionFinished"
+            VibrationOnDetected="False" />
+
+        <Border
+            Margin="12"
+            BackgroundColor="#99000000"
+            Padding="10"
+            VerticalOptions="Start">
+            <Label
+                x:Name="CameraInstructionLabel"
+                HorizontalTextAlignment="Center"
+                Text="Совместите нужный код с красной точкой."
+                TextColor="White" />
+        </Border>
+    </Grid>
+</ContentView>

@@ -7,7 +7,7 @@ namespace Wms.Mobile;
 public partial class TransitInventoryTransferStartPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly ILifecycleBarcodeScanner _intentScanner;
+    private readonly IOperationalBarcodeScanner _scanner;
     private readonly MobileWarehouseResponse _warehouse;
     private MobileStorageLocationResponse? _transitLocation;
     private MobileInventoryTransferSummaryResponse? _activeTransfer;
@@ -17,13 +17,14 @@ public partial class TransitInventoryTransferStartPage : ContentPage
 
     public TransitInventoryTransferStartPage(
         MobileApiClient apiClient,
-        ILifecycleBarcodeScanner intentScanner,
+        IOperationalBarcodeScanner scanner,
         MobileWarehouseResponse warehouse)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _intentScanner = intentScanner;
+        _scanner = scanner;
         _warehouse = warehouse;
+        CameraScannerView.Configure(scanner);
     }
 
     protected override void OnAppearing()
@@ -34,15 +35,17 @@ public partial class TransitInventoryTransferStartPage : ContentPage
             return;
         }
 
-        _intentScanner.ScanReceived += OnScanReceived;
+        _scanner.ScanReceived += OnScanReceived;
         _scannerSubscribed = true;
+        _ = UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
+        CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
-            _intentScanner.ScanReceived -= OnScanReceived;
+            _scanner.ScanReceived -= OnScanReceived;
             _scannerSubscribed = false;
         }
 
@@ -52,6 +55,27 @@ public partial class TransitInventoryTransferStartPage : ContentPage
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
         MainThread.BeginInvokeOnMainThread(async () => await ResolveTransitLocationAsync(
             scanEvent.Value));
+
+    private async Task UpdateCameraAsync()
+    {
+        if (_scanner.ActiveSource is null)
+        {
+            CameraScannerView.Stop();
+            ErrorLabel.Text = "На устройстве не найден доступный сканер.";
+            return;
+        }
+
+        if (_scanner.ActiveSource == BarcodeScanSource.Camera
+            && !_busy
+            && _transitLocation is null)
+        {
+            await CameraScannerView.StartAsync();
+        }
+        else
+        {
+            CameraScannerView.Stop();
+        }
+    }
 
     private async Task ResolveTransitLocationAsync(string barcode)
     {
@@ -100,6 +124,7 @@ public partial class TransitInventoryTransferStartPage : ContentPage
         finally
         {
             SetBusy(false);
+            await UpdateCameraAsync();
         }
     }
 
@@ -149,7 +174,7 @@ public partial class TransitInventoryTransferStartPage : ContentPage
     {
         await Navigation.PushAsync(new InventoryTransferDetailsPage(
             _apiClient,
-            _intentScanner,
+            _scanner,
             transfer));
         Navigation.RemovePage(this);
     }
