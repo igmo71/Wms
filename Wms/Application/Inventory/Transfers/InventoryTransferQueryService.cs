@@ -89,6 +89,99 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .SingleOrDefaultAsync(ct) ?? 0;
     }
 
+    public async Task<OperationResult<IReadOnlyList<InventoryTransferSkuSearchResult>>>
+        SearchAvailableDirectSkusAsync(
+            Guid transferId,
+            Guid sourceStorageLocationId,
+            string searchText,
+            int take,
+            CancellationToken ct = default)
+    {
+        var term = searchText.Trim();
+        if (term.Length < 2)
+        {
+            return Array.Empty<InventoryTransferSkuSearchResult>();
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var transfer = await dbContext.InventoryTransfers
+            .AsNoTracking()
+            .Where(x => x.Id == transferId)
+            .Select(x => new { x.WarehouseId, x.Status })
+            .FirstOrDefaultAsync(ct);
+        if (transfer is null)
+        {
+            return OperationError.NotFound($"Перемещение '{transferId}' не найдено.");
+        }
+
+        if (transfer.Status == InventoryTransferStatus.Completed)
+        {
+            return OperationError.Invalid("Завершенное перемещение нельзя изменять.");
+        }
+
+        var sourceLocationIsValid = await dbContext.StorageLocations
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == sourceStorageLocationId
+                && !x.IsFolder
+                && !x.DeletionMark
+                && x.WarehouseId == transfer.WarehouseId
+                && !x.Zone!.DeletionMark
+                && x.Zone.Type == ZoneType.Storage,
+                ct);
+        if (!sourceLocationIsValid)
+        {
+            return OperationError.Invalid(
+                "Исходная ячейка должна быть активной обычной ячейкой склада перемещения.");
+        }
+
+        var matches = await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Where(x => x.WarehouseId == transfer.WarehouseId
+                && x.StorageLocationId == sourceStorageLocationId
+                && x.Quantity > 0
+                && !x.StockKeepingUnit!.DeletionMark
+                && ((x.StockKeepingUnit.Name != null
+                        && x.StockKeepingUnit.Name.Contains(term))
+                    || (x.StockKeepingUnit.Code != null
+                        && x.StockKeepingUnit.Code.Contains(term))
+                    || dbContext.SkuBarcodes.Any(barcode =>
+                        barcode.SkuId == x.StockKeepingUnitId
+                        && barcode.Value != null
+                        && barcode.Value.Contains(term))))
+            .Select(x => new
+            {
+                Id = x.StockKeepingUnitId,
+                Code = x.StockKeepingUnit!.Code ?? string.Empty,
+                Name = x.StockKeepingUnit.Name ?? string.Empty,
+                UnitOfMeasure = x.StockKeepingUnit.BaseUnitOfMeasure == null
+                    ? null
+                    : x.StockKeepingUnit.BaseUnitOfMeasure.Description,
+                AvailableQuantity = x.Quantity,
+                IsExactMatch = (x.StockKeepingUnit.Code != null
+                        && x.StockKeepingUnit.Code == term)
+                    || (x.StockKeepingUnit.Name != null && x.StockKeepingUnit.Name == term)
+                    || dbContext.SkuBarcodes.Any(barcode =>
+                        barcode.SkuId == x.StockKeepingUnitId
+                        && barcode.Value == term)
+            })
+            .OrderByDescending(x => x.IsExactMatch)
+            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Code)
+            .Take(Math.Clamp(take, 1, 10))
+            .ToListAsync(ct);
+
+        return matches
+            .Select(x => new InventoryTransferSkuSearchResult(
+                x.Id,
+                x.Code,
+                x.Name,
+                x.UnitOfMeasure,
+                x.AvailableQuantity,
+                x.IsExactMatch))
+            .ToList();
+    }
+
     public async Task<InventoryMovement?> GetMovementAsync(
         Guid transferId,
         Guid movementId,

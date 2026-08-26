@@ -200,6 +200,30 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректные сведения о товаре и остатке.");
     }
 
+    public async Task<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>
+        SearchDirectTransferSkusAsync(
+            Guid transferId,
+            Guid sourceStorageLocationId,
+            string query,
+            CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryTransfers}/{transferId:D}/direct/skus"
+            + $"?sourceStorageLocationId={sourceStorageLocationId:D}"
+            + $"&query={Uri.EscapeDataString(query)}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowApiExceptionAsync(response, ct);
+        }
+
+        return await response.Content
+            .ReadFromJsonAsync<List<MobileDirectTransferSkuSearchResponse>>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_direct_transfer_sku_search_response",
+                "Сервер вернул некорректные результаты поиска товара.");
+    }
+
     public async Task<MobileMoveDirectInventoryTransferResponse> MoveDirectAsync(
         Guid transferId,
         Guid sourceStorageLocationId,

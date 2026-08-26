@@ -287,6 +287,12 @@ a new movement opens a separate sequential scanning screen; a successful
 command returns to the refreshed history and highlights the new movement, while
 a rejected or uncertain command remains on the scanning screen.
 
+On the SKU step, scanning remains the primary path. If a label cannot be read,
+the operator may explicitly open an inline search by name, code, or barcode.
+The search is limited to SKUs with a positive balance in the already selected
+source location, does not take focus until the operator opens it, and selecting
+a result continues through the same quantity and confirmation workflow.
+
 The accepted scope and delivery order are under
 [`specs/mobile-wms/`](../specs/mobile-wms/). Those documents describe the active
 development target, not already implemented behavior.

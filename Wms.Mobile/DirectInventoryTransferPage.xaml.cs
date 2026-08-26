@@ -17,6 +17,7 @@ public partial class DirectInventoryTransferPage : ContentPage
     private MobileStorageLocationResponse? _destinationLocation;
     private MobileMoveDirectInventoryTransferResponse? _confirmedMovement;
     private Guid? _pendingMoveRequestId;
+    private CancellationTokenSource? _skuSearchCancellation;
     private bool _scannerSubscribed;
     private bool _resolving;
 
@@ -50,6 +51,9 @@ public partial class DirectInventoryTransferPage : ContentPage
 
     protected override void OnDisappearing()
     {
+        _skuSearchCancellation?.Cancel();
+        SkuSearchEntry.Unfocus();
+
         if (_scannerSubscribed)
         {
             _intentScanner.ScanReceived -= OnScanReceived;
@@ -95,24 +99,15 @@ public partial class DirectInventoryTransferPage : ContentPage
                 SourceCard.IsVisible = true;
                 StepLabel.Text = "2. Товар";
                 InstructionLabel.Text = "Отсканируйте штрихкод товара.";
+                SkuSearchPrompt.IsVisible = true;
             }
             else if (_sku is null)
             {
-                _sku = await _apiClient.ResolveDirectTransferSkuAsync(
+                var sku = await _apiClient.ResolveDirectTransferSkuAsync(
                     _transfer.Id,
                     _sourceLocation.Id,
                     barcode);
-                var unit = string.IsNullOrWhiteSpace(_sku.UnitOfMeasure)
-                    ? string.Empty
-                    : $" {_sku.UnitOfMeasure}";
-                SkuLabel.Text = $"{_sku.Name}\nКод: {_sku.Code}";
-                AvailableQuantityLabel.Text =
-                    $"Доступно: {_sku.AvailableQuantity:0.###}{unit}";
-                SkuCard.IsVisible = true;
-                QuantityPanel.IsVisible = true;
-                StepLabel.Text = "3. Количество";
-                InstructionLabel.Text = "Введите количество перемещения.";
-                QuantityEntry.Focus();
+                ApplySku(sku, focusQuantity: true);
             }
             else
             {
@@ -151,6 +146,201 @@ public partial class DirectInventoryTransferPage : ContentPage
             SetBusy(false);
             _resolving = false;
         }
+    }
+
+    private void OnOpenSkuSearchTapped(object? sender, TappedEventArgs e)
+    {
+        if (_sourceLocation is null || _sku is not null || _resolving)
+        {
+            return;
+        }
+
+        SkuSearchPrompt.IsVisible = false;
+        SkuSearchPanel.IsVisible = true;
+        InstructionLabel.Text = "Введите наименование, код или штрихкод.";
+        SkuSearchStatusLabel.Text = "Введите не менее двух символов.";
+        Dispatcher.Dispatch(() => SkuSearchEntry.Focus());
+    }
+
+    private void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e) =>
+        CloseSkuSearch(showPrompt: true);
+
+    private async void OnSkuSearchTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        _skuSearchCancellation?.Cancel();
+        _skuSearchCancellation = null;
+        SkuSearchResults.Children.Clear();
+
+        var query = e.NewTextValue?.Trim() ?? string.Empty;
+        if (_sourceLocation is null || _sku is not null || query.Length < 2)
+        {
+            SetSkuSearchBusy(false);
+            InstructionLabel.Text = "Введите наименование, код или штрихкод.";
+            SkuSearchStatusLabel.Text = "Введите не менее двух символов.";
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _skuSearchCancellation = cancellation;
+        InstructionLabel.Text = "Ищем товар...";
+        SkuSearchStatusLabel.Text = string.Empty;
+
+        try
+        {
+            await Task.Delay(300, cancellation.Token);
+            SetSkuSearchBusy(true);
+
+            var results = await _apiClient.SearchDirectTransferSkusAsync(
+                _transfer.Id,
+                _sourceLocation.Id,
+                query,
+                cancellation.Token);
+            if (cancellation.IsCancellationRequested
+                || !ReferenceEquals(_skuSearchCancellation, cancellation)
+                || _sku is not null)
+            {
+                return;
+            }
+
+            ShowSkuSearchResults(results);
+        }
+        catch (OperationCanceledException)
+        {
+            // Новый текст или сканирование отменяет устаревший поиск.
+        }
+        catch (MobileApiException exception)
+        {
+            SkuSearchStatusLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            SkuSearchStatusLabel.Text = "Сервер WMS недоступен.";
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine(exception);
+            SkuSearchStatusLabel.Text = "Не удалось выполнить поиск товара.";
+        }
+        finally
+        {
+            if (ReferenceEquals(_skuSearchCancellation, cancellation))
+            {
+                _skuSearchCancellation = null;
+                SetSkuSearchBusy(false);
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
+    private void ShowSkuSearchResults(
+        IReadOnlyList<MobileDirectTransferSkuSearchResponse> results)
+    {
+        SkuSearchResults.Children.Clear();
+        InstructionLabel.Text = results.Count == 10
+            ? "Найдено: 10. Уточните запрос, если вариантов слишком много."
+            : $"Найдено: {results.Count}.";
+        if (results.Count == 0)
+        {
+            SkuSearchStatusLabel.Text = "В исходной ячейке товар не найден.";
+            return;
+        }
+
+        SkuSearchStatusLabel.Text = string.Empty;
+        foreach (var result in results)
+        {
+            var unit = string.IsNullOrWhiteSpace(result.UnitOfMeasure)
+                ? string.Empty
+                : $" {result.UnitOfMeasure}";
+            var resultLayout = new VerticalStackLayout { Spacing = 3 };
+            resultLayout.Children.Add(new Label
+            {
+                Text = result.Name,
+                FontSize = 17,
+                FontAttributes = result.IsExactMatch
+                    ? FontAttributes.Bold
+                    : FontAttributes.None
+            });
+            resultLayout.Children.Add(new Label
+            {
+                Text = $"Код: {result.Code} · Доступно: {result.AvailableQuantity:0.###}{unit}",
+                FontSize = 15
+            });
+
+            var resultBorder = new Border
+            {
+                Padding = 12,
+                Content = resultLayout
+            };
+            var tapGesture = new TapGestureRecognizer();
+            tapGesture.Tapped += async (_, _) => await SelectSkuSearchResultAsync(result);
+            resultBorder.GestureRecognizers.Add(tapGesture);
+            SkuSearchResults.Children.Add(resultBorder);
+        }
+    }
+
+    private async Task SelectSkuSearchResultAsync(
+        MobileDirectTransferSkuSearchResponse result)
+    {
+        if (_resolving || _sku is not null)
+        {
+            return;
+        }
+
+        SkuSearchEntry.Unfocus();
+        await SkuSearchEntry.HideSoftInputAsync(CancellationToken.None);
+        ApplySku(new MobileDirectTransferSkuResponse(
+            result.Id,
+            result.Code,
+            result.Name,
+            result.UnitOfMeasure,
+            result.AvailableQuantity),
+            focusQuantity: false);
+    }
+
+    private void ApplySku(MobileDirectTransferSkuResponse sku, bool focusQuantity)
+    {
+        _sku = sku;
+        CloseSkuSearch(showPrompt: false);
+
+        var unit = string.IsNullOrWhiteSpace(sku.UnitOfMeasure)
+            ? string.Empty
+            : $" {sku.UnitOfMeasure}";
+        SkuLabel.Text = $"{sku.Name}\nКод: {sku.Code}";
+        AvailableQuantityLabel.Text =
+            $"Доступно: {sku.AvailableQuantity:0.###}{unit}";
+        SkuCard.IsVisible = true;
+        QuantityPanel.IsVisible = true;
+        StepLabel.Text = "3. Количество";
+        InstructionLabel.Text = "Введите количество перемещения.";
+        if (focusQuantity)
+        {
+            Dispatcher.Dispatch(() => QuantityEntry.Focus());
+        }
+    }
+
+    private void CloseSkuSearch(bool showPrompt)
+    {
+        _skuSearchCancellation?.Cancel();
+        _skuSearchCancellation = null;
+        SetSkuSearchBusy(false);
+        SkuSearchEntry.Unfocus();
+        SkuSearchEntry.Text = string.Empty;
+        SkuSearchResults.Children.Clear();
+        SkuSearchPanel.IsVisible = false;
+        SkuSearchPrompt.IsVisible = showPrompt
+            && _sourceLocation is not null
+            && _sku is null;
+        if (showPrompt)
+        {
+            InstructionLabel.Text = "Отсканируйте штрихкод товара.";
+        }
+    }
+
+    private void SetSkuSearchBusy(bool isBusy)
+    {
+        SkuSearchIndicator.IsVisible = isBusy;
+        SkuSearchIndicator.IsRunning = isBusy;
     }
 
     private void SetBusy(bool isBusy)

@@ -26,6 +26,56 @@
                         FontSize="18"
                         Text="Отсканируйте QR исходной ячейки." />
 
+                    <Border
+                        x:Name="SkuSearchPrompt"
+                        BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
+                        IsVisible="False"
+                        Padding="14">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenSkuSearchTapped" />
+                        </Border.GestureRecognizers>
+                        <Label
+                            FontSize="17"
+                            HorizontalTextAlignment="Center"
+                            Text="Не удаётся отсканировать?" />
+                    </Border>
+
+                    <VerticalStackLayout
+                        x:Name="SkuSearchPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Entry
+                                x:Name="SkuSearchEntry"
+                                ClearButtonVisibility="WhileEditing"
+                                FontSize="18"
+                                Placeholder="Наименование, код или штрихкод"
+                                TextChanged="OnSkuSearchTextChanged" />
+                            <Label
+                                Grid.Column="1"
+                                FontSize="16"
+                                Text="Отмена"
+                                VerticalTextAlignment="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnCancelSkuSearchTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Grid>
+
+                        <ActivityIndicator
+                            x:Name="SkuSearchIndicator"
+                            IsRunning="False"
+                            IsVisible="False" />
+                        <Label
+                            x:Name="SkuSearchStatusLabel"
+                            FontSize="15"
+                            HorizontalTextAlignment="Center"
+                            Text="Введите не менее двух символов." />
+                        <VerticalStackLayout
+                            x:Name="SkuSearchResults"
+                            Spacing="8" />
+                    </VerticalStackLayout>
+
                     <VerticalStackLayout
                         x:Name="QuantityPanel"
                         IsVisible="False"

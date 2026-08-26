@@ -42,6 +42,13 @@ internal static class MobileInventoryTransferEndpoints
             .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
             .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapGet(
+                "/inventory-transfers/{transferId:guid}/direct/skus",
+                SearchDirectSkusAsync)
+            .Produces<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/direct-movements",
                 MoveDirectAsync)
@@ -197,8 +204,38 @@ internal static class MobileInventoryTransferEndpoints
             sku.Id,
             sku.Code ?? string.Empty,
             sku.Name ?? string.Empty,
-            sku.BaseUnitOfMeasure?.Name,
+            sku.BaseUnitOfMeasure?.Description,
             quantityResult.Value));
+    }
+
+    private static async Task<IResult> SearchDirectSkusAsync(
+        Guid transferId,
+        Guid sourceStorageLocationId,
+        string query,
+        InventoryTransferQueryService transferQueryService,
+        CancellationToken ct)
+    {
+        var result = await transferQueryService.SearchAvailableDirectSkusAsync(
+            transferId,
+            sourceStorageLocationId,
+            query,
+            10,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return CommandProblem(result.Error!);
+        }
+
+        return TypedResults.Ok<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>(
+            result.Value!
+                .Select(x => new MobileDirectTransferSkuSearchResponse(
+                    x.Id,
+                    x.Code,
+                    x.Name,
+                    x.UnitOfMeasure,
+                    x.AvailableQuantity,
+                    x.IsExactMatch))
+                .ToList());
     }
 
     private static async Task<IResult> MoveDirectAsync(

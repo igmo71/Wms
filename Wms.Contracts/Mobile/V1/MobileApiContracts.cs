@@ -109,6 +109,14 @@ public sealed record MobileDirectTransferSkuResponse(
     string? UnitOfMeasure,
     double AvailableQuantity);
 
+public sealed record MobileDirectTransferSkuSearchResponse(
+    Guid Id,
+    string Code,
+    string Name,
+    string? UnitOfMeasure,
+    double AvailableQuantity,
+    bool IsExactMatch);
+
 public sealed record MobileMoveDirectInventoryTransferRequest(
     Guid ClientRequestId,
     Guid SourceStorageLocationId,
