@@ -32,7 +32,7 @@ internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<Inventor
             x.StockKeepingUnitId
         })
         .IsUnique()
-        .HasDatabaseName("UX_InventoryBalances_BusinessKey");
+        .HasDatabaseName(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex);
 
         //builder.Property(x => x.Quantity)
         //    .HasPrecision(18, 3);

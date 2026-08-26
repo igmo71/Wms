@@ -32,6 +32,10 @@ internal class InventoryTransferConfiguration : IEntityTypeConfiguration<Invento
         builder.HasIndex(x => new { x.WarehouseId, x.Date });
         builder.HasIndex(x => x.TransitStorageLocationId)
             .IsUnique()
-            .HasFilter($"[TransitStorageLocationId] IS NOT NULL AND [Status] IN ({(int)InventoryTransferStatus.Draft}, {(int)InventoryTransferStatus.InProgress})");
+            .HasDatabaseName(DatabaseObjectNames.InventoryTransfersActiveTransitLocationIndex)
+            .HasFilter(
+                $"[{nameof(InventoryTransfer.TransitStorageLocationId)}] IS NOT NULL " +
+                $"AND [{nameof(InventoryTransfer.Status)}] IN " +
+                $"({(int)InventoryTransferStatus.Draft}, {(int)InventoryTransferStatus.InProgress})");
     }
 }

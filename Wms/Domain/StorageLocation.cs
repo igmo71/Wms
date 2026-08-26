@@ -5,6 +5,8 @@ namespace Wms.Domain;
 
 public class StorageLocation
 {
+    private const string BarcodePrefix = "WMSL:";
+
     private readonly List<StorageLocation> _children = [];
 
     public Guid Id { get; private set; }
@@ -29,16 +31,14 @@ public class StorageLocation
 
     public long? PickSequence { get; private set; }
 
-    public string Barcode => $"WMSL:{Id:N}";
+    public string Barcode => $"{BarcodePrefix}{Id:N}";
 
     public static bool TryParseBarcode(string? value, out Guid id)
     {
-        const string prefix = "WMSL:";
-
         id = Guid.Empty;
         return value is not null
-            && value.StartsWith(prefix, StringComparison.Ordinal)
-            && Guid.TryParseExact(value[prefix.Length..], "N", out id);
+            && value.StartsWith(BarcodePrefix, StringComparison.Ordinal)
+            && Guid.TryParseExact(value[BarcodePrefix.Length..], "N", out id);
     }
 
     public static OperationResult<string> BuildCode(

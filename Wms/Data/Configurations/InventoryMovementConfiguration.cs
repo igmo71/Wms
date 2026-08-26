@@ -41,7 +41,8 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
                 x.RecorderLineNumber
             })
             .IsUnique()
-            .HasDatabaseName("UX_InventoryMovements_TransferLine")
-            .HasFilter($"[RecorderType] = {(int)RecorderType.InventoryTransfer}");
+            .HasDatabaseName(DatabaseObjectNames.InventoryMovementsTransferLineIndex)
+            .HasFilter(
+                $"[{nameof(InventoryMovement.RecorderType)}] = {(int)RecorderType.InventoryTransfer}");
     }
 }

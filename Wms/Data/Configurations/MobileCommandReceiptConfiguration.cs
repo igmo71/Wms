@@ -13,7 +13,7 @@ internal sealed class MobileCommandReceiptConfiguration
             x.UserId,
             x.CommandType,
             x.ClientRequestId
-        }).HasName("PK_MobileCommandReceipts");
+        });
 
         builder.Property(x => x.UserId)
             .HasMaxLength(DefaultConfiguration.Guid)
