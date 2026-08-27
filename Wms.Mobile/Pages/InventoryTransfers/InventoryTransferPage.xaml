@@ -29,6 +29,7 @@
                 HeightRequest="56"
                 Text="+ Напрямую" />
             <Button
+                x:Name="TransitButton"
                 Grid.Column="1"
                 Clicked="OnOpenTransitClicked"
                 HeightRequest="56"

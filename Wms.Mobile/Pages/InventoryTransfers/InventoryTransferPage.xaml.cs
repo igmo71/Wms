@@ -174,6 +174,7 @@ public partial class InventoryTransferPage : ContentPage
         WarehousePicker.IsEnabled = !isBusy && _pendingCreateRequestId is null;
         RefreshButton.IsEnabled = !isBusy;
         NewDirectTransferButton.IsEnabled = !isBusy;
+        TransitButton.IsEnabled = !isBusy;
     }
 
     private void ClearPendingCreate()
