@@ -1,4 +1,5 @@
 @page "/inventory-counts/{Id:guid}"
+@using Wms.Application.Inventory.Counts
 @using Wms.Common
 @using Wms.Domain
 @using Wms.Domain.Enums
@@ -17,16 +18,23 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Инвентаризация №@_inventoryCount.Number от @_inventoryCount.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+            <MudText Typo="Typo.h5">Инвентаризация №@_inventoryCount.Number</MudText>
             <MudSpacer />
             @if (IsDraft)
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="@_isPosting"
+                           Disabled="@(_isPosting || UncountedItems > 0)"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="PostAsync">
                     Провести
+                </MudButton>
+                <MudButton Color="Color.Error"
+                           Variant="Variant.Text"
+                           Disabled="@_isDeletingDraft"
+                           StartIcon="@Icons.Material.Filled.DeleteOutline"
+                           OnClick="DeleteDraftAsync">
+                    Удалить черновик
                 </MudButton>
             }
             <MudButton Href="inventory-counts" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
@@ -41,116 +49,102 @@ else
 
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="4">
+                <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption">Склад</MudText>
                     <MudText>@_inventoryCount.Warehouse?.Name</MudText>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="4">
+                <MudItem xs="12" sm="4">
+                    <MudText Typo="Typo.caption">Ячейка</MudText>
+                    <MudText><b>@LocationText</b></MudText>
+                </MudItem>
+                <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption">Статус</MudText>
-                    <MudChip T="string" Size="Size.Small" Color="@_inventoryCount.Status.GetChipColor()">@_inventoryCount.Status.GetDisplayName()</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="@_inventoryCount.Status.GetChipColor()">
+                        @_inventoryCount.Status.GetDisplayName()
+                    </MudChip>
                 </MudItem>
             </MudGrid>
             <MudDivider Class="my-3" />
-            <MudGrid Spacing="2">
-                <DocumentOperationInfo Title="Создал" UserName="@GetUserName(_inventoryCount.CreatedBy)" Timestamp="_inventoryCount.CreatedAtUtc" Md="4" />
-                <DocumentOperationInfo Title="Изменил" UserName="@GetUserName(_inventoryCount.UpdatedBy)" Timestamp="_inventoryCount.UpdatedAtUtc" Md="4" />
-                <DocumentOperationInfo Title="Провёл" UserName="@GetUserName(_inventoryCount.PostedBy)" Timestamp="_inventoryCount.PostedAtUtc" Md="4" />
-            </MudGrid>
+            <MudText>
+                Позиций: @_inventoryCount.Items.Count · Пересчитано: @CountedItems · Осталось: @UncountedItems
+            </MudText>
         </MudPaper>
 
         @if (IsDraft)
         {
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Outlined"
-                       Disabled="@_isAddingItem"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="AddItemAsync">
-                Добавить строку
-            </MudButton>
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Добавить или исправить товар</b></MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="7">
+                        <MudAutocomplete T="InventoryCountSkuSearchResult"
+                                         @bind-Value="_selectedSku"
+                                         SearchFunc="SearchSkusAsync"
+                                         ToStringFunc="GetSkuText"
+                                         Label="Наименование, код или штрихкод"
+                                         Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudNumericField T="double?"
+                                         @bind-Value="_manualQuantity"
+                                         Label="Фактически"
+                                         Min="0"
+                                         HideSpinButtons="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="2">
+                        <MudButton Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   FullWidth="true"
+                                   Disabled="@(_isSaving || _selectedSku is null || _manualQuantity is null)"
+                                   OnClick="SaveManualQuantityAsync">
+                            Сохранить
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
         }
 
-        <MudTable Items="_inventoryCount.Items" Hover="true" Striped="true" Dense="true">
+        <MudTable Items="_inventoryCount.Items.OrderBy(x => x.LineNumber)" Hover="true" Striped="true" Dense="true">
             <HeaderContent>
-                <MudTh>Строка</MudTh>
-                <MudTh>Ячейка</MudTh>
-                <MudTh>Номенклатура</MudTh>
+                <MudTh>Товар</MudTh>
                 <MudTh>Ожидается</MudTh>
                 <MudTh>Фактически</MudTh>
-                <MudTh>Фактический вес</MudTh>
                 <MudTh>Разница</MudTh>
-                @if (IsDraft)
-                {
-                    <MudTh></MudTh>
-                }
+                @if (IsDraft) { <MudTh></MudTh> }
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Строка">
-                    <MudTooltip Text="@GetItemAuditTooltip(context)">
-                        <span>@context.LineNumber</span>
-                    </MudTooltip>
+                <MudTd DataLabel="Товар">
+                    <b>@context.StockKeepingUnit?.Name</b><br />
+                    <MudText Typo="Typo.caption">
+                        Код: @context.StockKeepingUnit?.Code · @context.StockKeepingUnit?.BaseUnitOfMeasure?.Description
+                    </MudText>
                 </MudTd>
-                <MudTd DataLabel="Ячейка">
-                    @if (IsDraft)
-                    {
-                        <MudAutocomplete T="StorageLocation"
-                                         Value="context.StorageLocation"
-                                         ValueChanged="location => UpdateStorageLocationAsync(context, location)"
-                                         SearchFunc="SearchStorageLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty"
-                                         Variant="Variant.Text"
-                                         Dense="true"
-                                         Clearable="true" />
-                    }
-                    else
-                    {
-                        @context.StorageLocation?.Name
-                    }
-                </MudTd>
-                <MudTd DataLabel="Номенклатура">
-                    @if (IsDraft)
-                    {
-                        <MudAutocomplete T="StockKeepingUnit"
-                                         Value="context.StockKeepingUnit"
-                                         ValueChanged="sku => UpdateStockKeepingUnitAsync(context, sku)"
-                                         SearchFunc="SearchStockKeepingUnitsAsync"
-                                         ToStringFunc="sku => sku?.Name ?? string.Empty"
-                                         Variant="Variant.Text"
-                                         Dense="true"
-                                         Clearable="true" />
-                    }
-                    else
-                    {
-                        <MudTooltip Text="@context.StockKeepingUnit?.Name">
-                            <span>@context.StockKeepingUnit?.Name</span>
-                        </MudTooltip>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Ожидается">@context.ExpectedQuantity</MudTd>
+                <MudTd DataLabel="Ожидается">@FormatQuantity(context.ExpectedQuantity)</MudTd>
                 <MudTd DataLabel="Фактически">
                     @if (IsDraft)
                     {
-                        <MudNumericField T="double"
+                        <MudNumericField T="double?"
                                          Value="context.CountedQuantity"
-                                         ValueChanged="quantity => UpdateCountedQuantityAsync(context, quantity)"
+                                         ValueChanged="quantity => UpdateQuantityAsync(context, quantity)"
                                          Min="0"
-                                         Variant="Variant.Text"
-                                         HideSpinButtons="true" />
+                                         Placeholder="Не пересчитано"
+                                         HideSpinButtons="true"
+                                         Variant="Variant.Text" />
                     }
                     else
                     {
-                        @context.CountedQuantity
+                        @FormatQuantity(context.CountedQuantity)
                     }
                 </MudTd>
-                <MudTd DataLabel="Фактический вес">@WeightDisplay.Format(context.CountedWeightKg)</MudTd>
-                <MudTd DataLabel="Разница">@context.DifferenceQuantity</MudTd>
+                <MudTd DataLabel="Разница">@FormatQuantity(context.DifferenceQuantity)</MudTd>
                 @if (IsDraft)
                 {
                     <MudTd>
-                        <MudTooltip Text="Удалить строку">
+                        @if (!context.IsExpected)
+                        {
                             <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
                                            Color="Color.Error"
-                                           OnClick="@(() => DeleteItemAsync(context))" />
-                        </MudTooltip>
+                                           OnClick="@(() => RemoveItemAsync(context))" />
+                        }
                     </MudTd>
                 }
             </RowTemplate>

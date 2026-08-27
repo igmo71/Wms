@@ -308,7 +308,7 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == id, ct)
         || await dbContext.InventoryTurnovers.AnyAsync(x => x.StorageLocationId == id, ct)
         || await dbContext.InventoryMovements.AnyAsync(x => x.SourceStorageLocationId == id || x.DestinationStorageLocationId == id, ct)
-        || await dbContext.InventoryCountItems.AnyAsync(x => x.StorageLocationId == id, ct)
+        || await dbContext.InventoryCounts.AnyAsync(x => x.StorageLocationId == id, ct)
         || await dbContext.InventoryTransfers.AnyAsync(x => x.TransitStorageLocationId == id, ct)
         || await dbContext.ReceivingOrders.AnyAsync(x => x.ReceivingLocationId == id, ct)
         || await dbContext.ShippingOrders.AnyAsync(x => x.ShippingLocationId == id, ct);

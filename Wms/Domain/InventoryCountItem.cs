@@ -4,138 +4,127 @@ namespace Wms.Domain;
 
 public class InventoryCountItem
 {
-    private InventoryCountItem()
-    {
-    }
+    private InventoryCountItem() { }
 
     public Guid Id { get; private set; }
-
     public Guid InventoryCountId { get; private set; }
     public InventoryCount? InventoryCount { get; private set; }
-
     public int LineNumber { get; private set; }
-
-    public Guid? StorageLocationId { get; private set; }
-    public StorageLocation? StorageLocation { get; private set; }
-
-    public Guid? StockKeepingUnitId { get; private set; }
+    public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-
     public double ExpectedQuantity { get; private set; }
-    public double CountedQuantity { get; private set; }
+    public double? CountedQuantity { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string CreatedBy { get; private set; } = null!;
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
     public string? UpdatedBy { get; private set; }
 
-    public bool IsComplete => StorageLocationId.HasValue && StockKeepingUnitId.HasValue;
-    public double DifferenceQuantity => CountedQuantity - ExpectedQuantity;
-    public double? CountedWeightKg => WeightCalculation.CalculateKg(CountedQuantity, StockKeepingUnit);
+    public bool IsExpected => ExpectedQuantity > 0;
+    public bool IsCounted => CountedQuantity.HasValue;
+    public double? DifferenceQuantity => CountedQuantity - ExpectedQuantity;
+    public double? CountedWeightKg => CountedQuantity.HasValue
+        ? WeightCalculation.CalculateKg(CountedQuantity.Value, StockKeepingUnit)
+        : null;
 
     internal static OperationResult<InventoryCountItem> Create(
         Guid id,
         Guid inventoryCountId,
         int lineNumber,
+        Guid stockKeepingUnitId,
+        double expectedQuantity,
+        double? countedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
-        if (id == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор строки инвентаризации обязателен.");
-        }
-
-        if (inventoryCountId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор инвентаризации обязателен.");
-        }
-
+        if (id == Guid.Empty || inventoryCountId == Guid.Empty)
+            return OperationError.Invalid("Идентификаторы строки инвентаризации обязательны.");
         if (lineNumber <= 0)
-        {
             return OperationError.Invalid("Номер строки должен быть положительным.");
-        }
+        if (stockKeepingUnitId == Guid.Empty)
+            return OperationError.Invalid("Номенклатура строки инвентаризации обязательна.");
 
-        var auditResult = ValidateAudit(createdAtUtc, createdBy, "Creating user must be specified.");
+        var quantitiesResult = ValidateQuantities(expectedQuantity, countedQuantity);
+        if (!quantitiesResult.IsSuccess)
+            return quantitiesResult.Error!;
+
+        var auditResult = ValidateAudit(createdAtUtc, createdBy);
         if (!auditResult.IsSuccess)
-        {
             return auditResult.Error!;
-        }
 
         return new InventoryCountItem
         {
             Id = id,
             InventoryCountId = inventoryCountId,
             LineNumber = lineNumber,
+            StockKeepingUnitId = stockKeepingUnitId,
+            ExpectedQuantity = expectedQuantity,
+            CountedQuantity = countedQuantity,
             CreatedAtUtc = createdAtUtc,
             CreatedBy = createdBy.Trim()
         };
     }
 
-    internal OperationResult Update(
-        Guid? storageLocationId,
-        Guid? stockKeepingUnitId,
-        double expectedQuantity,
-        double countedQuantity,
-        DateTimeOffset updatedAtUtc,
-        string updatedBy)
+    internal OperationResult IncrementCountedQuantity(DateTimeOffset updatedAtUtc, string updatedBy)
     {
-        if (storageLocationId == Guid.Empty)
-        {
-            return OperationError.Invalid("Некорректный идентификатор складской позиции.");
-        }
-
-        if (stockKeepingUnitId == Guid.Empty)
-        {
-            return OperationError.Invalid("Некорректный идентификатор номенклатуры.");
-        }
-
-        if (!double.IsFinite(expectedQuantity) || expectedQuantity < 0)
-        {
-            return OperationError.Invalid(
-                "Ожидаемое количество должно быть конечным неотрицательным числом.");
-        }
-
-        if (!double.IsFinite(countedQuantity) || countedQuantity < 0)
-        {
-            return OperationError.Invalid(
-                "Фактическое количество должно быть конечным неотрицательным числом.");
-        }
-
-        var auditResult = ValidateAudit(updatedAtUtc, updatedBy, "Updating user must be specified.");
+        var auditResult = ValidateUpdateAudit(updatedAtUtc, updatedBy);
         if (!auditResult.IsSuccess)
-        {
             return auditResult;
-        }
 
-        if (updatedAtUtc < CreatedAtUtc)
-        {
-            return OperationError.Invalid(
-                "Время изменения не может предшествовать созданию строки инвентаризации.");
-        }
+        var countedQuantity = (CountedQuantity ?? 0) + 1;
+        if (!double.IsFinite(countedQuantity))
+            return OperationError.Invalid("Фактическое количество стало слишком большим.");
 
-        StorageLocationId = storageLocationId;
-        StockKeepingUnitId = stockKeepingUnitId;
-        ExpectedQuantity = expectedQuantity;
         CountedQuantity = countedQuantity;
         UpdatedAtUtc = updatedAtUtc;
         UpdatedBy = updatedBy.Trim();
         return OperationResult.Success();
     }
 
-    private static OperationResult ValidateAudit(
-        DateTimeOffset occurredAtUtc,
-        string userId,
-        string missingUserMessage)
+    internal OperationResult SetCountedQuantity(
+        double countedQuantity,
+        DateTimeOffset updatedAtUtc,
+        string updatedBy)
+    {
+        var quantitiesResult = ValidateQuantities(ExpectedQuantity, countedQuantity);
+        if (!quantitiesResult.IsSuccess)
+            return quantitiesResult;
+
+        var auditResult = ValidateUpdateAudit(updatedAtUtc, updatedBy);
+        if (!auditResult.IsSuccess)
+            return auditResult;
+
+        CountedQuantity = countedQuantity;
+        UpdatedAtUtc = updatedAtUtc;
+        UpdatedBy = updatedBy.Trim();
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidateUpdateAudit(DateTimeOffset updatedAtUtc, string updatedBy)
+    {
+        var auditResult = ValidateAudit(updatedAtUtc, updatedBy);
+        if (!auditResult.IsSuccess)
+            return auditResult;
+
+        return updatedAtUtc < CreatedAtUtc
+            ? OperationError.Invalid("Время изменения не может предшествовать созданию строки инвентаризации.")
+            : OperationResult.Success();
+    }
+
+    private static OperationResult ValidateQuantities(double expectedQuantity, double? countedQuantity)
+    {
+        if (!double.IsFinite(expectedQuantity) || expectedQuantity < 0)
+            return OperationError.Invalid("Ожидаемое количество должно быть конечным неотрицательным числом.");
+        if (countedQuantity is double quantity && (!double.IsFinite(quantity) || quantity < 0))
+            return OperationError.Invalid("Фактическое количество должно быть конечным неотрицательным числом.");
+        return OperationResult.Success();
+    }
+
+    private static OperationResult ValidateAudit(DateTimeOffset occurredAtUtc, string userId)
     {
         if (occurredAtUtc == default)
-        {
             return OperationError.Invalid("Время операции обязательно.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid(missingUserMessage);
-        }
-
-        return OperationResult.Success();
+        return string.IsNullOrWhiteSpace(userId)
+            ? OperationError.Invalid("Пользователь операции обязателен.")
+            : OperationResult.Success();
     }
 }

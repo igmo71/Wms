@@ -58,6 +58,12 @@
                 Text="Перемещение" />
 
             <Button
+                Clicked="OnInventoryCountClicked"
+                FontSize="18"
+                HeightRequest="64"
+                Text="Инвентаризация" />
+
+            <Button
                 Clicked="OnScannerDiagnosticsClicked"
                 FontSize="16"
                 HeightRequest="56"

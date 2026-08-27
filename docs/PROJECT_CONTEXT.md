@@ -196,8 +196,9 @@ advances the operational revision of each distinct participating location in
 the same save operation. Acquiring or releasing a lock advances that revision
 as well, so a concurrent movement and lock change cannot both commit from the
 same location state. Document-owned locks are represented by the same active
-lock model; their lifecycle will first be used by the upcoming location-based
-inventory-count workflow.
+lock model. A location inventory count acquires its document-owned lock when
+the draft is created and releases it only when the count is posted or the draft
+is explicitly deleted.
 
 Transfer state uses targeted optimistic concurrency through
 `InventoryTransfer.RowVersion`. Balance row versions, a named balance
@@ -243,11 +244,23 @@ and [`specs/shipping-order-rollback/spec.md`](../specs/shipping-order-rollback/s
 
 ### Inventory counts
 
-Inventory counts are local WMS documents. A draft may contain incomplete rows.
-Posting a completed row creates a receipt or issue movement for the
-counted-versus-expected difference and records the posting user. Recounts,
-reservations, and generated count tasks are not implemented. Detailed rules are
-in [`specs/inventory-count-backend/spec.md`](../specs/inventory-count-backend/spec.md).
+An inventory count is a local WMS document for one ordinary storage location.
+Creating it atomically locks the location and records every positive current
+balance as an expected row. Expected quantities remain visible. A nullable
+counted quantity distinguishes an uncounted row from an explicitly confirmed
+zero.
+
+Each accepted SKU scan records one physical unit: the first scan sets one and
+subsequent scans increment by one. Manual search by name, code, or barcode sets
+an absolute nonnegative quantity and may add an unexpected SKU. Every row must
+be counted before posting. Posting creates movements only for nonzero
+counted-versus-expected differences and releases the lock in the same save.
+Explicitly abandoning work physically deletes the draft and its rows and also
+releases the lock; merely leaving the page preserves the draft. There is no
+cancelled status or separate mobile inventory-count model. Recounts,
+reservations, count assignments, and generated count tasks are not implemented.
+The active implementation record is in
+[`specs/2026-08-27-location-inventory-count/spec.md`](../specs/2026-08-27-location-inventory-count/spec.md).
 
 ### Intra-warehouse transfers
 

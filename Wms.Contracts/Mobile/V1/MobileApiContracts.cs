@@ -10,6 +10,7 @@ public static class MobileApiRoutes
     public const string ResolveSku = Base + "/barcodes/sku/resolve";
     public const string Warehouses = Base + "/warehouses";
     public const string InventoryTransfers = Base + "/inventory-transfers";
+    public const string InventoryCounts = Base + "/inventory-counts";
 }
 
 public sealed record MobileLoginRequest(string Email, string Password);
@@ -178,3 +179,71 @@ public sealed record MobileCompleteInventoryTransferResponse(
     Guid TransferId,
     MobileInventoryTransferStatus Status,
     DateTimeOffset CompletedAtUtc);
+
+public enum MobileInventoryCountStatus
+{
+    Draft = 0,
+    Posted = 1
+}
+
+public sealed record MobileInventoryCountSummaryResponse(
+    Guid Id,
+    string Number,
+    DateTime Date,
+    Guid WarehouseId,
+    string WarehouseName,
+    MobileStorageLocationResponse StorageLocation,
+    MobileInventoryCountStatus Status,
+    int TotalItems,
+    int CountedItems,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? UpdatedAtUtc,
+    DateTimeOffset? PostedAtUtc);
+
+public sealed record MobileInventoryCountItemResponse(
+    Guid Id,
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    double ExpectedQuantity,
+    double? CountedQuantity,
+    double? DifferenceQuantity,
+    bool IsExpected);
+
+public sealed record MobileInventoryCountDetailsResponse(
+    MobileInventoryCountSummaryResponse Count,
+    IReadOnlyList<MobileInventoryCountItemResponse> Items);
+
+public sealed record MobileInventoryCountScanResponse(
+    MobileInventoryCountDetailsResponse Details,
+    MobileInventoryCountItemResponse Item);
+
+public sealed record MobileStartInventoryCountRequest(
+    Guid ClientRequestId,
+    Guid WarehouseId,
+    string StorageLocationBarcode);
+
+public sealed record MobileIncrementInventoryCountSkuRequest(
+    Guid ClientRequestId,
+    string Barcode);
+
+public sealed record MobileInventoryCountSkuSearchResponse(
+    Guid Id,
+    string Code,
+    string Name,
+    string? UnitOfMeasure,
+    bool IsExactMatch);
+
+public sealed record MobileSetInventoryCountItemQuantityRequest(
+    Guid ClientRequestId,
+    double CountedQuantity);
+
+public sealed record MobileSetInventoryCountSkuQuantityRequest(
+    Guid ClientRequestId,
+    Guid StockKeepingUnitId,
+    double CountedQuantity);
+
+public sealed record MobileInventoryCountCommandRequest(Guid ClientRequestId);
+
+public sealed record MobileInventoryCountDeletedResponse(Guid InventoryCountId);

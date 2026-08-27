@@ -5,7 +5,7 @@
 
 <PageTitle>Инвентаризации</PageTitle>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
     <MudText Typo="Typo.h5">Инвентаризации</MudText>
     <MudSpacer />
     <MudAutocomplete T="Warehouse"
@@ -16,11 +16,19 @@
                      Label="Склад"
                      Clearable="true"
                      Class="mr-2" />
-    <MudTooltip Text="Чтобы создать инвентаризацию, выберите склад.">
+    <MudAutocomplete T="StorageLocation"
+                     @bind-Value="_storageLocation"
+                     SearchFunc="SearchStorageLocationsAsync"
+                     ToStringFunc="GetLocationText"
+                     Label="Ячейка"
+                     Disabled="@(_warehouse is null)"
+                     Clearable="true"
+                     Class="mr-2" />
+    <MudTooltip Text="Чтобы создать инвентаризацию, выберите склад и свободную ячейку.">
         <span>
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="@(_isCreating || _warehouse is null)"
+                       Disabled="@(_isCreating || _warehouse is null || _storageLocation is null)"
                        StartIcon="@Icons.Material.Filled.Add"
                        OnClick="CreateAsync">
                 Создать инвентаризацию
@@ -49,6 +57,9 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
+        <TemplateColumn Title="Ячейка">
+            <CellTemplate>@GetLocationText(context.Item.StorageLocation)</CellTemplate>
+        </TemplateColumn>
         <PropertyColumn Property="x => x.Status" Title="Статус">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>

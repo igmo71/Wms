@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.Inventory.Counts;
+using Wms.Application.StorageLocations;
 using Wms.Application.Users;
 using Wms.Application.Warehouses;
 using Wms.Common;
@@ -16,11 +17,13 @@ public partial class Index
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
+    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private MudDataGrid<InventoryCount> _dataGrid = null!;
     private Warehouse? _warehouse;
+    private StorageLocation? _storageLocation;
     private bool _isCreating;
     private bool _createFailed;
     private string? _errorMessage;
@@ -70,12 +73,38 @@ public partial class Index
     private Task OnWarehouseChanged(Warehouse? warehouse)
     {
         _warehouse = warehouse;
+        _storageLocation = null;
         return Task.CompletedTask;
     }
 
+    private async Task<IEnumerable<StorageLocation>> SearchStorageLocationsAsync(
+        string? searchText,
+        CancellationToken ct)
+    {
+        if (_warehouse is null)
+            return [];
+
+        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
+        {
+            SearchString = searchText,
+            WarehouseId = _warehouse.Id,
+            ZoneType = Domain.Enums.ZoneType.Storage,
+            ExcludeDeleted = true,
+            ExcludeFolders = true,
+            ExcludeLocked = true,
+            SortBy = "Code",
+            Take = 10
+        }, ct);
+        return result.Items;
+    }
+
+    private static string GetLocationText(StorageLocation? location) => location is null
+        ? string.Empty
+        : $"{location.Zone?.Code}-{location.Code} · {location.Name}";
+
     private async Task CreateAsync()
     {
-        if (_warehouse is not Warehouse warehouse)
+        if (_warehouse is not Warehouse warehouse || _storageLocation is not StorageLocation location)
             return;
 
         _isCreating = true;
@@ -91,7 +120,10 @@ public partial class Index
                 return;
             }
 
-            var result = await InventoryCountCommandService.CreateAsync(warehouse.Id, userId);
+            var result = await InventoryCountCommandService.CreateAsync(
+                warehouse.Id,
+                location.Id,
+                userId);
             if (!result.IsSuccess || result.Value is null)
             {
                 _createFailed = true;

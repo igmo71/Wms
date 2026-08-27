@@ -159,7 +159,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         var transfer = await queryService.GetAsync(result.Value, ct);
@@ -193,7 +193,7 @@ internal static class MobileInventoryTransferEndpoints
         var transfer = await queryService.GetAsync(transferId, ct);
         if (transfer is null)
         {
-            return CommandProblem(
+            return MobileEndpointResults.CommandProblem(
                 OperationError.NotFound($"Перемещение '{transferId}' не найдено."));
         }
 
@@ -245,7 +245,7 @@ internal static class MobileInventoryTransferEndpoints
         var skuResult = await skuService.ResolveByBarcodeAsync(request.Barcode, ct);
         if (!skuResult.IsSuccess)
         {
-            return CommandProblem(skuResult.Error!);
+            return MobileEndpointResults.CommandProblem(skuResult.Error!);
         }
 
         var sku = skuResult.Value!;
@@ -256,7 +256,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!quantityResult.IsSuccess)
         {
-            return CommandProblem(quantityResult.Error!);
+            return MobileEndpointResults.CommandProblem(quantityResult.Error!);
         }
 
         return TypedResults.Ok(new MobileDirectTransferSkuResponse(
@@ -282,7 +282,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         return TypedResults.Ok<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>(
@@ -307,7 +307,7 @@ internal static class MobileInventoryTransferEndpoints
         var skuResult = await skuService.ResolveByBarcodeAsync(request.Barcode, ct);
         if (!skuResult.IsSuccess)
         {
-            return CommandProblem(skuResult.Error!);
+            return MobileEndpointResults.CommandProblem(skuResult.Error!);
         }
 
         var sku = skuResult.Value!;
@@ -317,7 +317,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!quantityResult.IsSuccess)
         {
-            return CommandProblem(quantityResult.Error!);
+            return MobileEndpointResults.CommandProblem(quantityResult.Error!);
         }
 
         return TypedResults.Ok(new MobileDirectTransferSkuResponse(
@@ -341,7 +341,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         return TypedResults.Ok<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>(
@@ -381,7 +381,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         var movement = await queryService.GetMovementAsync(transferId, result.Value, ct);
@@ -470,7 +470,7 @@ internal static class MobileInventoryTransferEndpoints
     {
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         var transfer = await queryService.GetAsync(transferId, ct);
@@ -513,7 +513,7 @@ internal static class MobileInventoryTransferEndpoints
             ct);
         if (!result.IsSuccess)
         {
-            return CommandProblem(result.Error!);
+            return MobileEndpointResults.CommandProblem(result.Error!);
         }
 
         var transfer = await queryService.GetAsync(result.Value, ct);
@@ -556,21 +556,6 @@ internal static class MobileInventoryTransferEndpoints
             transfer.CreatedAtUtc,
             transfer.UpdatedAtUtc,
             transitLocation);
-    }
-
-    private static IResult CommandProblem(OperationError error)
-    {
-        var (statusCode, code) = error.Type switch
-        {
-            OperationErrorType.NotFound => (StatusCodes.Status404NotFound, "resource_not_found"),
-            OperationErrorType.Conflict => (StatusCodes.Status409Conflict, "request_conflict"),
-            OperationErrorType.Invalid => (StatusCodes.Status422UnprocessableEntity, "invalid_command"),
-            _ => (StatusCodes.Status400BadRequest, "command_failed")
-        };
-
-        return Results.Json(
-            new MobileProblemResponse(code, error.Message),
-            statusCode: statusCode);
     }
 
     private static MobileInventoryTransferStatus MapStatus(InventoryTransferStatus status) =>

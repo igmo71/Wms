@@ -20,16 +20,15 @@ internal class InventoryCountItemConfiguration : IEntityTypeConfiguration<Invent
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
 
-        builder.HasOne(x => x.StorageLocation)
-            .WithMany()
-            .HasForeignKey(x => x.StorageLocationId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(x => x.StockKeepingUnit)
             .WithMany()
             .HasForeignKey(x => x.StockKeepingUnitId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
 
         builder.HasIndex(x => new { x.InventoryCountId, x.LineNumber });
+        builder.HasIndex(x => new { x.InventoryCountId, x.StockKeepingUnitId })
+            .IsUnique()
+            .HasDatabaseName(DatabaseObjectNames.InventoryCountItemsSkuIndex);
     }
 }

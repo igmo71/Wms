@@ -1,0 +1,49 @@
+<ContentPage
+    x:Class="Wms.Mobile.InventoryCountPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Инвентаризация">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label FontAttributes="Bold" FontSize="26" Text="Инвентаризация ячейки" />
+
+            <Picker
+                x:Name="WarehousePicker"
+                ItemDisplayBinding="{Binding Name}"
+                SelectedIndexChanged="OnWarehouseChanged"
+                Title="Выберите склад" />
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label
+                        x:Name="StepLabel"
+                        FontAttributes="Bold"
+                        FontSize="22"
+                        Text="1. Выберите склад" />
+                    <Label
+                        x:Name="InstructionLabel"
+                        FontSize="18"
+                        Text="После выбора склада отсканируйте QR ячейки хранения." />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <ActivityIndicator
+                        x:Name="ProgressIndicator"
+                        IsRunning="False"
+                        IsVisible="False" />
+                    <Label
+                        x:Name="ErrorLabel"
+                        HorizontalTextAlignment="Center"
+                        TextColor="Red" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label FontAttributes="Bold" FontSize="20" Text="Незавершённые инвентаризации" />
+            <Label
+                x:Name="DraftsStatusLabel"
+                HorizontalTextAlignment="Center"
+                Text="Выберите склад." />
+            <VerticalStackLayout x:Name="DraftsContainer" Spacing="10" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

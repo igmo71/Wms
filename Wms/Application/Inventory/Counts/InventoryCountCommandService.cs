@@ -1,135 +1,302 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Inventory.Movements;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-using Wms.Application.Inventory.Movements;
-using Wms.Application.StorageLocations;
-
 namespace Wms.Application.Inventory.Counts;
 
-public class InventoryCountCommandService(
+public sealed class InventoryCountCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     InventoryPostingService inventoryPostingService)
 {
     public async Task<OperationResult<InventoryCount>> CreateAsync(
         Guid warehouseId,
+        Guid storageLocationId,
         string userId,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageCreateAsync(dbContext, warehouseId, storageLocationId, userId, ct);
+        if (!result.IsSuccess)
+            return result.Error!;
+
+        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
+    }
+
+    internal async Task<OperationResult<InventoryCount>> StageCreateAsync(
+        ApplicationDbContext dbContext,
+        Guid warehouseId,
+        Guid storageLocationId,
+        string userId,
+        CancellationToken ct)
+    {
+        var location = await dbContext.StorageLocations
+            .Include(x => x.Warehouse)
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == storageLocationId, ct);
+        if (location is null)
+            return OperationError.NotFound($"Складская позиция '{storageLocationId}' не найдена.");
+        if (location.WarehouseId != warehouseId
+            || location.Warehouse is null
+            || location.Warehouse.DeletionMark
+            || location.Zone is null
+            || location.Zone.DeletionMark
+            || location.Zone.Type != ZoneType.Storage
+            || location.IsFolder
+            || location.DeletionMark)
+            return OperationError.Invalid("Инвентаризацию можно начать только для активной ячейки зоны хранения выбранного склада.");
+        if (location.ActiveLock is not null)
+            return OperationError.Conflict($"Ячейка {GetAddress(location)} уже заблокирована: {location.ActiveLock.Reason}");
+
         var now = DateTimeOffset.UtcNow;
         var countResult = InventoryCount.Create(
             Guid.NewGuid(),
             now.LocalDateTime.ToString("yyMMdd-HHmmss"),
             now.LocalDateTime.Date,
             warehouseId,
+            storageLocationId,
             now,
             userId);
         if (!countResult.IsSuccess)
-        {
             return countResult.Error!;
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId, ct))
-        {
-            return OperationError.NotFound($"Склад '{warehouseId}' не найден.");
-        }
 
         var inventoryCount = countResult.Value!;
+        var expectedBalances = await dbContext.InventoryBalances
+            .AsNoTracking()
+            .Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == storageLocationId
+                && x.Quantity > 0)
+            .OrderBy(x => x.StockKeepingUnitId)
+            .Select(x => new { x.StockKeepingUnitId, x.Quantity })
+            .ToListAsync(ct);
+
+        foreach (var balance in expectedBalances)
+        {
+            var itemResult = inventoryCount.AddExpectedItem(
+                Guid.NewGuid(),
+                balance.StockKeepingUnitId,
+                balance.Quantity,
+                now,
+                userId);
+            if (!itemResult.IsSuccess)
+                return itemResult.Error!;
+        }
+
+        var lockResult = StorageLocationLock.CreateForInventoryCount(
+            location.Id,
+            inventoryCount.Id,
+            $"инвентаризация {inventoryCount.Number}",
+            now,
+            userId);
+        if (!lockResult.IsSuccess)
+            return lockResult.Error!;
+
+        location.AdvanceOperationalRevision();
         dbContext.InventoryCounts.Add(inventoryCount);
-        await dbContext.SaveChangesAsync(ct);
+        dbContext.StorageLocationLocks.Add(lockResult.Value!);
         return inventoryCount;
     }
 
-    public async Task<OperationResult> AddItemAsync(
+    public async Task<OperationResult<InventoryCountItem>> IncrementSkuAsync(
         Guid inventoryCountId,
+        Guid stockKeepingUnitId,
         string userId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var inventoryCount = await dbContext.InventoryCounts
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
-        if (inventoryCount is null)
-        {
-            return OperationError.NotFound($"Инвентаризация '{inventoryCountId}' не найдена.");
-        }
+        var result = await StageIncrementSkuAsync(
+            dbContext,
+            inventoryCountId,
+            stockKeepingUnitId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+            return result.Error!;
 
-        var itemResult = inventoryCount.AddItem(Guid.NewGuid(), DateTimeOffset.UtcNow, userId);
-        if (!itemResult.IsSuccess)
-        {
-            return itemResult.Error!;
-        }
-
-        dbContext.InventoryCountItems.Add(itemResult.Value!);
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
     }
 
-    public async Task<OperationResult> UpdateItemAsync(
+    internal async Task<OperationResult<InventoryCountItem>> StageIncrementSkuAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        Guid stockKeepingUnitId,
+        string userId,
+        CancellationToken ct)
+    {
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        if (!countResult.IsSuccess)
+            return countResult.Error!;
+        if (!await IsActiveSkuAsync(dbContext, stockKeepingUnitId, ct))
+            return OperationError.NotFound($"Номенклатура '{stockKeepingUnitId}' не найдена или недоступна.");
+
+        var inventoryCount = countResult.Value!;
+        var itemExists = inventoryCount.Items.Any(
+            x => x.StockKeepingUnitId == stockKeepingUnitId);
+        var result = inventoryCount.IncrementSku(
+            Guid.NewGuid(),
+            stockKeepingUnitId,
+            DateTimeOffset.UtcNow,
+            userId);
+        if (result.IsSuccess && !itemExists)
+            dbContext.InventoryCountItems.Add(result.Value!);
+        return result;
+    }
+
+    public async Task<OperationResult> SetCountedQuantityAsync(
+        Guid inventoryCountId,
         Guid itemId,
-        Guid? storageLocationId,
-        Guid? stockKeepingUnitId,
         double countedQuantity,
         string userId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
-        if (inventoryCount is null)
-        {
-            return OperationError.NotFound($"Строка инвентаризации '{itemId}' не найдена.");
-        }
-
-        var contextResult = await ValidateItemContextAsync(
+        var result = await StageSetCountedQuantityAsync(
             dbContext,
-            inventoryCount,
-            storageLocationId,
-            stockKeepingUnitId,
-            ct);
-        if (!contextResult.IsSuccess)
-        {
-            return contextResult.Error!;
-        }
-
-        var updateResult = inventoryCount.UpdateItem(
+            inventoryCountId,
             itemId,
-            storageLocationId,
+            countedQuantity,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+            return result;
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    internal async Task<OperationResult> StageSetCountedQuantityAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        Guid itemId,
+        double countedQuantity,
+        string userId,
+        CancellationToken ct)
+    {
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        return countResult.IsSuccess
+            ? countResult.Value!.SetCountedQuantity(itemId, countedQuantity, DateTimeOffset.UtcNow, userId)
+            : countResult.Error!;
+    }
+
+    public async Task<OperationResult<InventoryCountItem>> SetSkuCountedQuantityAsync(
+        Guid inventoryCountId,
+        Guid stockKeepingUnitId,
+        double countedQuantity,
+        string userId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageSetSkuCountedQuantityAsync(
+            dbContext,
+            inventoryCountId,
             stockKeepingUnitId,
-            contextResult.Value,
+            countedQuantity,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+            return result.Error!;
+
+        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
+    }
+
+    internal async Task<OperationResult<InventoryCountItem>> StageSetSkuCountedQuantityAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        Guid stockKeepingUnitId,
+        double countedQuantity,
+        string userId,
+        CancellationToken ct)
+    {
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        if (!countResult.IsSuccess)
+            return countResult.Error!;
+        if (!await IsActiveSkuAsync(dbContext, stockKeepingUnitId, ct))
+            return OperationError.NotFound($"Номенклатура '{stockKeepingUnitId}' не найдена или недоступна.");
+
+        var inventoryCount = countResult.Value!;
+        var itemExists = inventoryCount.Items.Any(
+            x => x.StockKeepingUnitId == stockKeepingUnitId);
+        var result = inventoryCount.SetSkuCountedQuantity(
+            Guid.NewGuid(),
+            stockKeepingUnitId,
             countedQuantity,
             DateTimeOffset.UtcNow,
             userId);
-        if (!updateResult.IsSuccess)
-        {
-            return updateResult;
-        }
-
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        if (result.IsSuccess && !itemExists)
+            dbContext.InventoryCountItems.Add(result.Value!);
+        return result;
     }
 
-    public async Task<OperationResult> DeleteItemAsync(
+    public async Task<OperationResult> RemoveUnexpectedItemAsync(
+        Guid inventoryCountId,
         Guid itemId,
         string userId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var inventoryCount = await FindByItemAsync(dbContext, itemId, ct);
-        if (inventoryCount is null)
-        {
-            return OperationError.NotFound($"Строка инвентаризации '{itemId}' не найдена.");
-        }
+        var result = await StageRemoveUnexpectedItemAsync(
+            dbContext,
+            inventoryCountId,
+            itemId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+            return result;
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+    }
 
-        var removalResult = inventoryCount.RemoveItem(itemId, DateTimeOffset.UtcNow, userId);
-        if (!removalResult.IsSuccess)
-        {
-            return removalResult;
-        }
+    internal async Task<OperationResult> StageRemoveUnexpectedItemAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        Guid itemId,
+        string userId,
+        CancellationToken ct)
+    {
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        if (!countResult.IsSuccess)
+            return countResult.Error!;
 
-        await dbContext.SaveChangesAsync(ct);
+        var item = countResult.Value!.Items.SingleOrDefault(x => x.Id == itemId);
+        var result = countResult.Value.RemoveUnexpectedItem(itemId, DateTimeOffset.UtcNow, userId);
+        if (result.IsSuccess && item is not null)
+            dbContext.InventoryCountItems.Remove(item);
+        return result;
+    }
+
+    public async Task<OperationResult> DeleteDraftAsync(
+        Guid inventoryCountId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageDeleteDraftAsync(dbContext, inventoryCountId, userId, ct);
+        if (!result.IsSuccess)
+            return result;
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    internal async Task<OperationResult> StageDeleteDraftAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        string userId,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return OperationError.Invalid("Пользователь операции не определён.");
+
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        if (!countResult.IsSuccess)
+            return countResult.Error!;
+
+        var inventoryCount = countResult.Value!;
+        var location = inventoryCount.StorageLocation!;
+        location.AdvanceOperationalRevision();
+        dbContext.StorageLocationLocks.Remove(location.ActiveLock!);
+        dbContext.InventoryCounts.Remove(inventoryCount);
         return OperationResult.Success();
     }
 
@@ -139,132 +306,104 @@ public class InventoryCountCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var inventoryCount = await dbContext.InventoryCounts
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == inventoryCountId, ct);
-        if (inventoryCount is null)
-        {
-            return OperationError.NotFound($"Инвентаризация '{inventoryCountId}' не найдена.");
-        }
+        var result = await StagePostAsync(dbContext, inventoryCountId, userId, ct);
+        if (!result.IsSuccess)
+            return result;
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    internal async Task<OperationResult> StagePostAsync(
+        ApplicationDbContext dbContext,
+        Guid inventoryCountId,
+        string userId,
+        CancellationToken ct)
+    {
+        var countResult = await LoadDraftAsync(dbContext, inventoryCountId, ct);
+        if (!countResult.IsSuccess)
+            return countResult.Error!;
+
+        var inventoryCount = countResult.Value!;
+        var expectedResult = await ValidateExpectedBalancesAsync(dbContext, inventoryCount, ct);
+        if (!expectedResult.IsSuccess)
+            return expectedResult;
 
         var now = DateTimeOffset.UtcNow;
         var postResult = inventoryCount.Post(now, userId);
         if (!postResult.IsSuccess)
-        {
             return postResult;
-        }
 
         var movementsResult = CreateDifferenceMovements(inventoryCount, now, userId);
         if (!movementsResult.IsSuccess)
-        {
             return movementsResult.Error!;
-        }
 
         var movements = movementsResult.Value!;
         dbContext.InventoryMovements.AddRange(movements);
-
         if (movements.Count > 0)
         {
-            var postingResult = await inventoryPostingService
-                .PostInventoryMovementsAsync(movements, dbContext, ct);
+            var postingResult = await inventoryPostingService.PostInventoryMovementsAsync(movements, dbContext, ct);
             if (!postingResult.IsSuccess)
-            {
                 return postingResult;
-            }
+        }
+        else
+        {
+            inventoryCount.StorageLocation!.AdvanceOperationalRevision();
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        dbContext.StorageLocationLocks.Remove(inventoryCount.StorageLocation!.ActiveLock!);
+        return OperationResult.Success();
     }
 
-    private static Task<InventoryCount?> FindByItemAsync(
+    private static async Task<OperationResult<InventoryCount>> LoadDraftAsync(
         ApplicationDbContext dbContext,
-        Guid itemId,
+        Guid inventoryCountId,
         CancellationToken ct)
     {
-        return dbContext.InventoryCounts
+        var inventoryCount = await dbContext.InventoryCounts
             .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Items.Any(item => item.Id == itemId), ct);
+            .Include(x => x.StorageLocation)
+                .ThenInclude(x => x!.Zone)
+            .Include(x => x.StorageLocation)
+                .ThenInclude(x => x!.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == inventoryCountId, ct);
+        if (inventoryCount is null)
+            return OperationError.NotFound($"Инвентаризация '{inventoryCountId}' не найдена.");
+        if (inventoryCount.Status != InventoryCountStatus.Draft)
+            return OperationError.Invalid("Изменять можно только черновик инвентаризации.");
+        if (inventoryCount.StorageLocation?.ActiveLock is not StorageLocationLock locationLock
+            || locationLock.OwnerType != StorageLocationLockOwnerType.InventoryCount
+            || locationLock.OwnerId != inventoryCount.Id)
+            return OperationError.Conflict("Ячейка больше не заблокирована этой инвентаризацией.");
+        return inventoryCount;
     }
 
-    private static async Task<OperationResult<double>> ValidateItemContextAsync(
+    private static Task<bool> IsActiveSkuAsync(
+        ApplicationDbContext dbContext,
+        Guid stockKeepingUnitId,
+        CancellationToken ct) =>
+        dbContext.StockKeepingUnits.AnyAsync(
+            x => x.Id == stockKeepingUnitId && !x.DeletionMark,
+            ct);
+
+    private static async Task<OperationResult> ValidateExpectedBalancesAsync(
         ApplicationDbContext dbContext,
         InventoryCount inventoryCount,
-        Guid? storageLocationId,
-        Guid? stockKeepingUnitId,
         CancellationToken ct)
     {
-        if (storageLocationId is Guid locationId)
-        {
-            var locationResult = await ValidateStorageLocationAsync(
-                dbContext,
-                inventoryCount.WarehouseId,
-                locationId,
-                ct);
-            if (!locationResult.IsSuccess)
-            {
-                return locationResult.Error!;
-            }
-        }
-
-        if (stockKeepingUnitId is Guid skuId
-            && !await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == skuId, ct))
-        {
-            return OperationError.NotFound($"Номенклатура '{skuId}' не найдена.");
-        }
-
-        if (storageLocationId is not Guid inventoryLocationId
-            || stockKeepingUnitId is not Guid inventorySkuId)
-        {
-            return 0d;
-        }
-
-        return await dbContext.InventoryBalances
+        var currentBalances = await dbContext.InventoryBalances
+            .AsNoTracking()
             .Where(x => x.WarehouseId == inventoryCount.WarehouseId
-                && x.StorageLocationId == inventoryLocationId
-                && x.StockKeepingUnitId == inventorySkuId)
-            .Select(x => (double?)x.Quantity)
-            .FirstOrDefaultAsync(ct) ?? 0d;
-    }
+                && x.StorageLocationId == inventoryCount.StorageLocationId
+                && x.Quantity > 0)
+            .ToDictionaryAsync(x => x.StockKeepingUnitId, x => x.Quantity, ct);
+        var expectedItems = inventoryCount.Items
+            .Where(x => x.IsExpected)
+            .ToDictionary(x => x.StockKeepingUnitId, x => x.ExpectedQuantity);
 
-    private static async Task<OperationResult> ValidateStorageLocationAsync(
-        ApplicationDbContext dbContext,
-        Guid warehouseId,
-        Guid storageLocationId,
-        CancellationToken ct)
-    {
-        var storageLocation = await dbContext.StorageLocations
-            .Include(x => x.Zone)
-            .Include(x => x.ActiveLock)
-            .FirstOrDefaultAsync(x => x.Id == storageLocationId, ct);
-        if (storageLocation is null)
-        {
-            return OperationError.NotFound($"Складская позиция '{storageLocationId}' не найдена.");
-        }
-
-        if (storageLocation.IsFolder
-            || storageLocation.DeletionMark
-            || storageLocation.Zone?.DeletionMark == true)
-        {
-            return OperationError.Invalid(
-                "Позиция инвентаризации должна быть активной складской позицией.");
-        }
-
-        if (storageLocation.WarehouseId != warehouseId)
-        {
-            return OperationError.Invalid(
-                "Складская позиция должна принадлежать складу инвентаризации.");
-        }
-
-        var availabilityResult = StorageLocationAvailability.ValidateUnlocked(storageLocation);
-        if (!availabilityResult.IsSuccess)
-        {
-            return availabilityResult;
-        }
-
-        return storageLocation.Zone?.Type == ZoneType.Storage
+        return currentBalances.Count == expectedItems.Count
+            && currentBalances.All(x => expectedItems.TryGetValue(x.Key, out var quantity)
+                && quantity == x.Value)
             ? OperationResult.Success()
-            : OperationError.Invalid(
-                "Позиция инвентаризации должна принадлежать зоне хранения.");
+            : OperationError.Conflict("Остатки ячейки изменились после начала инвентаризации. Обновите данные.");
     }
 
     private static OperationResult<List<InventoryMovement>> CreateDifferenceMovements(
@@ -275,26 +414,26 @@ public class InventoryCountCommandService(
         var movements = new List<InventoryMovement>();
         foreach (var item in inventoryCount.Items.Where(x => x.DifferenceQuantity != 0))
         {
+            var difference = item.DifferenceQuantity!.Value;
             var movementResult = InventoryMovement.Create(
                 Guid.NewGuid(),
                 inventoryCount.WarehouseId,
-                item.DifferenceQuantity < 0 ? item.StorageLocationId : null,
-                item.DifferenceQuantity > 0 ? item.StorageLocationId : null,
-                item.StockKeepingUnitId!.Value,
-                Math.Abs(item.DifferenceQuantity),
+                difference < 0 ? inventoryCount.StorageLocationId : null,
+                difference > 0 ? inventoryCount.StorageLocationId : null,
+                item.StockKeepingUnitId,
+                Math.Abs(difference),
                 createdAtUtc,
                 RecorderType.InventoryCount,
                 inventoryCount.Id,
                 item.LineNumber,
                 confirmedBy);
             if (!movementResult.IsSuccess)
-            {
                 return movementResult.Error!;
-            }
-
             movements.Add(movementResult.Value!);
         }
-
         return movements;
     }
+
+    private static string GetAddress(StorageLocation location) =>
+        location.Zone is null ? location.Code : $"{location.Zone.Code}-{location.Code}";
 }

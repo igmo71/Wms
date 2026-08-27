@@ -413,6 +413,149 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректный результат завершения перемещения.");
     }
 
+    public async Task<IReadOnlyList<MobileInventoryCountSummaryResponse>> GetInventoryCountDraftsAsync(
+        Guid warehouseId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryCounts}?warehouseId={warehouseId:D}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<List<MobileInventoryCountSummaryResponse>>(ct)
+            ?? throw InvalidResponse(response, "invalid_inventory_counts_response", "Сервер вернул некорректный список инвентаризаций.");
+    }
+
+    public async Task<MobileInventoryCountDetailsResponse> GetInventoryCountAsync(
+        Guid inventoryCountId,
+        CancellationToken ct = default) =>
+        await GetInventoryCountDetailsAsync($"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}", ct);
+
+    public async Task<MobileInventoryCountDetailsResponse> StartInventoryCountAsync(
+        Guid warehouseId,
+        string storageLocationBarcode,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        await PostInventoryCountDetailsAsync(
+            $"{MobileApiRoutes.InventoryCounts}/start",
+            new MobileStartInventoryCountRequest(clientRequestId, warehouseId, storageLocationBarcode),
+            ct);
+
+    public async Task<MobileInventoryCountScanResponse> IncrementInventoryCountSkuAsync(
+        Guid inventoryCountId,
+        string barcode,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/sku/scan";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileIncrementInventoryCountSkuRequest(clientRequestId, barcode),
+            ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileInventoryCountScanResponse>(ct)
+            ?? throw InvalidResponse(response, "invalid_inventory_count_scan_response", "Сервер вернул некорректный результат сканирования.");
+    }
+
+    public async Task<IReadOnlyList<MobileInventoryCountSkuSearchResponse>> SearchInventoryCountSkusAsync(
+        Guid inventoryCountId,
+        string query,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/skus?query={Uri.EscapeDataString(query)}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<List<MobileInventoryCountSkuSearchResponse>>(ct)
+            ?? throw InvalidResponse(response, "invalid_inventory_count_sku_search_response", "Сервер вернул некорректные результаты поиска товара.");
+    }
+
+    public Task<MobileInventoryCountDetailsResponse> SetInventoryCountSkuQuantityAsync(
+        Guid inventoryCountId,
+        Guid stockKeepingUnitId,
+        double countedQuantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostInventoryCountDetailsAsync(
+            $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/sku-quantity",
+            new MobileSetInventoryCountSkuQuantityRequest(
+                clientRequestId,
+                stockKeepingUnitId,
+                countedQuantity),
+            ct);
+
+    public Task<MobileInventoryCountDetailsResponse> SetInventoryCountItemQuantityAsync(
+        Guid inventoryCountId,
+        Guid itemId,
+        double countedQuantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostInventoryCountDetailsAsync(
+            $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/items/{itemId:D}/quantity",
+            new MobileSetInventoryCountItemQuantityRequest(clientRequestId, countedQuantity),
+            ct);
+
+    public Task<MobileInventoryCountDetailsResponse> RemoveInventoryCountItemAsync(
+        Guid inventoryCountId,
+        Guid itemId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostInventoryCountDetailsAsync(
+            $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/items/{itemId:D}/remove",
+            new MobileInventoryCountCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileInventoryCountDetailsResponse> PostInventoryCountAsync(
+        Guid inventoryCountId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostInventoryCountDetailsAsync(
+            $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/post",
+            new MobileInventoryCountCommandRequest(clientRequestId),
+            ct);
+
+    public async Task DeleteInventoryCountDraftAsync(
+        Guid inventoryCountId,
+        Guid clientRequestId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/delete";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileInventoryCountCommandRequest(clientRequestId),
+            ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+    }
+
+    private async Task<MobileInventoryCountDetailsResponse> GetInventoryCountDetailsAsync(
+        string route,
+        CancellationToken ct)
+    {
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileInventoryCountDetailsResponse>(ct)
+            ?? throw InvalidResponse(response, "invalid_inventory_count_response", "Сервер вернул некорректную инвентаризацию.");
+    }
+
+    private async Task<MobileInventoryCountDetailsResponse> PostInventoryCountDetailsAsync<TRequest>(
+        string route,
+        TRequest request,
+        CancellationToken ct)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileInventoryCountDetailsResponse>(ct)
+            ?? throw InvalidResponse(response, "invalid_inventory_count_response", "Сервер вернул некорректную инвентаризацию.");
+    }
+
+    private static MobileApiException InvalidResponse(
+        HttpResponseMessage response,
+        string code,
+        string message) => new(response.StatusCode, code, message);
+
     public void Logout() => _sessionStore.Clear();
 
     private static async Task ThrowApiExceptionAsync(

@@ -7,17 +7,15 @@ public class InventoryCount
 {
     private readonly List<InventoryCountItem> _items = [];
 
-    private InventoryCount()
-    {
-    }
+    private InventoryCount() { }
 
     public Guid Id { get; private set; }
     public string Number { get; private set; } = null!;
     public DateTime Date { get; private set; }
-
     public Guid WarehouseId { get; private set; }
     public Warehouse? Warehouse { get; private set; }
-
+    public Guid StorageLocationId { get; private set; }
+    public StorageLocation? StorageLocation { get; private set; }
     public InventoryCountStatus Status { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string CreatedBy { get; private set; } = null!;
@@ -25,7 +23,7 @@ public class InventoryCount
     public string? UpdatedBy { get; private set; }
     public DateTimeOffset? PostedAtUtc { get; private set; }
     public string? PostedBy { get; private set; }
-
+    public byte[] RowVersion { get; private set; } = null!;
     public IReadOnlyCollection<InventoryCountItem> Items => _items;
 
     public static OperationResult<InventoryCount> Create(
@@ -33,34 +31,18 @@ public class InventoryCount
         string number,
         DateTime date,
         Guid warehouseId,
+        Guid storageLocationId,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
-        if (id == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор инвентаризации обязателен.");
-        }
+        if (id == Guid.Empty || warehouseId == Guid.Empty || storageLocationId == Guid.Empty)
+            return OperationError.Invalid("Идентификаторы инвентаризации, склада и ячейки обязательны.");
+        if (string.IsNullOrWhiteSpace(number) || date == default)
+            return OperationError.Invalid("Номер и дата инвентаризации обязательны.");
 
-        if (string.IsNullOrWhiteSpace(number))
-        {
-            return OperationError.Invalid("Номер инвентаризации обязателен.");
-        }
-
-        if (date == default)
-        {
-            return OperationError.Invalid("Дата инвентаризации обязательна.");
-        }
-
-        if (warehouseId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор склада обязателен.");
-        }
-
-        var auditResult = ValidateAudit(createdAtUtc, createdBy, "Creating user must be specified.");
+        var auditResult = ValidateAudit(createdAtUtc, createdBy);
         if (!auditResult.IsSuccess)
-        {
             return auditResult.Error!;
-        }
 
         return new InventoryCount
         {
@@ -68,111 +50,101 @@ public class InventoryCount
             Number = number.Trim(),
             Date = date.Date,
             WarehouseId = warehouseId,
+            StorageLocationId = storageLocationId,
             Status = InventoryCountStatus.Draft,
             CreatedAtUtc = createdAtUtc,
             CreatedBy = createdBy.Trim()
         };
     }
 
-    public OperationResult<InventoryCountItem> AddItem(
+    public OperationResult<InventoryCountItem> AddExpectedItem(
         Guid itemId,
+        Guid stockKeepingUnitId,
+        double expectedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
-        var draftResult = ValidateDraft("Items can be added only to a draft inventory count.");
-        if (!draftResult.IsSuccess)
-        {
-            return draftResult.Error!;
-        }
-
-        var lineNumber = _items.Count == 0 ? 1 : _items.Max(x => x.LineNumber) + 1;
-        var itemResult = InventoryCountItem.Create(
-            itemId,
-            Id,
-            lineNumber,
-            createdAtUtc,
-            createdBy);
-        if (!itemResult.IsSuccess)
-        {
-            return itemResult.Error!;
-        }
-
-        _items.Add(itemResult.Value!);
-        Touch(createdAtUtc, createdBy);
-        return itemResult;
+        if (expectedQuantity <= 0)
+            return OperationError.Invalid("Ожидаемая строка должна иметь положительный остаток.");
+        return AddItem(itemId, stockKeepingUnitId, expectedQuantity, null, createdAtUtc, createdBy);
     }
 
-    public OperationResult UpdateItem(
+    public OperationResult<InventoryCountItem> IncrementSku(
         Guid itemId,
-        Guid? storageLocationId,
-        Guid? stockKeepingUnitId,
-        double expectedQuantity,
+        Guid stockKeepingUnitId,
+        DateTimeOffset updatedAtUtc,
+        string updatedBy)
+    {
+        var draftResult = ValidateDraft();
+        if (!draftResult.IsSuccess)
+            return draftResult.Error!;
+
+        var existingItem = _items.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
+        if (existingItem is null)
+            return AddItem(itemId, stockKeepingUnitId, 0, 1, updatedAtUtc, updatedBy);
+
+        var incrementResult = existingItem.IncrementCountedQuantity(updatedAtUtc, updatedBy);
+        if (!incrementResult.IsSuccess)
+            return incrementResult.Error!;
+
+        Touch(updatedAtUtc, updatedBy);
+        return existingItem;
+    }
+
+    public OperationResult SetCountedQuantity(
+        Guid itemId,
         double countedQuantity,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
-        var draftResult = ValidateDraft("Items can be changed only in a draft inventory count.");
-        if (!draftResult.IsSuccess)
-        {
-            return draftResult;
-        }
+        var itemResult = FindDraftItem(itemId);
+        if (!itemResult.IsSuccess)
+            return itemResult.Error!;
 
-        var item = _items.FirstOrDefault(x => x.Id == itemId);
-        if (item is null)
-        {
-            return OperationError.NotFound(
-                $"Строка инвентаризации '{itemId}' в документе '{Id}' не найдена.");
-        }
-
-        if (storageLocationId.HasValue
-            && stockKeepingUnitId.HasValue
-            && _items.Any(x => x.Id != itemId
-                && x.StorageLocationId == storageLocationId
-                && x.StockKeepingUnitId == stockKeepingUnitId))
-        {
-            return OperationError.Invalid(
-                "Сочетание складской позиции и номенклатуры не должно повторяться в инвентаризации.");
-        }
-
-        var updateResult = item.Update(
-            storageLocationId,
-            stockKeepingUnitId,
-            expectedQuantity,
-            countedQuantity,
-            updatedAtUtc,
-            updatedBy);
+        var updateResult = itemResult.Value!.SetCountedQuantity(countedQuantity, updatedAtUtc, updatedBy);
         if (!updateResult.IsSuccess)
-        {
             return updateResult;
-        }
 
         Touch(updatedAtUtc, updatedBy);
         return OperationResult.Success();
     }
 
-    public OperationResult RemoveItem(
+    public OperationResult<InventoryCountItem> SetSkuCountedQuantity(
         Guid itemId,
-        DateTimeOffset removedAtUtc,
-        string removedBy)
+        Guid stockKeepingUnitId,
+        double countedQuantity,
+        DateTimeOffset updatedAtUtc,
+        string updatedBy)
     {
-        var draftResult = ValidateDraft("Items can be deleted only from a draft inventory count.");
+        var draftResult = ValidateDraft();
         if (!draftResult.IsSuccess)
-        {
-            return draftResult;
-        }
+            return draftResult.Error!;
 
-        var item = _items.FirstOrDefault(x => x.Id == itemId);
-        if (item is null)
-        {
-            return OperationError.NotFound(
-                $"Строка инвентаризации '{itemId}' в документе '{Id}' не найдена.");
-        }
+        var existingItem = _items.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
+        if (existingItem is null)
+            return AddItem(itemId, stockKeepingUnitId, 0, countedQuantity, updatedAtUtc, updatedBy);
 
-        var auditResult = ValidateAudit(removedAtUtc, removedBy, "Deleting user must be specified.");
+        var updateResult = existingItem.SetCountedQuantity(countedQuantity, updatedAtUtc, updatedBy);
+        if (!updateResult.IsSuccess)
+            return updateResult.Error!;
+
+        Touch(updatedAtUtc, updatedBy);
+        return existingItem;
+    }
+
+    public OperationResult RemoveUnexpectedItem(Guid itemId, DateTimeOffset removedAtUtc, string removedBy)
+    {
+        var itemResult = FindDraftItem(itemId);
+        if (!itemResult.IsSuccess)
+            return itemResult.Error!;
+
+        var item = itemResult.Value!;
+        if (item.IsExpected)
+            return OperationError.Invalid("Ожидаемую позицию нельзя удалить из инвентаризации.");
+
+        var auditResult = ValidateAudit(removedAtUtc, removedBy);
         if (!auditResult.IsSuccess)
-        {
             return auditResult;
-        }
 
         _items.Remove(item);
         Touch(removedAtUtc, removedBy);
@@ -181,39 +153,18 @@ public class InventoryCount
 
     public OperationResult Post(DateTimeOffset postedAtUtc, string postedBy)
     {
-        var draftResult = ValidateDraft("Only a draft inventory count can be posted.");
+        var draftResult = ValidateDraft();
         if (!draftResult.IsSuccess)
-        {
             return draftResult;
-        }
+        if (_items.Any(x => !x.IsCounted))
+            return OperationError.Invalid("Перед проведением пересчитайте каждую ожидаемую позицию.");
 
-        if (_items.Any(x => !x.IsComplete))
-        {
-            return OperationError.Invalid(
-                "Перед проведением в каждой строке должны быть указаны складская позиция и номенклатура.");
-        }
-
-        var hasDuplicates = _items
-            .GroupBy(x => new { x.StorageLocationId, x.StockKeepingUnitId })
-            .Any(x => x.Count() > 1);
-        if (hasDuplicates)
-        {
-            return OperationError.Invalid(
-                "Сочетание складской позиции и номенклатуры не должно повторяться в инвентаризации.");
-        }
-
-        var auditResult = ValidateAudit(postedAtUtc, postedBy, "Posting user must be specified.");
+        var auditResult = ValidateAudit(postedAtUtc, postedBy);
         if (!auditResult.IsSuccess)
-        {
             return auditResult;
-        }
-
         if (postedAtUtc < CreatedAtUtc
             || _items.Any(x => x.CreatedAtUtc > postedAtUtc || x.UpdatedAtUtc > postedAtUtc))
-        {
-            return OperationError.Invalid(
-                "Время проведения не может предшествовать последнему изменению инвентаризации.");
-        }
+            return OperationError.Invalid("Время проведения не может предшествовать последнему изменению инвентаризации.");
 
         Status = InventoryCountStatus.Posted;
         PostedAtUtc = postedAtUtc;
@@ -222,12 +173,52 @@ public class InventoryCount
         return OperationResult.Success();
     }
 
-    private OperationResult ValidateDraft(string message)
+    private OperationResult<InventoryCountItem> AddItem(
+        Guid itemId,
+        Guid stockKeepingUnitId,
+        double expectedQuantity,
+        double? countedQuantity,
+        DateTimeOffset createdAtUtc,
+        string createdBy)
     {
-        return Status == InventoryCountStatus.Draft
-            ? OperationResult.Success()
-            : OperationError.Invalid(message);
+        var draftResult = ValidateDraft();
+        if (!draftResult.IsSuccess)
+            return draftResult.Error!;
+        if (_items.Any(x => x.StockKeepingUnitId == stockKeepingUnitId))
+            return OperationError.Conflict("Товар уже присутствует в инвентаризации.");
+
+        var lineNumber = _items.Count == 0 ? 1 : _items.Max(x => x.LineNumber) + 1;
+        var itemResult = InventoryCountItem.Create(
+            itemId,
+            Id,
+            lineNumber,
+            stockKeepingUnitId,
+            expectedQuantity,
+            countedQuantity,
+            createdAtUtc,
+            createdBy);
+        if (!itemResult.IsSuccess)
+            return itemResult.Error!;
+
+        _items.Add(itemResult.Value!);
+        Touch(createdAtUtc, createdBy);
+        return itemResult;
     }
+
+    private OperationResult<InventoryCountItem> FindDraftItem(Guid itemId)
+    {
+        var draftResult = ValidateDraft();
+        if (!draftResult.IsSuccess)
+            return draftResult.Error!;
+        var item = _items.SingleOrDefault(x => x.Id == itemId);
+        return item is null
+            ? OperationError.NotFound($"Строка инвентаризации '{itemId}' не найдена.")
+            : item;
+    }
+
+    private OperationResult ValidateDraft() => Status == InventoryCountStatus.Draft
+        ? OperationResult.Success()
+        : OperationError.Invalid("Изменять можно только черновик инвентаризации.");
 
     private void Touch(DateTimeOffset updatedAtUtc, string updatedBy)
     {
@@ -235,21 +226,12 @@ public class InventoryCount
         UpdatedBy = updatedBy.Trim();
     }
 
-    private static OperationResult ValidateAudit(
-        DateTimeOffset occurredAtUtc,
-        string userId,
-        string missingUserMessage)
+    private static OperationResult ValidateAudit(DateTimeOffset occurredAtUtc, string userId)
     {
         if (occurredAtUtc == default)
-        {
             return OperationError.Invalid("Время операции обязательно.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid(missingUserMessage);
-        }
-
-        return OperationResult.Success();
+        return string.IsNullOrWhiteSpace(userId)
+            ? OperationError.Invalid("Пользователь операции обязателен.")
+            : OperationResult.Success();
     }
 }

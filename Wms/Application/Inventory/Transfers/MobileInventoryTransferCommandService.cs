@@ -1,15 +1,12 @@
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Wms.Application.Inventory;
+using Wms.Application.MobileCommands;
 using Wms.Common;
 using Wms.Data;
 
 namespace Wms.Application.Inventory.Transfers;
 
 public sealed class MobileInventoryTransferCommandService(
-    IDbContextFactory<ApplicationDbContext> dbContextFactory,
+    MobileCommandExecutor mobileCommandExecutor,
     InventoryTransferCommandService transferCommandService)
 {
     private const string CreateDraftCommand = "inventory-transfer.create-draft";
@@ -24,7 +21,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
-        ExecuteIdempotentAsync(
+        mobileCommandExecutor.ExecuteAsync(
             CreateDraftCommand,
             clientRequestId,
             ComputeCreateDraftHash(warehouseId, transitStorageLocationId),
@@ -50,7 +47,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
-        ExecuteIdempotentAsync(
+        mobileCommandExecutor.ExecuteAsync(
             MoveDirectCommand,
             clientRequestId,
             ComputeMoveDirectHash(
@@ -118,7 +115,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
-        ExecuteIdempotentAsync(
+        mobileCommandExecutor.ExecuteAsync(
             CompleteCommand,
             clientRequestId,
             ComputeCompleteHash(transferId),
@@ -144,7 +141,7 @@ public sealed class MobileInventoryTransferCommandService(
         string userId,
         bool isPick,
         CancellationToken ct) =>
-        ExecuteIdempotentAsync(
+        mobileCommandExecutor.ExecuteAsync(
             commandType,
             clientRequestId,
             ComputeTransitMovementHash(
@@ -176,101 +173,6 @@ public sealed class MobileInventoryTransferCommandService(
             },
             ct);
 
-    private async Task<OperationResult<Guid>> ExecuteIdempotentAsync(
-        string commandType,
-        Guid clientRequestId,
-        string requestHash,
-        string userId,
-        Func<ApplicationDbContext, CancellationToken, Task<OperationResult<Guid>>> stageAction,
-        CancellationToken ct)
-    {
-        if (clientRequestId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор запроса обязателен.");
-        }
-
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return OperationError.Invalid("Пользователь команды не определён.");
-        }
-
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var existingReceipt = await FindReceiptAsync(
-            dbContext,
-            userId,
-            commandType,
-            clientRequestId,
-            ct);
-        if (existingReceipt is not null)
-        {
-            return ResolveReceipt(existingReceipt, requestHash);
-        }
-
-        var result = await stageAction(dbContext, ct);
-        if (!result.IsSuccess)
-        {
-            return result.Error!;
-        }
-
-        dbContext.MobileCommandReceipts.Add(new MobileCommandReceipt
-        {
-            UserId = userId,
-            CommandType = commandType,
-            ClientRequestId = clientRequestId,
-            RequestHash = requestHash,
-            ResultResourceId = result.Value,
-            CompletedAtUtc = DateTimeOffset.UtcNow
-        });
-
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-            return result.Value;
-        }
-        catch (DbUpdateException exception)
-        {
-            await using var retryContext = await dbContextFactory.CreateDbContextAsync(ct);
-            var winningReceipt = await FindReceiptAsync(
-                retryContext,
-                userId,
-                commandType,
-                clientRequestId,
-                ct);
-            if (winningReceipt is not null)
-            {
-                return ResolveReceipt(winningReceipt, requestHash);
-            }
-
-            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
-            {
-                return error;
-            }
-
-            throw;
-        }
-    }
-
-    private static Task<MobileCommandReceipt?> FindReceiptAsync(
-        ApplicationDbContext dbContext,
-        string userId,
-        string commandType,
-        Guid clientRequestId,
-        CancellationToken ct) =>
-        dbContext.MobileCommandReceipts
-            .AsNoTracking()
-            .SingleOrDefaultAsync(x => x.UserId == userId
-                && x.CommandType == commandType
-                && x.ClientRequestId == clientRequestId,
-                ct);
-
-    private static OperationResult<Guid> ResolveReceipt(
-        MobileCommandReceipt receipt,
-        string requestHash) =>
-        receipt.RequestHash == requestHash
-            ? receipt.ResultResourceId
-            : OperationError.Conflict(
-                "Этот идентификатор запроса уже использован с другими данными.");
-
     private static string ComputeCreateDraftHash(
         Guid warehouseId,
         Guid? transitStorageLocationId)
@@ -278,7 +180,7 @@ public sealed class MobileInventoryTransferCommandService(
         var value = transitStorageLocationId is Guid locationId
             ? $"{warehouseId:N}|{locationId:N}"
             : warehouseId.ToString("N");
-        return ComputeHash(value);
+        return MobileCommandExecutor.ComputeHash(value);
     }
 
     private static string ComputeMoveDirectHash(
@@ -287,7 +189,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
         double quantity) =>
-        ComputeHash(string.Join(
+        MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             sourceStorageLocationId.ToString("N"),
@@ -300,7 +202,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid enteredStorageLocationId,
         Guid stockKeepingUnitId,
         double quantity) =>
-        ComputeHash(string.Join(
+        MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             enteredStorageLocationId.ToString("N"),
@@ -308,8 +210,5 @@ public sealed class MobileInventoryTransferCommandService(
             quantity.ToString("R", CultureInfo.InvariantCulture)));
 
     private static string ComputeCompleteHash(Guid transferId) =>
-        ComputeHash(transferId.ToString("N"));
-
-    private static string ComputeHash(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+        MobileCommandExecutor.ComputeHash(transferId.ToString("N"));
 }

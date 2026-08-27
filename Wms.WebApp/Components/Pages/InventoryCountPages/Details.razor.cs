@@ -1,10 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
+using MudBlazor;
 using Wms.Application.Inventory.Counts;
-using Wms.Application.StockKeepingUnits;
-using Wms.Application.StorageLocations;
-using Wms.Application.Users;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -13,230 +11,162 @@ namespace Wms.WebApp.Components.Pages.InventoryCountPages;
 
 public partial class Details
 {
-    [Parameter]
-    public Guid Id { get; set; }
+    [Parameter] public Guid Id { get; set; }
 
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
-    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
-    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
-    [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private InventoryCount? _inventoryCount;
+    private InventoryCountSkuSearchResult? _selectedSku;
+    private double? _manualQuantity;
     private bool _isLoading = true;
-    private bool _isAddingItem;
+    private bool _isSaving;
     private bool _isPosting;
+    private bool _isDeletingDraft;
     private bool _operationFailed;
     private string? _errorMessage;
-    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool IsDraft => _inventoryCount?.Status == InventoryCountStatus.Draft;
+    private int CountedItems => _inventoryCount?.Items.Count(x => x.IsCounted) ?? 0;
+    private int UncountedItems => _inventoryCount?.Items.Count(x => !x.IsCounted) ?? 0;
+    private string LocationText => _inventoryCount?.StorageLocation is null
+        ? "—"
+        : $"{_inventoryCount.StorageLocation.Zone?.Code}-{_inventoryCount.StorageLocation.Code} · {_inventoryCount.StorageLocation.Name}";
 
-    protected override async Task OnParametersSetAsync()
-    {
-        await ReloadAsync();
-    }
+    protected override Task OnParametersSetAsync() => ReloadAsync();
 
     private async Task ReloadAsync()
     {
         _isLoading = true;
         _inventoryCount = await InventoryCountQueryService.GetAsync(Id);
-        await LoadUserNamesAsync();
         _isLoading = false;
     }
 
-    private async Task<IEnumerable<StorageLocation>> SearchStorageLocationsAsync(string? searchText, CancellationToken ct)
+    private async Task<IEnumerable<InventoryCountSkuSearchResult>> SearchSkusAsync(
+        string? searchText,
+        CancellationToken ct)
     {
-        if (_inventoryCount is null)
-            return [];
+        var result = await InventoryCountQueryService.SearchSkusAsync(Id, searchText ?? string.Empty, 10, ct);
+        return result.IsSuccess ? result.Value! : [];
+    }
 
-        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
+    private static string GetSkuText(InventoryCountSkuSearchResult? sku) => sku is null
+        ? string.Empty
+        : $"{sku.Name} · {sku.Code}";
+
+    private async Task SaveManualQuantityAsync()
+    {
+        if (_selectedSku is null || _manualQuantity is not double quantity)
+            return;
+
+        await RunOperationAsync(
+            userId => SetSkuCountedQuantityAsync(_selectedSku.Id, quantity, userId),
+            "Не удалось сохранить фактическое количество.");
+        if (!_operationFailed)
         {
-            SearchString = searchText,
-            WarehouseId = _inventoryCount.WarehouseId,
-            ZoneType = ZoneType.Storage,
-            ExcludeLocked = true,
-            SortBy = "Name",
-            Take = 10
-        }, ct);
-
-        return result.Items;
-    }
-
-    private async Task<IEnumerable<StockKeepingUnit>> SearchStockKeepingUnitsAsync(string? searchText, CancellationToken ct)
-    {
-        var result = await StockKeepingUnitService.ListAsync(new ListQuery
-        {
-            SearchString = searchText,
-            SortBy = "Name",
-            Take = 10
-        }, ct);
-
-        return result.Items;
-    }
-
-    private Task UpdateStorageLocationAsync(InventoryCountItem item, StorageLocation? storageLocation)
-    {
-        return UpdateItemAsync(item, storageLocation?.Id, item.StockKeepingUnitId, item.CountedQuantity);
-    }
-
-    private Task UpdateStockKeepingUnitAsync(InventoryCountItem item, StockKeepingUnit? stockKeepingUnit)
-    {
-        return UpdateItemAsync(item, item.StorageLocationId, stockKeepingUnit?.Id, item.CountedQuantity);
-    }
-
-    private Task UpdateCountedQuantityAsync(InventoryCountItem item, double countedQuantity)
-    {
-        return UpdateItemAsync(item, item.StorageLocationId, item.StockKeepingUnitId, countedQuantity);
-    }
-
-    private async Task UpdateItemAsync(
-        InventoryCountItem item,
-        Guid? storageLocationId,
-        Guid? stockKeepingUnitId,
-        double countedQuantity)
-    {
-        _operationFailed = false;
-
-        try
-        {
-            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.UpdateItemAsync(
-                item.Id, storageLocationId, stockKeepingUnitId, countedQuantity, userId));
-
-            if (!result.IsSuccess)
-            {
-                _operationFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось обновить строку инвентаризации.";
-                return;
-            }
-
-            await ReloadAsync();
-        }
-        catch
-        {
-            _operationFailed = true;
-            _errorMessage = "Не удалось обновить строку инвентаризации.";
+            _selectedSku = null;
+            _manualQuantity = null;
         }
     }
 
-    private async Task AddItemAsync()
+    private async Task<OperationResult> SetSkuCountedQuantityAsync(
+        Guid stockKeepingUnitId,
+        double countedQuantity,
+        string userId)
     {
-        _isAddingItem = true;
-        _operationFailed = false;
-
-        try
-        {
-            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.AddItemAsync(Id, userId));
-            if (!result.IsSuccess)
-            {
-                _operationFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось добавить строку инвентаризации.";
-                return;
-            }
-
-            await ReloadAsync();
-        }
-        catch
-        {
-            _operationFailed = true;
-            _errorMessage = "Не удалось добавить строку инвентаризации.";
-        }
-        finally
-        {
-            _isAddingItem = false;
-        }
+        var result = await InventoryCountCommandService.SetSkuCountedQuantityAsync(
+            Id,
+            stockKeepingUnitId,
+            countedQuantity,
+            userId);
+        return result.IsSuccess ? OperationResult.Success() : result.Error!;
     }
 
-    private async Task DeleteItemAsync(InventoryCountItem item)
-    {
-        _operationFailed = false;
+    private Task UpdateQuantityAsync(InventoryCountItem item, double? quantity) =>
+        quantity is null
+            ? Task.CompletedTask
+            : RunOperationAsync(
+                userId => InventoryCountCommandService.SetCountedQuantityAsync(
+                    Id,
+                    item.Id,
+                    quantity.Value,
+                    userId),
+                "Не удалось сохранить фактическое количество.");
 
-        try
-        {
-            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.DeleteItemAsync(item.Id, userId));
-            if (!result.IsSuccess)
-            {
-                _operationFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось удалить строку инвентаризации.";
-                return;
-            }
-
-            await ReloadAsync();
-        }
-        catch
-        {
-            _operationFailed = true;
-            _errorMessage = "Не удалось удалить строку инвентаризации.";
-        }
-    }
+    private Task RemoveItemAsync(InventoryCountItem item) => RunOperationAsync(
+        userId => InventoryCountCommandService.RemoveUnexpectedItemAsync(Id, item.Id, userId),
+        "Не удалось удалить ошибочно добавленный товар.");
 
     private async Task PostAsync()
     {
-        _isPosting = true;
-        _operationFailed = false;
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Провести инвентаризацию",
+            "Остатки ячейки будут приведены к указанному фактическому количеству.",
+            yesText: "Провести",
+            cancelText: "Отмена");
+        if (confirmed != true)
+            return;
 
+        _isPosting = true;
+        await RunOperationAsync(
+            userId => InventoryCountCommandService.PostAsync(Id, userId),
+            "Не удалось провести инвентаризацию.");
+        _isPosting = false;
+    }
+
+    private async Task DeleteDraftAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Удалить черновик",
+            "Введённые данные будут удалены, а ячейка освобождена.",
+            yesText: "Удалить",
+            cancelText: "Оставить");
+        if (confirmed != true)
+            return;
+
+        _isDeletingDraft = true;
+        var result = await RunAsCurrentUserAsync(userId =>
+            InventoryCountCommandService.DeleteDraftAsync(Id, userId));
+        _isDeletingDraft = false;
+        if (result.IsSuccess)
+            NavigationManager.NavigateTo("inventory-counts");
+        else
+        {
+            _operationFailed = true;
+            _errorMessage = result.Error?.Message ?? "Не удалось удалить черновик.";
+        }
+    }
+
+    private async Task RunOperationAsync(
+        Func<string, Task<OperationResult>> action,
+        string fallbackMessage)
+    {
+        _isSaving = true;
+        _operationFailed = false;
         try
         {
-            var result = await RunAsCurrentUserAsync(userId => InventoryCountCommandService.PostAsync(Id, userId));
+            var result = await RunAsCurrentUserAsync(action);
             if (!result.IsSuccess)
             {
                 _operationFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось провести инвентаризацию.";
+                _errorMessage = result.Error?.Message ?? fallbackMessage;
                 return;
             }
-
             await ReloadAsync();
         }
         catch
         {
             _operationFailed = true;
-            _errorMessage = "Не удалось провести инвентаризацию.";
+            _errorMessage = fallbackMessage;
         }
         finally
         {
-            _isPosting = false;
+            _isSaving = false;
         }
     }
-
-    private static string FormatDateTimeOffset(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
-
-    private string FormatOperation(DateTimeOffset? timestamp, string? userId)
-    {
-        var time = FormatDateTimeOffset(timestamp);
-        return userId is null ? time : $"{time} · {GetUserName(userId)}";
-    }
-
-    private async Task LoadUserNamesAsync()
-    {
-        if (_inventoryCount is null)
-        {
-            _userNames = new Dictionary<string, string>();
-            return;
-        }
-
-        var userIds = new[]
-        {
-            _inventoryCount.CreatedBy,
-            _inventoryCount.UpdatedBy,
-            _inventoryCount.PostedBy
-        }
-        .Concat(_inventoryCount.Items.SelectMany(x => new[] { x.CreatedBy, x.UpdatedBy }))
-        .Where(x => !string.IsNullOrWhiteSpace(x))
-        .Distinct();
-
-        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(userIds);
-    }
-
-    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
-        ? "—"
-        : _userNames.TryGetValue(userId, out var userName)
-            ? userName
-            : "Пользователь не найден";
-
-    private string GetItemAuditTooltip(InventoryCountItem item) =>
-        $"Создана: {FormatOperation(item.CreatedAtUtc, item.CreatedBy)}\nИзменена: {FormatOperation(item.UpdatedAtUtc, item.UpdatedBy)}";
 
     private async Task<OperationResult> RunAsCurrentUserAsync(Func<string, Task<OperationResult>> action)
     {
@@ -246,4 +176,6 @@ public partial class Details
             ? OperationError.Invalid("Не удалось определить текущего пользователя.")
             : await action(userId);
     }
+
+    private static string FormatQuantity(double? quantity) => quantity?.ToString("0.###") ?? "—";
 }
