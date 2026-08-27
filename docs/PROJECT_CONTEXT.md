@@ -141,6 +141,8 @@ generation of immediate children with deterministic codes, coordinates, and
 picking sequence. Weight and volume limits are stored but are not yet displayed
 as live occupancy or enforced during posting. Detailed rules are in
 [`specs/storage-location-topology/spec.md`](../specs/storage-location-topology/spec.md).
+The accepted cross-process locking rules are in
+[`specs/2026-08-27-storage-location-locking/spec.md`](../specs/2026-08-27-storage-location-locking/spec.md).
 
 ## SKU physical properties and 1C import
 
