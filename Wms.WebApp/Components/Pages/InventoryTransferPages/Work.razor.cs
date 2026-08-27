@@ -151,6 +151,7 @@ public partial class Work
             SearchString = searchText,
             WarehouseId = _transfer.WarehouseId,
             ZoneType = ZoneType.Storage,
+            ExcludeLocked = true,
             SortBy = "Name",
             Take = 10
         }, ct);

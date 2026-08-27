@@ -1,6 +1,7 @@
 @page "/storage-locations"
 @attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @using Wms.Domain
+@using Wms.Domain.Enums
 
 <PageTitle>Складские позиции</PageTitle>
 
@@ -76,6 +77,55 @@ else
                         <MudText><b>Тип:</b> @(_selectedLocation.IsFolder ? "Структурная группа" : "Место хранения")</MudText>
                         <MudText><b>Координаты:</b> @CoordinatesText</MudText>
                         <MudText><b>Порядок отбора:</b> @(_selectedLocation.PickSequence?.ToString() ?? "—")</MudText>
+                        @if (!_selectedLocation.IsFolder && !_selectedLocation.DeletionMark)
+                        {
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.subtitle2">Блокировка</MudText>
+                            @if (_selectedLocation.ActiveLock is null)
+                            {
+                                <MudText Color="Color.Success">Доступна</MudText>
+                                <MudTextField T="string"
+                                              @bind-Value="_lockReason"
+                                              Label="Причина блокировки"
+                                              Lines="2"
+                                              MaxLength="@StorageLocationLock.MaximumReasonLength"
+                                              Counter="@StorageLocationLock.MaximumReasonLength"
+                                              Disabled="@_isChangingLock" />
+                                <MudButton Color="Color.Warning"
+                                           Variant="Variant.Filled"
+                                           StartIcon="@Icons.Material.Filled.Lock"
+                                           Disabled="@(_isChangingLock || string.IsNullOrWhiteSpace(_lockReason))"
+                                           OnClick="LockSelectedAsync">
+                                    Заблокировать
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true">
+                                    <MudText><b>Заблокирована</b></MudText>
+                                    <MudText>@_selectedLocation.ActiveLock.Reason</MudText>
+                                    <MudText Typo="Typo.caption">
+                                        @GetLockOwnerText(_selectedLocation.ActiveLock)
+                                    </MudText>
+                                </MudAlert>
+                                @if (_selectedLocation.ActiveLock.OwnerType == StorageLocationLockOwnerType.Manual)
+                                {
+                                    <MudButton Color="Color.Success"
+                                               Variant="Variant.Outlined"
+                                               StartIcon="@Icons.Material.Filled.LockOpen"
+                                               Disabled="@_isChangingLock"
+                                               OnClick="UnlockSelectedAsync">
+                                        Разблокировать
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption">
+                                        Ячейка освобождается завершением или отменой документа.
+                                    </MudText>
+                                }
+                            }
+                        }
                         <MudStack Row="true" Class="mt-2">
                             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="EditSelectedAsync">Изменить</MudButton>
                             @if (!_selectedLocation.IsFolder && !_selectedLocation.DeletionMark)

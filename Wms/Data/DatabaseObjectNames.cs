@@ -8,4 +8,6 @@ internal static class DatabaseObjectNames
         "UX_InventoryMovements_TransferLine";
     public const string InventoryTransfersActiveTransitLocationIndex =
         "IX_InventoryTransfers_TransitStorageLocationId";
+    public const string StorageLocationLocksPrimaryKey =
+        "PK_StorageLocationLocks";
 }

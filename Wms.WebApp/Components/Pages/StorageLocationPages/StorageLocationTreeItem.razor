@@ -23,6 +23,14 @@
         .OrderBy(x => x.Code);
 
     private string Text => $"{Location.Code} · {Location.Name}";
-    private string Icon => Location.IsFolder ? Icons.Material.Filled.Folder : Icons.Material.Filled.Inventory2;
-    private Color IconColor => Location.DeletionMark ? Color.Default : Color.Primary;
+    private string Icon => Location.IsFolder
+        ? Icons.Material.Filled.Folder
+        : Location.ActiveLock is null
+            ? Icons.Material.Filled.Inventory2
+            : Icons.Material.Filled.Lock;
+    private Color IconColor => Location.DeletionMark
+        ? Color.Default
+        : Location.ActiveLock is null
+            ? Color.Primary
+            : Color.Warning;
 }

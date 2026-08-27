@@ -1,17 +1,24 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
+using System.Security.Claims;
 using Wms.Application.StorageLocations;
+using Wms.Application.Users;
 using Wms.Application.Warehouses;
 using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.StorageLocationPages;
 
 public partial class Index
 {
     [Inject] private StorageLocationCommandService StorageLocationCommandService { get; set; } = null!;
+    [Inject] private StorageLocationLockCommandService StorageLocationLockCommandService { get; set; } = null!;
     [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private ZoneQueryService ZoneQueryService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
@@ -22,7 +29,10 @@ public partial class Index
     private IReadOnlyList<StorageLocation> _locations = [];
     private bool _includeDeleted;
     private bool _isLoading;
+    private bool _isChangingLock;
+    private string _lockReason = string.Empty;
     private string? _errorMessage;
+    private IReadOnlyDictionary<string, string> _lockUserNames = new Dictionary<string, string>();
 
     private string CoordinatesText => _selectedLocation is null
         ? "—"
@@ -81,6 +91,7 @@ public partial class Index
     private Task OnSelectedLocationChanged(StorageLocation? location)
     {
         _selectedLocation = location;
+        _lockReason = string.Empty;
         return Task.CompletedTask;
     }
 
@@ -155,6 +166,65 @@ public partial class Index
         await HandleActionResultAsync(result);
     }
 
+    private async Task LockSelectedAsync()
+    {
+        if (_selectedLocation is null)
+            return;
+
+        _isChangingLock = true;
+        _errorMessage = null;
+        try
+        {
+            var result = await RunAsCurrentUserAsync(userId =>
+                StorageLocationLockCommandService.LockManuallyAsync(
+                    _selectedLocation.Id,
+                    _lockReason,
+                    userId));
+            await HandleActionResultAsync(result);
+        }
+        catch
+        {
+            _errorMessage = "Не удалось заблокировать ячейку.";
+        }
+        finally
+        {
+            _isChangingLock = false;
+        }
+    }
+
+    private async Task UnlockSelectedAsync()
+    {
+        if (_selectedLocation is null)
+            return;
+
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Разблокировать ячейку",
+            $"Разблокировать ячейку {_zone?.Code}-{_selectedLocation.Code}?",
+            yesText: "Разблокировать",
+            cancelText: "Отмена");
+        if (confirmed != true)
+            return;
+
+        _isChangingLock = true;
+        _errorMessage = null;
+        try
+        {
+            var result = await RunAsCurrentUserAsync(userId =>
+                StorageLocationLockCommandService.UnlockManualAsync(
+                    _selectedLocation.Id,
+                    userId));
+            await HandleActionResultAsync(result);
+        }
+        catch
+        {
+            _errorMessage = "Не удалось разблокировать ячейку.";
+        }
+        finally
+        {
+            _isChangingLock = false;
+        }
+    }
+
     private async Task HandleActionResultAsync(OperationResult result)
     {
         if (!result.IsSuccess)
@@ -168,10 +238,11 @@ public partial class Index
     private async Task LoadTreeAsync()
     {
         _errorMessage = null;
-        _selectedLocation = null;
+        var selectedLocationId = _selectedLocation?.Id;
         if (_zone is null)
         {
             _locations = [];
+            _selectedLocation = null;
             return;
         }
 
@@ -179,6 +250,15 @@ public partial class Index
         try
         {
             _locations = await StorageLocationQueryService.GetTreeAsync(_zone.Id, _includeDeleted);
+            _selectedLocation = selectedLocationId is Guid id
+                ? _locations.SingleOrDefault(x => x.Id == id)
+                : null;
+            var userIds = _locations
+                .Select(x => x.ActiveLock?.LockedBy)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!)
+                .Distinct();
+            _lockUserNames = await ApplicationUserQueryService.GetUserNamesAsync(userIds);
         }
         catch
         {
@@ -193,4 +273,25 @@ public partial class Index
 
     private static string Format(double? value) => value?.ToString("0.###") ?? "—";
     private static string ZoneText(Zone? zone) => zone is null ? string.Empty : $"{zone.Code} · {zone.Name}";
+
+    private string GetLockOwnerText(StorageLocationLock locationLock)
+    {
+        var userName = _lockUserNames.TryGetValue(locationLock.LockedBy, out var value)
+            ? value
+            : locationLock.LockedBy;
+        var source = locationLock.OwnerType == StorageLocationLockOwnerType.Manual
+            ? "вручную"
+            : "инвентаризация";
+        return $"{source} · {userName} · {locationLock.LockedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}";
+    }
+
+    private async Task<OperationResult> RunAsCurrentUserAsync(
+        Func<string, Task<OperationResult>> action)
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return userId is null
+            ? OperationError.Invalid("Не удалось определить текущего пользователя.")
+            : await action(userId);
+    }
 }

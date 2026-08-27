@@ -100,6 +100,7 @@ public partial class Details
             WarehouseId = _order.WarehouseId,
             ZoneId = _shippingZone.Id,
             ZoneType = ZoneType.Shipping,
+            ExcludeLocked = true,
             SortBy = "Name",
             Take = 10
         }, ct);

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -219,9 +221,7 @@ public class PutawayCommandService(
             return postingResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     private static Task<ReceivingOrder?> LoadEditableOrderAsync(
@@ -253,18 +253,33 @@ public class PutawayCommandService(
             return OperationError.Invalid("Позиция назначения должна отличаться от позиции приёмки.");
         }
 
-        var isValid = await dbContext.StorageLocations
-            .AnyAsync(x => x.Id == destinationStorageLocationId
-                && x.WarehouseId == order.WarehouseId
-                && !x.IsFolder
-                && !x.DeletionMark
-                && !x.Zone!.DeletionMark
-                && x.Zone.Type == ZoneType.Storage, ct);
+        var destination = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == destinationStorageLocationId, ct);
 
-        return isValid
-            ? OperationResult.Success()
-            : OperationError.Invalid(
+        if (destination is null
+            || destination.WarehouseId != order.WarehouseId
+            || destination.IsFolder
+            || destination.DeletionMark
+            || destination.Zone?.DeletionMark == true
+            || destination.Zone?.Type != ZoneType.Storage)
+        {
+            return OperationError.Invalid(
                 "Позиция размещения должна быть активной позицией хранения на складе ордера.");
+        }
+
+        var destinationResult = StorageLocationAvailability.ValidateUnlocked(destination);
+        if (!destinationResult.IsSuccess)
+        {
+            return destinationResult;
+        }
+
+        var source = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleAsync(x => x.Id == order.ReceivingLocationId, ct);
+        return StorageLocationAvailability.ValidateUnlocked(source);
     }
 
     private static async Task<OperationResult> ValidateSourceBalanceAsync(

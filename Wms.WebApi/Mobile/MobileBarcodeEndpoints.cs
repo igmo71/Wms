@@ -19,6 +19,7 @@ internal static class MobileBarcodeEndpoints
             .Produces<MobileStorageLocationResponse>()
             .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
             .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
+            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
             .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 
         group.MapPost("/sku/resolve", ResolveSkuAsync)
@@ -91,7 +92,9 @@ internal static class MobileBarcodeEndpoints
         var (statusCode, suffix) = error.Type switch
         {
             OperationErrorType.NotFound => (StatusCodes.Status404NotFound, "not_found"),
-            OperationErrorType.Conflict => (StatusCodes.Status409Conflict, "ambiguous"),
+            OperationErrorType.Conflict => (
+                StatusCodes.Status409Conflict,
+                subject == "storage_location" ? "locked" : "ambiguous"),
             OperationErrorType.Invalid => (StatusCodes.Status422UnprocessableEntity, "not_allowed"),
             _ => (StatusCodes.Status400BadRequest, "resolution_failed")
         };

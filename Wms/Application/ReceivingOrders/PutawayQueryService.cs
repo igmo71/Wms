@@ -39,6 +39,7 @@ public class PutawayQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .Where(x => x.WarehouseId == warehouseId
                 && !x.IsFolder
                 && !x.DeletionMark
+                && x.ActiveLock == null
                 && !x.Zone!.DeletionMark
                 && x.Zone.Type == ZoneType.Storage);
 

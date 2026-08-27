@@ -120,6 +120,14 @@ are deliberately not modeled.
 - Existing nodes cannot be moved or renumbered in the MVP.
 - A node with active children cannot be deactivated, and a child cannot be
   activated while its parent is inactive.
+- An active operational location may have one temporary active lock with an
+  explicit reason. A manual lock blocks all inbound and outbound inventory
+  movements; administrators manage it in the storage-location configuration.
+  Unlocking removes the active lock rather than retaining lock history.
+- A locked location remains visible in topology, balances, and history, but is
+  excluded from operational selectors. It cannot be deactivated or converted
+  to a folder while locked. Draft work may continue to exist, but final posting
+  involving the location is rejected.
 - Optional dimensions use meters, volume uses cubic meters, maximum weight uses
   kilograms, and coordinates use the warehouse's local meter coordinate
   system. `UsableVolume` is `Volume * (VolumeFactor ?? 1)`.
@@ -180,6 +188,14 @@ inventory until their workflow posts them. The operator UI lists balances,
 posted movements, and turnovers; drafts are excluded from the posted-movement
 list. Reservations and aggregated available-to-promise quantities are not
 modeled.
+
+Every posting validates active location locks before changing inventory and
+advances the operational revision of each distinct participating location in
+the same save operation. Acquiring or releasing a lock advances that revision
+as well, so a concurrent movement and lock change cannot both commit from the
+same location state. Document-owned locks are represented by the same active
+lock model; their lifecycle will first be used by the upcoming location-based
+inventory-count workflow.
 
 Transfer state uses targeted optimistic concurrency through
 `InventoryTransfer.RowVersion`. Balance row versions, a named balance

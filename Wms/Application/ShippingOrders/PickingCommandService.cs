@@ -4,6 +4,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Application.StorageLocations;
 
 namespace Wms.Application.ShippingOrders;
 
@@ -174,18 +175,38 @@ public class PickingCommandService(
         Guid sourceStorageLocationId,
         CancellationToken ct)
     {
-        bool isValid = await dbContext.StorageLocations
-            .AnyAsync(x => x.Id == sourceStorageLocationId
-                && x.WarehouseId == order.WarehouseId
-                && !x.IsFolder
-                && !x.DeletionMark
-                && !x.Zone!.DeletionMark
-                && x.Zone.Type == ZoneType.Storage, ct);
+        var source = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
 
-        return isValid
-            ? OperationResult.Success()
-            : OperationError.Invalid(
+        if (source is null
+            || source.WarehouseId != order.WarehouseId
+            || source.IsFolder
+            || source.DeletionMark
+            || source.Zone?.DeletionMark == true
+            || source.Zone?.Type != ZoneType.Storage)
+        {
+            return OperationError.Invalid(
                 "Источник отбора должен быть активной позицией хранения на складе ордера.");
+        }
+
+        var sourceResult = StorageLocationAvailability.ValidateUnlocked(source);
+        if (!sourceResult.IsSuccess)
+        {
+            return sourceResult;
+        }
+
+        if (order.ShippingLocationId is not Guid shippingLocationId)
+        {
+            return OperationError.Invalid("Для отбора должна быть указана позиция отгрузки.");
+        }
+
+        var destination = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleAsync(x => x.Id == shippingLocationId, ct);
+        return StorageLocationAvailability.ValidateUnlocked(destination);
     }
 
     private static async Task<OperationResult> ValidateSourceBalanceAsync(

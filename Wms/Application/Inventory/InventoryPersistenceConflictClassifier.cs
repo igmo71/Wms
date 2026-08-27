@@ -14,6 +14,9 @@ internal static class InventoryPersistenceConflictClassifier
     private static readonly OperationError TransferConflict = OperationError.Conflict(
         "Перемещение изменилось. Обновите данные и повторите операцию.");
 
+    private static readonly OperationError StorageLocationConflict = OperationError.Conflict(
+        "Состояние ячейки изменилось. Обновите данные и повторите операцию.");
+
     public static bool TryClassify(DbUpdateException exception, out OperationError error)
     {
         if (exception is DbUpdateConcurrencyException concurrencyException)
@@ -27,6 +30,12 @@ internal static class InventoryPersistenceConflictClassifier
             if (concurrencyException.Entries.Any(x => x.Entity is InventoryTransfer))
             {
                 error = TransferConflict;
+                return true;
+            }
+
+            if (concurrencyException.Entries.Any(x => x.Entity is StorageLocation))
+            {
+                error = StorageLocationConflict;
                 return true;
             }
         }
@@ -55,6 +64,14 @@ internal static class InventoryPersistenceConflictClassifier
             {
                 error = OperationError.Conflict(
                     "Транзитная позиция уже назначена другому активному перемещению.");
+                return true;
+            }
+
+            if (sqlException.Message.Contains(
+                    DatabaseObjectNames.StorageLocationLocksPrimaryKey,
+                    StringComparison.Ordinal))
+            {
+                error = StorageLocationConflict;
                 return true;
             }
         }

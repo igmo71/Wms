@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
+using Wms.Application.StorageLocations;
 
 namespace Wms.Application.Inventory.Movements;
 
@@ -20,7 +22,12 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
         var locationResult = await ValidateLocationsAsync(movements, dbContext, ct);
         if (!locationResult.IsSuccess)
         {
-            return locationResult;
+            return locationResult.Error!;
+        }
+
+        foreach (var location in locationResult.Value!)
+        {
+            location.AdvanceOperationalRevision();
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -202,13 +209,15 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
         return OperationResult.Success();
     }
 
-    private static async Task<OperationResult> ValidateLocationsAsync(
+    private static async Task<OperationResult<IReadOnlyCollection<StorageLocation>>> ValidateLocationsAsync(
         IReadOnlyCollection<InventoryMovement> movements,
         ApplicationDbContext dbContext,
         CancellationToken ct)
     {
         var storageLocationIds = GetStorageLocationIds(movements);
         var locations = await dbContext.StorageLocations
+            .Include(x => x.ActiveLock)
+            .Include(x => x.Zone)
             .Where(x => storageLocationIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
 
@@ -229,11 +238,24 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
                     return OperationError.Invalid(
                         "Для движений необходимы складские позиции, не являющиеся папками и принадлежащие своему складу.");
                 }
+
+                if (location.ActiveLock is not null
+                    && !IsOwnedByMovement(location.ActiveLock, movement))
+                {
+                    return StorageLocationAvailability.LockedConflict(location);
+                }
             }
         }
 
-        return OperationResult.Success();
+        return OperationResult<IReadOnlyCollection<StorageLocation>>.Success(locations.Values);
     }
+
+    private static bool IsOwnedByMovement(
+        StorageLocationLock locationLock,
+        InventoryMovement movement) =>
+        locationLock.OwnerType == StorageLocationLockOwnerType.InventoryCount
+        && locationLock.OwnerId == movement.RecorderId
+        && movement.RecorderType == RecorderType.InventoryCount;
 
     private static Guid[] GetStorageLocationIds(IReadOnlyCollection<InventoryMovement> movements)
     {

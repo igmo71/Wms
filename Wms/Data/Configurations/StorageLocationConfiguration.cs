@@ -12,6 +12,7 @@ internal class StorageLocationConfiguration : IEntityTypeConfiguration<StorageLo
 
         builder.Property(x => x.Code).HasMaxLength(DefaultConfiguration.Code).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(DefaultConfiguration.Name).IsRequired();
+        builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
 
         builder.HasOne(x => x.Warehouse).WithMany(x => x.StorageLocations)
             .HasForeignKey(x => x.WarehouseId).HasPrincipalKey(x => x.Id)

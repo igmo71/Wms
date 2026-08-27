@@ -5,6 +5,7 @@ using Wms.Domain;
 using Wms.Domain.Enums;
 
 using Wms.Application.Inventory.Movements;
+using Wms.Application.StorageLocations;
 
 namespace Wms.Application.Inventory.Counts;
 
@@ -172,8 +173,7 @@ public class InventoryCountCommandService(
             }
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     private static Task<InventoryCount?> FindByItemAsync(
@@ -234,6 +234,7 @@ public class InventoryCountCommandService(
     {
         var storageLocation = await dbContext.StorageLocations
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .FirstOrDefaultAsync(x => x.Id == storageLocationId, ct);
         if (storageLocation is null)
         {
@@ -252,6 +253,12 @@ public class InventoryCountCommandService(
         {
             return OperationError.Invalid(
                 "Складская позиция должна принадлежать складу инвентаризации.");
+        }
+
+        var availabilityResult = StorageLocationAvailability.ValidateUnlocked(storageLocation);
+        if (!availabilityResult.IsSuccess)
+        {
+            return availabilityResult;
         }
 
         return storageLocation.Zone?.Type == ZoneType.Storage

@@ -30,6 +30,8 @@ public class StorageLocation
     public LocationCoordinates Coordinates { get; private set; } = LocationCoordinates.Empty;
 
     public long? PickSequence { get; private set; }
+    public long OperationalRevision { get; private set; }
+    public StorageLocationLock? ActiveLock { get; private set; }
 
     public string Barcode => $"{BarcodePrefix}{Id:N}";
 
@@ -146,6 +148,8 @@ public class StorageLocation
     public void Deactivate() => DeletionMark = true;
 
     public void Activate() => DeletionMark = false;
+
+    public void AdvanceOperationalRevision() => OperationalRevision++;
 
     private void ApplyDetails(StorageLocationDetails details)
     {

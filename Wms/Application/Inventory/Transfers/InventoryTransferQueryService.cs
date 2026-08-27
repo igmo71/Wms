@@ -3,6 +3,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Application.StorageLocations;
 
 namespace Wms.Application.Inventory.Transfers;
 
@@ -81,6 +82,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
         var sourceLocation = await dbContext.StorageLocations
             .AsNoTracking()
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .FirstOrDefaultAsync(x => x.Id == sourceStorageLocationId, ct);
         if (sourceLocation is null)
         {
@@ -96,6 +98,12 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
         {
             return OperationError.Invalid(
                 "Исходная ячейка должна быть активной обычной ячейкой склада перемещения.");
+        }
+
+        var sourceAvailabilityResult = StorageLocationAvailability.ValidateUnlocked(sourceLocation);
+        if (!sourceAvailabilityResult.IsSuccess)
+        {
+            return sourceAvailabilityResult.Error!;
         }
 
         return await dbContext.InventoryBalances
@@ -143,6 +151,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .AnyAsync(x => x.Id == sourceStorageLocationId
                 && !x.IsFolder
                 && !x.DeletionMark
+                && x.ActiveLock == null
                 && x.WarehouseId == transfer.WarehouseId
                 && !x.Zone!.DeletionMark
                 && x.Zone.Type == ZoneType.Storage,
@@ -488,6 +497,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .Where(x => x.WarehouseId == warehouseId
                 && !x.IsFolder
                 && !x.DeletionMark
+                && x.ActiveLock == null
                 && !x.Zone!.DeletionMark
                 && x.Zone!.Type == ZoneType.Transit
                 && !activeTransitStorageLocationIds.Contains(x.Id)

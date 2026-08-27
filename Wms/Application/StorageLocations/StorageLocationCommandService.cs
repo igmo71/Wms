@@ -58,10 +58,17 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         CancellationToken ct = default)
     {
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
+        StorageLocation? location = await dbContext.StorageLocations
+            .Include(x => x.ActiveLock)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
             return OperationError.NotFound($"Складская позиция '{id}' не найдена.");
+        }
+
+        if (!location.IsFolder && details.IsFolder && location.ActiveLock is not null)
+        {
+            return OperationError.Invalid("Заблокированную складскую позицию нельзя преобразовать в группу.");
         }
 
         if (!location.IsFolder && details.IsFolder && await HasBeenUsedAsync(dbContext, id, ct))
@@ -122,7 +129,9 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
     public async Task<OperationResult> MarkDeleteAsync(Guid id, CancellationToken ct = default)
     {
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        StorageLocation? location = await dbContext.StorageLocations.FirstOrDefaultAsync(x => x.Id == id, ct);
+        StorageLocation? location = await dbContext.StorageLocations
+            .Include(x => x.ActiveLock)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (location is null)
         {
             return OperationError.NotFound($"Складская позиция '{id}' не найдена.");
@@ -131,6 +140,11 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         if (await dbContext.StorageLocations.AnyAsync(x => x.ParentId == id && !x.DeletionMark, ct))
         {
             return OperationError.Invalid("Сначала деактивируйте дочерние позиции.");
+        }
+
+        if (location.ActiveLock is not null)
+        {
+            return OperationError.Invalid("Заблокированную складскую позицию нельзя деактивировать.");
         }
 
         if (!location.IsFolder && await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == id && x.Quantity > 0, ct))

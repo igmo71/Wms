@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -162,9 +164,7 @@ public class ReceivingOrderCommandService(
             return externalResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> UpdateOrderItemFactQuantityAsync(
@@ -210,17 +210,25 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
         }
 
-        var validLocation = await dbContext.StorageLocations
-            .AnyAsync(x => x.Id == receivingLocationId
-                && x.WarehouseId == order.WarehouseId
-                && !x.IsFolder
-                && !x.DeletionMark
-                && !x.Zone!.DeletionMark
-                && x.Zone!.Type == ZoneType.Receiving, ct);
+        var location = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == receivingLocationId, ct);
 
-        if (!validLocation)
+        if (location is null
+            || location.WarehouseId != order.WarehouseId
+            || location.IsFolder
+            || location.DeletionMark
+            || location.Zone?.DeletionMark == true
+            || location.Zone?.Type != ZoneType.Receiving)
         {
             return OperationError.Invalid("Позиция приёмки должна принадлежать зоне приёмки на складе ордера.");
+        }
+
+        var availabilityResult = StorageLocationAvailability.ValidateUnlocked(location);
+        if (!availabilityResult.IsSuccess)
+        {
+            return availabilityResult;
         }
 
         var locationResult = order.SetReceivingLocation(receivingLocationId);

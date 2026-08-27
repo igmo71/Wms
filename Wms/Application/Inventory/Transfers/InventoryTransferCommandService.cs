@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -367,19 +368,8 @@ public class InventoryTransferCommandService(
 
     private static async Task<OperationResult> SaveChangesAsync(
         ApplicationDbContext dbContext,
-        CancellationToken ct)
-    {
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-            return OperationResult.Success();
-        }
-        catch (DbUpdateException exception)
-            when (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
-        {
-            return error;
-        }
-    }
+        CancellationToken ct) =>
+        await InventoryPersistence.SaveChangesAsync(dbContext, ct);
 
     private static OperationResult<InventoryTransferRoute> CreateRoute(
         InventoryTransfer transfer,
@@ -424,6 +414,7 @@ public class InventoryTransferCommandService(
     {
         var transitLocation = await dbContext.StorageLocations
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .FirstOrDefaultAsync(x => x.Id == locationId, ct);
         if (transitLocation is null)
         {
@@ -443,6 +434,12 @@ public class InventoryTransferCommandService(
         {
             return OperationError.Invalid(
                 "Транзитная позиция должна быть активной и принадлежать транзитной зоне склада перемещения.");
+        }
+
+        var transitAvailabilityResult = StorageLocationAvailability.ValidateUnlocked(transitLocation);
+        if (!transitAvailabilityResult.IsSuccess)
+        {
+            return transitAvailabilityResult;
         }
 
         if (await dbContext.InventoryBalances.AnyAsync(
@@ -480,6 +477,7 @@ public class InventoryTransferCommandService(
 
         var locations = await dbContext.StorageLocations
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .Where(x => locationIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
 
@@ -501,6 +499,18 @@ public class InventoryTransferCommandService(
         {
             return OperationError.Invalid(
                 "Позиции движения должны быть активными и принадлежать складу перемещения.");
+        }
+
+        var sourceAvailabilityResult = StorageLocationAvailability.ValidateUnlocked(sourceLocation);
+        if (!sourceAvailabilityResult.IsSuccess)
+        {
+            return sourceAvailabilityResult;
+        }
+
+        var destinationAvailabilityResult = StorageLocationAvailability.ValidateUnlocked(destinationLocation);
+        if (!destinationAvailabilityResult.IsSuccess)
+        {
+            return destinationAvailabilityResult;
         }
 
         var expectedSourceType = mode == MovementMode.Put ? ZoneType.Transit : ZoneType.Storage;

@@ -142,6 +142,11 @@ last-resort user-facing response and logging.
 - Optimistic concurrency is added to mutable aggregate roots or rows only when
   a stale save can break a documented lifecycle or inventory invariant. Do not
   put `RowVersion` on a universal base entity merely for consistency.
+- A cross-process guard may use a targeted numeric operational revision on the
+  shared resource. Inventory posting and storage-location lock changes both
+  advance `StorageLocation.OperationalRevision` in their single save boundary;
+  this coordinates movement and locking without a repository, distributed
+  lock, or long-running database transaction.
 - Expected concurrency failures and violations of specifically named
   concurrency-related constraints may become `OperationResult.Conflict` at the
   application save boundary. Unrecognized database failures remain exceptions.

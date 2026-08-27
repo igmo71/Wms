@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -163,9 +165,7 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
@@ -218,9 +218,7 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> SetShippingLocationAsync(
@@ -238,17 +236,25 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound($"Расходный ордер '{shippingOrderId}' не найден.");
         }
 
-        bool validLocation = await dbContext.StorageLocations
-            .AnyAsync(x => x.Id == shippingLocationId
-                && x.WarehouseId == order.WarehouseId
-                && !x.IsFolder
-                && !x.DeletionMark
-                && !x.Zone!.DeletionMark
-                && x.Zone!.Type == ZoneType.Shipping, ct);
+        var location = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == shippingLocationId, ct);
 
-        if (!validLocation)
+        if (location is null
+            || location.WarehouseId != order.WarehouseId
+            || location.IsFolder
+            || location.DeletionMark
+            || location.Zone?.DeletionMark == true
+            || location.Zone?.Type != ZoneType.Shipping)
         {
             return OperationError.Invalid("Позиция отгрузки должна принадлежать зоне отгрузки на складе ордера.");
+        }
+
+        var availabilityResult = StorageLocationAvailability.ValidateUnlocked(location);
+        if (!availabilityResult.IsSuccess)
+        {
+            return availabilityResult;
         }
 
         OperationResult locationResult = order.SetShippingLocation(shippingLocationId);
@@ -324,7 +330,11 @@ public class ShippingOrderCommandService(
             }
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        if (!saveResult.IsSuccess)
+        {
+            return saveResult;
+        }
 
         logger.LogInformation("Операция расходного ордера отменена пользователем {UserId}. Причина: {Reason}", userId, reason.Trim());
         return OperationResult.Success();

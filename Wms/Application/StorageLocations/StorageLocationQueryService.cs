@@ -24,6 +24,7 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .SingleOrDefaultAsync(x => x.Id == locationId, ct);
 
         if (location is null)
@@ -57,6 +58,11 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
             return OperationError.Invalid("Ячейка не подходит для текущей операции.");
         }
 
+        if (location.ActiveLock is not null)
+        {
+            return StorageLocationAvailability.LockedConflict(location);
+        }
+
         return location;
     }
 
@@ -70,6 +76,7 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
             .Where(x => x.ZoneId == zoneId);
 
         if (!includeDeleted)
@@ -88,7 +95,8 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
         IQueryable<StorageLocation> locations = dbContext.StorageLocations
             .AsNoTracking()
             .Include(x => x.Warehouse)
-            .Include(x => x.Zone);
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock);
 
         if (query.ExcludeDeleted)
         {
@@ -98,6 +106,11 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
         if (query.ExcludeFolders)
         {
             locations = locations.Where(x => !x.IsFolder);
+        }
+
+        if (query.ExcludeLocked)
+        {
+            locations = locations.Where(x => x.ActiveLock == null);
         }
 
         if (query.WarehouseId is Guid warehouseId)
