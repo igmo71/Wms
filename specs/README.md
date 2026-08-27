@@ -38,12 +38,14 @@ scope must be split or the user must choose their order.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
-| 2026-08-19 | **Active** | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
+| 2026-08-27 | **Active** | Temporary storage-location locking across inventory processes | [`2026-08-27-storage-location-locking/spec.md`](2026-08-27-storage-location-locking/spec.md) |
+| 2026-08-19 | Frozen reference | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
 | 2026-08-25 | Frozen reference | Atomic idempotency for mobile inventory-transfer commands | [`2026-08-25-mobile-command-idempotency/spec.md`](2026-08-25-mobile-command-idempotency/spec.md) |
 | 2026-08-21 | Frozen reference | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
 
-The parent mobile workstream has resumed after atomic command receipts were
-implemented for creation of the first inventory-transfer draft.
+Storage-location locking is the active cross-cutting prerequisite for the next
+mobile process. The accepted mobile foundation and intra-warehouse transfer
+vertical remain frozen references.
 
 ## Legacy reference ledger
 

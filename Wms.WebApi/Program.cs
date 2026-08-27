@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Serilog;
 using SerilogTracing;
@@ -42,7 +43,15 @@ public class Program
             .AddApiEndpoints();
 
         builder.Services.AddAuthentication(IdentityConstants.BearerScheme)
-            .AddBearerToken(IdentityConstants.BearerScheme);
+            .AddBearerToken(IdentityConstants.BearerScheme, options =>
+            {
+                var configuredExpiration = builder.Configuration.GetValue<TimeSpan?>(
+                    "MobileAuthentication:AccessTokenExpiration");
+                if (configuredExpiration is { } expiration)
+                {
+                    options.BearerTokenExpiration = expiration;
+                }
+            });
 
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy(

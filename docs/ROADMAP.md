@@ -6,9 +6,8 @@ in `specs/`.
 
 ## Current MVP focus
 
-- Resume mobile development from the contracts and authenticated API
-  foundation, then deliver direct intra-warehouse movement as the first
-  scanning-oriented vertical.
+- Deliver the active storage-location locking specification as the shared
+  prerequisite for mobile and web inventory counting.
 - Manually validate and harden the implemented web workflows after the
   rich-model, authorization, storage-topology, and SKU-import refactoring.
 - Prove that existing databases can be migrated safely to required zone and
@@ -53,31 +52,17 @@ and per-warehouse assignments remain deferred until a pilot needs them.
 - Define expected notification delivery semantics. The current in-memory
   channel can lose queued notifications on restart and has no retry queue.
 
-## Mobile WMS — active delivery path
+## Mobile WMS — next delivery path
 
-The accepted architecture and detailed stages are under `specs/mobile-wms/`.
-The mobile identity slice now shares V1 contracts, exposes bearer login,
-refresh, and `/me`, stores tokens in Android secure storage, and derives server
-users from claims. Scanner, resolver, idempotency store, and business workflow
-are still absent; the packaged `mobile-api.json` address must be replaced with
-the reachable trusted HTTPS endpoint for a physical device.
+The mobile foundation, scanning and direct/transit intra-warehouse movement are
+accepted. Storage-location locking is the active prerequisite. After it is
+accepted, specify a location-based inventory-count workflow shared by mobile
+and web interfaces.
 
-Delivery order:
-
-1. Validate login, refresh, session restoration, and `/me` against a reachable
-   trusted HTTPS endpoint on the emulator and pilot device.
-2. Build vendor-neutral diagnostic scanning on the chosen TSD and a smartphone.
-3. Add server resolvers for `WMSL:{storage-location-guid-N}` and imported 1C SKU
-   barcodes, then physically verify a location label.
-4. Add atomic request idempotency and deliver direct intra-warehouse movement,
-   then the transit-location workflow.
-5. Specify and deliver receiving, putaway, picking/shipping, and count flows in
-   the order justified by pilot feedback.
-
-External inputs still required: 1C document-barcode control examples, verified
-scanner modes/action/extras for pilot devices, camera-library selection,
-printer/label constraints, and a safe badge-login decision if badge login
-remains desirable.
+External inputs still required: 1C document-barcode control examples before a
+document-driven mobile process, printer/label constraints before finalizing
+label geometry, and a safe badge-login decision if badge login remains
+desirable.
 
 Offline inventory commands, mass label printing, fleet management, and broader
 device certification remain separate later epics.

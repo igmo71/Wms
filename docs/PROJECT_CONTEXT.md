@@ -64,10 +64,13 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   resolution of storage-location and SKU barcodes. Its first operational
   workflow covers direct and transit intra-warehouse movements.
 
-Mobile development is the current resumed workstream. Authentication, shared
-contracts/API client, diagnostic scanning, contextual barcode resolvers, and
-the intra-warehouse transfer workflow are present. Device acceptance and the
-remaining mobile foundation checks still determine pilot readiness.
+The mobile foundation and first operational vertical are implemented and
+manually accepted on Urovo TD50 and a control Android smartphone. This includes
+authentication and session restoration, real refresh of an expired access
+token, automatic selection of the embedded scanner or inline camera, contextual
+barcode resolution, atomic command idempotency, and direct/transit
+intra-warehouse transfers. The next mobile warehouse process is selected and
+specified separately from this completed vertical.
 
 ## Authentication and authorization
 
@@ -265,12 +268,11 @@ followed by local failure.
 
 ## Mobile WMS direction
 
-Mobile development has resumed, but the web application remains the only
-operational user channel until a mobile vertical passes its acceptance checks.
+The first mobile operational vertical has passed its manual acceptance checks.
 The client is Android-only, online-only, and communicates exclusively through
-an authenticated, versioned API. It must reuse the same application services
-and server-side business rules, derive the acting user from the authenticated
-principal, and make every state-changing command idempotent by a stable client
+an authenticated, versioned API. It reuses the same application services and
+server-side business rules, derives the acting user from the authenticated
+principal, and makes every state-changing command idempotent by a stable client
 request id.
 
 Scanning stays vendor-neutral. Storage locations use the existing
@@ -306,9 +308,9 @@ The search is limited to SKUs with a positive balance in the already selected
 source location, does not take focus until the operator opens it, and selecting
 a result continues through the same quantity and confirmation workflow.
 
-The accepted scope and delivery order are under
-[`specs/mobile-wms/`](../specs/mobile-wms/). Those documents describe the active
-development target, not already implemented behavior.
+The accepted foundation and first-vertical scope are retained under
+[`specs/mobile-wms/`](../specs/mobile-wms/) as a frozen reference. Each
+subsequent mobile warehouse process is specified separately.
 
 Changing mobile commands use persisted command receipts. The idempotency key is
 the authenticated user, stable command type, and client-generated request id;
