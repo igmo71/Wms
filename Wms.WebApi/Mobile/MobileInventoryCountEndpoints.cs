@@ -11,6 +11,8 @@ namespace Wms.WebApi.Mobile;
 
 internal static class MobileInventoryCountEndpoints
 {
+    private const int SkuSearchResultLimit = 10;
+
     public static IEndpointRouteBuilder MapMobileInventoryCountEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup(MobileApiRoutes.Base + "/inventory-counts")
@@ -134,7 +136,12 @@ internal static class MobileInventoryCountEndpoints
         InventoryCountQueryService queryService,
         CancellationToken ct)
     {
-        var result = await queryService.SearchSkusAsync(inventoryCountId, query, 10, ct);
+        // One extra item tells the mobile UI that more matches exist than it displays.
+        var result = await queryService.SearchSkusAsync(
+            inventoryCountId,
+            query,
+            SkuSearchResultLimit + 1,
+            ct);
         if (!result.IsSuccess)
             return MobileEndpointResults.CommandProblem(result.Error!);
         return TypedResults.Ok<IReadOnlyList<MobileInventoryCountSkuSearchResponse>>(

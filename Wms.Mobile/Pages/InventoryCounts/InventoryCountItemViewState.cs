@@ -124,8 +124,12 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
 
     public void SetAccent(bool isAccented, string? text)
     {
+        var accentText = isAccented ? text : null;
+        if (IsAccented == isAccented && AccentText == accentText)
+            return;
+
         IsAccented = isAccented;
-        AccentText = isAccented ? text : null;
+        AccentText = accentText;
         OnPropertyChanged(nameof(IsAccented));
         OnPropertyChanged(nameof(AccentText));
         OnPropertyChanged(nameof(HasAccentText));

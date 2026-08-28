@@ -8,11 +8,13 @@ namespace Wms.Mobile;
 
 public partial class InventoryCountDetailsPage : ContentPage
 {
+    private const int VisibleSearchResultCount = 10;
+
     private readonly MobileApiClient _apiClient;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly Dictionary<Guid, Entry> _quantityEntries = [];
     private MobileInventoryCountDetailsResponse _details;
-    private CancellationTokenSource? _searchCancellation;
+    private int _searchVersion;
     private InventoryCountPageMode _mode = InventoryCountPageMode.Scanning;
     private InventoryCountItemViewState? _editingItem;
     private Entry? _activeQuantityEntry;
@@ -54,7 +56,7 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     protected override void OnDisappearing()
     {
-        _searchCancellation?.Cancel();
+        _searchVersion++;
         SkuSearchEntry.Unfocus();
         _activeQuantityEntry?.Unfocus();
         CameraScannerView.Stop();
@@ -98,6 +100,7 @@ public partial class InventoryCountDetailsPage : ContentPage
             _pendingBarcode = null;
             ApplyDetails(response.Details);
             AccentItem(response.Item.StockKeepingUnitId, "+1");
+            ShowItem(response.Item.StockKeepingUnitId);
             InstructionLabel.Text = "Принято +1. Сканируйте следующий товар.";
         }
         catch (MobileApiException exception)
@@ -137,8 +140,7 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async void OnSkuSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
-        _searchCancellation?.Cancel();
-        _searchCancellation = null;
+        var searchVersion = ++_searchVersion;
         SetSearchBusy(false);
         SkuSearchResults.Children.Clear();
         if (_mode != InventoryCountPageMode.Searching)
@@ -151,50 +153,48 @@ public partial class InventoryCountDetailsPage : ContentPage
             return;
         }
 
-        var cancellation = new CancellationTokenSource();
-        _searchCancellation = cancellation;
         try
         {
-            await Task.Delay(300, cancellation.Token);
+            await Task.Delay(300);
+            if (!IsCurrentSearch(searchVersion))
+                return;
+
             SetSearchBusy(true);
             var results = await _apiClient.SearchInventoryCountSkusAsync(
                 _details.Count.Id,
                 query,
-                cancellation.Token);
-            if (ReferenceEquals(_searchCancellation, cancellation))
+                CancellationToken.None);
+            if (IsCurrentSearch(searchVersion))
                 ShowSearchResults(results);
-        }
-        catch (OperationCanceledException)
-        {
         }
         catch (MobileApiException exception)
         {
-            if (ReferenceEquals(_searchCancellation, cancellation))
+            if (IsCurrentSearch(searchVersion))
                 SkuSearchStatusLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
         {
-            if (ReferenceEquals(_searchCancellation, cancellation))
+            if (IsCurrentSearch(searchVersion))
                 SkuSearchStatusLabel.Text = "Сервер WMS недоступен.";
         }
         finally
         {
-            if (ReferenceEquals(_searchCancellation, cancellation))
-            {
-                _searchCancellation = null;
+            if (IsCurrentSearch(searchVersion))
                 SetSearchBusy(false);
-            }
-            cancellation.Dispose();
         }
     }
+
+    private bool IsCurrentSearch(int searchVersion) =>
+        searchVersion == _searchVersion
+        && _mode == InventoryCountPageMode.Searching;
 
     private void ShowSearchResults(IReadOnlyList<MobileInventoryCountSkuSearchResponse> results)
     {
         SkuSearchResults.Children.Clear();
-        SkuSearchStatusLabel.Text = results.Count == 10
-            ? "Найдено: 10. Уточните запрос при необходимости."
+        SkuSearchStatusLabel.Text = results.Count > VisibleSearchResultCount
+            ? $"Найдено: более {VisibleSearchResultCount}. Уточните запрос."
             : $"Найдено: {results.Count}.";
-        foreach (var sku in results)
+        foreach (var sku in results.Take(VisibleSearchResultCount))
         {
             var layout = new VerticalStackLayout { Spacing = 3 };
             layout.Children.Add(new Label
@@ -225,10 +225,12 @@ public partial class InventoryCountDetailsPage : ContentPage
             item = InventoryCountItemViewState.FromPendingSku(sku);
             ItemStates.Add(item);
             await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingNew);
+            ShowItem(item);
         }
         else
         {
             await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingExisting);
+            ShowItem(item);
         }
     }
 
@@ -348,19 +350,13 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async void OnEditQuantityTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is TapGestureRecognizer
-            {
-                CommandParameter: InventoryCountItemViewState item
-            })
+        if (e.Parameter is InventoryCountItemViewState item)
             await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingExisting);
     }
 
     private async void OnRemoveItemTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is TapGestureRecognizer
-            {
-                CommandParameter: InventoryCountItemViewState item
-            })
+        if (e.Parameter is InventoryCountItemViewState item)
             await RemoveItemAsync(item);
     }
 
@@ -544,6 +540,16 @@ public partial class InventoryCountDetailsPage : ContentPage
             item.SetAccent(item.StockKeepingUnitId == stockKeepingUnitId, text);
     }
 
+    private void ShowItem(Guid stockKeepingUnitId)
+    {
+        var item = ItemStates.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
+        if (item is not null)
+            ShowItem(item);
+    }
+
+    private void ShowItem(InventoryCountItemViewState item) =>
+        ItemsCollectionView.ScrollTo(item, position: ScrollToPosition.MakeVisible, animate: false);
+
     private async void OnQuantityEntryLoaded(object? sender, EventArgs e)
     {
         if (sender is not Entry
@@ -594,8 +600,7 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private void CloseSearch()
     {
-        _searchCancellation?.Cancel();
-        _searchCancellation = null;
+        _searchVersion++;
         SetSearchBusy(false);
         SkuSearchEntry.Unfocus();
         SkuSearchEntry.Text = string.Empty;

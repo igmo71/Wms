@@ -129,7 +129,7 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
             .OrderByDescending(x => x.IsExactMatch)
             .ThenBy(x => x.Name)
             .ThenBy(x => x.Code)
-            .Take(Math.Clamp(take, 1, 10))
+            .Take(Math.Clamp(take, 1, 100))
             .ToListAsync(ct);
 
         return matches.Select(x => new InventoryCountSkuSearchResult(

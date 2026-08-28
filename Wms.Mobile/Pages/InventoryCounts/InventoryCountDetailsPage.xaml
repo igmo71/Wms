@@ -7,6 +7,7 @@
     Title="Пересчёт ячейки">
 
     <CollectionView
+        x:Name="ItemsCollectionView"
         ItemsSource="{Binding ItemStates, Source={x:Reference Page}}"
         Margin="24,0"
         SelectionMode="None">
@@ -200,7 +201,7 @@
         </CollectionView.ItemTemplate>
 
         <CollectionView.Footer>
-            <BoxView HeightRequest="24" />
+            <BoxView HeightRequest="48" />
         </CollectionView.Footer>
     </CollectionView>
 </ContentPage>
