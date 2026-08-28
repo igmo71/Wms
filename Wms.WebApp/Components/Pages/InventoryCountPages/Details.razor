@@ -24,14 +24,14 @@ else
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="@(_isPosting || UncountedItems > 0)"
+                           Disabled="@(_isBusy || UncountedItems > 0)"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="PostAsync">
                     Провести
                 </MudButton>
                 <MudButton Color="Color.Error"
                            Variant="Variant.Text"
-                           Disabled="@_isDeletingDraft"
+                           Disabled="@_isBusy"
                            StartIcon="@Icons.Material.Filled.DeleteOutline"
                            OnClick="DeleteDraftAsync">
                     Удалить черновик
@@ -81,6 +81,7 @@ else
                                          SearchFunc="SearchSkusAsync"
                                          ToStringFunc="GetSkuText"
                                          Label="Наименование, код или штрихкод"
+                                         Disabled="@_isBusy"
                                          Clearable="true" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
@@ -88,13 +89,14 @@ else
                                          @bind-Value="_manualQuantity"
                                          Label="Фактически"
                                          Min="0"
+                                         Disabled="@_isBusy"
                                          HideSpinButtons="true" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="2">
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
                                    FullWidth="true"
-                                   Disabled="@(_isSaving || _selectedSku is null || _manualQuantity is null)"
+                                   Disabled="@(_isBusy || _selectedSku is null || _manualQuantity is null)"
                                    OnClick="SaveManualQuantityAsync">
                             Сохранить
                         </MudButton>
@@ -126,6 +128,7 @@ else
                                          Value="context.CountedQuantity"
                                          ValueChanged="quantity => UpdateQuantityAsync(context, quantity)"
                                          Min="0"
+                                         Disabled="@_isBusy"
                                          Placeholder="Не пересчитано"
                                          HideSpinButtons="true"
                                          Variant="Variant.Text" />
@@ -143,6 +146,7 @@ else
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
                                            Color="Color.Error"
+                                           Disabled="@_isBusy"
                                            OnClick="@(() => RemoveItemAsync(context))" />
                         }
                     </MudTd>

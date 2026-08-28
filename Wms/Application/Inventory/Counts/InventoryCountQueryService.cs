@@ -83,9 +83,6 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         return await dbContext.InventoryCounts
             .AsNoTracking()
-            .Include(x => x.Warehouse)
-            .Include(x => x.StorageLocation)
-                .ThenInclude(x => x!.Zone)
             .SingleOrDefaultAsync(x => x.StorageLocationId == storageLocationId
                 && x.Status == InventoryCountStatus.Draft,
                 ct);

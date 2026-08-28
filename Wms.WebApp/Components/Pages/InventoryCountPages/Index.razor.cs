@@ -20,6 +20,7 @@ public partial class Index
     [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] private ILogger<Index> Logger { get; set; } = null!;
 
     private MudDataGrid<InventoryCount> _dataGrid = null!;
     private Warehouse? _warehouse;
@@ -133,8 +134,9 @@ public partial class Index
 
             NavigationManager.NavigateTo($"inventory-counts/{result.Value.Id}");
         }
-        catch
+        catch (Exception exception)
         {
+            Logger.LogError(exception, "Failed to create inventory count for storage location {StorageLocationId}.", location.Id);
             _createFailed = true;
             _errorMessage = "Не удалось создать инвентаризацию.";
         }

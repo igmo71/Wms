@@ -1,100 +1,206 @@
 <ContentPage
     x:Class="Wms.Mobile.InventoryCountDetailsPage"
+    x:Name="Page"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:Wms.Mobile"
     Title="Пересчёт ячейки">
 
-    <ScrollView x:Name="PageScrollView" SizeChanged="OnPageScrollViewSizeChanged">
-        <VerticalStackLayout Padding="24" Spacing="16">
-            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="25" />
-            <Label x:Name="LocationLabel" FontSize="18" />
+    <CollectionView
+        ItemsSource="{Binding ItemStates, Source={x:Reference Page}}"
+        Margin="24,0"
+        SelectionMode="None">
+        <CollectionView.Header>
+            <VerticalStackLayout Padding="0,24,0,16" Spacing="16">
+                <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="25" />
+                <Label x:Name="LocationLabel" FontSize="18" />
 
-            <Border Padding="16">
-                <VerticalStackLayout Spacing="12">
-                    <Label
-                        x:Name="StepLabel"
-                        FontAttributes="Bold"
-                        FontSize="22"
-                        Text="Пересчёт товара" />
-                    <Label
-                        x:Name="InstructionLabel"
-                        FontSize="18"
-                        Text="Отсканируйте товар. Каждый принятый скан добавляет одну единицу." />
-                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-
-                    <Border
-                        x:Name="SkuSearchPrompt"
-                        BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
-                        Loaded="OnNonScanControlLoaded"
-                        Padding="14">
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnOpenSkuSearchTapped" />
-                        </Border.GestureRecognizers>
+                <Border Padding="16">
+                    <VerticalStackLayout Spacing="12">
                         <Label
-                            FontSize="17"
-                            HorizontalTextAlignment="Center"
-                            Text="Найти товар вручную" />
-                    </Border>
+                            x:Name="StepLabel"
+                            FontAttributes="Bold"
+                            FontSize="22"
+                            Text="Пересчёт товара" />
+                        <Label
+                            x:Name="InstructionLabel"
+                            FontSize="18"
+                            Text="Отсканируйте товар. Каждый принятый скан добавляет одну единицу." />
+                        <local:OperationalCameraScannerView x:Name="CameraScannerView" />
 
-                    <VerticalStackLayout x:Name="SkuSearchPanel" IsVisible="False" Spacing="10">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <Entry
-                                x:Name="SkuSearchEntry"
-                                ClearButtonVisibility="WhileEditing"
-                                FontSize="18"
-                                Placeholder="Наименование, код или штрихкод"
-                                TextChanged="OnSkuSearchTextChanged" />
-                            <Label Grid.Column="1" FontSize="16" Text="Отмена" VerticalTextAlignment="Center">
-                                <Label.GestureRecognizers>
-                                    <TapGestureRecognizer Tapped="OnCancelSkuSearchTapped" />
-                                </Label.GestureRecognizers>
-                            </Label>
-                        </Grid>
+                        <Border
+                            x:Name="SkuSearchPrompt"
+                            BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
+                            Loaded="OnNonScanControlLoaded"
+                            Padding="14">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnOpenSkuSearchTapped" />
+                            </Border.GestureRecognizers>
+                            <Label
+                                FontSize="17"
+                                HorizontalTextAlignment="Center"
+                                Text="Найти товар вручную" />
+                        </Border>
+
+                        <VerticalStackLayout x:Name="SkuSearchPanel" IsVisible="False" Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <Entry
+                                    x:Name="SkuSearchEntry"
+                                    ClearButtonVisibility="WhileEditing"
+                                    FontSize="18"
+                                    Placeholder="Наименование, код или штрихкод"
+                                    TextChanged="OnSkuSearchTextChanged" />
+                                <Label Grid.Column="1" FontSize="16" Text="Отмена" VerticalTextAlignment="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnCancelSkuSearchTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Grid>
+                            <ActivityIndicator
+                                x:Name="SkuSearchIndicator"
+                                IsRunning="False"
+                                IsVisible="False" />
+                            <Label
+                                x:Name="SkuSearchStatusLabel"
+                                FontSize="15"
+                                HorizontalTextAlignment="Center"
+                                Text="Введите не менее двух символов." />
+                            <VerticalStackLayout x:Name="SkuSearchResults" Spacing="8" />
+                        </VerticalStackLayout>
+
                         <ActivityIndicator
-                            x:Name="SkuSearchIndicator"
+                            x:Name="ProgressIndicator"
                             IsRunning="False"
                             IsVisible="False" />
-                        <Label
-                            x:Name="SkuSearchStatusLabel"
-                            FontSize="15"
-                            HorizontalTextAlignment="Center"
-                            Text="Введите не менее двух символов." />
-                        <VerticalStackLayout x:Name="SkuSearchResults" Spacing="8" />
+                        <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
                     </VerticalStackLayout>
+                </Border>
 
-                    <ActivityIndicator
-                        x:Name="ProgressIndicator"
-                        IsRunning="False"
-                        IsVisible="False" />
-                    <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
-                </VerticalStackLayout>
-            </Border>
+                <Label x:Name="ProgressLabel" FontAttributes="Bold" FontSize="18" />
 
-            <Label x:Name="ProgressLabel" FontAttributes="Bold" FontSize="18" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button
+                        x:Name="PostButton"
+                        Clicked="OnPostClicked"
+                        HeightRequest="58"
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Провести" />
+                    <Button
+                        x:Name="DeleteDraftButton"
+                        Grid.Column="1"
+                        Clicked="OnDeleteDraftClicked"
+                        HeightRequest="58"
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Удалить черновик" />
+                </Grid>
 
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                <Button
-                    x:Name="PostButton"
-                    Clicked="OnPostClicked"
-                    HeightRequest="58"
-                    Loaded="OnNonScanControlLoaded"
-                    Text="Провести" />
-                <Button
-                    x:Name="DeleteDraftButton"
-                    Grid.Column="1"
-                    Clicked="OnDeleteDraftClicked"
-                    HeightRequest="58"
-                    Loaded="OnNonScanControlLoaded"
-                    Text="Удалить черновик" />
-            </Grid>
+                <Label FontAttributes="Bold" FontSize="20" Text="Содержимое ячейки" />
+            </VerticalStackLayout>
+        </CollectionView.Header>
 
-            <Label FontAttributes="Bold" FontSize="20" Text="Содержимое ячейки" />
-            <VerticalStackLayout x:Name="ItemsContainer" Spacing="10" />
-            <BoxView
-                x:Name="KeyboardScrollSpacer"
-                HeightRequest="0"
-                IsVisible="False" />
-        </VerticalStackLayout>
-    </ScrollView>
+        <CollectionView.EmptyView>
+            <Label
+                FontSize="16"
+                Text="Ячейка ожидается пустой. Отсканируйте найденный товар или проведите инвентаризацию." />
+        </CollectionView.EmptyView>
+
+        <CollectionView.ItemsLayout>
+            <LinearItemsLayout ItemSpacing="10" Orientation="Vertical" />
+        </CollectionView.ItemsLayout>
+
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="local:InventoryCountItemViewState">
+                <Border Padding="13" Stroke="Gray" StrokeThickness="1">
+                    <Border.Triggers>
+                        <DataTrigger Binding="{Binding IsAccented}" TargetType="Border" Value="True">
+                            <Setter Property="Stroke" Value="{StaticResource Primary}" />
+                            <Setter Property="StrokeThickness" Value="3" />
+                        </DataTrigger>
+                    </Border.Triggers>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Label
+                                FontAttributes="Bold"
+                                FontSize="17"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding SkuName}" />
+                            <Label
+                                Grid.Column="1"
+                                FontAttributes="Bold"
+                                FontSize="17"
+                                IsVisible="{Binding HasAccentText}"
+                                Text="{Binding AccentText}"
+                                TextColor="{StaticResource Primary}"
+                                VerticalTextAlignment="Center" />
+                        </Grid>
+
+                        <Label
+                            FontSize="15"
+                            LineBreakMode="TailTruncation"
+                            MaxLines="1"
+                            Text="{Binding QuantitySummary}" />
+
+                        <HorizontalStackLayout IsVisible="{Binding ShowActions}" Spacing="24">
+                            <Label FontSize="15" Loaded="OnNonScanControlLoaded" Text="Количество" TextColor="{StaticResource Primary}">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnEditQuantityTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                            <Label
+                                FontSize="15"
+                                IsVisible="{Binding ShowRemoveAction}"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Удалить"
+                                TextColor="IndianRed">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnRemoveItemTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
+                            <Entry
+                                FontSize="20"
+                                Keyboard="Numeric"
+                                Loaded="OnQuantityEntryLoaded"
+                                Placeholder="Количество"
+                                Text="{Binding QuantityText, Mode=TwoWay}"
+                                Unloaded="OnQuantityEntryUnloaded">
+                                <Entry.Triggers>
+                                    <DataTrigger Binding="{Binding HasQuantityError}" TargetType="Entry" Value="True">
+                                        <Setter Property="TextColor" Value="Red" />
+                                    </DataTrigger>
+                                </Entry.Triggers>
+                            </Entry>
+                            <Button
+                                Grid.Column="1"
+                                Clicked="OnSaveQuantityClicked"
+                                CommandParameter="{Binding .}"
+                                FontSize="22"
+                                HeightRequest="46"
+                                Loaded="OnNonScanControlLoaded"
+                                Padding="0"
+                                Text="✓"
+                                WidthRequest="46" />
+                            <Button
+                                Grid.Column="2"
+                                Clicked="OnCancelQuantityClicked"
+                                CommandParameter="{Binding .}"
+                                FontSize="24"
+                                HeightRequest="46"
+                                Loaded="OnNonScanControlLoaded"
+                                Padding="0"
+                                Text="×"
+                                WidthRequest="46" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+
+        <CollectionView.Footer>
+            <BoxView HeightRequest="24" />
+        </CollectionView.Footer>
+    </CollectionView>
 </ContentPage>

@@ -18,14 +18,13 @@ public partial class Details
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private ILogger<Details> Logger { get; set; } = null!;
 
     private InventoryCount? _inventoryCount;
     private InventoryCountSkuSearchResult? _selectedSku;
     private double? _manualQuantity;
     private bool _isLoading = true;
-    private bool _isSaving;
-    private bool _isPosting;
-    private bool _isDeletingDraft;
+    private bool _isBusy;
     private bool _operationFailed;
     private string? _errorMessage;
 
@@ -59,7 +58,7 @@ public partial class Details
 
     private async Task SaveManualQuantityAsync()
     {
-        if (_selectedSku is null || _manualQuantity is not double quantity)
+        if (_isBusy || _selectedSku is null || _manualQuantity is not double quantity)
             return;
 
         await RunOperationAsync(
@@ -86,7 +85,7 @@ public partial class Details
     }
 
     private Task UpdateQuantityAsync(InventoryCountItem item, double? quantity) =>
-        quantity is null
+        quantity is null || _isBusy
             ? Task.CompletedTask
             : RunOperationAsync(
                 userId => InventoryCountCommandService.SetCountedQuantityAsync(
@@ -96,12 +95,17 @@ public partial class Details
                     userId),
                 "Не удалось сохранить фактическое количество.");
 
-    private Task RemoveItemAsync(InventoryCountItem item) => RunOperationAsync(
-        userId => InventoryCountCommandService.RemoveUnexpectedItemAsync(Id, item.Id, userId),
-        "Не удалось удалить ошибочно добавленный товар.");
+    private Task RemoveItemAsync(InventoryCountItem item) => _isBusy
+        ? Task.CompletedTask
+        : RunOperationAsync(
+            userId => InventoryCountCommandService.RemoveUnexpectedItemAsync(Id, item.Id, userId),
+            "Не удалось удалить ошибочно добавленный товар.");
 
     private async Task PostAsync()
     {
+        if (_isBusy)
+            return;
+
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Провести инвентаризацию",
             "Остатки ячейки будут приведены к указанному фактическому количеству.",
@@ -110,15 +114,16 @@ public partial class Details
         if (confirmed != true)
             return;
 
-        _isPosting = true;
         await RunOperationAsync(
             userId => InventoryCountCommandService.PostAsync(Id, userId),
             "Не удалось провести инвентаризацию.");
-        _isPosting = false;
     }
 
     private async Task DeleteDraftAsync()
     {
+        if (_isBusy)
+            return;
+
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Удалить черновик",
             "Введённые данные будут удалены, а ячейка освобождена.",
@@ -126,17 +131,32 @@ public partial class Details
             cancelText: "Оставить");
         if (confirmed != true)
             return;
+        if (_isBusy)
+            return;
 
-        _isDeletingDraft = true;
-        var result = await RunAsCurrentUserAsync(userId =>
-            InventoryCountCommandService.DeleteDraftAsync(Id, userId));
-        _isDeletingDraft = false;
-        if (result.IsSuccess)
-            NavigationManager.NavigateTo("inventory-counts");
-        else
+        _isBusy = true;
+        _operationFailed = false;
+        try
         {
+            var result = await RunAsCurrentUserAsync(userId =>
+                InventoryCountCommandService.DeleteDraftAsync(Id, userId));
+            if (result.IsSuccess)
+                NavigationManager.NavigateTo("inventory-counts");
+            else
+            {
+                _operationFailed = true;
+                _errorMessage = result.Error?.Message ?? "Не удалось удалить черновик.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to delete inventory count draft {InventoryCountId}.", Id);
             _operationFailed = true;
-            _errorMessage = result.Error?.Message ?? "Не удалось удалить черновик.";
+            _errorMessage = "Не удалось удалить черновик.";
+        }
+        finally
+        {
+            _isBusy = false;
         }
     }
 
@@ -144,7 +164,10 @@ public partial class Details
         Func<string, Task<OperationResult>> action,
         string fallbackMessage)
     {
-        _isSaving = true;
+        if (_isBusy)
+            return;
+
+        _isBusy = true;
         _operationFailed = false;
         try
         {
@@ -157,14 +180,15 @@ public partial class Details
             }
             await ReloadAsync();
         }
-        catch
+        catch (Exception exception)
         {
+            Logger.LogError(exception, "Inventory count operation failed for {InventoryCountId}.", Id);
             _operationFailed = true;
             _errorMessage = fallbackMessage;
         }
         finally
         {
-            _isSaving = false;
+            _isBusy = false;
         }
     }
 

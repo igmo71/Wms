@@ -361,8 +361,6 @@ public sealed class InventoryCountCommandService(
         var inventoryCount = await dbContext.InventoryCounts
             .Include(x => x.Items)
             .Include(x => x.StorageLocation)
-                .ThenInclude(x => x!.Zone)
-            .Include(x => x.StorageLocation)
                 .ThenInclude(x => x!.ActiveLock)
             .SingleOrDefaultAsync(x => x.Id == inventoryCountId, ct);
         if (inventoryCount is null)
