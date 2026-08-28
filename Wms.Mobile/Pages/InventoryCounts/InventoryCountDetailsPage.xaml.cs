@@ -100,7 +100,6 @@ public partial class InventoryCountDetailsPage : ContentPage
             _pendingBarcode = null;
             ApplyDetails(response.Details);
             AccentItem(response.Item.StockKeepingUnitId, "+1");
-            ShowItem(response.Item.StockKeepingUnitId);
             InstructionLabel.Text = "Принято +1. Сканируйте следующий товар.";
         }
         catch (MobileApiException exception)
@@ -225,12 +224,10 @@ public partial class InventoryCountDetailsPage : ContentPage
             item = InventoryCountItemViewState.FromPendingSku(sku);
             ItemStates.Add(item);
             await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingNew);
-            ShowItem(item);
         }
         else
         {
             await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingExisting);
-            ShowItem(item);
         }
     }
 
@@ -539,16 +536,6 @@ public partial class InventoryCountDetailsPage : ContentPage
         foreach (var item in ItemStates)
             item.SetAccent(item.StockKeepingUnitId == stockKeepingUnitId, text);
     }
-
-    private void ShowItem(Guid stockKeepingUnitId)
-    {
-        var item = ItemStates.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
-        if (item is not null)
-            ShowItem(item);
-    }
-
-    private void ShowItem(InventoryCountItemViewState item) =>
-        ItemsCollectionView.ScrollTo(item, position: ScrollToPosition.MakeVisible, animate: false);
 
     private async void OnQuantityEntryLoaded(object? sender, EventArgs e)
     {

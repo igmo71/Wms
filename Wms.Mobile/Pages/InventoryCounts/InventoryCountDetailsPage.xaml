@@ -7,7 +7,6 @@
     Title="Пересчёт ячейки">
 
     <CollectionView
-        x:Name="ItemsCollectionView"
         ItemsSource="{Binding ItemStates, Source={x:Reference Page}}"
         Margin="24,0"
         SelectionMode="None">
@@ -143,7 +142,10 @@
                             Text="{Binding QuantitySummary}" />
 
                         <HorizontalStackLayout IsVisible="{Binding ShowActions}" Spacing="24">
-                            <Label FontSize="15" Loaded="OnNonScanControlLoaded" Text="Количество" TextColor="{StaticResource Primary}">
+                            <Label FontSize="15" 
+                                   Loaded="OnNonScanControlLoaded" 
+                                   Text="Количество" 
+                                   TextColor="{StaticResource Primary}">
                                 <Label.GestureRecognizers>
                                     <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnEditQuantityTapped" />
                                 </Label.GestureRecognizers>
