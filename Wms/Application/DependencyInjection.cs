@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<PutawayCommandService>();
         services.AddScoped<PutawayQueryService>();
         services.AddScoped<ReceivingOrderCommandService>();
+        services.AddScoped<MobileReceivingOrderCommandService>();
         services.AddScoped<MobileReceivingOrderQueryService>();
         services.AddScoped<ReceivingOrderQueryService>();
         services.AddScoped<ShippingOrderCommandService>();

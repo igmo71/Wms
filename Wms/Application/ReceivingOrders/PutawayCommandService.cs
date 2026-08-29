@@ -17,14 +17,26 @@ public class PutawayCommandService(
 {
     public async Task<OperationResult> StartAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageStartAsync(dbContext, orderId, userId, ct);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult> StageStartAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        CancellationToken ct)
+    {
         using var scope = logger.BeginScope("Putaway Start {OrderId}", orderId);
 
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var order = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
-
+        var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
@@ -36,9 +48,7 @@ public class PutawayCommandService(
             return startResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return startResult;
     }
 
     public async Task<OperationResult> AddMovementAsync(
@@ -49,6 +59,30 @@ public class PutawayCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageAddMovementAsync(
+            dbContext,
+            orderId,
+            lineNumber,
+            destinationStorageLocationId,
+            quantity,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return result.Error!;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult<InventoryMovement>> StageAddMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        Guid destinationStorageLocationId,
+        double quantity,
+        CancellationToken ct)
+    {
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
 
         if (order is null)
@@ -74,20 +108,18 @@ public class PutawayCommandService(
             dbContext, order, destinationStorageLocationId, ct);
         if (!destinationResult.IsSuccess)
         {
-            return destinationResult;
+            return destinationResult.Error!;
         }
 
         var balanceResult = await ValidateSourceBalanceAsync(
             dbContext, order, movement, draftMovements, null, ct);
         if (!balanceResult.IsSuccess)
         {
-            return balanceResult;
+            return balanceResult.Error!;
         }
 
         dbContext.InventoryMovements.Add(movement);
-        await dbContext.SaveChangesAsync(ct);
-
-        return OperationResult.Success();
+        return movement;
     }
 
     public async Task<OperationResult> UpdateMovementAsync(
@@ -97,7 +129,28 @@ public class PutawayCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageUpdateMovementAsync(
+            dbContext,
+            movementId,
+            destinationStorageLocationId,
+            quantity,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
 
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult> StageUpdateMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid movementId,
+        Guid destinationStorageLocationId,
+        double quantity,
+        CancellationToken ct)
+    {
         var movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
@@ -141,14 +194,35 @@ public class PutawayCommandService(
             return balanceResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
 
     public async Task<OperationResult> DeleteMovementAsync(Guid movementId, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageDeleteMovementAsync(dbContext, null, movementId, ct);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
 
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    internal Task<OperationResult> StageDeleteMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        Guid movementId,
+        CancellationToken ct) =>
+        StageDeleteMovementAsync(dbContext, (Guid?)orderId, movementId, ct);
+
+    private static async Task<OperationResult> StageDeleteMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid? expectedOrderId,
+        Guid movementId,
+        CancellationToken ct)
+    {
         var movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
 
@@ -157,8 +231,14 @@ public class PutawayCommandService(
             return OperationError.NotFound($"Движение размещения '{movementId}' не найдено.");
         }
 
-        var order = movement.RecorderId is Guid orderId
-            ? await dbContext.ReceivingOrders.FirstOrDefaultAsync(x => x.Id == orderId, ct)
+        if (expectedOrderId is Guid expectedId && movement.RecorderId != expectedId)
+        {
+            return OperationError.NotFound(
+                $"Движение размещения '{movementId}' не найдено в приходном ордере '{expectedId}'.");
+        }
+
+        var order = movement.RecorderId is Guid recorderOrderId
+            ? await dbContext.ReceivingOrders.FirstOrDefaultAsync(x => x.Id == recorderOrderId, ct)
             : null;
 
         if (order is null)
@@ -174,16 +254,25 @@ public class PutawayCommandService(
         }
 
         dbContext.InventoryMovements.Remove(movement);
-        await dbContext.SaveChangesAsync(ct);
-
         return OperationResult.Success();
     }
 
     public async Task<OperationResult> CompleteAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("Putaway Complete {OrderId}", orderId);
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageCompleteAsync(dbContext, orderId, userId, ct);
+        return result.IsSuccess
+            ? await InventoryPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
+    }
+
+    internal async Task<OperationResult> StageCompleteAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("Putaway Complete {OrderId}", orderId);
 
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
         if (order is null)
@@ -221,7 +310,7 @@ public class PutawayCommandService(
             return postingResult;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return OperationResult.Success();
     }
 
     private static Task<ReceivingOrder?> LoadEditableOrderAsync(

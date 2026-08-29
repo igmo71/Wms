@@ -227,6 +227,20 @@ public class ReceivingOrder
             : item.IncrementFact();
     }
 
+    public OperationResult UpdateItemFactQuantity(int lineNumber, double factQuantity)
+    {
+        var editingResult = ValidateReceivingEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        return item is null
+            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
+            : item.UpdateFact(factQuantity, item.Comment);
+    }
+
     public OperationResult UpdateItemComment(int lineNumber, string? comment)
     {
         var editingResult = ValidateReceivingEditing();

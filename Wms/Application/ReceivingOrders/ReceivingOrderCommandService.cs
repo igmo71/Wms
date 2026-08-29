@@ -70,29 +70,83 @@ public class ReceivingOrderCommandService(
 
     public async Task<OperationResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder SetInReceiving {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ReceivingOrder.SetInReceiving", nameof(ReceivingOrderCommandService));
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageSetInReceivingAsync(dbContext, orderId, userId, ct);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
 
-        var existingOrder = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
 
-        if (existingOrder is null)
+    internal async Task<OperationResult> StageStartReceivingAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        Guid receivingLocationId,
+        string userId,
+        CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("ReceivingOrder Start {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity(
+            "ReceivingOrder.Start",
+            nameof(ReceivingOrderCommandService));
+
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
         {
             logger.LogError("Приходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
-        var transitionResult = existingOrder.SetInReceiving(DateTimeOffset.UtcNow, userId);
+        var locationResult = await StageSetReceivingLocationAsync(
+            dbContext,
+            order,
+            receivingLocationId,
+            ct);
+        if (!locationResult.IsSuccess)
+        {
+            return locationResult;
+        }
+
+        return await StageSetInReceivingAsync(order, userId, ct);
+    }
+
+    internal async Task<OperationResult> StageSetInReceivingAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("ReceivingOrder SetInReceiving {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity(
+            "ReceivingOrder.SetInReceiving",
+            nameof(ReceivingOrderCommandService));
+
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            logger.LogError("Приходный ордер {OrderId} не найден", orderId);
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return await StageSetInReceivingAsync(order, userId, ct);
+    }
+
+    private async Task<OperationResult> StageSetInReceivingAsync(
+        ReceivingOrder order,
+        string userId,
+        CancellationToken ct)
+    {
+        var transitionResult = order.SetInReceiving(DateTimeOffset.UtcNow, userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Не удалось перевести приходный ордер в приемку: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        var externalResult = await outboundService.SetInReceivingAsync(orderId, ct);
+        var externalResult = await outboundService.SetInReceivingAsync(order.Id, ct);
 
         if (!externalResult.IsSuccess)
         {
@@ -100,37 +154,45 @@ public class ReceivingOrderCommandService(
             return externalResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-
         return OperationResult.Success();
     }
 
     public async Task<OperationResult> SetReceivedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder SetReceived {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity("ReceivingOrder.SetReceived", nameof(ReceivingOrderCommandService));
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var result = await StageSetReceivedAsync(dbContext, orderId, userId, ct);
+        return result.IsSuccess
+            ? await InventoryPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
+    }
 
-        var existingOrder = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+    internal async Task<OperationResult> StageSetReceivedAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("ReceivingOrder SetReceived {OrderId}", orderId);
+        using var activity = AppTracing.StartActivity(
+            "ReceivingOrder.SetReceived",
+            nameof(ReceivingOrderCommandService));
 
-        if (existingOrder is null)
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
         {
             logger.LogError("Приходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
         var now = DateTimeOffset.UtcNow;
-        var transitionResult = existingOrder.SetReceived(now, userId);
+        var transitionResult = order.SetReceived(now, userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Не удалось завершить приемку приходного ордера: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        var movementsResult = CreateReceivingMovements(existingOrder, now);
+        var movementsResult = CreateReceivingMovements(order, now);
         if (!movementsResult.IsSuccess)
         {
             return movementsResult.Error!;
@@ -145,9 +207,12 @@ public class ReceivingOrderCommandService(
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
 
-        if (existingOrder.HasPlanFactDifference)
+        if (order.HasPlanFactDifference)
         {
-            var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(existingOrder.Id, existingOrder.Items, ct);
+            var externalItemsUpdateResult = await outboundService.UpdateDocumentItemsAsync(
+                order.Id,
+                order.Items,
+                ct);
 
             if (!externalItemsUpdateResult.IsSuccess)
             {
@@ -164,7 +229,7 @@ public class ReceivingOrderCommandService(
             return externalResult;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> UpdateOrderItemFactQuantityAsync(
@@ -175,25 +240,68 @@ public class ReceivingOrderCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingOrder = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
-
-        if (existingOrder is null)
+        var result = await StageUpdateItemFactQuantityAsync(
+            dbContext,
+            receivingOrderId,
+            lineNumber,
+            factQuantity,
+            comment,
+            ct);
+        if (!result.IsSuccess)
         {
-            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
-        }
-
-        var updateResult = existingOrder.UpdateItemFact(lineNumber, factQuantity, comment);
-        if (!updateResult.IsSuccess)
-        {
-            return updateResult;
+            return result;
         }
 
         await dbContext.SaveChangesAsync(ct);
-
         return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult> StageUpdateItemFactQuantityAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        double factQuantity,
+        string? comment,
+        CancellationToken ct)
+    {
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return order.UpdateItemFact(lineNumber, factQuantity, comment);
+    }
+
+    internal async Task<OperationResult> StageIncrementItemFactAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        CancellationToken ct)
+    {
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return order.IncrementItemFact(lineNumber);
+    }
+
+    internal async Task<OperationResult> StageSetItemFactQuantityAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        double factQuantity,
+        CancellationToken ct)
+    {
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return order.UpdateItemFactQuantity(lineNumber, factQuantity);
     }
 
     public async Task<OperationResult> UpdateOrderItemCommentAsync(
@@ -203,24 +311,35 @@ public class ReceivingOrderCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var existingOrder = await dbContext.ReceivingOrders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
-
-        if (existingOrder is null)
+        var result = await StageUpdateItemCommentAsync(
+            dbContext,
+            receivingOrderId,
+            lineNumber,
+            comment,
+            ct);
+        if (!result.IsSuccess)
         {
-            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
-        }
-
-        var updateResult = existingOrder.UpdateItemComment(lineNumber, comment);
-        if (!updateResult.IsSuccess)
-        {
-            return updateResult;
+            return result;
         }
 
         await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult> StageUpdateItemCommentAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        string? comment,
+        CancellationToken ct)
+    {
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return order.UpdateItemComment(lineNumber, comment);
     }
 
     public async Task<OperationResult> SetReceivingLocationAsync(
@@ -229,14 +348,45 @@ public class ReceivingOrderCommandService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        var order = await dbContext.ReceivingOrders
-            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
-        if (order is null)
+        var result = await StageSetReceivingLocationAsync(
+            dbContext,
+            receivingOrderId,
+            receivingLocationId,
+            ct);
+        if (!result.IsSuccess)
         {
-            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
+            return result;
         }
 
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
+    internal async Task<OperationResult> StageSetReceivingLocationAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        Guid receivingLocationId,
+        CancellationToken ct)
+    {
+        var order = await LoadOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
+        }
+
+        return await StageSetReceivingLocationAsync(
+            dbContext,
+            order,
+            receivingLocationId,
+            ct);
+    }
+
+    private static async Task<OperationResult> StageSetReceivingLocationAsync(
+        ApplicationDbContext dbContext,
+        ReceivingOrder order,
+        Guid receivingLocationId,
+        CancellationToken ct)
+    {
         var location = await dbContext.StorageLocations
             .Include(x => x.Zone)
             .Include(x => x.ActiveLock)
@@ -264,9 +414,16 @@ public class ReceivingOrderCommandService(
             return locationResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
         return OperationResult.Success();
     }
+
+    private static Task<ReceivingOrder?> LoadOrderAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        CancellationToken ct) =>
+        dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
     private static OperationResult<List<InventoryMovement>> CreateReceivingMovements(
         ReceivingOrder order,
