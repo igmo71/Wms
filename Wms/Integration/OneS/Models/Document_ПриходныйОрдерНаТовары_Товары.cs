@@ -23,8 +23,9 @@ internal class Document_ПриходныйОрдерНаТовары_Товар�
         {
             Ref_Key = item.ReceivingOrderId,
             LineNumber = item.LineNumber,
-            Количество = item.FactQuantity,
-            КоличествоУпаковок = item.FactQuantity,
+            Количество = item.FactQuantity
+                ?? throw new InvalidOperationException("Фактическое количество строки приходного ордера не подтверждено."),
+            КоличествоУпаковок = item.FactQuantity.Value,
             Номенклатура_Key = item.StockKeepingUnitId,
             Комментарий = item.Comment
         };

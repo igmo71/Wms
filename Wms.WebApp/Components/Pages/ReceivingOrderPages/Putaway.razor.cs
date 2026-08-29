@@ -205,7 +205,7 @@ public partial class Putaway
         _movements.Where(x => x.RecorderLineNumber == lineNumber).Sum(x => x.Quantity);
 
     private double GetRemainingQuantity(ReceivingOrderItem item) =>
-        Math.Max(0, item.FactQuantity - GetAllocatedQuantity(item.LineNumber));
+        Math.Max(0, item.FactQuantity!.Value - GetAllocatedQuantity(item.LineNumber));
 
     private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
 

@@ -13,6 +13,9 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
 public partial class Details
 {
+    private static string FormatQuantity(double? quantity, string emptyText = "—") =>
+        quantity?.ToString("0.###") ?? emptyText;
+
     [Parameter]
     public Guid Id { get; set; }
 

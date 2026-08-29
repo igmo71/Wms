@@ -21,7 +21,7 @@ else
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="@(_isCompleting || _receivingLocation is null)"
+                       Disabled="@(_isCompleting || _receivingLocation is null || _order.UnconfirmedItemCount > 0)"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="SetReceivedAsync">
                 Завершить
@@ -40,6 +40,13 @@ else
         @if (_completeFailed)
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+        }
+
+        @if (_order.UnconfirmedItemCount > 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                Не проверено строк: @_order.UnconfirmedItemCount. Для завершения приёмки укажите факт каждой строки, включая явный ноль.
+            </MudAlert>
         }
 
         <MudPaper Class="pa-2" Elevation="0" Outlined="true">
@@ -111,15 +118,18 @@ else
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
-                        <MudNumericField T="double"
+                        <MudNumericField T="double?"
                                          Value="context.Item.FactQuantity"
                                          ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
+                                         Placeholder="Не проверено"
                                          Variant="Variant.Text"
                                          HideSpinButtons="true" />
                     </CellTemplate>
                 </TemplateColumn>
                 <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+                <TemplateColumn Title="Осталось">
+                    <CellTemplate>@FormatQuantity(context.Item.RemainingQuantity)</CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Комментарий">
                     <CellTemplate>
                         <MudTextField T="string"

@@ -80,8 +80,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
             Ref_Key = orderItem.ReceivingOrderId,
             LineNumber = orderItem.LineNumber,
             Номенклатура_Key = orderItem.StockKeepingUnitId,
-            Количество = orderItem.FactQuantity,
-            КоличествоУпаковок = orderItem.FactQuantity,
+            Количество = orderItem.FactQuantity!.Value,
+            КоличествоУпаковок = orderItem.FactQuantity.Value,
             Комментарий = orderItem.Comment
         };
     }

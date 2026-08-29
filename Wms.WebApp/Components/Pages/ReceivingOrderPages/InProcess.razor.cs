@@ -114,17 +114,49 @@ public partial class InProcess
         return Task.CompletedTask;
     }
 
-    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double factQuantity)
+    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double? factQuantity)
     {
-        await UpdateOrderItemAsync(item, factQuantity, item.Comment);
+        if (factQuantity is null)
+        {
+            _completeFailed = true;
+            _errorMessage = "Укажите фактическое количество, включая явный ноль.";
+            return;
+        }
+
+        await UpdateOrderItemFactAsync(item, factQuantity.Value, item.Comment);
     }
 
     private async Task UpdateCommentAsync(ReceivingOrderItem item, string? comment)
     {
-        await UpdateOrderItemAsync(item, item.FactQuantity, comment);
+        _completeFailed = false;
+
+        try
+        {
+            var updateResult = await OrderCommandService
+                .UpdateOrderItemCommentAsync(item.ReceivingOrderId, item.LineNumber, comment);
+
+            if (!updateResult.IsSuccess)
+            {
+                _completeFailed = true;
+                _errorMessage = updateResult.Error?.Message ?? "Не удалось обновить комментарий строки.";
+                return;
+            }
+
+            var localUpdateResult = _order!.UpdateItemComment(item.LineNumber, comment);
+            if (!localUpdateResult.IsSuccess)
+            {
+                _completeFailed = true;
+                _errorMessage = localUpdateResult.Error?.Message ?? "Не удалось обновить строку на странице.";
+            }
+        }
+        catch
+        {
+            _completeFailed = true;
+            _errorMessage = "Не удалось обновить комментарий строки.";
+        }
     }
 
-    private async Task UpdateOrderItemAsync(ReceivingOrderItem item, double factQuantity, string? comment)
+    private async Task UpdateOrderItemFactAsync(ReceivingOrderItem item, double factQuantity, string? comment)
     {
         _completeFailed = false;
 
@@ -152,6 +184,9 @@ public partial class InProcess
             _completeFailed = true;
         }
     }
+
+    private static string FormatQuantity(double? quantity) =>
+        quantity?.ToString("0.###") ?? "—";
 
     private async Task SetReceivedAsync()
     {

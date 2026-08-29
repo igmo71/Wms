@@ -14,13 +14,19 @@ public class ReceivingOrderItem
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
     public double PlanQuantity { get; private set; }
-    public double FactQuantity { get; private set; }
+    public double? FactQuantity { get; private set; }
     public string? Comment { get; private set; }
 
-    public double RemainingQuantity => PlanQuantity - FactQuantity;
-    public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
+    public double? RemainingQuantity => FactQuantity is double factQuantity
+        ? PlanQuantity - factQuantity
+        : null;
+    public double? FactWeightKg => FactQuantity is double factQuantity
+        ? WeightCalculation.CalculateKg(factQuantity, StockKeepingUnit)
+        : null;
+    public bool IsFactConfirmed => FactQuantity.HasValue;
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
-    public bool IsPlanFactDifference => FactQuantity != PlanQuantity;
+    public bool IsPlanFactDifference => FactQuantity is double factQuantity
+        && factQuantity != PlanQuantity;
 
     internal static OperationResult<ReceivingOrderItem> Create(
         Guid receivingOrderId,
@@ -71,6 +77,24 @@ public class ReceivingOrderItem
         FactQuantity = factQuantity;
         Comment = comment;
         return OperationResult.Success();
+    }
+
+    internal OperationResult IncrementFact()
+    {
+        var factQuantity = (FactQuantity ?? 0) + 1;
+        if (!double.IsFinite(factQuantity))
+        {
+            return OperationError.Invalid(
+                "Фактическое количество должно быть конечным неотрицательным числом.");
+        }
+
+        FactQuantity = factQuantity;
+        return OperationResult.Success();
+    }
+
+    internal void UpdateComment(string? comment)
+    {
+        Comment = comment;
     }
 
     internal static OperationResult ValidateImport(

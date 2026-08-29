@@ -196,6 +196,33 @@ public class ReceivingOrderCommandService(
         return OperationResult.Success();
     }
 
+    public async Task<OperationResult> UpdateOrderItemCommentAsync(
+        Guid receivingOrderId,
+        int lineNumber,
+        string? comment,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var existingOrder = await dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == receivingOrderId, ct);
+
+        if (existingOrder is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{receivingOrderId}' не найден.");
+        }
+
+        var updateResult = existingOrder.UpdateItemComment(lineNumber, comment);
+        if (!updateResult.IsSuccess)
+        {
+            return updateResult;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return OperationResult.Success();
+    }
+
     public async Task<OperationResult> SetReceivingLocationAsync(
         Guid receivingOrderId,
         Guid receivingLocationId,
@@ -246,7 +273,7 @@ public class ReceivingOrderCommandService(
         DateTimeOffset createdAtUtc)
     {
         var movements = new List<InventoryMovement>();
-        foreach (var item in order.Items.Where(x => x.FactQuantity != 0))
+        foreach (var item in order.Items.Where(x => x.FactQuantity > 0))
         {
             var movementResult = InventoryMovement.Create(
                 Guid.NewGuid(),
@@ -254,7 +281,7 @@ public class ReceivingOrderCommandService(
                 null,
                 order.ReceivingLocationId,
                 item.StockKeepingUnitId,
-                item.FactQuantity,
+                item.FactQuantity!.Value,
                 createdAtUtc,
                 RecorderType.ReceivingOrder,
                 order.Id,

@@ -47,7 +47,9 @@ public class ReceivingOrder
     public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
-    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
+    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is double factQuantity
+        && (factQuantity == 0 || x.FactWeightKg.HasValue));
+    public int UnconfirmedItemCount => _items.Count(x => !x.IsFactConfirmed);
 
     public static OperationResult<ReceivingOrder> Create(
         ReceivingOrderImportSnapshot snapshot,
@@ -199,11 +201,10 @@ public class ReceivingOrder
         double factQuantity,
         string? comment)
     {
-        if (Status is not (ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired))
+        var editingResult = ValidateReceivingEditing();
+        if (!editingResult.IsSuccess)
         {
-            return OperationError.Invalid(
-                "Фактическое количество можно изменять только во время приёмки или обработки ордера.");
+            return editingResult;
         }
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
@@ -211,6 +212,45 @@ public class ReceivingOrder
             ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
             : item.UpdateFact(factQuantity, comment);
     }
+
+    public OperationResult IncrementItemFact(int lineNumber)
+    {
+        var editingResult = ValidateReceivingEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        return item is null
+            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
+            : item.IncrementFact();
+    }
+
+    public OperationResult UpdateItemComment(int lineNumber, string? comment)
+    {
+        var editingResult = ValidateReceivingEditing();
+        if (!editingResult.IsSuccess)
+        {
+            return editingResult;
+        }
+
+        var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
+        }
+
+        item.UpdateComment(comment);
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidateReceivingEditing() =>
+        Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired
+            ? OperationResult.Success()
+            : OperationError.Invalid(
+                "Строки приходного ордера можно изменять только во время приёмки или обработки ордера.");
 
     private OperationResult ValidateToSetReceived()
     {
@@ -225,6 +265,12 @@ public class ReceivingOrder
         {
             return OperationError.Invalid(
                 "Перед завершением приёмки необходимо указать позицию приёмки.");
+        }
+
+        if (_items.Any(x => !x.IsFactConfirmed))
+        {
+            return OperationError.Invalid(
+                "Перед завершением приёмки необходимо проверить фактическое количество каждой строки.");
         }
 
         return OperationResult.Success();
@@ -494,7 +540,7 @@ public class ReceivingOrder
                 .ToList();
 
             if (movements.Any(x => x.StockKeepingUnitId != item.StockKeepingUnitId)
-                || movements.Sum(x => x.Quantity) != item.FactQuantity)
+                || movements.Sum(x => x.Quantity) != item.FactQuantity!.Value)
             {
                 return OperationError.Invalid(
                     "Перед завершением размещения каждая строка ордера должна быть размещена полностью.");
@@ -527,7 +573,7 @@ public class ReceivingOrder
                 && x.RecorderLineNumber == item.LineNumber)
             .Sum(x => x.Quantity) + quantity;
 
-        return lineQuantity <= item.FactQuantity
+        return lineQuantity <= item.FactQuantity!.Value
             ? OperationResult.Success()
             : OperationError.Invalid(
                 "Количество размещения превышает принятое количество по строке ордера.");

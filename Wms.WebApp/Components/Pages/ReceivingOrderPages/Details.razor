@@ -166,9 +166,13 @@ else
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
-                <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <TemplateColumn Title="Факт">
+                    <CellTemplate>@FormatQuantity(context.Item.FactQuantity, "Не проверено")</CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+                <TemplateColumn Title="Осталось">
+                    <CellTemplate>@FormatQuantity(context.Item.RemainingQuantity)</CellTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.Comment" Title="Комментарий" />
             </Columns>
         </MudDataGrid>
