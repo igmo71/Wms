@@ -1,0 +1,52 @@
+<ContentPage
+    x:Class="Wms.Mobile.ReceivingOrderPutawayPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    Title="Размещение">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label
+                FontAttributes="Bold"
+                FontSize="26"
+                Text="{Binding Order.Number, StringFormat='Размещение ордера {0}'}" />
+            <Label x:Name="StatusLabel" FontAttributes="Bold" FontSize="18" />
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="{Binding Order.WarehouseName, StringFormat='Склад: {0}'}" />
+                    <Label x:Name="LocationLabel" />
+                    <Label x:Name="ProgressLabel" FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label
+                Text="Принятые строки"
+                FontAttributes="Bold"
+                FontSize="20" />
+            <VerticalStackLayout
+                x:Name="LinesLayout"
+                BindableLayout.ItemsSource="{Binding Lines}"
+                Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="contracts:MobileReceivingOrderLineResponse">
+                        <Border Padding="14">
+                            <VerticalStackLayout Spacing="4">
+                                <Label
+                                    FontAttributes="Bold"
+                                    FontSize="17"
+                                    Text="{Binding SkuName}" />
+                                <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                                <Label Text="{Binding FactQuantity, StringFormat='Принято: {0:g}'}" />
+                                <Label Text="{Binding AllocatedQuantity, StringFormat='Размещено: {0:g}'}" />
+                                <Label Text="{Binding RemainingPutawayQuantity, StringFormat='Осталось: {0:g}'}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

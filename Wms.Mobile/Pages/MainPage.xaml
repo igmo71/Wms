@@ -64,6 +64,12 @@
                 Text="Инвентаризация" />
 
             <Button
+                Clicked="OnReceivingOrdersClicked"
+                FontSize="18"
+                HeightRequest="64"
+                Text="Приёмка и размещение" />
+
+            <Button
                 Clicked="OnScannerDiagnosticsClicked"
                 FontSize="16"
                 HeightRequest="56"

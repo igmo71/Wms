@@ -1,0 +1,146 @@
+<ContentPage
+    x:Class="Wms.Mobile.ReceivingOrderPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Приёмка и размещение">
+
+    <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
+        <ScrollView>
+            <VerticalStackLayout Padding="24" Spacing="16">
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="26"
+                    Text="Приёмка и размещение" />
+
+                <Picker
+                    x:Name="WarehousePicker"
+                    ItemDisplayBinding="{Binding Name}"
+                    SelectedIndexChanged="OnWarehouseChanged"
+                    Title="Выберите склад" />
+
+                <Border Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label
+                            x:Name="ScanStepLabel"
+                            FontAttributes="Bold"
+                            FontSize="22"
+                            Text="1. Выберите склад" />
+                        <Label
+                            x:Name="ScanInstructionLabel"
+                            FontSize="18"
+                            Text="После выбора склада отсканируйте штрихкод приходного ордера." />
+                        <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                        <BoxView
+                            x:Name="ProgressIndicator"
+                            Color="{StaticResource Primary}"
+                            HeightRequest="3"
+                            Opacity="0" />
+                        <Label
+                            x:Name="ErrorLabel"
+                            HorizontalTextAlignment="Center"
+                            TextColor="Red" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        x:Name="ReceivingTabButton"
+                        Clicked="OnReceivingTabClicked"
+                        Grid.Column="0"
+                        Text="Приёмка" />
+                    <Button
+                        x:Name="PutawayTabButton"
+                        Clicked="OnPutawayTabClicked"
+                        Grid.Column="1"
+                        Text="Размещение" />
+                </Grid>
+
+                <VerticalStackLayout x:Name="ReceivingSection" Spacing="10">
+                    <Label
+                        x:Name="ReceivingStatusLabel"
+                        HorizontalTextAlignment="Center"
+                        Text="Выберите склад." />
+                    <VerticalStackLayout
+                        x:Name="ReceivingOrdersLayout"
+                        BindableLayout.ItemsSource="{Binding ReceivingOrders}"
+                        Spacing="10">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
+                                <Border Padding="14">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            CommandParameter="{Binding Id}"
+                                            Tapped="OnOrderTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label
+                                                FontAttributes="Bold"
+                                                FontSize="18"
+                                                Text="{Binding Number, StringFormat='Ордер {0}'}" />
+                                            <Label
+                                                Grid.Column="1"
+                                                Text="{Binding DateText}" />
+                                        </Grid>
+                                        <Label
+                                            FontAttributes="Bold"
+                                            Text="{Binding StatusText}" />
+                                        <Label Text="{Binding DetailsText}" />
+                                        <Label
+                                            FontSize="16"
+                                            Text="{Binding ProgressText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout
+                    x:Name="PutawaySection"
+                    IsVisible="False"
+                    Spacing="10">
+                    <Label
+                        x:Name="PutawayStatusLabel"
+                        HorizontalTextAlignment="Center"
+                        Text="Выберите склад." />
+                    <VerticalStackLayout
+                        x:Name="PutawayOrdersLayout"
+                        BindableLayout.ItemsSource="{Binding PutawayOrders}"
+                        Spacing="10">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
+                                <Border Padding="14">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            CommandParameter="{Binding Id}"
+                                            Tapped="OnOrderTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label
+                                                FontAttributes="Bold"
+                                                FontSize="18"
+                                                Text="{Binding Number, StringFormat='Ордер {0}'}" />
+                                            <Label
+                                                Grid.Column="1"
+                                                Text="{Binding DateText}" />
+                                        </Grid>
+                                        <Label
+                                            FontAttributes="Bold"
+                                            Text="{Binding StatusText}" />
+                                        <Label Text="{Binding DetailsText}" />
+                                        <Label
+                                            FontSize="16"
+                                            Text="{Binding ProgressText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+</ContentPage>
