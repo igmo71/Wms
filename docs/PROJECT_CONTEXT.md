@@ -64,8 +64,9 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   resolution of storage-location and SKU barcodes. Its implemented operational
   workflows cover direct and transit intra-warehouse movements and
   location-based inventory counts. The receiving and putaway Mobile V1 server
-  contracts and endpoints are implemented; their MAUI screens are not yet
-  implemented.
+  contracts and endpoints, warehouse work queue, document scan, and mobile
+  receiving workflow are implemented. Mobile putaway is still read-only and
+  has no operational commands on its MAUI screen yet.
 
 The mobile foundation and intra-warehouse transfer workflow are manually
 accepted on Urovo TD50 and a control Android smartphone. The location-based
