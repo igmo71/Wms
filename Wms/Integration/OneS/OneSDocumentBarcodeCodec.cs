@@ -15,8 +15,20 @@ public static class OneSDocumentBarcodeCodec
             return OperationError.Invalid("Штрихкод документа 1С не указан.");
         }
 
+        if (payload.Any(character => character is < '0' or > '9'))
+        {
+            return OperationError.Invalid(
+                "Штрихкод документа 1С должен содержать допустимое десятичное представление Ref_Key.");
+        }
+
+        var normalizedPayload = payload.TrimStart('0');
+        if (normalizedPayload.Length == 0)
+        {
+            normalizedPayload = "0";
+        }
+
         if (!BigInteger.TryParse(
-            payload,
+            normalizedPayload,
             NumberStyles.None,
             CultureInfo.InvariantCulture,
             out var numericValue)
@@ -30,7 +42,7 @@ public static class OneSDocumentBarcodeCodec
         var hexadecimalValue = numericValue.ToString("x", CultureInfo.InvariantCulture)
             .PadLeft(32, '0');
         if (!Guid.TryParseExact(hexadecimalValue, "N", out var documentId)
-            || Encode(documentId) != payload)
+            || Encode(documentId) != normalizedPayload)
         {
             return OperationError.Invalid(
                 "Штрихкод документа 1С имеет некорректный формат.");
