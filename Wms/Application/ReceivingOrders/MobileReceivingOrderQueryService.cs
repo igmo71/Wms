@@ -46,7 +46,19 @@ public sealed class MobileReceivingOrderQueryService(
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(
         Guid orderId,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        await GetDetailsAsync(orderId, requireMobileWork: true, ct);
+
+    public async Task<OperationResult<MobileReceivingOrderDetails>>
+        GetCommandResultDetailsAsync(
+            Guid orderId,
+            CancellationToken ct = default) =>
+        await GetDetailsAsync(orderId, requireMobileWork: false, ct);
+
+    private async Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(
+        Guid orderId,
+        bool requireMobileWork,
+        CancellationToken ct)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var order = await BaseOrderQuery(dbContext)
@@ -58,7 +70,7 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
-        if (!IsMobileWork(order))
+        if (requireMobileWork && !IsMobileWork(order))
         {
             return OperationError.Invalid(
                 "Для приходного ордера нет доступного мобильного действия.");

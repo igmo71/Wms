@@ -58,12 +58,14 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
 - `Wms.WebApi` hosts the authenticated mobile V1 identity boundary, protected
   development application endpoints, and separate 1C integration endpoints.
   Verification of 1C callers is still unfinished.
-- `Wms.Contracts` contains the first versioned mobile identity wire contracts.
+- `Wms.Contracts` contains the versioned Mobile V1 wire contracts.
 - `Wms.Mobile` is an Android .NET MAUI client with login, secure token storage,
   refresh handling, intent and camera scanning, and diagnostic server-side
   resolution of storage-location and SKU barcodes. Its implemented operational
   workflows cover direct and transit intra-warehouse movements and
-  location-based inventory counts.
+  location-based inventory counts. The receiving and putaway Mobile V1 server
+  contracts and endpoints are implemented; their MAUI screens are not yet
+  implemented.
 
 The mobile foundation and intra-warehouse transfer workflow are manually
 accepted on Urovo TD50 and a control Android smartphone. The location-based
@@ -219,6 +221,16 @@ status, comments, timestamps, and users. Completing receiving posts facts into
 the receiving location. Putaway records draft movements from that location to
 ordinary storage and posts them when putaway completes.
 
+A nullable receiving fact distinguishes an unchecked line from an explicitly
+confirmed zero. A mobile accepted SKU scan increments the selected order line
+by one, while manual input sets its absolute nonnegative fact without changing
+an existing web-entered comment. Every line must have an explicit fact before
+receiving can complete. The Mobile V1 server exposes one warehouse work queue,
+document and line resolution, receiving commands, draft putaway commands, and
+terminal command results. A 1C document barcode resolves to the document GUID
+through the shared decimal codec; leading zeroes in the scanned decimal payload
+are accepted and normalized.
+
 The receiving and putaway rules are defined in
 [`specs/receiving-putaway/spec.md`](../specs/receiving-putaway/spec.md) and the
 strict workflow behavior in
@@ -361,7 +373,8 @@ receipt and its WMS change are saved by the same `ApplicationDbContext` and
 warehouse action. Reusing the key with different input is a conflict. The
 current implementation protects creation of direct and transit
 inventory-transfer drafts, direct movement, pick to transit, put from transit,
-completion of the transfer, and every changing inventory-count command. The
+completion of the transfer, every changing inventory-count command, and every
+changing receiving and putaway command. The
 repeated receipt lifecycle is centralized inside the respective mobile command
 service while each business action remains an explicit internal staged
 operation.

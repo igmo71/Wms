@@ -425,6 +425,169 @@ public sealed class MobileApiClient
             ?? throw InvalidResponse(response, "invalid_inventory_counts_response", "Сервер вернул некорректный список инвентаризаций.");
     }
 
+    public async Task<MobileReceivingOrderWorkQueueResponse> GetReceivingOrderWorkQueueAsync(
+        Guid warehouseId,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.ReceivingOrders}?warehouseId={warehouseId:D}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderWorkQueueResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_queue_response",
+                "Сервер вернул некорректную очередь приёмки и размещения.");
+    }
+
+    public Task<MobileReceivingOrderDetailsResponse> GetReceivingOrderAsync(
+        Guid orderId,
+        CancellationToken ct = default) =>
+        GetReceivingOrderDetailsAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}",
+            ct);
+
+    public async Task<MobileReceivingOrderDetailsResponse> ResolveReceivingOrderDocumentAsync(
+        Guid warehouseId,
+        string barcode,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.ReceivingOrders}/resolve-document";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileResolveReceivingOrderDocumentRequest(warehouseId, barcode),
+            ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderDetailsResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_response",
+                "Сервер вернул некорректный приходный ордер.");
+    }
+
+    public Task<MobileReceivingOrderCommandResponse> StartReceivingOrderAsync(
+        Guid orderId,
+        string receivingLocationBarcode,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/start-receiving",
+            new MobileStartReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
+            ct);
+
+    public async Task<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>>
+        ResolveReceivingOrderSkuAsync(
+            Guid orderId,
+            string barcode,
+            CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lines/resolve-sku";
+        using var response = await _httpClient.PostAsJsonAsync(
+            route,
+            new MobileResolveReceivingOrderSkuRequest(barcode),
+            ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content
+            .ReadFromJsonAsync<List<MobileReceivingOrderLineCandidateResponse>>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_sku_response",
+                "Сервер вернул некорректные строки товара приходного ордера.");
+    }
+
+    public async Task<MobileReceivingOrderLineSearchResponse> SearchReceivingOrderLinesAsync(
+        Guid orderId,
+        string query,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lines/search"
+            + $"?query={Uri.EscapeDataString(query)}";
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderLineSearchResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_line_search_response",
+                "Сервер вернул некорректные результаты поиска строк приходного ордера.");
+    }
+
+    public Task<MobileReceivingOrderCommandResponse> IncrementReceivingOrderLineAsync(
+        Guid orderId,
+        int lineNumber,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lines/{lineNumber}/scan",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> SetReceivingOrderLineQuantityAsync(
+        Guid orderId,
+        int lineNumber,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lines/{lineNumber}/quantity",
+            new MobileSetReceivingOrderLineQuantityRequest(clientRequestId, quantity),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> CompleteReceivingOrderAsync(
+        Guid orderId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/complete-receiving",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> StartReceivingOrderPutawayAsync(
+        Guid orderId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/start-putaway",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> AddReceivingOrderPutawayMovementAsync(
+        Guid orderId,
+        int lineNumber,
+        string destinationStorageLocationBarcode,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/putaway-movements",
+            new MobileAddReceivingOrderPutawayMovementRequest(
+                clientRequestId,
+                lineNumber,
+                destinationStorageLocationBarcode,
+                quantity),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> DeleteReceivingOrderPutawayMovementAsync(
+        Guid orderId,
+        Guid movementId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/putaway-movements/{movementId:D}/delete",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> CompleteReceivingOrderPutawayAsync(
+        Guid orderId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostReceivingOrderCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/complete-putaway",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
     public async Task<MobileInventoryCountDetailsResponse> GetInventoryCountAsync(
         Guid inventoryCountId,
         CancellationToken ct = default) =>
@@ -537,6 +700,36 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         return await response.Content.ReadFromJsonAsync<MobileInventoryCountDetailsResponse>(ct)
             ?? throw InvalidResponse(response, "invalid_inventory_count_response", "Сервер вернул некорректную инвентаризацию.");
+    }
+
+    private async Task<MobileReceivingOrderDetailsResponse> GetReceivingOrderDetailsAsync(
+        string route,
+        CancellationToken ct)
+    {
+        using var response = await _httpClient.GetAsync(route, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderDetailsResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_response",
+                "Сервер вернул некорректный приходный ордер.");
+    }
+
+    private async Task<MobileReceivingOrderCommandResponse>
+        PostReceivingOrderCommandAsync<TRequest>(
+            string route,
+            TRequest request,
+            CancellationToken ct)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderCommandResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_receiving_order_command_response",
+                "Сервер вернул некорректный результат операции с приходным ордером.");
     }
 
     private async Task<MobileInventoryCountDetailsResponse> PostInventoryCountDetailsAsync<TRequest>(
