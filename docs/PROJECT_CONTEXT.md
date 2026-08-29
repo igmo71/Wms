@@ -61,16 +61,16 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
 - `Wms.Contracts` contains the first versioned mobile identity wire contracts.
 - `Wms.Mobile` is an Android .NET MAUI client with login, secure token storage,
   refresh handling, intent and camera scanning, and diagnostic server-side
-  resolution of storage-location and SKU barcodes. Its first operational
-  workflow covers direct and transit intra-warehouse movements.
+  resolution of storage-location and SKU barcodes. Its implemented operational
+  workflows cover direct and transit intra-warehouse movements and
+  location-based inventory counts.
 
-The mobile foundation and first operational vertical are implemented and
-manually accepted on Urovo TD50 and a control Android smartphone. This includes
-authentication and session restoration, real refresh of an expired access
-token, automatic selection of the embedded scanner or inline camera, contextual
-barcode resolution, atomic command idempotency, and direct/transit
-intra-warehouse transfers. The next mobile warehouse process is selected and
-specified separately from this completed vertical.
+The mobile foundation and intra-warehouse transfer workflow are manually
+accepted on Urovo TD50 and a control Android smartphone. The location-based
+inventory-count workflow is manually accepted on Urovo TD50. Accepted behavior
+includes authentication and session restoration, real refresh of an expired
+access token, automatic selection of the embedded scanner or inline camera,
+contextual barcode resolution, and atomic command idempotency.
 
 ## Authentication and authorization
 
@@ -250,16 +250,18 @@ balance as an expected row. Expected quantities remain visible. A nullable
 counted quantity distinguishes an uncounted row from an explicitly confirmed
 zero.
 
-Each accepted SKU scan records one physical unit: the first scan sets one and
-subsequent scans increment by one. Manual search by name, code, or barcode sets
-an absolute nonnegative quantity and may add an unexpected SKU. Every row must
-be counted before posting. Posting creates movements only for nonzero
-counted-versus-expected differences and releases the lock in the same save.
+Each accepted mobile SKU scan records one physical unit: the first scan sets
+one and subsequent scans increment by one. Manual input in either UI searches
+by name, code, or barcode, sets an absolute nonnegative quantity, and may add an
+unexpected SKU. The web UI does not provide a separate repeated-scan `+1` mode.
+Every row must be counted before posting. Posting creates movements only for
+nonzero counted-versus-expected differences and releases the lock in the same
+save.
 Explicitly abandoning work physically deletes the draft and its rows and also
 releases the lock; merely leaving the page preserves the draft. There is no
 cancelled status or separate mobile inventory-count model. Recounts,
 reservations, count assignments, and generated count tasks are not implemented.
-The active implementation record is in
+The completed implementation record is in
 [`specs/2026-08-27-location-inventory-count/spec.md`](../specs/2026-08-27-location-inventory-count/spec.md).
 
 ### Intra-warehouse transfers
@@ -299,7 +301,8 @@ followed by local failure.
 
 ## Mobile WMS direction
 
-The first mobile operational vertical has passed its manual acceptance checks.
+The first two mobile operational processes have passed their manual acceptance
+checks.
 The client is Android-only, online-only, and communicates exclusively through
 an authenticated, versioned API. It reuses the same application services and
 server-side business rules, derives the acting user from the authenticated
@@ -339,6 +342,13 @@ The search is limited to SKUs with a positive balance in the already selected
 source location, does not take focus until the operator opens it, and selecting
 a result continues through the same quantity and confirmation workflow.
 
+The second accepted mobile process is a full count of one ordinary storage
+location. Scanning the location creates or reopens its draft and acquires a
+document-owned location lock. Expected rows remain visible; repeated SKU scans
+accumulate one unit at a time, while manual search records an absolute quantity
+and can add an unexpected SKU. Posting or explicitly deleting the draft
+releases the lock; merely leaving the screen preserves the draft.
+
 The accepted foundation and first-vertical scope are retained under
 [`specs/mobile-wms/`](../specs/mobile-wms/) as a frozen reference. Each
 subsequent mobile warehouse process is specified separately.
@@ -351,6 +361,7 @@ receipt and its WMS change are saved by the same `ApplicationDbContext` and
 warehouse action. Reusing the key with different input is a conflict. The
 current implementation protects creation of direct and transit
 inventory-transfer drafts, direct movement, pick to transit, put from transit,
-and completion of the transfer. The repeated receipt lifecycle is centralized
-inside the mobile transfer command service while each business action remains
-an explicit internal staged operation.
+completion of the transfer, and every changing inventory-count command. The
+repeated receipt lifecycle is centralized inside the respective mobile command
+service while each business action remains an explicit internal staged
+operation.

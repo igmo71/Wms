@@ -38,15 +38,18 @@ scope must be split or the user must choose their order.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
-| 2026-08-27 | **Active** | Location-based inventory counting shared by mobile and web | [`2026-08-27-location-inventory-count/spec.md`](2026-08-27-location-inventory-count/spec.md) |
+| 2026-08-29 | Active | Mobile receiving and putaway | [`2026-08-29-mobile-receiving-putaway/spec.md`](2026-08-29-mobile-receiving-putaway/spec.md) |
+| 2026-08-27 | Frozen reference | Location-based inventory counting shared by mobile and web | [`2026-08-27-location-inventory-count/spec.md`](2026-08-27-location-inventory-count/spec.md) |
 | 2026-08-27 | Frozen reference | Temporary storage-location locking across inventory processes | [`2026-08-27-storage-location-locking/spec.md`](2026-08-27-storage-location-locking/spec.md) |
 | 2026-08-19 | Frozen reference | Android mobile WMS foundation and first vertical | [`mobile-wms/spec.md`](mobile-wms/spec.md) |
 | 2026-08-25 | Frozen reference | Atomic idempotency for mobile inventory-transfer commands | [`2026-08-25-mobile-command-idempotency/spec.md`](2026-08-25-mobile-command-idempotency/spec.md) |
 | 2026-08-21 | Frozen reference | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
+| 2026-08-10 | Superseded by `2026-08-27-location-inventory-count` | Legacy multi-location inventory-count backend | [`inventory-count-backend/spec.md`](inventory-count-backend/spec.md) |
 
-Location-based inventory counting is active. Storage-location locking, the
-mobile foundation, and the intra-warehouse transfer vertical are accepted
-frozen references required by it.
+Mobile receiving and putaway is the active issue under discussion.
+Location-based inventory counting, storage-location locking, the mobile
+foundation, and the intra-warehouse transfer vertical are accepted frozen
+references.
 
 ## Legacy reference ledger
 
@@ -58,7 +61,6 @@ addition of their specification directories.
 | 2026-08-08 | `order-workflow-consistency` |
 | 2026-08-08 | `shipping-order-workflow` |
 | 2026-08-09 | `strict-order-workflows` |
-| 2026-08-10 | `inventory-count-backend` |
 | 2026-08-10 | `operational-hardening` |
 | 2026-08-10 | `picking-draft-movements` |
 | 2026-08-10 | `shipping-order-ui` |

@@ -8,11 +8,11 @@ public partial class InventoryCountPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private readonly IOperationalBarcodeScanner _scanner;
-    private IReadOnlyList<MobileWarehouseResponse> _warehouses = [];
     private bool _loaded;
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
+    private int _draftLoadVersion;
     private Guid? _pendingStartRequestId;
     private string? _pendingBarcode;
 
@@ -36,7 +36,6 @@ public partial class InventoryCountPage : ContentPage
 
         if (!_loaded)
         {
-            _loaded = true;
             await LoadWarehousesAsync();
         }
         else
@@ -49,6 +48,7 @@ public partial class InventoryCountPage : ContentPage
     protected override void OnDisappearing()
     {
         _isVisible = false;
+        _draftLoadVersion++;
         CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
@@ -66,9 +66,10 @@ public partial class InventoryCountPage : ContentPage
         SetBusy(true);
         try
         {
-            _warehouses = await _apiClient.GetWarehousesAsync();
-            WarehousePicker.ItemsSource = _warehouses.ToList();
-            if (_warehouses.Count == 1)
+            var warehouses = await _apiClient.GetWarehousesAsync();
+            WarehousePicker.ItemsSource = warehouses.ToList();
+            _loaded = true;
+            if (warehouses.Count == 1)
                 WarehousePicker.SelectedIndex = 0;
         }
         catch (MobileApiException exception)
@@ -87,8 +88,10 @@ public partial class InventoryCountPage : ContentPage
 
     private async void OnWarehouseChanged(object? sender, EventArgs e)
     {
+        if (_pendingStartRequestId is not null)
+            return;
+
         ErrorLabel.Text = string.Empty;
-        _pendingStartRequestId = null;
         _pendingBarcode = null;
         StepLabel.Text = SelectedWarehouse is null ? "1. Выберите склад" : "2. Ячейка";
         InstructionLabel.Text = SelectedWarehouse is null
@@ -123,7 +126,8 @@ public partial class InventoryCountPage : ContentPage
                 _pendingStartRequestId.Value);
             _pendingStartRequestId = null;
             _pendingBarcode = null;
-            await Navigation.PushAsync(new InventoryCountDetailsPage(_apiClient, _scanner, details));
+            if (_isVisible)
+                await Navigation.PushAsync(new InventoryCountDetailsPage(_apiClient, _scanner, details));
         }
         catch (MobileApiException exception)
         {
@@ -144,6 +148,7 @@ public partial class InventoryCountPage : ContentPage
 
     private async Task LoadDraftsAsync()
     {
+        var loadVersion = ++_draftLoadVersion;
         DraftsContainer.Children.Clear();
         if (SelectedWarehouse is not MobileWarehouseResponse warehouse)
         {
@@ -154,6 +159,9 @@ public partial class InventoryCountPage : ContentPage
         try
         {
             var drafts = await _apiClient.GetInventoryCountDraftsAsync(warehouse.Id);
+            if (loadVersion != _draftLoadVersion || SelectedWarehouse?.Id != warehouse.Id)
+                return;
+
             DraftsStatusLabel.Text = drafts.Count == 0
                 ? "Незавершённых инвентаризаций нет."
                 : $"В работе: {drafts.Count}.";
@@ -162,11 +170,13 @@ public partial class InventoryCountPage : ContentPage
         }
         catch (MobileApiException exception)
         {
-            DraftsStatusLabel.Text = exception.Message;
+            if (loadVersion == _draftLoadVersion)
+                DraftsStatusLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
         {
-            DraftsStatusLabel.Text = "Не удалось загрузить черновики.";
+            if (loadVersion == _draftLoadVersion)
+                DraftsStatusLabel.Text = "Не удалось загрузить черновики.";
         }
     }
 
@@ -195,13 +205,18 @@ public partial class InventoryCountPage : ContentPage
 
     private async Task OpenDraftAsync(Guid inventoryCountId)
     {
-        if (_busy)
+        if (_busy || _pendingStartRequestId is not null)
+        {
+            if (_pendingStartRequestId is not null)
+                ErrorLabel.Text = "Сначала повторите сканирование предыдущей ячейки.";
             return;
+        }
         SetBusy(true);
         try
         {
             var details = await _apiClient.GetInventoryCountAsync(inventoryCountId);
-            await Navigation.PushAsync(new InventoryCountDetailsPage(_apiClient, _scanner, details));
+            if (_isVisible)
+                await Navigation.PushAsync(new InventoryCountDetailsPage(_apiClient, _scanner, details));
         }
         catch (MobileApiException exception)
         {
@@ -231,8 +246,7 @@ public partial class InventoryCountPage : ContentPage
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        ProgressIndicator.IsVisible = busy;
-        ProgressIndicator.IsRunning = busy;
-        WarehousePicker.IsEnabled = !busy;
+        ProgressIndicator.Opacity = busy ? 1 : 0;
+        WarehousePicker.IsEnabled = !busy && _pendingStartRequestId is null;
     }
 }

@@ -23,6 +23,7 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     public bool IsAccented { get; private set; }
     public string? AccentText { get; private set; }
     public bool HasQuantityError { get; private set; }
+    public bool ActionsEnabled { get; private set; }
 
     public string QuantitySummary =>
         $"Ожид.: {Format(ExpectedQuantity)} · Факт: {Format(CountedQuantity)} · Разн.: {Format(DifferenceQuantity)} {UnitOfMeasure}";
@@ -37,10 +38,13 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
         {
             if (_quantityText == value)
                 return;
+
+            var hadQuantityError = HasQuantityError;
             _quantityText = value;
             HasQuantityError = false;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(HasQuantityError));
+            if (hadQuantityError)
+                OnPropertyChanged(nameof(HasQuantityError));
         }
     }
 
@@ -105,35 +109,55 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
         QuantityText = CountedQuantity?.ToString("0.###", CultureInfo.InvariantCulture)
             ?? string.Empty;
         IsEditing = true;
-        HasQuantityError = false;
+        ClearQuantityError();
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(ShowActions));
         OnPropertyChanged(nameof(ShowRemoveAction));
-        OnPropertyChanged(nameof(HasQuantityError));
     }
 
     public void EndEditing()
     {
         IsEditing = false;
-        HasQuantityError = false;
+        ClearQuantityError();
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(ShowActions));
         OnPropertyChanged(nameof(ShowRemoveAction));
-        OnPropertyChanged(nameof(HasQuantityError));
     }
 
     public void SetAccent(bool isAccented, string? text)
     {
+        var accentText = isAccented ? text : null;
+        if (IsAccented == isAccented && AccentText == accentText)
+            return;
+
         IsAccented = isAccented;
-        AccentText = isAccented ? text : null;
+        AccentText = accentText;
         OnPropertyChanged(nameof(IsAccented));
         OnPropertyChanged(nameof(AccentText));
         OnPropertyChanged(nameof(HasAccentText));
     }
 
+    public void SetActionsEnabled(bool enabled)
+    {
+        if (ActionsEnabled == enabled)
+            return;
+
+        ActionsEnabled = enabled;
+        OnPropertyChanged(nameof(ActionsEnabled));
+    }
+
     public void MarkQuantityInvalid()
     {
         HasQuantityError = true;
+        OnPropertyChanged(nameof(HasQuantityError));
+    }
+
+    private void ClearQuantityError()
+    {
+        if (!HasQuantityError)
+            return;
+
+        HasQuantityError = false;
         OnPropertyChanged(nameof(HasQuantityError));
     }
 

@@ -1,5 +1,10 @@
 # Inventory count backend
 
+Status: **Superseded** by
+[`2026-08-27-location-inventory-count`](../2026-08-27-location-inventory-count/spec.md),
+which replaced the former multi-location draft with one document per storage
+location.
+
 ## Business outcome
 
 Allow WMS to create a draft inventory count, record counted quantities by storage

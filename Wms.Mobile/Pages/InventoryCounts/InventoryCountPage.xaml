@@ -27,10 +27,11 @@
                         FontSize="18"
                         Text="После выбора склада отсканируйте QR ячейки хранения." />
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <ActivityIndicator
+                    <BoxView
                         x:Name="ProgressIndicator"
-                        IsRunning="False"
-                        IsVisible="False" />
+                        Color="{StaticResource Primary}"
+                        HeightRequest="3"
+                        Opacity="0" />
                     <Label
                         x:Name="ErrorLabel"
                         HorizontalTextAlignment="Center"

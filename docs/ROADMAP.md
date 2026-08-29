@@ -6,8 +6,6 @@ in `specs/`.
 
 ## Current MVP focus
 
-- Specify and implement one location-based inventory-count workflow shared by
-  mobile and web interfaces, using document-owned storage-location locks.
 - Manually validate and harden the implemented web workflows after the
   rich-model, authorization, storage-topology, and SKU-import refactoring.
 - Prove that existing databases can be migrated safely to required zone and
@@ -54,9 +52,10 @@ and per-warehouse assignments remain deferred until a pilot needs them.
 
 ## Mobile WMS — next delivery path
 
-The mobile foundation, scanning, direct/transit intra-warehouse movement, and
-storage-location locking are accepted. The next delivery is a location-based
-inventory-count workflow shared by mobile and web interfaces.
+The mobile foundation, scanning, direct/transit intra-warehouse movement,
+storage-location locking, and location-based inventory counting are accepted.
+The next mobile process has not been selected and must be specified separately
+before implementation.
 
 External inputs still required: 1C document-barcode control examples before a
 document-driven mobile process, printer/label constraints before finalizing

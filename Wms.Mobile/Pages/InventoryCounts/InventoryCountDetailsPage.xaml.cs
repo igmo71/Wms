@@ -12,12 +12,11 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private readonly MobileApiClient _apiClient;
     private readonly IOperationalBarcodeScanner _scanner;
-    private readonly Dictionary<Guid, Entry> _quantityEntries = [];
     private MobileInventoryCountDetailsResponse _details;
     private int _searchVersion;
     private InventoryCountPageMode _mode = InventoryCountPageMode.Scanning;
     private InventoryCountItemViewState? _editingItem;
-    private Entry? _activeQuantityEntry;
+    private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
     private Guid? _pendingScanRequestId;
@@ -34,6 +33,8 @@ public partial class InventoryCountDetailsPage : ContentPage
         MobileInventoryCountDetailsResponse details)
     {
         InitializeComponent();
+        ItemStates.CollectionChanged += (_, _) =>
+            EmptyItemsLabel.IsVisible = ItemStates.Count == 0;
         _apiClient = apiClient;
         _scanner = scanner;
         _details = details;
@@ -43,22 +44,23 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     public ObservableCollection<InventoryCountItemViewState> ItemStates { get; } = [];
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _isVisible = true;
         if (!_scannerSubscribed)
         {
             _scanner.ScanReceived += OnScanReceived;
             _scannerSubscribed = true;
         }
-        _ = UpdateCameraAsync();
+        await UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
+        _isVisible = false;
         _searchVersion++;
         SkuSearchEntry.Unfocus();
-        _activeQuantityEntry?.Unfocus();
         CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
@@ -69,9 +71,19 @@ public partial class InventoryCountDetailsPage : ContentPage
     }
 
     private bool IsDraft => _details.Count.Status == MobileInventoryCountStatus.Draft;
+    private bool HasPendingCommand => _pendingScanRequestId is not null
+        || _pendingQuantityRequestId is not null
+        || _pendingPostRequestId is not null
+        || _pendingDeleteRequestId is not null
+        || _pendingRemoveRequestId is not null;
+    private bool CanStartNewAction => IsDraft
+        && !_busy
+        && _mode == InventoryCountPageMode.Scanning
+        && !HasPendingCommand;
     private bool IsScanExpected => IsDraft
         && !_busy
-        && _mode == InventoryCountPageMode.Scanning;
+        && _mode == InventoryCountPageMode.Scanning
+        && (!HasPendingCommand || _pendingScanRequestId is not null);
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
         MainThread.BeginInvokeOnMainThread(async () => await IncrementScanAsync(scanEvent.Value));
@@ -121,7 +133,7 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private void OnOpenSkuSearchTapped(object? sender, TappedEventArgs e)
     {
-        if (!IsScanExpected)
+        if (!CanStartNewAction)
             return;
 
         SetMode(InventoryCountPageMode.Searching);
@@ -133,8 +145,9 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async void OnCancelSkuSearchTapped(object? sender, TappedEventArgs e)
     {
-        CloseSearch();
-        await ReturnToScanningAsync();
+        await ClearSearchAsync();
+        ReturnToScanning();
+        await UpdateCameraAsync();
     }
 
     private async void OnSkuSearchTextChanged(object? sender, TextChangedEventArgs e)
@@ -214,50 +227,61 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async Task SelectSkuAsync(MobileInventoryCountSkuSearchResponse sku)
     {
-        SkuSearchEntry.Unfocus();
-        await SkuSearchEntry.HideSoftInputAsync(CancellationToken.None);
-        CloseSearch();
+        await ClearSearchAsync();
 
         var item = ItemStates.SingleOrDefault(x => x.StockKeepingUnitId == sku.Id);
         if (item is null)
         {
             item = InventoryCountItemViewState.FromPendingSku(sku);
             ItemStates.Add(item);
-            await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingNew);
         }
-        else
-        {
-            await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingExisting);
-        }
+        BeginQuantityEdit(item);
     }
 
     private async void OnPostClicked(object? sender, EventArgs e)
     {
-        if (_busy || _mode != InventoryCountPageMode.Scanning)
+        if (_busy
+            || _mode != InventoryCountPageMode.Scanning
+            || (HasPendingCommand && _pendingPostRequestId is null))
             return;
         if (_details.Items.Any(x => x.CountedQuantity is null))
         {
             ErrorLabel.Text = "Сначала пересчитайте все ожидаемые позиции.";
             return;
         }
-        if (_pendingPostRequestId is null
-            && !await DisplayAlertAsync(
+        if (_pendingPostRequestId is null)
+        {
+            SetBusy(true);
+            var confirmed = await DisplayAlertAsync(
                 "Провести инвентаризацию",
                 "Остатки ячейки будут исправлены по фактическому количеству.",
                 "Провести",
-                "Отмена"))
-            return;
+                "Отмена");
+            if (!confirmed)
+            {
+                SetBusy(false);
+                await UpdateCameraAsync();
+                return;
+            }
+        }
+        else
+        {
+            SetBusy(true);
+        }
 
         _pendingPostRequestId ??= Guid.NewGuid();
-        SetBusy(true);
         try
         {
             _details = await _apiClient.PostInventoryCountAsync(
                 _details.Count.Id,
                 _pendingPostRequestId.Value);
             _pendingPostRequestId = null;
-            await DisplayAlertAsync("Готово", "Инвентаризация проведена, ячейка освобождена.", "ОК");
-            await Navigation.PopAsync();
+            if (_isVisible)
+            {
+                await DisplayAlertAsync("Готово", "Инвентаризация проведена, ячейка освобождена.", "ОК");
+                if (_isVisible)
+                    await Navigation.PopAsync();
+            }
         }
         catch (MobileApiException exception)
         {
@@ -273,30 +297,45 @@ public partial class InventoryCountDetailsPage : ContentPage
         finally
         {
             SetBusy(false);
+            await UpdateCameraAsync();
         }
     }
 
     private async void OnDeleteDraftClicked(object? sender, EventArgs e)
     {
-        if (_busy || _mode != InventoryCountPageMode.Scanning)
+        if (_busy
+            || _mode != InventoryCountPageMode.Scanning
+            || (HasPendingCommand && _pendingDeleteRequestId is null))
             return;
-        if (_pendingDeleteRequestId is null
-            && !await DisplayAlertAsync(
+        if (_pendingDeleteRequestId is null)
+        {
+            SetBusy(true);
+            var confirmed = await DisplayAlertAsync(
                 "Удалить черновик",
                 "Введённые данные будут удалены, ячейка освобождена.",
                 "Удалить",
-                "Оставить"))
-            return;
+                "Оставить");
+            if (!confirmed)
+            {
+                SetBusy(false);
+                await UpdateCameraAsync();
+                return;
+            }
+        }
+        else
+        {
+            SetBusy(true);
+        }
 
         _pendingDeleteRequestId ??= Guid.NewGuid();
-        SetBusy(true);
         try
         {
             await _apiClient.DeleteInventoryCountDraftAsync(
                 _details.Count.Id,
                 _pendingDeleteRequestId.Value);
             _pendingDeleteRequestId = null;
-            await Navigation.PopAsync();
+            if (_isVisible)
+                await Navigation.PopAsync();
         }
         catch (MobileApiException exception)
         {
@@ -310,6 +349,7 @@ public partial class InventoryCountDetailsPage : ContentPage
         finally
         {
             SetBusy(false);
+            await UpdateCameraAsync();
         }
     }
 
@@ -345,10 +385,10 @@ public partial class InventoryCountDetailsPage : ContentPage
         }
     }
 
-    private async void OnEditQuantityTapped(object? sender, TappedEventArgs e)
+    private void OnEditQuantityTapped(object? sender, TappedEventArgs e)
     {
         if (e.Parameter is InventoryCountItemViewState item)
-            await BeginQuantityEditAsync(item, InventoryCountPageMode.EditingExisting);
+            BeginQuantityEdit(item);
     }
 
     private async void OnRemoveItemTapped(object? sender, TappedEventArgs e)
@@ -375,24 +415,21 @@ public partial class InventoryCountDetailsPage : ContentPage
             await CancelQuantityEditAsync(item);
     }
 
-    private async Task BeginQuantityEditAsync(
-        InventoryCountItemViewState item,
-        InventoryCountPageMode mode)
+    private void BeginQuantityEdit(InventoryCountItemViewState item)
     {
-        if (_busy || _mode is not (InventoryCountPageMode.Scanning or InventoryCountPageMode.Searching))
+        if (_busy
+            || HasPendingCommand
+            || _mode is not (InventoryCountPageMode.Scanning or InventoryCountPageMode.Searching))
             return;
 
         CameraScannerView.Stop();
-        _editingItem?.EndEditing();
         _editingItem = item;
-        _pendingQuantityRequestId = null;
-        SetMode(mode);
+        SetMode(InventoryCountPageMode.Editing);
         AccentItem(item.StockKeepingUnitId, null);
         item.BeginEditing();
         InstructionLabel.Text = item.IsPending
             ? "Введите итоговое количество в новой карточке товара."
             : "Введите итоговое количество в карточке товара.";
-        await FocusQuantityEntryAsync(item);
     }
 
     private async Task SaveQuantityAsync(InventoryCountItemViewState item)
@@ -429,13 +466,11 @@ public partial class InventoryCountDetailsPage : ContentPage
             }
 
             _pendingQuantityRequestId = null;
-            await HideQuantityKeyboardAsync(item);
             item.EndEditing();
             _editingItem = null;
-            SetMode(InventoryCountPageMode.Scanning);
             ApplyDetails(details);
             AccentItem(item.StockKeepingUnitId, null);
-            await ReturnToScanningAsync();
+            ReturnToScanning();
         }
         catch (MobileApiException exception)
         {
@@ -457,14 +492,18 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         if (_busy || !ReferenceEquals(_editingItem, item))
             return;
+        if (_pendingQuantityRequestId is not null)
+        {
+            ErrorLabel.Text = "Сначала повторите сохранение количества.";
+            return;
+        }
 
-        _pendingQuantityRequestId = null;
-        await HideQuantityKeyboardAsync(item);
         item.EndEditing();
         if (item.IsPending)
             ItemStates.Remove(item);
         _editingItem = null;
-        await ReturnToScanningAsync();
+        ReturnToScanning();
+        await UpdateCameraAsync();
     }
 
     private static bool TryReadQuantity(
@@ -488,22 +527,38 @@ public partial class InventoryCountDetailsPage : ContentPage
             || item.IsExpected
             || item.ItemId is not Guid itemId)
             return;
+        if (HasPendingCommand && _pendingRemoveRequestId is null)
+        {
+            ErrorLabel.Text = "Сначала повторите незавершённую операцию.";
+            return;
+        }
         if (_pendingRemoveItemId is not null && _pendingRemoveItemId != itemId)
         {
             ErrorLabel.Text = "Сначала повторите удаление предыдущего товара.";
             return;
         }
-        if (_pendingRemoveRequestId is null
-            && !await DisplayAlertAsync(
+        if (_pendingRemoveRequestId is null)
+        {
+            SetBusy(true);
+            var confirmed = await DisplayAlertAsync(
                 "Удалить товар",
                 $"Удалить ошибочно добавленный товар «{item.SkuName}»?",
                 "Удалить",
-                "Отмена"))
-            return;
+                "Отмена");
+            if (!confirmed)
+            {
+                SetBusy(false);
+                await UpdateCameraAsync();
+                return;
+            }
+        }
+        else
+        {
+            SetBusy(true);
+        }
 
         _pendingRemoveItemId = itemId;
         _pendingRemoveRequestId ??= Guid.NewGuid();
-        SetBusy(true);
         try
         {
             var details = await _apiClient.RemoveInventoryCountItemAsync(
@@ -537,70 +592,22 @@ public partial class InventoryCountDetailsPage : ContentPage
             item.SetAccent(item.StockKeepingUnitId == stockKeepingUnitId, text);
     }
 
-    private async void OnQuantityEntryLoaded(object? sender, EventArgs e)
-    {
-        if (sender is not Entry
-            {
-                BindingContext: InventoryCountItemViewState item
-            } entry)
-            return;
-
-        _quantityEntries[item.StockKeepingUnitId] = entry;
-        if (item.IsEditing)
-            await FocusQuantityEntryAsync(item);
-    }
-
-    private void OnQuantityEntryUnloaded(object? sender, EventArgs e)
-    {
-        if (sender is not Entry
-            {
-                BindingContext: InventoryCountItemViewState item
-            } entry)
-            return;
-        if (_quantityEntries.TryGetValue(item.StockKeepingUnitId, out var registered)
-            && ReferenceEquals(registered, entry))
-            _quantityEntries.Remove(item.StockKeepingUnitId);
-    }
-
-    private async Task FocusQuantityEntryAsync(InventoryCountItemViewState item)
-    {
-        await Task.Yield();
-        if (!_quantityEntries.TryGetValue(item.StockKeepingUnitId, out var entry))
-            return;
-
-        _activeQuantityEntry = entry;
-        entry.Focus();
-        entry.CursorPosition = entry.Text?.Length ?? 0;
-        entry.SelectionLength = 0;
-    }
-
-    private async Task HideQuantityKeyboardAsync(InventoryCountItemViewState item)
-    {
-        if (!_quantityEntries.TryGetValue(item.StockKeepingUnitId, out var entry))
-            return;
-
-        entry.Unfocus();
-        await entry.HideSoftInputAsync(CancellationToken.None);
-        if (ReferenceEquals(_activeQuantityEntry, entry))
-            _activeQuantityEntry = null;
-    }
-
-    private void CloseSearch()
+    private async Task ClearSearchAsync()
     {
         _searchVersion++;
         SetSearchBusy(false);
         SkuSearchEntry.Unfocus();
+        await SkuSearchEntry.HideSoftInputAsync(CancellationToken.None);
         SkuSearchEntry.Text = string.Empty;
         SkuSearchResults.Children.Clear();
     }
 
-    private async Task ReturnToScanningAsync()
+    private void ReturnToScanning()
     {
         SetMode(InventoryCountPageMode.Scanning);
         StepLabel.Text = "Пересчёт товара";
         InstructionLabel.Text = "Отсканируйте товар. Каждый принятый скан добавляет одну единицу.";
         ErrorLabel.Text = string.Empty;
-        await UpdateCameraAsync();
     }
 
     private void SetMode(InventoryCountPageMode mode)
@@ -613,7 +620,9 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async Task UpdateCameraAsync()
     {
-        if (_scanner.ActiveSource == BarcodeScanSource.Camera && IsScanExpected)
+        if (_isVisible
+            && _scanner.ActiveSource == BarcodeScanSource.Camera
+            && IsScanExpected)
             await CameraScannerView.StartAsync();
         else
             CameraScannerView.Stop();
@@ -622,8 +631,7 @@ public partial class InventoryCountDetailsPage : ContentPage
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        ProgressIndicator.IsVisible = busy;
-        ProgressIndicator.IsRunning = busy;
+        ProgressIndicator.Opacity = busy ? 1 : 0;
         RefreshActionAvailability();
     }
 
@@ -633,14 +641,18 @@ public partial class InventoryCountDetailsPage : ContentPage
             && IsDraft
             && _mode == InventoryCountPageMode.Scanning;
         PostButton.IsEnabled = canRunDocumentAction
+            && (!HasPendingCommand || _pendingPostRequestId is not null)
             && _details.Items.All(x => x.CountedQuantity.HasValue);
-        DeleteDraftButton.IsEnabled = canRunDocumentAction;
+        DeleteDraftButton.IsEnabled = canRunDocumentAction
+            && (!HasPendingCommand || _pendingDeleteRequestId is not null);
+        SkuSearchPrompt.IsEnabled = CanStartNewAction;
+        foreach (var item in ItemStates)
+            item.SetActionsEnabled(CanStartNewAction);
     }
 
     private void SetSearchBusy(bool busy)
     {
-        SkuSearchIndicator.IsVisible = busy;
-        SkuSearchIndicator.IsRunning = busy;
+        SkuSearchIndicator.Opacity = busy ? 1 : 0;
     }
 
     private void OnNonScanControlLoaded(object? sender, EventArgs e)
@@ -664,7 +676,6 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         Scanning,
         Searching,
-        EditingExisting,
-        EditingNew
+        Editing
     }
 }
