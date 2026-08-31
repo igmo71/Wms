@@ -270,6 +270,11 @@ by web and future mobile commands, so concurrent work on one order returns a
 business conflict instead of silently overwriting its facts, movements, or
 status.
 
+The authenticated Mobile V1 read boundary for picking and shipping exposes a
+warehouse work queue, document and line resolution, current-cycle picking
+movements, and source-location availability. The mobile UI and changing
+commands remain unfinished while this specification is active.
+
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse
 movements so turnover history remains intact. Drafts are not reservations and

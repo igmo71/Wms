@@ -87,6 +87,7 @@ public class Program
         app.MapMobileInventoryTransferEndpoints();
         app.MapMobileInventoryCountEndpoints();
         app.MapMobileReceivingOrderEndpoints();
+        app.MapMobileShippingOrderEndpoints();
         app.MapOneCEndpoints();
 
         app.Run();
