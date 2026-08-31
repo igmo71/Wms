@@ -40,6 +40,7 @@ public static class OneSDocumentBarcodeCodec
         }
 
         var hexadecimalValue = numericValue.ToString("x", CultureInfo.InvariantCulture)
+            .TrimStart('0')
             .PadLeft(32, '0');
         if (!Guid.TryParseExact(hexadecimalValue, "N", out var documentId)
             || Encode(documentId) != normalizedPayload)

@@ -16,6 +16,7 @@
                 <Picker
                     x:Name="WarehousePicker"
                     ItemDisplayBinding="{Binding Name}"
+                    Loaded="OnNonScanControlLoaded"
                     SelectedIndexChanged="OnWarehouseChanged"
                     Title="Выберите склад" />
 
@@ -48,11 +49,13 @@
                         x:Name="ReceivingTabButton"
                         Clicked="OnReceivingTabClicked"
                         Grid.Column="0"
+                        Loaded="OnNonScanControlLoaded"
                         Text="Приёмка" />
                     <Button
                         x:Name="PutawayTabButton"
                         Clicked="OnPutawayTabClicked"
                         Grid.Column="1"
+                        Loaded="OnNonScanControlLoaded"
                         Text="Размещение" />
                 </Grid>
 
@@ -67,7 +70,9 @@
                         Spacing="10">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
-                                <Border Padding="14">
+                                <Border
+                                    Loaded="OnNonScanControlLoaded"
+                                    Padding="14">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer
                                             CommandParameter="{Binding Id}"
@@ -111,7 +116,9 @@
                         Spacing="10">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
-                                <Border Padding="14">
+                                <Border
+                                    Loaded="OnNonScanControlLoaded"
+                                    Padding="14">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer
                                             CommandParameter="{Binding Id}"

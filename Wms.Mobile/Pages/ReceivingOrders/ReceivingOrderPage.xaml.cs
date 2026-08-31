@@ -294,4 +294,23 @@ public partial class ReceivingOrderPage : ContentPage
         ReceivingTabButton.IsEnabled = !busy;
         PutawayTabButton.IsEnabled = !busy;
     }
+
+    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element)
+        {
+            DisableAndroidFocus(element);
+        }
+    }
+
+    private static void DisableAndroidFocus(VisualElement element)
+    {
+#if ANDROID
+        if (element.Handler?.PlatformView is Android.Views.View view)
+        {
+            view.Focusable = false;
+            view.FocusableInTouchMode = false;
+        }
+#endif
+    }
 }
