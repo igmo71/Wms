@@ -1,0 +1,112 @@
+<ContentPage
+    x:Class="Wms.Mobile.ReceivingOrderPutawayMovementPage"
+    x:Name="Page"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Новое размещение">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="25" />
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="6">
+                    <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="18" />
+                    <Label x:Name="SelectedLineLabel" />
+                    <Label x:Name="SelectedDestinationLabel" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
+                    <Label x:Name="InstructionLabel" FontSize="18" />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+
+                    <VerticalStackLayout x:Name="CandidatePanel" IsVisible="False" Spacing="10">
+                        <VerticalStackLayout
+                            BindableLayout.ItemsSource="{Binding ScanCandidates, Source={x:Reference Page}}"
+                            Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="contracts:MobileReceivingOrderLineCandidateResponse">
+                                    <Border Padding="12">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                CommandParameter="{Binding .}"
+                                                Tapped="OnCandidateTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
+                                            <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                            <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                                            <Label Text="{Binding RemainingPutawayQuantity, StringFormat='Осталось: {0:g}'}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Button
+                            Clicked="OnCancelCandidatesClicked"
+                            Loaded="OnNonScanControlLoaded"
+                            Text="Отмена" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="QuantityPanel" IsVisible="False" Spacing="10">
+                        <Entry
+                            x:Name="QuantityEntry"
+                            FontSize="22"
+                            Keyboard="Numeric"
+                            Placeholder="Количество" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button
+                                Clicked="OnQuantityNextClicked"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Далее" />
+                            <Button
+                                Clicked="OnRescanDestinationClicked"
+                                Grid.Column="1"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Другой адрес" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="ConfirmationPanel" IsVisible="False" Spacing="10">
+                        <Label x:Name="ConfirmationLabel" FontSize="18" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button
+                                x:Name="ConfirmMovementButton"
+                                Clicked="OnConfirmMovementClicked"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Подтвердить" />
+                            <Button
+                                x:Name="BackToQuantityButton"
+                                Clicked="OnBackToQuantityClicked"
+                                Grid.Column="1"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Назад" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <BoxView
+                        x:Name="ProgressIndicator"
+                        Color="{StaticResource Primary}"
+                        HeightRequest="3"
+                        Opacity="0" />
+                    <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button
+                x:Name="CancelFlowButton"
+                Clicked="OnCancelFlowClicked"
+                Loaded="OnNonScanControlLoaded"
+                Text="Отменить новое размещение" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
