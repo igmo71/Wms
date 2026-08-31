@@ -524,6 +524,18 @@ public sealed class MobileApiClient
                 "Сервер вернул некорректные позиции отбора.");
     }
 
+    public Task<MobileShippingOrderCommandResponse> StartShippingOrderPickingAsync(
+        Guid orderId,
+        string shippingLocationBarcode,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostShippingOrderCommandAsync(
+            $"{MobileApiRoutes.ShippingOrders}/{orderId:D}/start-picking",
+            new MobileStartShippingOrderPickingRequest(
+                clientRequestId,
+                shippingLocationBarcode),
+            ct);
+
     public async Task<MobileReceivingOrderWorkQueueResponse> GetReceivingOrderWorkQueueAsync(
         Guid warehouseId,
         CancellationToken ct = default)
@@ -843,6 +855,22 @@ public sealed class MobileApiClient
                 response,
                 "invalid_receiving_order_command_response",
                 "Сервер вернул некорректный результат операции с приходным ордером.");
+    }
+
+    private async Task<MobileShippingOrderCommandResponse>
+        PostShippingOrderCommandAsync<TRequest>(
+            string route,
+            TRequest request,
+            CancellationToken ct)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
+        if (!response.IsSuccessStatusCode)
+            await ThrowApiExceptionAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<MobileShippingOrderCommandResponse>(ct)
+            ?? throw InvalidResponse(
+                response,
+                "invalid_shipping_order_command_response",
+                "Сервер вернул некорректный результат операции с расходным ордером.");
     }
 
     private async Task<MobileInventoryCountDetailsResponse> PostInventoryCountDetailsAsync<TRequest>(

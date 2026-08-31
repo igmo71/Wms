@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
@@ -22,6 +23,8 @@ internal static class MobileShippingOrderEndpoints
             .WithMobileResponses<MobileShippingOrderDetailsResponse>();
         group.MapGet("/{orderId:guid}", GetDetailsAsync)
             .WithMobileResponses<MobileShippingOrderDetailsResponse>();
+        group.MapPost("/{orderId:guid}/start-picking", StartPickingAsync)
+            .WithMobileResponses<MobileShippingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lines/resolve-sku", ResolveSkuAsync)
             .WithMobileResponses<IReadOnlyList<MobileShippingOrderLineCandidateResponse>>();
         group.MapGet("/{orderId:guid}/lines/search", SearchLinesAsync)
@@ -88,6 +91,38 @@ internal static class MobileShippingOrderEndpoints
             ? TypedResults.Ok<IReadOnlyList<MobileShippingOrderLineCandidateResponse>>(
                 result.Value!.Select(MapCandidate).ToList())
             : MobileEndpointResults.CommandProblem(result.Error!);
+    }
+
+    private static async Task<IResult> StartPickingAsync(
+        Guid orderId,
+        MobileStartShippingOrderPickingRequest request,
+        ClaimsPrincipal principal,
+        MobileShippingOrderQueryService queryService,
+        MobileShippingOrderCommandService commandService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.StartPickingAsync(
+            orderId,
+            request.ShippingLocationBarcode,
+            request.ClientRequestId,
+            userId,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        }
+
+        var updatedDetailsResult = await queryService.GetCommandResultDetailsAsync(orderId, ct);
+        return updatedDetailsResult.IsSuccess
+            ? TypedResults.Ok(new MobileShippingOrderCommandResponse(
+                MapDetails(updatedDetailsResult.Value!)))
+            : MobileEndpointResults.CommandProblem(updatedDetailsResult.Error!);
     }
 
     private static async Task<IResult> SearchLinesAsync(

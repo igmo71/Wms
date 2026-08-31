@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<MobileReceivingOrderQueryService>();
         services.AddScoped<ReceivingOrderQueryService>();
         services.AddScoped<ShippingOrderCommandService>();
+        services.AddScoped<MobileShippingOrderCommandService>();
         services.AddScoped<MobileShippingOrderQueryService>();
         services.AddScoped<ShippingOrderQueryService>();
         services.AddScoped<SkuBarcodeService>();

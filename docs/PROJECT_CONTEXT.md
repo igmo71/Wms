@@ -270,10 +270,13 @@ by web and future mobile commands, so concurrent work on one order returns a
 business conflict instead of silently overwriting its facts, movements, or
 status.
 
-The authenticated Mobile V1 read boundary for picking and shipping exposes a
+The authenticated Mobile V1 boundary for picking and shipping exposes a
 warehouse work queue, document and line resolution, current-cycle picking
-movements, and source-location availability. The mobile UI and changing
-commands remain unfinished while this specification is active.
+movements, and source-location availability. It can idempotently start picking
+after a physical scan of an eligible shipping location; the location, local
+transition, audit, and command receipt share one save boundary. The remaining
+changing commands and mobile UI are unfinished while this specification is
+active.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse
