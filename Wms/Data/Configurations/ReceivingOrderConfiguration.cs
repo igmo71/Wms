@@ -9,6 +9,7 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
     public void Configure(EntityTypeBuilder<ReceivingOrder> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
 
         builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);

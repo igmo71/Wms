@@ -169,8 +169,11 @@ the SKU catalog changes. A nonzero fact with unknown unit weight is displayed as
 unknown and makes a document/report total incomplete.
 
 A 1C packaging is an input/conversion representation rather than a separate
-inventory balance. Packaging conversion and the exact relationship between
-`Количество` and `КоличествоУпаковок` still require real 1C examples. A 1C
+inventory balance. For receiving-order lines, both `Количество` and
+`КоличествоУпаковок` are configured as nonnegative 1C numbers with length 15
+and precision 3 and are exposed as nullable `Edm.Double`; the line also exposes
+nullable `Упаковка_Key`. Packaging conversion and the exact relationship
+between the two quantities still require real value examples. A 1C
 characteristic that distinguishes a stock variant must eventually become part
 of SKU identity, but characteristic-aware identity is not implemented. The
 current importer therefore assumes one SKU per 1C nomenclature item.
@@ -232,6 +235,12 @@ document and line resolution, receiving commands, draft putaway commands, and
 terminal command results. A 1C document barcode resolves to the document GUID
 through the shared decimal codec; leading zeroes in the scanned decimal payload
 are accepted and normalized.
+
+The aggregate advances `ReceivingOrder.OperationalRevision` for every local
+plan reconciliation, receiving change, state transition, and draft putaway
+movement change. The revision is an optimistic-concurrency token shared by web
+and mobile saves; a stale command returns a business conflict instead of
+silently overwriting another operator's work.
 
 The receiving and putaway rules are defined in
 [`specs/receiving-putaway/spec.md`](../specs/receiving-putaway/spec.md) and the
@@ -380,3 +389,8 @@ changing receiving and putaway command. The
 repeated receipt lifecycle is centralized inside the respective mobile command
 service while each business action remains an explicit internal staged
 operation.
+
+The client retains the same command request id after transport failure, HTTP
+`408`, HTTP `5xx`, or an unreadable successful response because those outcomes
+do not prove whether the server committed the command. A definitive `4xx`
+business/client rejection releases the request id.

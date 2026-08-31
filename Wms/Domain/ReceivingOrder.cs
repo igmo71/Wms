@@ -12,6 +12,7 @@ public class ReceivingOrder
     }
 
     public Guid Id { get; private set; }
+    public long OperationalRevision { get; private set; }
     public bool DeletionMark { get; private set; }
     public bool Posted { get; private set; }
     public string? Number { get; private set; }
@@ -106,7 +107,12 @@ public class ReceivingOrder
 
         if (Status != ReceivingOrderStatus.ReadyForReceiving)
         {
-            ExternalChangeDetected = true;
+            if (!ExternalChangeDetected)
+            {
+                ExternalChangeDetected = true;
+                AdvanceOperationalRevision();
+            }
+
             return ReceivingOrderReconciliation.Conflict;
         }
 
@@ -131,6 +137,7 @@ public class ReceivingOrder
         ApplyImport(snapshot);
         UpdatedAtUtc = updatedAtUtc;
         ExternalChangeDetected = false;
+        AdvanceOperationalRevision();
         return ReceivingOrderReconciliation.Updated;
     }
 
@@ -150,6 +157,7 @@ public class ReceivingOrder
         }
 
         ReceivingLocationId = receivingLocationId;
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -193,6 +201,7 @@ public class ReceivingOrder
         Status = ReceivingOrderStatus.InReceiving;
         StartedAtUtc = startedAtUtc;
         StartedBy = startedBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -208,9 +217,19 @@ public class ReceivingOrder
         }
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
-        return item is null
-            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
-            : item.UpdateFact(factQuantity, comment);
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
+        }
+
+        var result = item.UpdateFact(factQuantity, comment);
+        if (result.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return result;
     }
 
     public OperationResult IncrementItemFact(int lineNumber)
@@ -222,9 +241,19 @@ public class ReceivingOrder
         }
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
-        return item is null
-            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
-            : item.IncrementFact();
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
+        }
+
+        var result = item.IncrementFact();
+        if (result.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return result;
     }
 
     public OperationResult UpdateItemFactQuantity(int lineNumber, double factQuantity)
@@ -236,9 +265,19 @@ public class ReceivingOrder
         }
 
         var item = _items.FirstOrDefault(x => x.LineNumber == lineNumber);
-        return item is null
-            ? OperationError.NotFound($"Строка {lineNumber} приходного ордера '{Id}' не найдена.")
-            : item.UpdateFact(factQuantity, item.Comment);
+        if (item is null)
+        {
+            return OperationError.NotFound(
+                $"Строка {lineNumber} приходного ордера '{Id}' не найдена.");
+        }
+
+        var result = item.UpdateFact(factQuantity, item.Comment);
+        if (result.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return result;
     }
 
     public OperationResult UpdateItemComment(int lineNumber, string? comment)
@@ -257,6 +296,7 @@ public class ReceivingOrder
         }
 
         item.UpdateComment(comment);
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -316,6 +356,7 @@ public class ReceivingOrder
         PutawayStatus = _items.Any(x => x.FactQuantity > 0)
             ? PutawayStatus.Pending
             : PutawayStatus.Inactive;
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -369,6 +410,7 @@ public class ReceivingOrder
         PutawayStatus = PutawayStatus.InProgress;
         PutawayStartedAtUtc = startedAtUtc;
         PutawayStartedBy = startedBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -399,7 +441,7 @@ public class ReceivingOrder
             return quantityResult.Error!;
         }
 
-        return InventoryMovement.Create(
+        var movementResult = InventoryMovement.Create(
             movementId,
             WarehouseId,
             ReceivingLocationId,
@@ -410,6 +452,12 @@ public class ReceivingOrder
             RecorderType.ReceivingOrder,
             Id,
             item.LineNumber);
+        if (movementResult.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return movementResult;
     }
 
     public OperationResult UpdatePutawayMovement(
@@ -438,16 +486,30 @@ public class ReceivingOrder
             return quantityResult;
         }
 
-        return movement.UpdateDraft(
+        var result = movement.UpdateDraft(
             ReceivingLocationId,
             destinationStorageLocationId,
             item.StockKeepingUnitId,
             quantity,
             updatedAtUtc);
+        if (result.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return result;
     }
 
-    public OperationResult ValidatePutawayMovementRemoval(InventoryMovement movement) =>
-        ValidatePutawayMovementChange(movement);
+    public OperationResult RemovePutawayMovement(InventoryMovement movement)
+    {
+        var result = ValidatePutawayMovementChange(movement);
+        if (result.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return result;
+    }
 
     public OperationResult CompletePutaway(
         IReadOnlyCollection<InventoryMovement> draftMovements,
@@ -475,8 +537,11 @@ public class ReceivingOrder
         PutawayStatus = PutawayStatus.Completed;
         PutawayCompletedAtUtc = completedAtUtc;
         PutawayCompletedBy = completedBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
+
+    private void AdvanceOperationalRevision() => OperationalRevision++;
 
     private OperationResult ValidatePutawayEditing()
     {

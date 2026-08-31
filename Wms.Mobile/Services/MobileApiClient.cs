@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Wms.Contracts.Mobile.V1;
 
@@ -744,10 +745,10 @@ public sealed class MobileApiClient
             ?? throw InvalidResponse(response, "invalid_inventory_count_response", "Сервер вернул некорректную инвентаризацию.");
     }
 
-    private static MobileApiException InvalidResponse(
+    private static HttpRequestException InvalidResponse(
         HttpResponseMessage response,
-        string code,
-        string message) => new(response.StatusCode, code, message);
+        string _,
+        string message) => new(message, null, response.StatusCode);
 
     public void Logout() => _sessionStore.Clear();
 
@@ -764,6 +765,15 @@ public sealed class MobileApiClient
             exception is System.Text.Json.JsonException or NotSupportedException)
         {
             // The fallback below deliberately avoids exposing a raw server response.
+        }
+
+        if (response.StatusCode == HttpStatusCode.RequestTimeout
+            || (int)response.StatusCode >= 500)
+        {
+            throw new HttpRequestException(
+                problem?.Message ?? "Сервер WMS не подтвердил результат операции.",
+                null,
+                response.StatusCode);
         }
 
         throw new MobileApiException(

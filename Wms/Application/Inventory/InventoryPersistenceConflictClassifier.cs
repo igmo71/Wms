@@ -20,6 +20,9 @@ internal static class InventoryPersistenceConflictClassifier
     private static readonly OperationError StorageLocationConflict = OperationError.Conflict(
         "Состояние ячейки изменилось. Обновите данные и повторите операцию.");
 
+    private static readonly OperationError ReceivingOrderConflict = OperationError.Conflict(
+        "Приходный ордер изменился. Обновите данные и повторите операцию.");
+
     public static bool TryClassify(DbUpdateException exception, out OperationError error)
     {
         if (exception is DbUpdateConcurrencyException concurrencyException)
@@ -45,6 +48,12 @@ internal static class InventoryPersistenceConflictClassifier
             if (concurrencyException.Entries.Any(x => x.Entity is StorageLocation))
             {
                 error = StorageLocationConflict;
+                return true;
+            }
+
+            if (concurrencyException.Entries.Any(x => x.Entity is ReceivingOrder))
+            {
+                error = ReceivingOrderConflict;
                 return true;
             }
         }

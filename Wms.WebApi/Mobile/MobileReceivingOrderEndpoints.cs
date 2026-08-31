@@ -137,15 +137,8 @@ internal static class MobileReceivingOrderEndpoints
         MobileReceivingOrderQueryService queryService,
         CancellationToken ct)
     {
-        var contextResult = await ResolveLineContextAsync(orderId, queryService, ct);
-        if (!contextResult.IsSuccess)
-        {
-            return MobileEndpointResults.CommandProblem(contextResult.Error!);
-        }
-
         var result = await queryService.ResolveLineBarcodeAsync(
             orderId,
-            contextResult.Value,
             request.Barcode,
             ct);
         return result.IsSuccess
@@ -160,15 +153,8 @@ internal static class MobileReceivingOrderEndpoints
         MobileReceivingOrderQueryService queryService,
         CancellationToken ct)
     {
-        var contextResult = await ResolveLineContextAsync(orderId, queryService, ct);
-        if (!contextResult.IsSuccess)
-        {
-            return MobileEndpointResults.CommandProblem(contextResult.Error!);
-        }
-
         var result = await queryService.SearchLinesAsync(
             orderId,
-            contextResult.Value,
             query,
             LineSearchResultLimit,
             ct);
@@ -397,35 +383,6 @@ internal static class MobileReceivingOrderEndpoints
                 changedLineNumber,
                 changedMovementId))
             : MobileEndpointResults.CommandProblem(detailsResult.Error!);
-    }
-
-    private static async Task<OperationResult<ReceivingOrderLineContext>>
-        ResolveLineContextAsync(
-            Guid orderId,
-            MobileReceivingOrderQueryService queryService,
-            CancellationToken ct)
-    {
-        var detailsResult = await queryService.GetDetailsAsync(orderId, ct);
-        if (!detailsResult.IsSuccess)
-        {
-            return detailsResult.Error!;
-        }
-
-        var order = detailsResult.Value!.Order;
-        if (order.Status is ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired)
-        {
-            return ReceivingOrderLineContext.Receiving;
-        }
-
-        if (order.Status == ReceivingOrderStatus.Received
-            && order.PutawayStatus == PutawayStatus.InProgress)
-        {
-            return ReceivingOrderLineContext.Putaway;
-        }
-
-        return OperationError.Invalid(
-            "Выбор товара доступен только во время приёмки или размещения ордера.");
     }
 
     private static MobileReceivingOrderDetailsResponse MapDetails(

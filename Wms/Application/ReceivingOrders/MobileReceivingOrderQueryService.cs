@@ -113,7 +113,6 @@ public sealed class MobileReceivingOrderQueryService(
     public async Task<OperationResult<IReadOnlyList<MobileReceivingOrderLineCandidate>>>
         ResolveLineBarcodeAsync(
             Guid orderId,
-            ReceivingOrderLineContext context,
             string? barcode,
             CancellationToken ct = default)
     {
@@ -122,13 +121,14 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.Invalid("Штрихкод товара не указан.");
         }
 
-        var workResult = await LoadLineWorkAsync(orderId, context, ct);
+        var workResult = await LoadLineWorkAsync(orderId, ct);
         if (!workResult.IsSuccess)
         {
             return workResult.Error!;
         }
 
         var work = workResult.Value!;
+        var context = work.Context;
         var matches = work.Order.Items
             .Where(x => !x.StockKeepingUnit!.DeletionMark
                 && x.StockKeepingUnit.Barcodes.Any(itemBarcode => itemBarcode.Value == barcode))
@@ -147,7 +147,6 @@ public sealed class MobileReceivingOrderQueryService(
 
     public async Task<OperationResult<MobileReceivingOrderLineSearchResult>> SearchLinesAsync(
         Guid orderId,
-        ReceivingOrderLineContext context,
         string? searchText,
         int take,
         CancellationToken ct = default)
@@ -158,13 +157,14 @@ public sealed class MobileReceivingOrderQueryService(
             return new MobileReceivingOrderLineSearchResult([], false);
         }
 
-        var workResult = await LoadLineWorkAsync(orderId, context, ct);
+        var workResult = await LoadLineWorkAsync(orderId, ct);
         if (!workResult.IsSuccess)
         {
             return workResult.Error!;
         }
 
         var work = workResult.Value!;
+        var context = work.Context;
         var maximumItems = Math.Clamp(take, 1, 10);
         var matches = work.Order.Items
             .Where(x => !x.StockKeepingUnit!.DeletionMark
@@ -191,15 +191,8 @@ public sealed class MobileReceivingOrderQueryService(
 
     private async Task<OperationResult<ReceivingOrderLineWork>> LoadLineWorkAsync(
         Guid orderId,
-        ReceivingOrderLineContext context,
         CancellationToken ct)
     {
-        if (context is not (ReceivingOrderLineContext.Receiving
-            or ReceivingOrderLineContext.Putaway))
-        {
-            return OperationError.Invalid("Указан неизвестный этап приходного ордера.");
-        }
-
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var order = await BaseOrderQuery(dbContext)
             .AsSplitQuery()
@@ -209,23 +202,25 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
-        var contextIsAvailable = context switch
+        var context = order.Status switch
         {
-            ReceivingOrderLineContext.Receiving => IsReceivingEditing(order.Status),
-            ReceivingOrderLineContext.Putaway => order.Status == ReceivingOrderStatus.Received
-                && order.PutawayStatus == PutawayStatus.InProgress,
-            _ => false
+            ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired =>
+                ReceivingOrderLineContext.Receiving,
+            ReceivingOrderStatus.Received when order.PutawayStatus == PutawayStatus.InProgress =>
+                ReceivingOrderLineContext.Putaway,
+            _ => (ReceivingOrderLineContext?)null
         };
-        if (!contextIsAvailable)
+        if (context is null)
         {
             return OperationError.Invalid(
-                context == ReceivingOrderLineContext.Putaway
-                    ? "Строки размещения доступны только во время размещения ордера."
-                    : "Строки приёмки доступны только во время приёмки или обработки ордера.");
+                "Выбор товара доступен только во время приёмки или размещения ордера.");
         }
 
         var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
-        return new ReceivingOrderLineWork(order, BuildAllocatedByLine(movements));
+        return new ReceivingOrderLineWork(
+            order,
+            context.Value,
+            BuildAllocatedByLine(movements));
     }
 
     private static IQueryable<ReceivingOrder> BaseOrderQuery(ApplicationDbContext dbContext) =>
@@ -460,5 +455,6 @@ public sealed class MobileReceivingOrderQueryService(
 
     private sealed record ReceivingOrderLineWork(
         ReceivingOrder Order,
+        ReceivingOrderLineContext Context,
         IReadOnlyDictionary<int, double> AllocatedByLine);
 }

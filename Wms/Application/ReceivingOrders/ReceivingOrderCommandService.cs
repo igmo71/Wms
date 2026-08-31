@@ -40,8 +40,7 @@ public class ReceivingOrderCommandService(
             }
 
             dbContext.ReceivingOrders.Add(creationResult.Value!);
-            await dbContext.SaveChangesAsync(ct);
-            return OperationResult.Success();
+            return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
         }
 
         var reconciliationResult = existingOrder.Reconcile(snapshot, now);
@@ -56,7 +55,12 @@ public class ReceivingOrderCommandService(
             return OperationResult.Success();
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        if (!saveResult.IsSuccess)
+        {
+            return saveResult;
+        }
+
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Conflict)
         {
             logger.LogWarning("Изменения приходного ордера в 1С конфликтуют с локальными. Локальный статус: {LocalStatus}, статус 1С: {ExternalStatus}",
@@ -77,8 +81,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageStartReceivingAsync(
@@ -252,8 +255,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateItemFactQuantityAsync(
@@ -322,8 +324,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateItemCommentAsync(
@@ -358,8 +359,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageSetReceivingLocationAsync(

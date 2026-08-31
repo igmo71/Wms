@@ -49,6 +49,12 @@ and per-warehouse assignments remain deferred until a pilot needs them.
   manual recovery procedure is exercised.
 - Define expected notification delivery semantics. The current in-memory
   channel can lose queued notifications on restart and has no retry queue.
+- Persist the latest conflicting 1C revision of an active receiving order,
+  show field/line differences in web and mobile UI, and block further warehouse
+  work while a material conflict is unresolved.
+- Add explicit safe conflict-resolution commands: automatically rebase only
+  changes that preserve recorded WMS facts, and route removed/changed worked
+  lines or post-putaway conflicts to an audited responsible-user workflow.
 
 ## Mobile WMS — next delivery path
 
@@ -67,9 +73,11 @@ device certification remain separate later epics.
 
 ## Process and integration backlog
 
-- Confirm real 1C quantity semantics for `Количество` and
-  `КоличествоУпаковок`, then implement packaging conversion in one shared,
-  directionally tested function.
+- Capture real receiving rows with and without packaging and confirm the value
+  relationship between `Количество`, `КоличествоУпаковок`, and
+  `Упаковка_Key`. Both quantities are already confirmed as 1C Number(15,3)
+  exposed through OData as nullable `Edm.Double`. Then implement packaging
+  conversion in one shared, directionally tested function.
 - Confirm characteristic identity from real catalog, document-line, and
   barcode-register examples before changing the SKU/inventory key.
 - Display occupied/free location weight and volume, show incomplete capacity

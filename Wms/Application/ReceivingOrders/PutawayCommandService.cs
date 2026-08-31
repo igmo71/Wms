@@ -24,8 +24,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageStartAsync(
@@ -71,8 +70,7 @@ public class PutawayCommandService(
             return result.Error!;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult<InventoryMovement>> StageAddMovementAsync(
@@ -140,8 +138,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateMovementAsync(
@@ -206,8 +203,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal Task<OperationResult> StageDeleteMovementAsync(
@@ -247,7 +243,7 @@ public class PutawayCommandService(
                 $"Приходный ордер '{movement.RecorderId}' для движения размещения '{movementId}' не найден.");
         }
 
-        var removalResult = order.ValidatePutawayMovementRemoval(movement);
+        var removalResult = order.RemovePutawayMovement(movement);
         if (!removalResult.IsSuccess)
         {
             return removalResult;
