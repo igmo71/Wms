@@ -69,12 +69,13 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   start, scanned destinations, split quantities, draft deletion, exact
   completion, and idempotent retry of uncertain changing responses.
 
-The mobile foundation and intra-warehouse transfer workflow are manually
-accepted on Urovo TD50 and a control Android smartphone. The location-based
-inventory-count workflow is manually accepted on Urovo TD50. Accepted behavior
-includes authentication and session restoration, real refresh of an expired
-access token, automatic selection of the embedded scanner or inline camera,
-contextual barcode resolution, and atomic command idempotency.
+The mobile foundation and the intra-warehouse transfer, location-based
+inventory-count, and receiving/putaway workflows are accepted. Device checks
+cover Urovo TD50 and, for the foundation and transfer workflow, a control
+Android smartphone. Accepted behavior includes authentication and session
+restoration, real refresh of an expired access token, automatic selection of
+the embedded scanner or inline camera, contextual barcode resolution, and
+atomic command idempotency.
 
 ## Authentication and authorization
 
@@ -234,11 +235,13 @@ A nullable receiving fact distinguishes an unchecked line from an explicitly
 confirmed zero. A mobile accepted SKU scan increments the selected order line
 by one, while manual input sets its absolute nonnegative fact without changing
 an existing web-entered comment. Every line must have an explicit fact before
-receiving can complete. The Mobile V1 server exposes one warehouse work queue,
-document and line resolution, receiving commands, draft putaway commands, and
-terminal command results. A 1C document barcode resolves to the document GUID
-through the shared decimal codec; leading zeroes in the scanned decimal payload
-are accepted and normalized.
+receiving can complete. A new order therefore shows aggregate fact zero while
+its confirmed-line count remains zero and each line is shown as unchecked;
+the aggregate zero does not confirm those lines. The Mobile V1 server exposes
+one warehouse work queue, document and line resolution, receiving commands,
+draft putaway commands, and terminal command results. A 1C document barcode
+resolves to the document GUID through the shared decimal codec; leading zeroes
+in the scanned decimal payload are accepted and normalized.
 
 The aggregate advances `ReceivingOrder.OperationalRevision` for every local
 plan reconciliation, receiving change, state transition, and draft putaway
@@ -328,8 +331,7 @@ followed by local failure.
 
 ## Mobile WMS direction
 
-The first two mobile operational processes have passed their manual acceptance
-checks.
+The first three mobile operational processes have been accepted.
 The client is Android-only, online-only, and communicates exclusively through
 an authenticated, versioned API. It reuses the same application services and
 server-side business rules, derives the acting user from the authenticated
@@ -375,6 +377,13 @@ document-owned location lock. Expected rows remain visible; repeated SKU scans
 accumulate one unit at a time, while manual search records an absolute quantity
 and can add an unexpected SKU. Posting or explicitly deleting the draft
 releases the lock; merely leaving the screen preserves the draft.
+
+The third accepted mobile process is receiving and putaway of one 1C receiving
+order. A warehouse queue or document barcode opens the applicable stage. Every
+receiving line remains unchecked until an accepted SKU scan or absolute manual
+input confirms it, including an explicit zero. Completion posts positive facts
+to the scanned receiving location; putaway then records and posts exact,
+possibly split draft movements to scanned ordinary storage locations.
 
 The accepted foundation and first-vertical scope are retained under
 [`specs/mobile-wms/`](../specs/mobile-wms/) as a frozen reference. Each

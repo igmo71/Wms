@@ -59,13 +59,12 @@ and per-warehouse assignments remain deferred until a pilot needs them.
 ## Mobile WMS — next delivery path
 
 The mobile foundation, scanning, direct/transit intra-warehouse movement,
-storage-location locking, and location-based inventory counting are accepted.
-The next mobile process has not been selected and must be specified separately
-before implementation.
+storage-location locking, location-based inventory counting, and receiving and
+putaway are accepted. The next mobile process has not been selected and must be
+specified separately before implementation.
 
-External inputs still required: 1C document-barcode control examples before a
-document-driven mobile process, printer/label constraints before finalizing
-label geometry, and a safe badge-login decision if badge login remains
+External inputs still required: printer/label constraints before finalizing
+label geometry and a safe badge-login decision if badge login remains
 desirable.
 
 Offline inventory commands, mass label printing, fleet management, and broader
@@ -73,6 +72,10 @@ device certification remain separate later epics.
 
 ## Process and integration backlog
 
+- Replace binary floating-point operational quantities with a decimal model
+  aligned with the 1C `Number(15,3)` boundary. Define database/API precision,
+  rounding, comparison, and migration rules together before changing receiving,
+  putaway, movements, balances, and related reports.
 - Keep packaging conversion deferred for the current deployment: its existing
   receiving lines have no nonempty `Упаковка_Key`, and both quantities are
   treated 1:1. Before onboarding a consumer that uses packaging, capture real
