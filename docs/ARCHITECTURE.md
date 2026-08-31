@@ -150,6 +150,9 @@ last-resort user-facing response and logging.
 - Expected concurrency failures and violations of specifically named
   concurrency-related constraints may become `OperationResult.Conflict` at the
   application save boundary. Unrecognized database failures remain exceptions.
+- Shared save-boundary handling and its narrow persistence-conflict classifier
+  live under `Wms.Application.Persistence`; they are not inventory services or
+  a repository abstraction.
 
 ## Coding and verification
 

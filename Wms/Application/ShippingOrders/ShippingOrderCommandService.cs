@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Persistence;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
@@ -165,7 +165,7 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
@@ -218,7 +218,7 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> SetShippingLocationAsync(
@@ -330,7 +330,7 @@ public class ShippingOrderCommandService(
             }
         }
 
-        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         if (!saveResult.IsSuccess)
         {
             return saveResult;

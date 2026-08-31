@@ -173,10 +173,14 @@ inventory balance. For receiving-order lines, both `Количество` and
 `КоличествоУпаковок` are configured as nonnegative 1C numbers with length 15
 and precision 3 and are exposed as nullable `Edm.Double`; the line also exposes
 nullable `Упаковка_Key`. Packaging conversion and the exact relationship
-between the two quantities still require real value examples. A 1C
-characteristic that distinguishes a stock variant must eventually become part
-of SKU identity, but characteristic-aware identity is not implemented. The
-current importer therefore assumes one SKU per 1C nomenclature item.
+between the two quantities are not implemented. Existing receiving lines in
+the current deployment contain no nonempty packaging key, so WMS deliberately
+keeps the current 1:1 import/export behavior. A future deployment that uses
+packaging must provide real line and packaging examples and define conversion
+before this assumption is changed. A 1C characteristic that distinguishes a
+stock variant must eventually become part of SKU identity, but
+characteristic-aware identity is not implemented. The current importer
+therefore assumes one SKU per 1C nomenclature item.
 
 Live occupied/free weight and volume and hard blocking of known capacity
 excesses are later increments. The missing-data policy must remain distinct from

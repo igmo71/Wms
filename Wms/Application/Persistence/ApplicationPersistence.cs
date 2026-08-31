@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Wms.Common;
 using Wms.Data;
 
-namespace Wms.Application.Inventory;
+namespace Wms.Application.Persistence;
 
-internal static class InventoryPersistence
+internal static class ApplicationPersistence
 {
     public static async Task<OperationResult> SaveChangesAsync(
         ApplicationDbContext dbContext,
@@ -16,7 +16,7 @@ internal static class InventoryPersistence
             return OperationResult.Success();
         }
         catch (DbUpdateException exception)
-            when (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
+            when (PersistenceConflictClassifier.TryClassify(exception, out var error))
         {
             return error;
         }

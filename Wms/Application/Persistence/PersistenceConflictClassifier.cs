@@ -4,9 +4,9 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 
-namespace Wms.Application.Inventory;
+namespace Wms.Application.Persistence;
 
-internal static class InventoryPersistenceConflictClassifier
+internal static class PersistenceConflictClassifier
 {
     private static readonly OperationError BalanceConflict = OperationError.Conflict(
         "Остаток изменился. Обновите данные и повторите операцию.");

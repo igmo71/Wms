@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Wms.Application.Inventory;
+using Wms.Application.Persistence;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -107,7 +107,7 @@ public sealed class StorageLocationLockCommandService(
             return OperationResult.Success();
         }
         catch (DbUpdateException exception)
-            when (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
+            when (PersistenceConflictClassifier.TryClassify(exception, out var error))
         {
             return error;
         }

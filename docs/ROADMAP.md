@@ -73,11 +73,12 @@ device certification remain separate later epics.
 
 ## Process and integration backlog
 
-- Capture real receiving rows with and without packaging and confirm the value
-  relationship between `Количество`, `КоличествоУпаковок`, and
-  `Упаковка_Key`. Both quantities are already confirmed as 1C Number(15,3)
-  exposed through OData as nullable `Edm.Double`. Then implement packaging
-  conversion in one shared, directionally tested function.
+- Keep packaging conversion deferred for the current deployment: its existing
+  receiving lines have no nonempty `Упаковка_Key`, and both quantities are
+  treated 1:1. Before onboarding a consumer that uses packaging, capture real
+  line/catalog examples, define the relationship between `Количество`,
+  `КоличествоУпаковок`, and the packaging coefficient, then implement one
+  shared directional conversion.
 - Confirm characteristic identity from real catalog, document-line, and
   barcode-register examples before changing the SKU/inventory key.
 - Display occupied/free location weight and volume, show incomplete capacity

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using Wms.Application.Inventory;
+using Wms.Application.Persistence;
 using Wms.Common;
 using Wms.Data;
 
@@ -63,7 +63,7 @@ public sealed class MobileCommandExecutor(
                 ct);
             if (winningReceipt is not null)
                 return ResolveReceipt(winningReceipt, requestHash);
-            if (InventoryPersistenceConflictClassifier.TryClassify(exception, out var error))
+            if (PersistenceConflictClassifier.TryClassify(exception, out var error))
                 return error;
             throw;
         }

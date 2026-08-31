@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Persistence;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
@@ -24,7 +24,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageStartAsync(
@@ -70,7 +70,7 @@ public class PutawayCommandService(
             return result.Error!;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult<InventoryMovement>> StageAddMovementAsync(
@@ -138,7 +138,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateMovementAsync(
@@ -203,7 +203,7 @@ public class PutawayCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal Task<OperationResult> StageDeleteMovementAsync(
@@ -258,7 +258,7 @@ public class PutawayCommandService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var result = await StageCompleteAsync(dbContext, orderId, userId, ct);
         return result.IsSuccess
-            ? await InventoryPersistence.SaveChangesAsync(dbContext, ct)
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
             : result;
     }
 

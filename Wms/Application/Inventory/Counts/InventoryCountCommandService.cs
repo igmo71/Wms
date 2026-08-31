@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Persistence;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -22,7 +23,7 @@ public sealed class InventoryCountCommandService(
         if (!result.IsSuccess)
             return result.Error!;
 
-        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
     }
 
@@ -117,7 +118,7 @@ public sealed class InventoryCountCommandService(
         if (!result.IsSuccess)
             return result.Error!;
 
-        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
     }
 
@@ -164,7 +165,7 @@ public sealed class InventoryCountCommandService(
             ct);
         if (!result.IsSuccess)
             return result;
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageSetCountedQuantityAsync(
@@ -199,7 +200,7 @@ public sealed class InventoryCountCommandService(
         if (!result.IsSuccess)
             return result.Error!;
 
-        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess ? result.Value! : saveResult.Error!;
     }
 
@@ -246,7 +247,7 @@ public sealed class InventoryCountCommandService(
             ct);
         if (!result.IsSuccess)
             return result;
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageRemoveUnexpectedItemAsync(
@@ -276,7 +277,7 @@ public sealed class InventoryCountCommandService(
         var result = await StageDeleteDraftAsync(dbContext, inventoryCountId, userId, ct);
         if (!result.IsSuccess)
             return result;
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageDeleteDraftAsync(
@@ -309,7 +310,7 @@ public sealed class InventoryCountCommandService(
         var result = await StagePostAsync(dbContext, inventoryCountId, userId, ct);
         if (!result.IsSuccess)
             return result;
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StagePostAsync(

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Persistence;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
@@ -369,7 +369,7 @@ public class InventoryTransferCommandService(
     private static async Task<OperationResult> SaveChangesAsync(
         ApplicationDbContext dbContext,
         CancellationToken ct) =>
-        await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
 
     private static OperationResult<InventoryTransferRoute> CreateRoute(
         InventoryTransfer transfer,

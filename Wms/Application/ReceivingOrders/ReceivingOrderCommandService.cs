@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Wms.Application.Inventory;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Persistence;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
@@ -40,7 +40,7 @@ public class ReceivingOrderCommandService(
             }
 
             dbContext.ReceivingOrders.Add(creationResult.Value!);
-            return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+            return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         }
 
         var reconciliationResult = existingOrder.Reconcile(snapshot, now);
@@ -55,7 +55,7 @@ public class ReceivingOrderCommandService(
             return OperationResult.Success();
         }
 
-        var saveResult = await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         if (!saveResult.IsSuccess)
         {
             return saveResult;
@@ -81,7 +81,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageStartReceivingAsync(
@@ -165,7 +165,7 @@ public class ReceivingOrderCommandService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var result = await StageSetReceivedAsync(dbContext, orderId, userId, ct);
         return result.IsSuccess
-            ? await InventoryPersistence.SaveChangesAsync(dbContext, ct)
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
             : result;
     }
 
@@ -255,7 +255,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateItemFactQuantityAsync(
@@ -324,7 +324,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageUpdateItemCommentAsync(
@@ -359,7 +359,7 @@ public class ReceivingOrderCommandService(
             return result;
         }
 
-        return await InventoryPersistence.SaveChangesAsync(dbContext, ct);
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     internal async Task<OperationResult> StageSetReceivingLocationAsync(
