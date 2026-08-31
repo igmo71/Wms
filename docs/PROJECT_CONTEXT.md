@@ -277,8 +277,10 @@ after a physical scan of an eligible shipping location; the location, local
 transition, audit, and command receipt share one save boundary. It can also
 idempotently add a draft movement from a scanned eligible storage location and
 delete a draft movement; each movement change and its receipt share one save
-boundary and reuse the Web picking rules. The terminal changing commands and
-mobile UI are unfinished while this specification is active.
+boundary and reuse the Web picking rules. It can idempotently complete full,
+partial, or zero picking through the existing 1C update and inventory posting,
+and can ship only after rescanning the order's active unlocked shipping
+location. The mobile UI is unfinished while this specification is active.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse
@@ -345,7 +347,10 @@ protocol, or programming failures remain observable infrastructure errors.
 Notification delivery currently uses an in-memory channel and has no durable
 retry guarantee. WMS-to-1C multi-step transitions have no outbox, so pilot
 operations require a documented recovery procedure for external success
-followed by local failure.
+followed by local failure. Shipping-order completion recognizes an already
+applied exact 1C item-table target as success, allowing the same mobile command
+to continue after external success and a failed local save; target status and
+posting calls are likewise deliberately repeatable.
 
 ## Mobile WMS direction
 

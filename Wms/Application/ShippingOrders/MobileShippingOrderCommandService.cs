@@ -13,6 +13,8 @@ public sealed class MobileShippingOrderCommandService(
     private const string StartPickingCommand = "shipping-order.start-picking";
     private const string AddPickingMovementCommand = "shipping-order.add-picking-movement";
     private const string DeletePickingMovementCommand = "shipping-order.delete-picking-movement";
+    private const string CompletePickingCommand = "shipping-order.complete-picking";
+    private const string ShipCommand = "shipping-order.ship";
 
     public Task<OperationResult<Guid>> StartPickingAsync(
         Guid orderId,
@@ -100,6 +102,61 @@ public sealed class MobileShippingOrderCommandService(
                 return result.IsSuccess ? movementId : result.Error!;
             },
             ct);
+
+    public Task<OperationResult<Guid>> CompletePickingAsync(
+        Guid orderId,
+        Guid clientRequestId,
+        string userId,
+        CancellationToken ct = default) =>
+        mobileCommandExecutor.ExecuteAsync(
+            CompletePickingCommand,
+            clientRequestId,
+            Hash(orderId),
+            userId,
+            async (dbContext, token) =>
+            {
+                var result = await shippingOrderCommandService.StageSetReadyForShipmentAsync(
+                    dbContext,
+                    orderId,
+                    userId,
+                    token);
+                return result.IsSuccess ? orderId : result.Error!;
+            },
+            ct);
+
+    public Task<OperationResult<Guid>> ShipAsync(
+        Guid orderId,
+        string? shippingLocationBarcode,
+        Guid clientRequestId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        if (!StorageLocation.TryParseBarcode(shippingLocationBarcode, out var shippingLocationId))
+        {
+            return Task.FromResult<OperationResult<Guid>>(
+                OperationError.Invalid("Некорректный QR-код ячейки."));
+        }
+
+        return mobileCommandExecutor.ExecuteAsync(
+            ShipCommand,
+            clientRequestId,
+            Hash(orderId, shippingLocationId),
+            userId,
+            async (dbContext, token) =>
+            {
+                var result = await shippingOrderCommandService.StageSetShippedAsync(
+                    dbContext,
+                    orderId,
+                    userId,
+                    shippingLocationId,
+                    token);
+                return result.IsSuccess ? orderId : result.Error!;
+            },
+            ct);
+    }
+
+    private static string Hash(Guid orderId) =>
+        MobileCommandExecutor.ComputeHash(orderId.ToString("N"));
 
     private static string Hash(Guid orderId, Guid shippingLocationId) =>
         MobileCommandExecutor.ComputeHash(string.Join(

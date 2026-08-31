@@ -563,6 +563,27 @@ public sealed class MobileApiClient
             new MobileShippingOrderCommandRequest(clientRequestId),
             ct);
 
+    public Task<MobileShippingOrderCommandResponse> CompleteShippingOrderPickingAsync(
+        Guid orderId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostShippingOrderCommandAsync(
+            $"{MobileApiRoutes.ShippingOrders}/{orderId:D}/complete-picking",
+            new MobileShippingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileShippingOrderCommandResponse> ShipShippingOrderAsync(
+        Guid orderId,
+        string shippingLocationBarcode,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostShippingOrderCommandAsync(
+            $"{MobileApiRoutes.ShippingOrders}/{orderId:D}/ship",
+            new MobileShipShippingOrderRequest(
+                clientRequestId,
+                shippingLocationBarcode),
+            ct);
+
     public async Task<MobileReceivingOrderWorkQueueResponse> GetReceivingOrderWorkQueueAsync(
         Guid warehouseId,
         CancellationToken ct = default)

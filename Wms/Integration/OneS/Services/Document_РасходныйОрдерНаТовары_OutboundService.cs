@@ -64,6 +64,14 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (freshDocument is null)
             return OperationError.NotFound("Расходный ордер не найден в 1С.");
 
+        if (HasAmbiguousSkuLines(shippingOrder))
+            return OperationError.Conflict("Расходный ордер содержит несколько строк одной номенклатуры и не может быть безопасно обновлён.");
+
+        // A mobile retry can arrive after 1C accepted this target table state but
+        // before WMS committed its local transition and command receipt.
+        if (IsTargetItemsState(shippingOrder, freshDocument))
+            return OperationResult.Success();
+
         var patchBodyResult = CreatePatchBody(shippingOrder, freshDocument);
         if (!patchBodyResult.IsSuccess)
             return patchBodyResult;
@@ -76,12 +84,6 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
 
     private static OperationResult<PatchBody> CreatePatchBody(ShippingOrder shippingOrder, Document freshDocument)
     {
-        if (shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
-            || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
-        {
-            return OperationError.Conflict("Расходный ордер содержит несколько строк одной номенклатуры и не может быть безопасно обновлён.");
-        }
-
         var freshBaseItemsByLine = freshDocument.ТоварыПоРаспоряжениям.ToDictionary(x => x.LineNumber);
         var freshItemsByLine = freshDocument.ОтгружаемыеТовары.ToDictionary(x => x.LineNumber);
 
@@ -175,6 +177,84 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             ТоварыПоРаспоряжениям = patchBaseItems,
             ОтгружаемыеТовары = patchItems
         };
+    }
+
+    private static bool HasAmbiguousSkuLines(ShippingOrder shippingOrder) =>
+        shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
+        || shippingOrder.BaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1);
+
+    private static bool IsTargetItemsState(
+        ShippingOrder shippingOrder,
+        Document freshDocument)
+    {
+        var expectedPositiveItems = shippingOrder.Items
+            .Where(x => x.FactQuantity > 0)
+            .ToList();
+        if (freshDocument.ТоварыПоРаспоряжениям.Count != expectedPositiveItems.Count)
+            return false;
+
+        foreach (var item in expectedPositiveItems)
+        {
+            var matchingBaseItems = freshDocument.ТоварыПоРаспоряжениям
+                .Where(x => x.Номенклатура_Key == item.StockKeepingUnitId)
+                .ToList();
+            if (matchingBaseItems.Count != 1
+                || matchingBaseItems[0].Количество != item.FactQuantity)
+            {
+                return false;
+            }
+        }
+
+        var freshItems = freshDocument.ОтгружаемыеТовары
+            .Where(Document.IsRegularShippingItem)
+            .ToList();
+        var expectedItemCount = shippingOrder.Items.Count
+            + shippingOrder.Items.Count(x => x.FactQuantity > 0
+                && x.FactQuantity < x.PlanQuantity);
+        if (freshItems.Count != expectedItemCount)
+            return false;
+
+        foreach (var item in shippingOrder.Items)
+        {
+            var matchingItems = freshItems
+                .Where(x => x.Номенклатура_Key == item.StockKeepingUnitId)
+                .ToList();
+            var expectedMatchingCount = item.FactQuantity > 0
+                && item.FactQuantity < item.PlanQuantity
+                    ? 2
+                    : 1;
+            if (matchingItems.Count != expectedMatchingCount)
+                return false;
+
+            var primaryItem = matchingItems.SingleOrDefault(x => x.LineNumber == item.LineNumber);
+            var primaryQuantity = item.FactQuantity > 0
+                ? item.FactQuantity
+                : item.PlanQuantity;
+            var primaryAction = item.FactQuantity > 0
+                ? ShippingOrderAction.Ship
+                : ShippingOrderAction.DoNotShip;
+            if (primaryItem is null
+                || primaryItem.Количество != primaryQuantity
+                || primaryItem.КоличествоУпаковок != primaryQuantity
+                || ODataEnumMapper.Parse<ShippingOrderAction>(primaryItem.Действие) != primaryAction)
+            {
+                return false;
+            }
+
+            if (expectedMatchingCount == 2)
+            {
+                var notShippedItem = matchingItems.Single(x => x.LineNumber != item.LineNumber);
+                var notShippedQuantity = item.PlanQuantity - item.FactQuantity;
+                if (notShippedItem.Количество != notShippedQuantity
+                    || notShippedItem.КоличествоУпаковок != notShippedQuantity
+                    || ODataEnumMapper.Parse<ShippingOrderAction>(notShippedItem.Действие) != ShippingOrderAction.DoNotShip)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static Document_РасходныйОрдерНаТовары_ТоварыПоРаспоряжениям Copy(

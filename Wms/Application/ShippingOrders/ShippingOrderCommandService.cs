@@ -150,10 +150,26 @@ public class ShippingOrderCommandService(
 
     public async Task<OperationResult> SetReadyForShipmentAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult result = await StageSetReadyForShipmentAsync(
+            dbContext,
+            orderId,
+            userId,
+            ct);
+
+        return result.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
+    }
+
+    internal async Task<OperationResult> StageSetReadyForShipmentAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        CancellationToken ct)
+    {
         using IDisposable? scope = logger.BeginScope("ShippingOrder SetReadyForShipment {OrderId}", orderId);
         using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetReadyForShipment", nameof(ShippingOrderCommandService));
-
-        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
@@ -206,15 +222,36 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        // 1C is updated before the local save by the established integration boundary.
+        // There is no outbox or distributed transaction; target-state calls are repeat-safe
+        // so the same command can recover after external success and local save failure.
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> SetShippedAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult result = await StageSetShippedAsync(
+            dbContext,
+            orderId,
+            userId,
+            confirmedShippingLocationId: null,
+            ct: ct);
+
+        return result.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
+    }
+
+    internal async Task<OperationResult> StageSetShippedAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        string userId,
+        Guid? confirmedShippingLocationId,
+        CancellationToken ct)
+    {
         using IDisposable? scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
         using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetShipped", nameof(ShippingOrderCommandService));
-
-        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
@@ -224,6 +261,19 @@ public class ShippingOrderCommandService(
         {
             logger.LogError("Расходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
+        }
+
+        if (confirmedShippingLocationId is Guid scannedLocationId)
+        {
+            OperationResult locationResult = await ValidateShippingLocationConfirmationAsync(
+                dbContext,
+                existingOrder,
+                scannedLocationId,
+                ct);
+            if (!locationResult.IsSuccess)
+            {
+                return locationResult;
+            }
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -259,7 +309,44 @@ public class ShippingOrderCommandService(
             return externalResult;
         }
 
-        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        // 1C is updated before the local save by the established integration boundary.
+        // There is no outbox or distributed transaction; target-state calls are repeat-safe
+        // so the same command can recover after external success and local save failure.
+        return OperationResult.Success();
+    }
+
+    private static async Task<OperationResult> ValidateShippingLocationConfirmationAsync(
+        ApplicationDbContext dbContext,
+        ShippingOrder order,
+        Guid scannedLocationId,
+        CancellationToken ct)
+    {
+        StorageLocation? location = await dbContext.StorageLocations
+            .Include(x => x.Zone)
+            .Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.Id == scannedLocationId, ct);
+
+        if (location is null
+            || location.WarehouseId != order.WarehouseId
+            || location.IsFolder
+            || location.DeletionMark
+            || location.Zone?.DeletionMark == true
+            || location.Zone?.Type != ZoneType.Shipping)
+        {
+            return OperationError.Invalid(
+                "Подтверждение отгрузки требует активную позицию зоны отгрузки склада ордера.");
+        }
+
+        OperationResult availabilityResult = StorageLocationAvailability.ValidateUnlocked(location);
+        if (!availabilityResult.IsSuccess)
+        {
+            return availabilityResult;
+        }
+
+        return order.ShippingLocationId == scannedLocationId
+            ? OperationResult.Success()
+            : OperationError.Invalid(
+                "Отсканированная позиция не совпадает с позицией отгрузки ордера.");
     }
 
     private static async Task<OperationResult> StageSetShippingLocationAsync(

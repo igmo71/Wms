@@ -31,6 +31,10 @@ internal static class MobileShippingOrderEndpoints
                 "/{orderId:guid}/picking-movements/{movementId:guid}/delete",
                 DeletePickingMovementAsync)
             .WithMobileResponses<MobileShippingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/complete-picking", CompletePickingAsync)
+            .WithMobileResponses<MobileShippingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/ship", ShipAsync)
+            .WithMobileResponses<MobileShippingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lines/resolve-sku", ResolveSkuAsync)
             .WithMobileResponses<IReadOnlyList<MobileShippingOrderLineCandidateResponse>>();
         group.MapGet("/{orderId:guid}/lines/search", SearchLinesAsync)
@@ -180,6 +184,51 @@ internal static class MobileShippingOrderEndpoints
             queryService,
             ct,
             changedMovementId: movementId);
+    }
+
+    private static async Task<IResult> CompletePickingAsync(
+        Guid orderId,
+        MobileShippingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        MobileShippingOrderQueryService queryService,
+        MobileShippingOrderCommandService commandService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.CompletePickingAsync(
+            orderId,
+            request.ClientRequestId,
+            userId,
+            ct);
+        return await CommandResultAsync(result, orderId, queryService, ct);
+    }
+
+    private static async Task<IResult> ShipAsync(
+        Guid orderId,
+        MobileShipShippingOrderRequest request,
+        ClaimsPrincipal principal,
+        MobileShippingOrderQueryService queryService,
+        MobileShippingOrderCommandService commandService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.ShipAsync(
+            orderId,
+            request.ShippingLocationBarcode,
+            request.ClientRequestId,
+            userId,
+            ct);
+        return await CommandResultAsync(result, orderId, queryService, ct);
     }
 
     private static async Task<IResult> SearchLinesAsync(
