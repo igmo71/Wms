@@ -25,6 +25,12 @@ internal static class MobileShippingOrderEndpoints
             .WithMobileResponses<MobileShippingOrderDetailsResponse>();
         group.MapPost("/{orderId:guid}/start-picking", StartPickingAsync)
             .WithMobileResponses<MobileShippingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/picking-movements", AddPickingMovementAsync)
+            .WithMobileResponses<MobileShippingOrderCommandResponse>();
+        group.MapPost(
+                "/{orderId:guid}/picking-movements/{movementId:guid}/delete",
+                DeletePickingMovementAsync)
+            .WithMobileResponses<MobileShippingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lines/resolve-sku", ResolveSkuAsync)
             .WithMobileResponses<IReadOnlyList<MobileShippingOrderLineCandidateResponse>>();
         group.MapGet("/{orderId:guid}/lines/search", SearchLinesAsync)
@@ -113,16 +119,67 @@ internal static class MobileShippingOrderEndpoints
             request.ClientRequestId,
             userId,
             ct);
-        if (!result.IsSuccess)
+        return await CommandResultAsync(result, orderId, queryService, ct);
+    }
+
+    private static async Task<IResult> AddPickingMovementAsync(
+        Guid orderId,
+        MobileAddShippingOrderPickingMovementRequest request,
+        ClaimsPrincipal principal,
+        MobileShippingOrderQueryService queryService,
+        MobileShippingOrderCommandService commandService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
         {
-            return MobileEndpointResults.CommandProblem(result.Error!);
+            return TypedResults.Unauthorized();
         }
 
-        var updatedDetailsResult = await queryService.GetCommandResultDetailsAsync(orderId, ct);
-        return updatedDetailsResult.IsSuccess
-            ? TypedResults.Ok(new MobileShippingOrderCommandResponse(
-                MapDetails(updatedDetailsResult.Value!)))
-            : MobileEndpointResults.CommandProblem(updatedDetailsResult.Error!);
+        var result = await commandService.AddPickingMovementAsync(
+            orderId,
+            request.LineNumber,
+            request.SourceStorageLocationBarcode,
+            request.Quantity,
+            request.ClientRequestId,
+            userId,
+            ct);
+        return await CommandResultAsync(
+            result,
+            orderId,
+            queryService,
+            ct,
+            changedLineNumber: request.LineNumber,
+            changedMovementId: result.IsSuccess ? result.Value : null);
+    }
+
+    private static async Task<IResult> DeletePickingMovementAsync(
+        Guid orderId,
+        Guid movementId,
+        MobileShippingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        MobileShippingOrderQueryService queryService,
+        MobileShippingOrderCommandService commandService,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await commandService.DeletePickingMovementAsync(
+            orderId,
+            movementId,
+            request.ClientRequestId,
+            userId,
+            ct);
+        return await CommandResultAsync(
+            result,
+            orderId,
+            queryService,
+            ct,
+            changedMovementId: movementId);
     }
 
     private static async Task<IResult> SearchLinesAsync(
@@ -164,6 +221,28 @@ internal static class MobileShippingOrderEndpoints
         MapSummary(details.Order),
         details.Lines.Select(MapLine).ToList(),
         details.Movements.Select(MapMovement).ToList());
+
+    private static async Task<IResult> CommandResultAsync(
+        OperationResult<Guid> result,
+        Guid orderId,
+        MobileShippingOrderQueryService queryService,
+        CancellationToken ct,
+        int? changedLineNumber = null,
+        Guid? changedMovementId = null)
+    {
+        if (!result.IsSuccess)
+        {
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        }
+
+        var detailsResult = await queryService.GetCommandResultDetailsAsync(orderId, ct);
+        return detailsResult.IsSuccess
+            ? TypedResults.Ok(new MobileShippingOrderCommandResponse(
+                MapDetails(detailsResult.Value!),
+                changedLineNumber,
+                changedMovementId))
+            : MobileEndpointResults.CommandProblem(detailsResult.Error!);
+    }
 
     private static MobileShippingOrderSummaryResponse MapSummary(
         MobileShippingOrderSummary order) => new(

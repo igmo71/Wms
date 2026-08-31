@@ -274,9 +274,11 @@ The authenticated Mobile V1 boundary for picking and shipping exposes a
 warehouse work queue, document and line resolution, current-cycle picking
 movements, and source-location availability. It can idempotently start picking
 after a physical scan of an eligible shipping location; the location, local
-transition, audit, and command receipt share one save boundary. The remaining
-changing commands and mobile UI are unfinished while this specification is
-active.
+transition, audit, and command receipt share one save boundary. It can also
+idempotently add a draft movement from a scanned eligible storage location and
+delete a draft movement; each movement change and its receipt share one save
+boundary and reuse the Web picking rules. The terminal changing commands and
+mobile UI are unfinished while this specification is active.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse

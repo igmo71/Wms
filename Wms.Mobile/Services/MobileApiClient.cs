@@ -536,6 +536,33 @@ public sealed class MobileApiClient
                 shippingLocationBarcode),
             ct);
 
+    public Task<MobileShippingOrderCommandResponse> AddShippingOrderPickingMovementAsync(
+        Guid orderId,
+        int lineNumber,
+        string sourceStorageLocationBarcode,
+        double quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostShippingOrderCommandAsync(
+            $"{MobileApiRoutes.ShippingOrders}/{orderId:D}/picking-movements",
+            new MobileAddShippingOrderPickingMovementRequest(
+                clientRequestId,
+                lineNumber,
+                sourceStorageLocationBarcode,
+                quantity),
+            ct);
+
+    public Task<MobileShippingOrderCommandResponse> DeleteShippingOrderPickingMovementAsync(
+        Guid orderId,
+        Guid movementId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostShippingOrderCommandAsync(
+            $"{MobileApiRoutes.ShippingOrders}/{orderId:D}"
+                + $"/picking-movements/{movementId:D}/delete",
+            new MobileShippingOrderCommandRequest(clientRequestId),
+            ct);
+
     public async Task<MobileReceivingOrderWorkQueueResponse> GetReceivingOrderWorkQueueAsync(
         Guid warehouseId,
         CancellationToken ct = default)

@@ -23,6 +23,29 @@ public class PickingCommandService(
         using IDisposable? scope = logger.BeginScope("Picking AddMovement {OrderId} {LineNumber}", orderId, lineNumber);
 
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult<InventoryMovement> result = await StageAddPickingMovementAsync(
+            dbContext,
+            orderId,
+            lineNumber,
+            sourceStorageLocationId,
+            quantity,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return result.Error!;
+        }
+
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    internal async Task<OperationResult<InventoryMovement>> StageAddPickingMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        int lineNumber,
+        Guid sourceStorageLocationId,
+        double quantity,
+        CancellationToken ct)
+    {
         ShippingOrder? order = await LoadOrderAsync(dbContext, orderId, ct);
         if (order is null)
         {
@@ -47,18 +70,18 @@ public class PickingCommandService(
             dbContext, order, sourceStorageLocationId, ct);
         if (!sourceResult.IsSuccess)
         {
-            return sourceResult;
+            return sourceResult.Error!;
         }
 
         OperationResult balanceResult = await ValidateSourceBalanceAsync(
             dbContext, order, movement, draftMovements, null, ct);
         if (!balanceResult.IsSuccess)
         {
-            return balanceResult;
+            return balanceResult.Error!;
         }
 
         dbContext.InventoryMovements.Add(movement);
-        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return movement;
     }
 
     public async Task<OperationResult> UpdatePickingMovementAsync(
@@ -122,11 +145,43 @@ public class PickingCommandService(
         using IDisposable? scope = logger.BeginScope("Picking DeleteMovement {MovementId}", movementId);
 
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult result = await StageDeletePickingMovementAsync(
+            dbContext,
+            null,
+            movementId,
+            ct);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    internal Task<OperationResult> StageDeletePickingMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        Guid movementId,
+        CancellationToken ct) =>
+        StageDeletePickingMovementAsync(dbContext, (Guid?)orderId, movementId, ct);
+
+    private static async Task<OperationResult> StageDeletePickingMovementAsync(
+        ApplicationDbContext dbContext,
+        Guid? expectedOrderId,
+        Guid movementId,
+        CancellationToken ct)
+    {
         InventoryMovement? movement = await dbContext.InventoryMovements
             .FirstOrDefaultAsync(x => x.Id == movementId, ct);
         if (movement is null)
         {
             return OperationError.NotFound($"Движение отбора '{movementId}' не найдено.");
+        }
+
+        if (expectedOrderId is Guid expectedId && movement.RecorderId != expectedId)
+        {
+            return OperationError.NotFound(
+                $"Движение отбора '{movementId}' не найдено в расходном ордере '{expectedId}'.");
         }
 
         ShippingOrder? order = movement.RecorderId is Guid orderId
@@ -146,7 +201,7 @@ public class PickingCommandService(
         }
 
         dbContext.InventoryMovements.Remove(movement);
-        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return OperationResult.Success();
     }
 
     private static Task<ShippingOrder?> LoadOrderAsync(
