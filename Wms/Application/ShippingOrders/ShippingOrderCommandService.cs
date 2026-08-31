@@ -42,8 +42,7 @@ public class ShippingOrderCommandService(
             }
 
             dbContext.ShippingOrders.Add(creationResult.Value!);
-            await dbContext.SaveChangesAsync(ct);
-            return OperationResult.Success();
+            return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         }
 
         OperationResult<ShippingOrderReconciliation> reconciliationResult = existingOrder.Reconcile(snapshot, now);
@@ -58,7 +57,12 @@ public class ShippingOrderCommandService(
             return OperationResult.Success();
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        if (!saveResult.IsSuccess)
+        {
+            return saveResult;
+        }
+
         if (reconciliationResult.Value == ShippingOrderReconciliation.Conflict)
         {
             logger.LogWarning("Изменения расходного ордера в 1С конфликтуют с локальными. Локальный статус: {LocalStatus}, статус 1С: {ExternalStatus}",
@@ -70,39 +74,76 @@ public class ShippingOrderCommandService(
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> SetReadyForPickingAsync(Guid orderId, string userId, CancellationToken ct = default)
+    public async Task<OperationResult> StartPickingAsync(
+        Guid orderId,
+        Guid shippingLocationId,
+        string userId,
+        CancellationToken ct = default)
     {
-        using IDisposable? scope = logger.BeginScope("ShippingOrder SetReadyForPicking {OrderId}", orderId);
-        using Activity? activity = AppTracing.StartActivity("ShippingOrder.SetReadyForPicking", nameof(ShippingOrderCommandService));
-
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult result = await StageStartPickingAsync(
+            dbContext,
+            orderId,
+            shippingLocationId,
+            userId,
+            ct);
 
-        ShippingOrder? existingOrder = await dbContext.ShippingOrders
+        return result.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
+    }
+
+    internal async Task<OperationResult> StageStartPickingAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        Guid shippingLocationId,
+        string userId,
+        CancellationToken ct)
+    {
+        using IDisposable? scope = logger.BeginScope("ShippingOrder StartPicking {OrderId}", orderId);
+        using Activity? activity = AppTracing.StartActivity("ShippingOrder.StartPicking", nameof(ShippingOrderCommandService));
+
+        ShippingOrder? order = await dbContext.ShippingOrders
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
-
-        if (existingOrder is null)
+        if (order is null)
         {
             logger.LogError("Расходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
-        OperationResult transitionResult = existingOrder.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
+        OperationResult locationResult = await StageSetShippingLocationAsync(
+            dbContext,
+            order,
+            shippingLocationId,
+            ct);
+        if (!locationResult.IsSuccess)
+        {
+            return locationResult;
+        }
+
+        return await StageSetReadyForPickingAsync(order, userId, ct);
+    }
+
+    private async Task<OperationResult> StageSetReadyForPickingAsync(
+        ShippingOrder order,
+        string userId,
+        CancellationToken ct)
+    {
+        OperationResult transitionResult = order.SetReadyForPicking(DateTimeOffset.UtcNow, userId);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Не удалось подготовить расходный ордер к отбору: {ErrorMessage}", transitionResult.Error?.Message);
             return transitionResult;
         }
 
-        OperationResult externalResult = await outboundService.SetReadyForPickingAsync(orderId, ct);
+        OperationResult externalResult = await outboundService.SetReadyForPickingAsync(order.Id, ct);
 
         if (!externalResult.IsSuccess)
         {
             logger.LogError("Не удалось подготовить документ 1С к отбору: {ErrorMessage}", externalResult.Error?.Message);
             return externalResult;
         }
-
-        await dbContext.SaveChangesAsync(ct);
 
         return OperationResult.Success();
     }
@@ -221,22 +262,13 @@ public class ShippingOrderCommandService(
         return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
-    public async Task<OperationResult> SetShippingLocationAsync(
-        Guid shippingOrderId,
+    private static async Task<OperationResult> StageSetShippingLocationAsync(
+        ApplicationDbContext dbContext,
+        ShippingOrder order,
         Guid shippingLocationId,
-        CancellationToken ct = default)
+        CancellationToken ct)
     {
-        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-
-        ShippingOrder? order = await dbContext.ShippingOrders
-            .FirstOrDefaultAsync(x => x.Id == shippingOrderId, ct);
-
-        if (order is null)
-        {
-            return OperationError.NotFound($"Расходный ордер '{shippingOrderId}' не найден.");
-        }
-
-        var location = await dbContext.StorageLocations
+        StorageLocation? location = await dbContext.StorageLocations
             .Include(x => x.Zone)
             .Include(x => x.ActiveLock)
             .SingleOrDefaultAsync(x => x.Id == shippingLocationId, ct);
@@ -257,14 +289,7 @@ public class ShippingOrderCommandService(
             return availabilityResult;
         }
 
-        OperationResult locationResult = order.SetShippingLocation(shippingLocationId);
-        if (!locationResult.IsSuccess)
-        {
-            return locationResult;
-        }
-
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return order.SetShippingLocation(shippingLocationId);
     }
 
     public async Task<OperationResult> RollbackAsync(

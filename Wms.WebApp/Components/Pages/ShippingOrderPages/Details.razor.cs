@@ -139,15 +139,10 @@ public partial class Details
                 return;
             }
 
-            var setLocationResult = await OrderCommandService.SetShippingLocationAsync(Id, shippingLocation.Id);
-            if (!setLocationResult.IsSuccess)
-            {
-                _startOrderFailed = true;
-                _errorMessage = setLocationResult.Error?.Message ?? "Не удалось сохранить место отгрузки.";
-                return;
-            }
-
-            var result = await OrderCommandService.SetReadyForPickingAsync(Id, userId);
+            var result = await OrderCommandService.StartPickingAsync(
+                Id,
+                shippingLocation.Id,
+                userId);
             if (!result.IsSuccess)
             {
                 _startOrderFailed = true;

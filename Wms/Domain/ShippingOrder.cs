@@ -13,6 +13,7 @@ public class ShippingOrder
     }
 
     public Guid Id { get; private set; }
+    public long OperationalRevision { get; private set; }
     public bool DeletionMark { get; private set; }
     public bool Posted { get; private set; }
     public string? Number { get; private set; }
@@ -115,7 +116,12 @@ public class ShippingOrder
 
         if (Status != ShippingOrderStatus.Prepared)
         {
-            ExternalChangeDetected = true;
+            if (!ExternalChangeDetected)
+            {
+                ExternalChangeDetected = true;
+                AdvanceOperationalRevision();
+            }
+
             return ShippingOrderReconciliation.Conflict;
         }
 
@@ -146,6 +152,7 @@ public class ShippingOrder
         ApplyImport(snapshot);
         UpdatedAtUtc = updatedAtUtc;
         ExternalChangeDetected = false;
+        AdvanceOperationalRevision();
         return ShippingOrderReconciliation.Updated;
     }
 
@@ -164,6 +171,7 @@ public class ShippingOrder
         }
 
         ShippingLocationId = shippingLocationId;
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -196,6 +204,7 @@ public class ShippingOrder
         Status = ShippingOrderStatus.ReadyForPicking;
         PickingStartedAtUtc = startedAtUtc;
         PickingStartedBy = startedBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -249,9 +258,13 @@ public class ShippingOrder
         }
 
         OperationResult itemResult = item.UpdateFact(factResult.Value);
-        return itemResult.IsSuccess
-            ? movementResult.Value!
-            : itemResult.Error!;
+        if (!itemResult.IsSuccess)
+        {
+            return itemResult.Error!;
+        }
+
+        AdvanceOperationalRevision();
+        return movementResult.Value!;
     }
 
     public OperationResult UpdatePickingMovement(
@@ -303,7 +316,13 @@ public class ShippingOrder
             return updateResult;
         }
 
-        return item.UpdateFact(factResult.Value);
+        OperationResult itemResult = item.UpdateFact(factResult.Value);
+        if (itemResult.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return itemResult;
     }
 
     public OperationResult RemovePickingMovement(
@@ -340,7 +359,13 @@ public class ShippingOrder
                 && x.RecorderLineNumber == item.LineNumber)
             .Sum(x => x.Quantity);
 
-        return item.UpdateFact(factQuantity);
+        OperationResult itemResult = item.UpdateFact(factQuantity);
+        if (itemResult.IsSuccess)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return itemResult;
     }
 
     public OperationResult SetReadyForShipment(
@@ -379,6 +404,7 @@ public class ShippingOrder
         Status = ShippingOrderStatus.ReadyForShipment;
         ReadyForShipmentAtUtc = readyAtUtc;
         ReadyForShipmentBy = readyBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -411,6 +437,7 @@ public class ShippingOrder
         Status = ShippingOrderStatus.Shipped;
         ShippedAtUtc = shippedAtUtc;
         ShippedBy = shippedBy.Trim();
+        AdvanceOperationalRevision();
         return OperationResult.Success();
     }
 
@@ -497,8 +524,11 @@ public class ShippingOrder
             item.ResetFact();
         }
 
+        AdvanceOperationalRevision();
         return compensationResult.Value!;
     }
+
+    private void AdvanceOperationalRevision() => OperationalRevision++;
 
     private OperationResult ValidatePickingEditing()
     {

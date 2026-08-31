@@ -262,6 +262,14 @@ the selected shipping location. Setting the order ready for shipment first
 reconciles the fresh 1C plan, updates the 1C table sections, then posts those
 movements. Shipping posts the final issue from the shipping location.
 
+Selecting the shipping location and starting picking form one local save
+boundary. `ShippingOrder.OperationalRevision` advances on local plan
+reconciliation, shipping-location and workflow transitions, draft-picking
+movement changes, and rollback. It is an optimistic-concurrency token shared
+by web and future mobile commands, so concurrent work on one order returns a
+business conflict instead of silently overwriting its facts, movements, or
+status.
+
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse
 movements so turnover history remains intact. Drafts are not reservations and

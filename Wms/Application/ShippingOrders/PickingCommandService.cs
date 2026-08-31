@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Wms.Application.Persistence;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
-using Wms.Application.StorageLocations;
 
 namespace Wms.Application.ShippingOrders;
 
@@ -57,8 +58,7 @@ public class PickingCommandService(
         }
 
         dbContext.InventoryMovements.Add(movement);
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> UpdatePickingMovementAsync(
@@ -112,8 +112,7 @@ public class PickingCommandService(
             return balanceResult;
         }
 
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     public async Task<OperationResult> DeletePickingMovementAsync(
@@ -147,8 +146,7 @@ public class PickingCommandService(
         }
 
         dbContext.InventoryMovements.Remove(movement);
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult.Success();
+        return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
     }
 
     private static Task<ShippingOrder?> LoadOrderAsync(

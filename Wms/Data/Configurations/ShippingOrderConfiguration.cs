@@ -9,6 +9,7 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
     public void Configure(EntityTypeBuilder<ShippingOrder> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
 
         builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
