@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
@@ -8,39 +9,72 @@ public partial class ShippingOrderPickingPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private readonly IOperationalBarcodeScanner _scanner;
+    private readonly IServiceProvider _services;
     private MobileShippingOrderDetailsResponse? _details;
     private PickingPageMode _mode = PickingPageMode.Ready;
     private MobileStorageLocationResponse? _scannedLocation;
     private string? _scannedLocationBarcode;
     private Guid? _pendingStartRequestId;
+    private Guid? _pendingDeleteRequestId;
+    private Guid? _pendingDeleteMovementId;
+    private int? _accentedLineNumber;
+    private Guid? _accentedMovementId;
+    private int _searchVersion;
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
 
     public ShippingOrderPickingPage(
         MobileApiClient apiClient,
-        IOperationalBarcodeScanner scanner)
+        IOperationalBarcodeScanner scanner,
+        IServiceProvider services)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _scanner = scanner;
+        _services = services;
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<MobileShippingOrderLineResponse> Lines { get; private set; } = [];
+    public ObservableCollection<ShippingOrderPickingLineViewState> LineStates { get; } = [];
+    public IReadOnlyList<MobileShippingOrderLineCandidateResponse> ScanCandidates { get; private set; } = [];
+    public IReadOnlyList<MobileShippingOrderLineCandidateResponse> SearchCandidates { get; private set; } = [];
 
     private MobileShippingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Расходный ордер не загружен.");
+
+    private bool IsEditable => Details.Order.Status is
+        MobileShippingOrderStatus.ReadyForPicking or
+        MobileShippingOrderStatus.ReadyForVerification or
+        MobileShippingOrderStatus.InVerification or
+        MobileShippingOrderStatus.Verified;
+
+    private bool HasPendingCommand => _pendingStartRequestId is not null
+        || _pendingDeleteRequestId is not null;
+
+    private bool CanStartMovement => IsEditable
+        && !_busy
+        && !HasPendingCommand
+        && _mode == PickingPageMode.Scanning;
+
+    private bool IsScanExpected => !_busy
+        && !HasPendingCommand
+        && (_mode == PickingPageMode.LocationScanning
+            || _mode == PickingPageMode.Scanning);
 
     public void Show(MobileShippingOrderDetailsResponse details)
     {
         _scannedLocation = null;
         _scannedLocationBarcode = null;
         _pendingStartRequestId = null;
+        _pendingDeleteRequestId = null;
+        _pendingDeleteMovementId = null;
+        _accentedLineNumber = null;
+        _accentedMovementId = null;
         ApplyDetails(details);
         SetMode(details.Order.Status == MobileShippingOrderStatus.Prepared
             ? PickingPageMode.Ready
-            : PickingPageMode.InProgress);
+            : PickingPageMode.Scanning);
     }
 
     protected override async void OnAppearing()
@@ -59,6 +93,8 @@ public partial class ShippingOrderPickingPage : ContentPage
     protected override void OnDisappearing()
     {
         _isVisible = false;
+        _searchVersion++;
+        LineSearchEntry.Unfocus();
         CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
@@ -69,10 +105,23 @@ public partial class ShippingOrderPickingPage : ContentPage
         base.OnDisappearing();
     }
 
+    protected override bool OnBackButtonPressed()
+    {
+        if (_busy || HasPendingCommand)
+        {
+            ErrorLabel.Text = HasPendingCommand
+                ? "Сначала повторите незавершённую операцию."
+                : "Дождитесь завершения операции.";
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
+    }
+
     private async void OnStartPickingClicked(object? sender, EventArgs e)
     {
         if (_busy
-            || _pendingStartRequestId is not null
+            || HasPendingCommand
             || Details.Order.Status != MobileShippingOrderStatus.Prepared)
         {
             return;
@@ -88,11 +137,23 @@ public partial class ShippingOrderPickingPage : ContentPage
 
     private async Task HandleScanAsync(string barcode)
     {
-        if (_busy || _mode != PickingPageMode.LocationScanning)
+        if (!IsScanExpected)
         {
             return;
         }
 
+        if (_mode == PickingPageMode.LocationScanning)
+        {
+            await ResolveShippingLocationAsync(barcode);
+        }
+        else
+        {
+            await ResolveSkuAsync(barcode);
+        }
+    }
+
+    private async Task ResolveShippingLocationAsync(string barcode)
+    {
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try
@@ -142,7 +203,7 @@ public partial class ShippingOrderPickingPage : ContentPage
             _scannedLocationBarcode = null;
             ConfirmLocationButton.Text = "Подтвердить";
             ApplyDetails(response.Details);
-            SetMode(PickingPageMode.InProgress);
+            SetMode(PickingPageMode.Scanning);
         }
         catch (MobileApiException exception)
         {
@@ -182,12 +243,283 @@ public partial class ShippingOrderPickingPage : ContentPage
         await UpdateCameraAsync();
     }
 
+    private async Task ResolveSkuAsync(string barcode)
+    {
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var candidates = await _apiClient.ResolveShippingOrderSkuAsync(
+                Details.Order.Id,
+                barcode);
+            if (candidates.Count == 1)
+            {
+                await OpenMovementPageAsync(candidates[0].LineNumber);
+                return;
+            }
+
+            ScanCandidates = candidates;
+            OnPropertyChanged(nameof(ScanCandidates));
+            SetMode(PickingPageMode.CandidateSelection);
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование товара.";
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
+    private async void OnScanCandidateTapped(object? sender, TappedEventArgs e)
+    {
+        if (_busy || e.Parameter is not MobileShippingOrderLineCandidateResponse candidate)
+        {
+            return;
+        }
+
+        ScanCandidates = [];
+        OnPropertyChanged(nameof(ScanCandidates));
+        SetMode(PickingPageMode.Scanning);
+        await OpenMovementPageAsync(candidate.LineNumber);
+    }
+
+    private async void OnCancelCandidatesClicked(object? sender, EventArgs e)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        ScanCandidates = [];
+        OnPropertyChanged(nameof(ScanCandidates));
+        SetMode(PickingPageMode.Scanning);
+        await UpdateCameraAsync();
+    }
+
+    private async void OnNewMovementClicked(object? sender, EventArgs e)
+    {
+        if (CanStartMovement)
+        {
+            await OpenMovementPageAsync(null);
+        }
+    }
+
+    private async void OnAddLineMovementTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is ShippingOrderPickingLineViewState line
+            && CanStartMovement
+            && line.RemainingQuantity > 0)
+        {
+            await OpenMovementPageAsync(line.LineNumber);
+        }
+    }
+
+    private async Task OpenMovementPageAsync(int? lineNumber)
+    {
+        var line = lineNumber is int number
+            ? Details.Lines.Single(x => x.LineNumber == number)
+            : null;
+        var page = _services.GetRequiredService<ShippingOrderPickingMovementPage>();
+        page.Show(Details, line, ApplyMovementResult);
+        await Navigation.PushAsync(page);
+    }
+
+    private void ApplyMovementResult(MobileShippingOrderCommandResponse response)
+    {
+        _accentedLineNumber = response.ChangedLineNumber;
+        _accentedMovementId = response.ChangedMovementId;
+        ApplyDetails(response.Details);
+    }
+
+    private void OnOpenLineSearchTapped(object? sender, TappedEventArgs e)
+    {
+        if (!CanStartMovement)
+        {
+            return;
+        }
+
+        SetMode(PickingPageMode.Searching);
+        CameraScannerView.Stop();
+        Dispatcher.Dispatch(() => LineSearchEntry.Focus());
+    }
+
+    private async void OnCancelLineSearchTapped(object? sender, TappedEventArgs e)
+    {
+        await ClearSearchAsync();
+        SetMode(PickingPageMode.Scanning);
+        await UpdateCameraAsync();
+    }
+
+    private async void OnLineSearchTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        var version = ++_searchVersion;
+        SetSearchBusy(false);
+        SearchCandidates = [];
+        OnPropertyChanged(nameof(SearchCandidates));
+        if (_mode != PickingPageMode.Searching)
+        {
+            return;
+        }
+
+        var query = e.NewTextValue?.Trim() ?? string.Empty;
+        if (query.Length < 2)
+        {
+            LineSearchStatusLabel.Text = "Введите не менее двух символов.";
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(300);
+            if (!IsCurrentSearch(version))
+            {
+                return;
+            }
+
+            SetSearchBusy(true);
+            var result = await _apiClient.SearchShippingOrderLinesAsync(
+                Details.Order.Id,
+                query);
+            if (!IsCurrentSearch(version))
+            {
+                return;
+            }
+
+            SearchCandidates = result.Items;
+            OnPropertyChanged(nameof(SearchCandidates));
+            LineSearchStatusLabel.Text = result.HasMore
+                ? "Показаны первые результаты. Уточните запрос."
+                : $"Найдено: {result.Items.Count}.";
+        }
+        catch (MobileApiException exception)
+        {
+            if (IsCurrentSearch(version))
+            {
+                LineSearchStatusLabel.Text = exception.Message;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            if (IsCurrentSearch(version))
+            {
+                LineSearchStatusLabel.Text = "Сервер WMS недоступен.";
+            }
+        }
+        finally
+        {
+            if (IsCurrentSearch(version))
+            {
+                SetSearchBusy(false);
+            }
+        }
+    }
+
+    private bool IsCurrentSearch(int version) =>
+        version == _searchVersion && _mode == PickingPageMode.Searching;
+
+    private async void OnSearchCandidateTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is not MobileShippingOrderLineCandidateResponse candidate)
+        {
+            return;
+        }
+
+        await ClearSearchAsync();
+        SetMode(PickingPageMode.Scanning);
+        await OpenMovementPageAsync(candidate.LineNumber);
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        _searchVersion++;
+        LineSearchEntry.Text = string.Empty;
+        LineSearchEntry.Unfocus();
+        await LineSearchEntry.HideSoftInputAsync(CancellationToken.None);
+        SearchCandidates = [];
+        OnPropertyChanged(nameof(SearchCandidates));
+        LineSearchStatusLabel.Text = "Введите не менее двух символов.";
+    }
+
+    private async void OnDeleteMovementTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is not ShippingOrderPickingMovementViewState movement || _busy)
+        {
+            return;
+        }
+
+        if (_pendingDeleteMovementId is Guid pendingId && pendingId != movement.Id)
+        {
+            ErrorLabel.Text = "Сначала повторите удаление предыдущего движения.";
+            return;
+        }
+
+        if (HasPendingCommand && _pendingDeleteRequestId is null)
+        {
+            ErrorLabel.Text = "Сначала повторите незавершённую операцию.";
+            return;
+        }
+
+        if (_pendingDeleteRequestId is null)
+        {
+            SetBusy(true);
+            var confirmed = await DisplayAlertAsync(
+                "Удалить движение",
+                $"Удалить черновик «{movement.SourceText}», {movement.QuantityText.ToLowerInvariant()}?",
+                "Удалить",
+                "Отмена");
+            if (!confirmed)
+            {
+                SetBusy(false);
+                return;
+            }
+        }
+        else
+        {
+            SetBusy(true);
+        }
+
+        _pendingDeleteMovementId = movement.Id;
+        _pendingDeleteRequestId ??= Guid.NewGuid();
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var response = await _apiClient.DeleteShippingOrderPickingMovementAsync(
+                Details.Order.Id,
+                movement.Id,
+                _pendingDeleteRequestId.Value);
+            _pendingDeleteRequestId = null;
+            _pendingDeleteMovementId = null;
+            _accentedLineNumber = movement.LineNumber;
+            _accentedMovementId = null;
+            ApplyDetails(response.Details);
+        }
+        catch (MobileApiException exception)
+        {
+            _pendingDeleteRequestId = null;
+            _pendingDeleteMovementId = null;
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите удаление этого же движения.";
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
     private void ApplyDetails(MobileShippingOrderDetailsResponse details)
     {
         _details = details;
-        Lines = details.Lines;
-        OnPropertyChanged(nameof(Lines));
-
         NumberLabel.Text = $"Ордер {details.Order.Number}";
         StatusLabel.Text = MapStatus(details.Order.Status);
         WarehouseLabel.Text = $"Склад: {details.Order.WarehouseName}";
@@ -203,13 +535,52 @@ public partial class ShippingOrderPickingPage : ContentPage
             + $"из {details.Order.Progress.PlanQuantity:g}";
         CommentLabel.Text = details.Order.Comment;
         CommentLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Order.Comment);
+        SynchronizeLines(details);
         RefreshActionAvailability();
+    }
+
+    private void SynchronizeLines(MobileShippingOrderDetailsResponse details)
+    {
+        var numbers = details.Lines.Select(x => x.LineNumber).ToHashSet();
+        for (var index = LineStates.Count - 1; index >= 0; index--)
+        {
+            if (!numbers.Contains(LineStates[index].LineNumber))
+            {
+                LineStates.RemoveAt(index);
+            }
+        }
+
+        foreach (var line in details.Lines.OrderBy(x => x.LineNumber))
+        {
+            var movements = details.Movements.Where(x => x.LineNumber == line.LineNumber);
+            var state = LineStates.SingleOrDefault(x => x.LineNumber == line.LineNumber);
+            if (state is null)
+            {
+                LineStates.Add(ShippingOrderPickingLineViewState.From(
+                    line,
+                    movements,
+                    CanStartMovement,
+                    _accentedLineNumber,
+                    _accentedMovementId));
+            }
+            else
+            {
+                state.Update(
+                    line,
+                    movements,
+                    CanStartMovement,
+                    _accentedLineNumber,
+                    _accentedMovementId);
+            }
+        }
     }
 
     private void SetMode(PickingPageMode mode)
     {
         _mode = mode;
         LocationConfirmationPanel.IsVisible = mode == PickingPageMode.LocationConfirmation;
+        LineCandidatesPanel.IsVisible = mode == PickingPageMode.CandidateSelection;
+        LineSearchPanel.IsVisible = mode == PickingPageMode.Searching;
         (StepLabel.Text, InstructionLabel.Text) = mode switch
         {
             PickingPageMode.Ready => (
@@ -221,9 +592,15 @@ public partial class ShippingOrderPickingPage : ContentPage
             PickingPageMode.LocationConfirmation => (
                 "Подтверждение позиции",
                 "Проверьте адрес и подтвердите начало отбора."),
+            PickingPageMode.CandidateSelection => (
+                "Выбор строки",
+                "Одинаковый товар есть в нескольких строках."),
+            PickingPageMode.Searching => (
+                "Ручной выбор строки",
+                "Выберите строку с положительным остатком к отбору."),
             _ => (
-                "Отбор начат",
-                "Позиция отгрузки закреплена за ордером.")
+                "Отбор товара",
+                "Отсканируйте товар или выберите строку ниже.")
         };
         RefreshActionAvailability();
     }
@@ -232,8 +609,7 @@ public partial class ShippingOrderPickingPage : ContentPage
     {
         if (_isVisible
             && _scanner.ActiveSource == BarcodeScanSource.Camera
-            && !_busy
-            && _mode == PickingPageMode.LocationScanning)
+            && IsScanExpected)
         {
             await CameraScannerView.StartAsync();
         }
@@ -258,10 +634,24 @@ public partial class ShippingOrderPickingPage : ContentPage
         }
 
         StartPickingButton.IsVisible = _mode == PickingPageMode.Ready;
-        StartPickingButton.IsEnabled = !_busy && _pendingStartRequestId is null;
+        StartPickingButton.IsEnabled = !_busy && !HasPendingCommand;
         ConfirmLocationButton.IsEnabled = !_busy && _scannedLocationBarcode is not null;
         CancelLocationButton.IsEnabled = !_busy && _pendingStartRequestId is null;
+        NewMovementButton.IsVisible = IsEditable;
+        NewMovementButton.IsEnabled = CanStartMovement
+            && Details.Lines.Any(x => x.RemainingQuantity > 0);
+        LineSearchPrompt.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
+        LineSearchPrompt.IsEnabled = CanStartMovement;
+        foreach (var line in LineStates)
+        {
+            line.SetActionAvailability(
+                CanStartMovement,
+                _pendingDeleteRequestId is null ? null : _pendingDeleteMovementId);
+        }
     }
+
+    private void SetSearchBusy(bool busy) =>
+        LineSearchIndicator.Opacity = busy ? 1 : 0;
 
     private static string MapStatus(MobileShippingOrderStatus status) => status switch
     {
@@ -297,6 +687,8 @@ public partial class ShippingOrderPickingPage : ContentPage
         Ready,
         LocationScanning,
         LocationConfirmation,
-        InProgress
+        Scanning,
+        CandidateSelection,
+        Searching
     }
 }

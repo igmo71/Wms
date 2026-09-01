@@ -284,9 +284,13 @@ boundary and reuse the Web picking rules. It can idempotently complete full,
 partial, or zero picking through the existing 1C update and inventory posting,
 and can ship only after rescanning the order's active unlocked shipping
 location. The mobile UI implements the warehouse queues, document scan, stage
-routing, and start-picking flow with stable retry identity. Picking movement,
-completion, and shipping interaction screens remain unfinished while this
-specification is active.
+routing, and start-picking flow with stable retry identity. It also shows the
+picking plan, facts, remaining quantities, and draft movements; an operator can
+select a line by SKU scan or manual search, scan an eligible source, confirm a
+safe quantity, split picking across sources, and delete a mistaken draft without
+editing it in place. Source availability is only a hint: the source itself must
+be physically scanned. Picking completion and shipping interaction screens
+remain unfinished while this specification is active.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse

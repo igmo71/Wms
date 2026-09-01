@@ -30,6 +30,7 @@ public static class MauiProgram
         builder.Services.AddTransient<ReceivingOrderPutawayMovementPage>();
         builder.Services.AddTransient<ShippingOrderPage>();
         builder.Services.AddTransient<ShippingOrderPickingPage>();
+        builder.Services.AddTransient<ShippingOrderPickingMovementPage>();
         builder.Services.AddTransient<ShippingOrderShippingPage>();
         builder.Services.AddTransient<ScannerDiagnosticsPage>();
 

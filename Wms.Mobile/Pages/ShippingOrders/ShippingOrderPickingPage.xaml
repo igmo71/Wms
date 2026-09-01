@@ -28,17 +28,24 @@
                 <VerticalStackLayout Spacing="12">
                     <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
                     <Label x:Name="InstructionLabel" FontSize="18" />
+
                     <Button
                         x:Name="StartPickingButton"
                         Clicked="OnStartPickingClicked"
                         HeightRequest="58"
                         Loaded="OnNonScanControlLoaded"
                         Text="Начать отбор" />
-                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <VerticalStackLayout
-                        x:Name="LocationConfirmationPanel"
+                    <Button
+                        x:Name="NewMovementButton"
+                        Clicked="OnNewMovementClicked"
+                        HeightRequest="58"
                         IsVisible="False"
-                        Spacing="10">
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Новое движение отбора" />
+
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+
+                    <VerticalStackLayout x:Name="LocationConfirmationPanel" IsVisible="False" Spacing="10">
                         <Label x:Name="ScannedLocationLabel" FontAttributes="Bold" FontSize="19" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button
@@ -56,34 +63,156 @@
                                 Text="Отмена" />
                         </Grid>
                     </VerticalStackLayout>
-                    <BoxView
-                        x:Name="ProgressIndicator"
-                        Color="{StaticResource Primary}"
-                        HeightRequest="3"
-                        Opacity="0" />
+
+                    <VerticalStackLayout x:Name="LineCandidatesPanel" IsVisible="False" Spacing="10">
+                        <Label FontSize="17" Text="Товар найден в нескольких строках. Выберите строку." />
+                        <VerticalStackLayout
+                            BindableLayout.ItemsSource="{Binding ScanCandidates, Source={x:Reference Page}}"
+                            Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="contracts:MobileShippingOrderLineCandidateResponse">
+                                    <Border Padding="12">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnScanCandidateTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
+                                            <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                            <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Button Clicked="OnCancelCandidatesClicked" Loaded="OnNonScanControlLoaded" Text="Отмена" />
+                    </VerticalStackLayout>
+
+                    <Border
+                        x:Name="LineSearchPrompt"
+                        BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
+                        IsVisible="False"
+                        Loaded="OnNonScanControlLoaded"
+                        Padding="14">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenLineSearchTapped" />
+                        </Border.GestureRecognizers>
+                        <Label FontSize="17" HorizontalTextAlignment="Center" Text="Найти строку вручную" />
+                    </Border>
+
+                    <VerticalStackLayout x:Name="LineSearchPanel" IsVisible="False" Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Entry
+                                x:Name="LineSearchEntry"
+                                ClearButtonVisibility="WhileEditing"
+                                FontSize="18"
+                                Placeholder="Наименование, код или штрихкод"
+                                TextChanged="OnLineSearchTextChanged" />
+                            <Label Grid.Column="1" FontSize="16" Text="Отмена" VerticalTextAlignment="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnCancelLineSearchTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Grid>
+                        <BoxView x:Name="LineSearchIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
+                        <Label x:Name="LineSearchStatusLabel" HorizontalTextAlignment="Center" Text="Введите не менее двух символов." />
+                        <VerticalStackLayout
+                            BindableLayout.ItemsSource="{Binding SearchCandidates, Source={x:Reference Page}}"
+                            Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="contracts:MobileShippingOrderLineCandidateResponse">
+                                    <Border Padding="12">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnSearchCandidateTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
+                                            <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                            <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
                     <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
                 </VerticalStackLayout>
             </Border>
 
             <Label FontAttributes="Bold" FontSize="20" Text="Строки ордера" />
             <VerticalStackLayout
-                BindableLayout.ItemsSource="{Binding Lines, Source={x:Reference Page}}"
+                BindableLayout.ItemsSource="{Binding LineStates, Source={x:Reference Page}}"
                 Spacing="10">
                 <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="contracts:MobileShippingOrderLineResponse">
-                        <Border Padding="14">
-                            <VerticalStackLayout Spacing="4">
+                    <DataTemplate x:DataType="local:ShippingOrderPickingLineViewState">
+                        <Border Padding="14" Stroke="Gray" StrokeThickness="1">
+                            <Border.Triggers>
+                                <DataTrigger Binding="{Binding IsAccented}" TargetType="Border" Value="True">
+                                    <Setter Property="Stroke" Value="{StaticResource Primary}" />
+                                    <Setter Property="StrokeThickness" Value="3" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <VerticalStackLayout Spacing="5">
                                 <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
-                                <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
-                                <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                                    <Label Text="{Binding PlanQuantity, StringFormat='План: {0:g}'}" />
-                                    <Label Grid.Column="1" Text="{Binding FactQuantity, StringFormat='Факт: {0:g}'}" />
-                                    <Label Grid.Column="2" Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
-                                </Grid>
+                                <Label Text="{Binding LineText}" />
+                                <Label FontSize="16" Text="{Binding QuantitySummary}" />
                                 <Label
                                     FontAttributes="Italic"
+                                    IsVisible="{Binding HasComment}"
                                     Text="{Binding Comment, StringFormat='Комментарий: {0}'}" />
+                                <Label
+                                    FontSize="15"
+                                    IsEnabled="{Binding CanAddMovement}"
+                                    IsVisible="{Binding CanAddMovement}"
+                                    Loaded="OnNonScanControlLoaded"
+                                    Text="Отобрать остаток"
+                                    TextColor="{StaticResource Primary}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnAddLineMovementTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+
+                                <VerticalStackLayout
+                                    BindableLayout.ItemsSource="{Binding Movements}"
+                                    IsVisible="{Binding HasMovements}"
+                                    Spacing="6">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="local:ShippingOrderPickingMovementViewState">
+                                            <Border
+                                                BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
+                                                Padding="10"
+                                                Stroke="Gray"
+                                                StrokeThickness="1">
+                                                <Border.Triggers>
+                                                    <DataTrigger Binding="{Binding IsAccented}" TargetType="Border" Value="True">
+                                                        <Setter Property="Stroke" Value="{StaticResource Primary}" />
+                                                        <Setter Property="StrokeThickness" Value="3" />
+                                                    </DataTrigger>
+                                                </Border.Triggers>
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                    <VerticalStackLayout Spacing="2">
+                                                        <Label FontAttributes="Bold" Text="{Binding SourceText}" />
+                                                        <Label Text="{Binding QuantityText}" />
+                                                    </VerticalStackLayout>
+                                                    <Label
+                                                        Grid.Column="1"
+                                                        IsEnabled="{Binding ActionsEnabled}"
+                                                        Loaded="OnNonScanControlLoaded"
+                                                        Text="Удалить"
+                                                        TextColor="IndianRed"
+                                                        VerticalTextAlignment="Center">
+                                                        <Label.GestureRecognizers>
+                                                            <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnDeleteMovementTapped" />
+                                                        </Label.GestureRecognizers>
+                                                    </Label>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>
