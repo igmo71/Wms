@@ -38,6 +38,7 @@ scope must be split or the user must choose their order.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
+| 2026-09-01 | Active | Mobile WMS stabilization after the first four operational processes | [`2026-09-01-mobile-wms-stabilization/spec.md`](2026-09-01-mobile-wms-stabilization/spec.md) |
 | 2026-08-31 | Frozen reference | Mobile picking and shipping | [`2026-08-31-mobile-picking-shipping/spec.md`](2026-08-31-mobile-picking-shipping/spec.md) |
 | 2026-08-29 | Frozen reference | Mobile receiving and putaway | [`2026-08-29-mobile-receiving-putaway/spec.md`](2026-08-29-mobile-receiving-putaway/spec.md) |
 | 2026-08-27 | Frozen reference | Location-based inventory counting shared by mobile and web | [`2026-08-27-location-inventory-count/spec.md`](2026-08-27-location-inventory-count/spec.md) |
@@ -47,10 +48,10 @@ scope must be split or the user must choose their order.
 | 2026-08-21 | Frozen reference | Concurrent `InventoryTransfer` commands and balance conflicts | [`2026-08-21-inventory-transfer-concurrency/spec.md`](2026-08-21-inventory-transfer-concurrency/spec.md) |
 | 2026-08-10 | Superseded by `2026-08-27-location-inventory-count` | Legacy multi-location inventory-count backend | [`inventory-count-backend/spec.md`](inventory-count-backend/spec.md) |
 
-There is no active specification. Mobile picking and shipping, mobile receiving
-and putaway, location-based inventory counting, storage-location locking, the
-mobile foundation, and the intra-warehouse transfer vertical are accepted
-frozen references.
+Mobile WMS stabilization is the active specification. Mobile picking and
+shipping, mobile receiving and putaway, location-based inventory counting,
+storage-location locking, the mobile foundation, and the intra-warehouse
+transfer vertical are accepted frozen references.
 
 ## Legacy reference ledger
 

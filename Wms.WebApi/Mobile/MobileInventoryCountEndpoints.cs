@@ -19,16 +19,26 @@ internal static class MobileInventoryCountEndpoints
             .WithTags("Mobile Inventory Counts")
             .RequireAuthorization(MobileAuthorization.WarehouseOperatorPolicy);
 
-        group.MapGet("", ListDraftsAsync);
-        group.MapGet("/{inventoryCountId:guid}", GetAsync);
-        group.MapPost("/start", StartAsync);
-        group.MapPost("/{inventoryCountId:guid}/sku/scan", IncrementSkuAsync);
-        group.MapGet("/{inventoryCountId:guid}/skus", SearchSkusAsync);
-        group.MapPost("/{inventoryCountId:guid}/sku-quantity", SetSkuQuantityAsync);
-        group.MapPost("/{inventoryCountId:guid}/items/{itemId:guid}/quantity", SetItemQuantityAsync);
-        group.MapPost("/{inventoryCountId:guid}/items/{itemId:guid}/remove", RemoveItemAsync);
-        group.MapPost("/{inventoryCountId:guid}/post", PostAsync);
-        group.MapPost("/{inventoryCountId:guid}/delete", DeleteDraftAsync);
+        group.MapGet("", ListDraftsAsync)
+            .WithMobileResponses<IReadOnlyList<MobileInventoryCountSummaryResponse>>();
+        group.MapGet("/{inventoryCountId:guid}", GetAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/start", StartAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/{inventoryCountId:guid}/sku/scan", IncrementSkuAsync)
+            .WithMobileResponses<MobileInventoryCountScanResponse>();
+        group.MapGet("/{inventoryCountId:guid}/skus", SearchSkusAsync)
+            .WithMobileResponses<IReadOnlyList<MobileInventoryCountSkuSearchResponse>>();
+        group.MapPost("/{inventoryCountId:guid}/sku-quantity", SetSkuQuantityAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/{inventoryCountId:guid}/items/{itemId:guid}/quantity", SetItemQuantityAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/{inventoryCountId:guid}/items/{itemId:guid}/remove", RemoveItemAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/{inventoryCountId:guid}/post", PostAsync)
+            .WithMobileResponses<MobileInventoryCountDetailsResponse>();
+        group.MapPost("/{inventoryCountId:guid}/delete", DeleteDraftAsync)
+            .WithMobileResponses<MobileInventoryCountDeletedResponse>();
         return endpoints;
     }
 

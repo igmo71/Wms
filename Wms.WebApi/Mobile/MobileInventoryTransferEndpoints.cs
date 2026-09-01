@@ -18,88 +18,62 @@ internal static class MobileInventoryTransferEndpoints
             .RequireAuthorization(MobileAuthorization.WarehouseOperatorPolicy);
 
         group.MapGet("/warehouses", ListWarehousesAsync)
-            .Produces<IReadOnlyList<MobileWarehouseResponse>>();
+            .WithMobileResponses<IReadOnlyList<MobileWarehouseResponse>>();
 
         group.MapGet("/inventory-transfers", ListTransfersAsync)
-            .Produces<IReadOnlyList<MobileInventoryTransferSummaryResponse>>();
+            .WithMobileResponses<IReadOnlyList<MobileInventoryTransferSummaryResponse>>();
 
         group.MapGet(
                 "/inventory-transfers/by-transit-location/{transitStorageLocationId:guid}",
                 GetTransferByTransitStorageLocationAsync)
-            .Produces<MobileInventoryTransferSummaryResponse>()
+            .WithMobileResponses<MobileInventoryTransferSummaryResponse>()
             .Produces(StatusCodes.Status204NoContent);
 
         group.MapGet("/inventory-transfers/{transferId:guid}", GetTransferAsync)
-            .Produces<MobileInventoryTransferDetailsResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound);
+            .WithMobileResponses<MobileInventoryTransferDetailsResponse>();
 
         group.MapPost("/inventory-transfers", CreateTransferAsync)
-            .Produces<MobileInventoryTransferSummaryResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileInventoryTransferSummaryResponse>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/direct/sku/resolve",
                 ResolveDirectSkuAsync)
-            .Produces<MobileDirectTransferSkuResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileDirectTransferSkuResponse>();
 
         group.MapGet(
                 "/inventory-transfers/{transferId:guid}/direct/skus",
                 SearchDirectSkusAsync)
-            .Produces<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/transit/sku/resolve",
                 ResolveTransitSkuAsync)
-            .Produces<MobileDirectTransferSkuResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileDirectTransferSkuResponse>();
 
         group.MapGet(
                 "/inventory-transfers/{transferId:guid}/transit/skus",
                 SearchTransitSkusAsync)
-            .Produces<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<IReadOnlyList<MobileDirectTransferSkuSearchResponse>>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/direct-movements",
                 MoveDirectAsync)
-            .Produces<MobileMoveDirectInventoryTransferResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileMoveDirectInventoryTransferResponse>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/pick-to-transit",
                 PickToTransitAsync)
-            .Produces<MobileTransitInventoryTransferMovementResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileTransitInventoryTransferMovementResponse>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/put-from-transit",
                 PutFromTransitAsync)
-            .Produces<MobileTransitInventoryTransferMovementResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileTransitInventoryTransferMovementResponse>();
 
         group.MapPost(
                 "/inventory-transfers/{transferId:guid}/complete",
                 CompleteTransferAsync)
-            .Produces<MobileCompleteInventoryTransferResponse>()
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
+            .WithMobileResponses<MobileCompleteInventoryTransferResponse>();
 
         return endpoints;
     }

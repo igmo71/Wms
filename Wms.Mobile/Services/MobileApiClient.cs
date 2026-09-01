@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Wms.Contracts.Mobile.V1;
 
 namespace Wms.Mobile.Services;
@@ -155,12 +156,10 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         }
 
-        return await response.Content
-            .ReadFromJsonAsync<MobileInventoryTransferSummaryResponse>(ct)
-            ?? throw new MobileApiException(
-                response.StatusCode,
-                "invalid_inventory_transfer_response",
-                "Сервер вернул некорректное перемещение.");
+        return await ReadCommandResponseAsync<MobileInventoryTransferSummaryResponse>(
+            response,
+            "Сервер вернул некорректное перемещение.",
+            ct);
     }
 
     public async Task<MobileInventoryTransferSummaryResponse?>
@@ -323,12 +322,10 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         }
 
-        return await response.Content
-            .ReadFromJsonAsync<MobileMoveDirectInventoryTransferResponse>(ct)
-            ?? throw new MobileApiException(
-                response.StatusCode,
-                "invalid_direct_movement_response",
-                "Сервер вернул некорректный результат перемещения.");
+        return await ReadCommandResponseAsync<MobileMoveDirectInventoryTransferResponse>(
+            response,
+            "Сервер вернул некорректный результат перемещения.",
+            ct);
     }
 
     public async Task<MobileTransitInventoryTransferMovementResponse> PickToTransitAsync(
@@ -353,12 +350,10 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         }
 
-        return await response.Content
-            .ReadFromJsonAsync<MobileTransitInventoryTransferMovementResponse>(ct)
-            ?? throw new MobileApiException(
-                response.StatusCode,
-                "invalid_pick_to_transit_response",
-                "Сервер вернул некорректный результат перемещения в транзитную ячейку.");
+        return await ReadCommandResponseAsync<MobileTransitInventoryTransferMovementResponse>(
+            response,
+            "Сервер вернул некорректный результат перемещения в транзитную ячейку.",
+            ct);
     }
 
     public async Task<MobileTransitInventoryTransferMovementResponse> PutFromTransitAsync(
@@ -383,12 +378,10 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         }
 
-        return await response.Content
-            .ReadFromJsonAsync<MobileTransitInventoryTransferMovementResponse>(ct)
-            ?? throw new MobileApiException(
-                response.StatusCode,
-                "invalid_put_from_transit_response",
-                "Сервер вернул некорректный результат перемещения из транзитной ячейки.");
+        return await ReadCommandResponseAsync<MobileTransitInventoryTransferMovementResponse>(
+            response,
+            "Сервер вернул некорректный результат перемещения из транзитной ячейки.",
+            ct);
     }
 
     public async Task<MobileCompleteInventoryTransferResponse> CompleteInventoryTransferAsync(
@@ -406,12 +399,10 @@ public sealed class MobileApiClient
             await ThrowApiExceptionAsync(response, ct);
         }
 
-        return await response.Content
-            .ReadFromJsonAsync<MobileCompleteInventoryTransferResponse>(ct)
-            ?? throw new MobileApiException(
-                response.StatusCode,
-                "invalid_inventory_transfer_completion_response",
-                "Сервер вернул некорректный результат завершения перемещения.");
+        return await ReadCommandResponseAsync<MobileCompleteInventoryTransferResponse>(
+            response,
+            "Сервер вернул некорректный результат завершения перемещения.",
+            ct);
     }
 
     public async Task<IReadOnlyList<MobileInventoryCountSummaryResponse>> GetInventoryCountDraftsAsync(
@@ -775,8 +766,10 @@ public sealed class MobileApiClient
             ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<MobileInventoryCountScanResponse>(ct)
-            ?? throw InvalidResponse(response, "invalid_inventory_count_scan_response", "Сервер вернул некорректный результат сканирования.");
+        return await ReadCommandResponseAsync<MobileInventoryCountScanResponse>(
+            response,
+            "Сервер вернул некорректный результат сканирования.",
+            ct);
     }
 
     public async Task<IReadOnlyList<MobileInventoryCountSkuSearchResponse>> SearchInventoryCountSkusAsync(
@@ -848,6 +841,10 @@ public sealed class MobileApiClient
             ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, ct);
+        await ReadCommandResponseAsync<MobileInventoryCountDeletedResponse>(
+            response,
+            "Сервер вернул некорректный результат удаления инвентаризации.",
+            ct);
     }
 
     private async Task<MobileInventoryCountDetailsResponse> GetInventoryCountDetailsAsync(
@@ -898,11 +895,10 @@ public sealed class MobileApiClient
         using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderCommandResponse>(ct)
-            ?? throw InvalidResponse(
-                response,
-                "invalid_receiving_order_command_response",
-                "Сервер вернул некорректный результат операции с приходным ордером.");
+        return await ReadCommandResponseAsync<MobileReceivingOrderCommandResponse>(
+            response,
+            "Сервер вернул некорректный результат операции с приходным ордером.",
+            ct);
     }
 
     private async Task<MobileShippingOrderCommandResponse>
@@ -914,11 +910,10 @@ public sealed class MobileApiClient
         using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<MobileShippingOrderCommandResponse>(ct)
-            ?? throw InvalidResponse(
-                response,
-                "invalid_shipping_order_command_response",
-                "Сервер вернул некорректный результат операции с расходным ордером.");
+        return await ReadCommandResponseAsync<MobileShippingOrderCommandResponse>(
+            response,
+            "Сервер вернул некорректный результат операции с расходным ордером.",
+            ct);
     }
 
     private async Task<MobileInventoryCountDetailsResponse> PostInventoryCountDetailsAsync<TRequest>(
@@ -929,8 +924,27 @@ public sealed class MobileApiClient
         using var response = await _httpClient.PostAsJsonAsync(route, request, ct);
         if (!response.IsSuccessStatusCode)
             await ThrowApiExceptionAsync(response, ct);
-        return await response.Content.ReadFromJsonAsync<MobileInventoryCountDetailsResponse>(ct)
-            ?? throw InvalidResponse(response, "invalid_inventory_count_response", "Сервер вернул некорректную инвентаризацию.");
+        return await ReadCommandResponseAsync<MobileInventoryCountDetailsResponse>(
+            response,
+            "Сервер вернул некорректную инвентаризацию.",
+            ct);
+    }
+
+    private static async Task<TResponse> ReadCommandResponseAsync<TResponse>(
+        HttpResponseMessage response,
+        string message,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<TResponse>(ct)
+                ?? throw new HttpRequestException(message, null, response.StatusCode);
+        }
+        catch (Exception exception) when (
+            exception is JsonException or NotSupportedException or IOException)
+        {
+            throw new HttpRequestException(message, exception, response.StatusCode);
+        }
     }
 
     private static HttpRequestException InvalidResponse(

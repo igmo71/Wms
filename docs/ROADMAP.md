@@ -17,8 +17,9 @@ in `specs/`.
 
 ### Security and external boundaries
 
-- Finish the stable problem-code mapping for upcoming mobile business
-  endpoints; identity failures already use mobile V1 wire errors.
+- Define and verify the staging build and deployment configuration, including
+  HTTPS certificate issuance, trust, installation, renewal, and the Android
+  client connection to the staging API.
 - Authenticate or otherwise verify 1C webhook/import callers before exposing
   their endpoints outside a trusted network.
 - Define session lifetime, refresh, and operational revocation for a lost or
@@ -59,9 +60,11 @@ and per-warehouse assignments remain deferred until a pilot needs them.
 ## Mobile WMS — next delivery path
 
 The mobile foundation, scanning, direct/transit intra-warehouse movement,
-storage-location locking, location-based inventory counting, and receiving and
-putaway are accepted. The next mobile process has not been selected and must be
-specified separately before implementation.
+storage-location locking, location-based inventory counting, receiving and
+putaway, and picking and shipping are accepted. Before another mobile process
+is selected, the shared Mobile V1 server and Android client are undergoing a
+focused stabilization pass. Any later mobile process must be specified
+separately before implementation.
 
 External inputs still required: printer/label constraints before finalizing
 label geometry and a safe badge-login decision if badge login remains

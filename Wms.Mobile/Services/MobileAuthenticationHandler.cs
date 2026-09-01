@@ -68,16 +68,40 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
             using var response = await base.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                sessionStore.Clear();
-                return null;
+                if (response.StatusCode is System.Net.HttpStatusCode.BadRequest
+                    or System.Net.HttpStatusCode.Unauthorized)
+                {
+                    sessionStore.Clear();
+                    return null;
+                }
+
+                throw new HttpRequestException(
+                    "Сервер WMS не подтвердил обновление сессии.",
+                    null,
+                    response.StatusCode);
             }
 
-            var refreshed = await response.Content.ReadFromJsonAsync<MobileSessionResponse>(ct);
-            if (refreshed is null)
+            MobileSessionResponse? refreshed;
+            try
             {
-                sessionStore.Clear();
-                return null;
+                refreshed = await response.Content.ReadFromJsonAsync<MobileSessionResponse>(ct);
             }
+            catch (Exception exception) when (
+                exception is System.Text.Json.JsonException
+                    or NotSupportedException
+                    or IOException)
+            {
+                throw new HttpRequestException(
+                    "Сервер WMS вернул некорректный результат обновления сессии.",
+                    exception,
+                    response.StatusCode);
+            }
+
+            if (refreshed is null)
+                throw new HttpRequestException(
+                    "Сервер WMS вернул некорректный результат обновления сессии.",
+                    null,
+                    response.StatusCode);
 
             session = ToSession(refreshed);
             await sessionStore.SaveAsync(session);

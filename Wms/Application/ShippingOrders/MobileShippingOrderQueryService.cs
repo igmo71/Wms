@@ -17,7 +17,7 @@ public sealed class MobileShippingOrderQueryService(
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var orders = await BaseOrderQuery(dbContext)
+        var orders = await QueueOrderQuery(dbContext)
             .Where(x => x.WarehouseId == warehouseId
                 && !x.DeletionMark
                 && (x.Status == ShippingOrderStatus.Prepared
@@ -291,6 +291,16 @@ public sealed class MobileShippingOrderQueryService(
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
                     .ThenInclude(x => x!.Barcodes);
+
+    private static IQueryable<ShippingOrder> QueueOrderQuery(
+        ApplicationDbContext dbContext) =>
+        dbContext.ShippingOrders
+            .AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.DeliveryDirection)
+            .Include(x => x.ShippingLocation)
+                .ThenInclude(x => x!.Zone)
+            .Include(x => x.Items);
 
     private static Task<List<InventoryMovement>> LoadCurrentCycleMovementsAsync(
         ApplicationDbContext dbContext,

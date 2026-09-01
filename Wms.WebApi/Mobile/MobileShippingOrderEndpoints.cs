@@ -383,13 +383,4 @@ internal static class MobileShippingOrderEndpoints
                 $"Неизвестный статус расходного ордера: {status}.")
         };
 
-    private static RouteHandlerBuilder WithMobileResponses<TResponse>(
-        this RouteHandlerBuilder builder) =>
-        builder
-            .Produces<TResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest)
-            .Produces<MobileProblemResponse>(StatusCodes.Status404NotFound)
-            .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
-            .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 }

@@ -108,6 +108,14 @@ also requires `IdentityBootstrap__AdministratorDisplayName` and the secret
 These role rules protect `Wms.WebApp`, mobile V1 endpoints, and the development
 application endpoints in `Wms.WebApi`. Mobile bearer login reuses the same
 confirmed accounts; command authors come from the authenticated principal.
+The Android client serializes concurrent access-token refresh, retains the
+stored session when refresh fails because of transport, HTTP `408`, HTTP `5xx`,
+or an unreadable successful response, and does not send the original operation
+with the stale token. A definitive refresh rejection (`400` or `401`) and a
+`401` from an authenticated API operation clear the local session. The main
+screen reconciles its displayed state with the local session whenever it
+reappears; a temporarily unreachable server is shown as a retained unavailable
+session rather than as a logout.
 Verification of 1C callers remains a separate pilot prerequisite. Detailed
 web-role behavior is in
 [`specs/identity-roles-and-user-management/spec.md`](../specs/identity-roles-and-user-management/spec.md).
@@ -451,3 +459,13 @@ The client retains the same command request id after transport failure, HTTP
 `408`, HTTP `5xx`, or an unreadable successful response because those outcomes
 do not prove whether the server committed the command. A definitive `4xx`
 business/client rejection releases the request id.
+
+Every changing Mobile V1 response is read through the same client boundary.
+An empty, malformed, truncated, or incompatible successful response is exposed
+to workflow pages as an uncertain `HttpRequestException`; JSON parsing failures
+must not escape an `async void` page handler or cause it to discard the request
+id. Mobile business errors use the stable type-level codes `invalid_command`,
+`resource_not_found`, `request_conflict`, and `command_failed`. A command that
+is unavailable in the document's current state remains `invalid_command`; the
+shared `OperationError` model is not expanded merely for a more detailed mobile
+code.

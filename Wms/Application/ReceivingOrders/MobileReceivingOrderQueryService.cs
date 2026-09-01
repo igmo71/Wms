@@ -18,7 +18,7 @@ public sealed class MobileReceivingOrderQueryService(
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var orders = await BaseOrderQuery(dbContext)
+        var orders = await QueueOrderQuery(dbContext)
             .Where(x => x.WarehouseId == warehouseId
                 && !x.DeletionMark
                 && (x.Status == ReceivingOrderStatus.ReadyForReceiving
@@ -235,6 +235,15 @@ public sealed class MobileReceivingOrderQueryService(
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
                     .ThenInclude(x => x!.Barcodes);
+
+    private static IQueryable<ReceivingOrder> QueueOrderQuery(
+        ApplicationDbContext dbContext) =>
+        dbContext.ReceivingOrders
+            .AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.ReceivingLocation)
+                .ThenInclude(x => x!.Zone)
+            .Include(x => x.Items);
 
     private static Task<List<InventoryMovement>> LoadDraftMovementsAsync(
         ApplicationDbContext dbContext,

@@ -15,6 +15,14 @@ public static class MobileApiRoutes
     public const string ShippingOrders = Base + "/shipping-orders";
 }
 
+public static class MobileProblemCodes
+{
+    public const string InvalidCommand = "invalid_command";
+    public const string ResourceNotFound = "resource_not_found";
+    public const string RequestConflict = "request_conflict";
+    public const string CommandFailed = "command_failed";
+}
+
 public sealed record MobileLoginRequest(string Email, string Password);
 
 public sealed record MobileRefreshRequest(string RefreshToken);

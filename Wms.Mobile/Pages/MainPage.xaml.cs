@@ -6,8 +6,10 @@ namespace Wms.Mobile;
 public partial class MainPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
+    private readonly IMobileSessionStore _sessionStore;
     private readonly IServiceProvider _services;
-    private bool _sessionChecked;
+    private bool _checkingSession;
+    private bool _currentUserLoaded;
 
     public MainPage(
         MobileApiClient apiClient,
@@ -15,19 +17,37 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
         _apiClient = apiClient;
+        _sessionStore = services.GetRequiredService<IMobileSessionStore>();
         _services = services;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_sessionChecked)
+        if (_checkingSession)
         {
             return;
         }
 
-        _sessionChecked = true;
-        await RunAsync(() => _apiClient.GetCurrentUserAsync(), ignoreMissingSession: true);
+        _checkingSession = true;
+        try
+        {
+            var session = await _sessionStore.GetAsync();
+            if (session is null)
+            {
+                ShowLoggedOut();
+                return;
+            }
+
+            if (!_currentUserLoaded)
+            {
+                await RestoreCurrentUserAsync();
+            }
+        }
+        finally
+        {
+            _checkingSession = false;
+        }
     }
 
     private async void OnLoginClicked(object? sender, EventArgs e)
@@ -36,7 +56,26 @@ public partial class MainPage : ContentPage
         var password = PasswordEntry.Text ?? string.Empty;
         PasswordEntry.Text = string.Empty;
 
-        await RunAsync(() => _apiClient.LoginAsync(email, password));
+        SetBusy(true);
+        StatusLabel.Text = string.Empty;
+        try
+        {
+            ShowLoggedIn(await _apiClient.LoginAsync(email, password));
+        }
+        catch (MobileApiException exception)
+        {
+            ShowLoggedOut();
+            StatusLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ShowLoggedOut();
+            StatusLabel.Text = "Сервер WMS недоступен.";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
     }
 
     private void OnLogoutClicked(object? sender, EventArgs e)
@@ -61,31 +100,26 @@ public partial class MainPage : ContentPage
     private async void OnScannerDiagnosticsClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ScannerDiagnosticsPage>());
 
-    private async Task RunAsync(
-        Func<Task<MobileCurrentUserResponse>> action,
-        bool ignoreMissingSession = false)
+    private async Task RestoreCurrentUserAsync()
     {
         SetBusy(true);
         StatusLabel.Text = string.Empty;
 
         try
         {
-            var user = await action();
-            ShowLoggedIn(user);
+            ShowLoggedIn(await _apiClient.GetCurrentUserAsync());
         }
         catch (MobileApiException exception)
         {
             ShowLoggedOut();
-            if (!ignoreMissingSession
-                || exception.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+            if (exception.StatusCode != System.Net.HttpStatusCode.Unauthorized)
             {
                 StatusLabel.Text = exception.Message;
             }
         }
         catch (HttpRequestException)
         {
-            ShowLoggedOut();
-            StatusLabel.Text = "Сервер WMS недоступен.";
+            ShowSessionUnavailable();
         }
         finally
         {
@@ -95,6 +129,7 @@ public partial class MainPage : ContentPage
 
     private void ShowLoggedIn(MobileCurrentUserResponse user)
     {
+        _currentUserLoaded = true;
         CurrentUserLabel.Text = $"{user.DisplayName}\n{user.Email}";
         LoginPanel.IsVisible = false;
         SessionPanel.IsVisible = true;
@@ -102,9 +137,19 @@ public partial class MainPage : ContentPage
 
     private void ShowLoggedOut()
     {
+        _currentUserLoaded = false;
         LoginPanel.IsVisible = true;
         SessionPanel.IsVisible = false;
         CurrentUserLabel.Text = string.Empty;
+    }
+
+    private void ShowSessionUnavailable()
+    {
+        _currentUserLoaded = false;
+        LoginPanel.IsVisible = false;
+        SessionPanel.IsVisible = true;
+        CurrentUserLabel.Text = "Сессия сохранена";
+        StatusLabel.Text = "Сервер WMS недоступен. Повторите действие позже.";
     }
 
     private void SetBusy(bool isBusy)
