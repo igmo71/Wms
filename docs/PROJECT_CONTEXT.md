@@ -68,9 +68,9 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   receiving and putaway workflows are implemented. Putaway supports explicit
   start, scanned destinations, split quantities, draft deletion, exact
   completion, and idempotent retry of uncertain changing responses. The
-  picking and shipping mobile section exposes warehouse-scoped queues,
-  document scan, stage routing, and the scanned shipping-location flow for
-  idempotently starting picking.
+  picking and shipping mobile section implements the full online path from a
+  warehouse-scoped queue or document scan through picking movements and result
+  confirmation to a rescanned shipping location and final shipment.
 
 The mobile foundation and the intra-warehouse transfer, location-based
 inventory-count, and receiving/putaway workflows are accepted. Device checks
@@ -269,7 +269,7 @@ Selecting the shipping location and starting picking form one local save
 boundary. `ShippingOrder.OperationalRevision` advances on local plan
 reconciliation, shipping-location and workflow transitions, draft-picking
 movement changes, and rollback. It is an optimistic-concurrency token shared
-by web and future mobile commands, so concurrent work on one order returns a
+by web and mobile commands, so concurrent work on one order returns a
 business conflict instead of silently overwriting its facts, movements, or
 status.
 
@@ -422,6 +422,13 @@ input confirms it, including an explicit zero. Completion posts positive facts
 to the scanned receiving location; putaway then records and posts exact,
 possibly split draft movements to scanned ordinary storage locations.
 
+The fourth accepted mobile process is picking and shipping of one 1C shipping
+order. A warehouse queue or document barcode opens the applicable stage.
+Picking starts against a scanned shipping location, records possibly split
+draft movements from scanned ordinary storage locations, and explicitly accepts
+a full, partial, or zero result. Final shipment requires rescanning the saved
+shipping location and removes the shipped order from the mobile work queues.
+
 The accepted foundation and first-vertical scope are retained under
 [`specs/mobile-wms/`](../specs/mobile-wms/) as a frozen reference. Each
 subsequent mobile warehouse process is specified separately.
@@ -435,7 +442,7 @@ warehouse action. Reusing the key with different input is a conflict. The
 current implementation protects creation of direct and transit
 inventory-transfer drafts, direct movement, pick to transit, put from transit,
 completion of the transfer, every changing inventory-count command, and every
-changing receiving and putaway command. The
+changing receiving, putaway, picking, and shipping command. The
 repeated receipt lifecycle is centralized inside the respective mobile command
 service while each business action remains an explicit internal staged
 operation.
