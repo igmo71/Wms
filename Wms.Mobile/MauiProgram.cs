@@ -28,6 +28,9 @@ public static class MauiProgram
         builder.Services.AddTransient<ReceivingOrderReceivingPage>();
         builder.Services.AddTransient<ReceivingOrderPutawayPage>();
         builder.Services.AddTransient<ReceivingOrderPutawayMovementPage>();
+        builder.Services.AddTransient<ShippingOrderPage>();
+        builder.Services.AddTransient<ShippingOrderPickingPage>();
+        builder.Services.AddTransient<ShippingOrderShippingPage>();
         builder.Services.AddTransient<ScannerDiagnosticsPage>();
 
         builder.Services.AddSingleton<AndroidIntentBarcodeScanner>();

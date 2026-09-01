@@ -70,6 +70,12 @@
                 Text="Приёмка и размещение" />
 
             <Button
+                Clicked="OnShippingOrdersClicked"
+                FontSize="18"
+                HeightRequest="64"
+                Text="Отбор и отгрузка" />
+
+            <Button
                 Clicked="OnScannerDiagnosticsClicked"
                 FontSize="16"
                 HeightRequest="56"

@@ -67,7 +67,10 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   contracts and endpoints, warehouse work queue, document scan, and mobile
   receiving and putaway workflows are implemented. Putaway supports explicit
   start, scanned destinations, split quantities, draft deletion, exact
-  completion, and idempotent retry of uncertain changing responses.
+  completion, and idempotent retry of uncertain changing responses. The
+  picking and shipping mobile section exposes warehouse-scoped queues,
+  document scan, stage routing, and the scanned shipping-location flow for
+  idempotently starting picking.
 
 The mobile foundation and the intra-warehouse transfer, location-based
 inventory-count, and receiving/putaway workflows are accepted. Device checks
@@ -280,7 +283,10 @@ delete a draft movement; each movement change and its receipt share one save
 boundary and reuse the Web picking rules. It can idempotently complete full,
 partial, or zero picking through the existing 1C update and inventory posting,
 and can ship only after rescanning the order's active unlocked shipping
-location. The mobile UI is unfinished while this specification is active.
+location. The mobile UI implements the warehouse queues, document scan, stage
+routing, and start-picking flow with stable retry identity. Picking movement,
+completion, and shipping interaction screens remain unfinished while this
+specification is active.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse

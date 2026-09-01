@@ -1,0 +1,94 @@
+<ContentPage
+    x:Class="Wms.Mobile.ShippingOrderPickingPage"
+    x:Name="Page"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Отбор">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="26" />
+            <Label x:Name="StatusLabel" FontAttributes="Bold" FontSize="18" />
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="6">
+                    <Label x:Name="WarehouseLabel" />
+                    <Label x:Name="ReceiverLabel" />
+                    <Label x:Name="QueueLabel" />
+                    <Label x:Name="PlannedDateLabel" />
+                    <Label x:Name="LocationLabel" />
+                    <Label x:Name="ProgressLabel" FontAttributes="Bold" />
+                    <Label x:Name="CommentLabel" FontAttributes="Italic" IsVisible="False" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
+                    <Label x:Name="InstructionLabel" FontSize="18" />
+                    <Button
+                        x:Name="StartPickingButton"
+                        Clicked="OnStartPickingClicked"
+                        HeightRequest="58"
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Начать отбор" />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <VerticalStackLayout
+                        x:Name="LocationConfirmationPanel"
+                        IsVisible="False"
+                        Spacing="10">
+                        <Label x:Name="ScannedLocationLabel" FontAttributes="Bold" FontSize="19" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button
+                                x:Name="ConfirmLocationButton"
+                                Clicked="OnConfirmLocationClicked"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Подтвердить" />
+                            <Button
+                                x:Name="CancelLocationButton"
+                                Clicked="OnCancelLocationClicked"
+                                Grid.Column="1"
+                                HeightRequest="54"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Отмена" />
+                        </Grid>
+                    </VerticalStackLayout>
+                    <BoxView
+                        x:Name="ProgressIndicator"
+                        Color="{StaticResource Primary}"
+                        HeightRequest="3"
+                        Opacity="0" />
+                    <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label FontAttributes="Bold" FontSize="20" Text="Строки ордера" />
+            <VerticalStackLayout
+                BindableLayout.ItemsSource="{Binding Lines, Source={x:Reference Page}}"
+                Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="contracts:MobileShippingOrderLineResponse">
+                        <Border Padding="14">
+                            <VerticalStackLayout Spacing="4">
+                                <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
+                                <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                    <Label Text="{Binding PlanQuantity, StringFormat='План: {0:g}'}" />
+                                    <Label Grid.Column="1" Text="{Binding FactQuantity, StringFormat='Факт: {0:g}'}" />
+                                    <Label Grid.Column="2" Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                </Grid>
+                                <Label
+                                    FontAttributes="Italic"
+                                    Text="{Binding Comment, StringFormat='Комментарий: {0}'}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
