@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    xmlns:local="clr-namespace:Wms.Mobile"
     Title="Отгрузка">
 
     <ScrollView>
@@ -20,7 +21,48 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Label FontSize="18" Text="Проверьте итог ордера и позицию отгрузки." />
+            <Border Padding="16">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
+                    <Label x:Name="InstructionLabel" FontSize="18" />
+
+                    <Button
+                        x:Name="StartShippingButton"
+                        Clicked="OnStartShippingClicked"
+                        HeightRequest="58"
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Отгрузить" />
+
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+
+                    <VerticalStackLayout x:Name="ConfirmationPanel" IsVisible="False" Spacing="10">
+                        <Label x:Name="ScannedLocationLabel" FontAttributes="Bold" FontSize="19" />
+                        <Label x:Name="ShippingSummaryLabel" FontSize="17" />
+                        <Label
+                            FontAttributes="Bold"
+                            Text="После подтверждения товар будет списан, а ордер закрыт."
+                            TextColor="DarkOrange" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button
+                                x:Name="ConfirmShippingButton"
+                                Clicked="OnConfirmShippingClicked"
+                                HeightRequest="58"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Подтвердить отгрузку" />
+                            <Button
+                                x:Name="CancelShippingButton"
+                                Clicked="OnCancelShippingClicked"
+                                Grid.Column="1"
+                                HeightRequest="58"
+                                Loaded="OnNonScanControlLoaded"
+                                Text="Отмена" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
+                    <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
+                </VerticalStackLayout>
+            </Border>
 
             <Label FontAttributes="Bold" FontSize="20" Text="Строки к отгрузке" />
             <VerticalStackLayout
@@ -34,6 +76,7 @@
                                 <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
                                 <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
                                 <Label FontSize="16" Text="{Binding FactQuantity, StringFormat='К отгрузке: {0:g}'}" />
+                                <Label Text="{Binding PlanQuantity, StringFormat='План: {0:g}'}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

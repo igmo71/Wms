@@ -289,8 +289,12 @@ picking plan, facts, remaining quantities, and draft movements; an operator can
 select a line by SKU scan or manual search, scan an eligible source, confirm a
 safe quantity, split picking across sources, and delete a mistaken draft without
 editing it in place. Source availability is only a hint: the source itself must
-be physically scanned. Picking completion and shipping interaction screens
-remain unfinished while this specification is active.
+be physically scanned. The picking screen presents the full, partial, or zero
+result before completion and requires a separate acknowledgement of any
+shortage. Successful completion opens the final shipping screen with fresh
+facts. Shipping requires rescanning the order's saved shipping location and an
+explicit final confirmation; success returns to the refreshed work queue, where
+the shipped order is no longer present.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse

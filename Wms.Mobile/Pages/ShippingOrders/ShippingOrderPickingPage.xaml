@@ -142,6 +142,55 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Button
+                x:Name="CompletePickingButton"
+                Clicked="OnCompletePickingClicked"
+                HeightRequest="60"
+                IsVisible="False"
+                Loaded="OnNonScanControlLoaded"
+                Text="Завершить отбор" />
+
+            <Border x:Name="CompletionPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="10">
+                    <Label FontAttributes="Bold" FontSize="22" Text="Итог отбора" />
+                    <Label x:Name="CompletionLinesLabel" FontSize="17" />
+                    <Label x:Name="CompletionQuantitiesLabel" FontAttributes="Bold" FontSize="17" />
+                    <Label x:Name="CompletionLocationLabel" FontSize="17" />
+                    <Label
+                        x:Name="CompletionWarningLabel"
+                        FontAttributes="Bold"
+                        FontSize="17"
+                        TextColor="DarkOrange" />
+                    <Button
+                        x:Name="ConfirmDeviationButton"
+                        Clicked="OnConfirmDeviationClicked"
+                        HeightRequest="54"
+                        Loaded="OnNonScanControlLoaded"
+                        Text="Подтвердить отклонения" />
+                    <Label
+                        x:Name="DeviationConfirmedLabel"
+                        FontAttributes="Bold"
+                        IsVisible="False"
+                        Text="Отклонения подтверждены."
+                        TextColor="Green" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button
+                            x:Name="ConfirmCompletionButton"
+                            Clicked="OnConfirmCompletionClicked"
+                            HeightRequest="58"
+                            Loaded="OnNonScanControlLoaded"
+                            Text="Подтвердить завершение" />
+                        <Button
+                            x:Name="CancelCompletionButton"
+                            Clicked="OnCancelCompletionClicked"
+                            Grid.Column="1"
+                            HeightRequest="58"
+                            Loaded="OnNonScanControlLoaded"
+                            Text="Вернуться к отбору" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
             <Label FontAttributes="Bold" FontSize="20" Text="Строки ордера" />
             <VerticalStackLayout
                 BindableLayout.ItemsSource="{Binding LineStates, Source={x:Reference Page}}"

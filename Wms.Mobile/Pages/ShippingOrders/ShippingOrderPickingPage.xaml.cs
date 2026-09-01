@@ -17,8 +17,10 @@ public partial class ShippingOrderPickingPage : ContentPage
     private Guid? _pendingStartRequestId;
     private Guid? _pendingDeleteRequestId;
     private Guid? _pendingDeleteMovementId;
+    private Guid? _pendingCompletionRequestId;
     private int? _accentedLineNumber;
     private Guid? _accentedMovementId;
+    private bool _deviationConfirmed;
     private int _searchVersion;
     private bool _isVisible;
     private bool _scannerSubscribed;
@@ -50,7 +52,11 @@ public partial class ShippingOrderPickingPage : ContentPage
         MobileShippingOrderStatus.Verified;
 
     private bool HasPendingCommand => _pendingStartRequestId is not null
-        || _pendingDeleteRequestId is not null;
+        || _pendingDeleteRequestId is not null
+        || _pendingCompletionRequestId is not null;
+
+    private bool HasPickingDeviation =>
+        Details.Order.Progress.FactQuantity != Details.Order.Progress.PlanQuantity;
 
     private bool CanStartMovement => IsEditable
         && !_busy
@@ -69,8 +75,10 @@ public partial class ShippingOrderPickingPage : ContentPage
         _pendingStartRequestId = null;
         _pendingDeleteRequestId = null;
         _pendingDeleteMovementId = null;
+        _pendingCompletionRequestId = null;
         _accentedLineNumber = null;
         _accentedMovementId = null;
+        _deviationConfirmed = false;
         ApplyDetails(details);
         SetMode(details.Order.Status == MobileShippingOrderStatus.Prepared
             ? PickingPageMode.Ready
@@ -517,6 +525,98 @@ public partial class ShippingOrderPickingPage : ContentPage
         }
     }
 
+    private void OnCompletePickingClicked(object? sender, EventArgs e)
+    {
+        if (_busy || !IsEditable || HasPendingCommand || _mode != PickingPageMode.Scanning)
+        {
+            return;
+        }
+
+        _deviationConfirmed = !HasPickingDeviation;
+        ErrorLabel.Text = string.Empty;
+        SetMode(PickingPageMode.Completion);
+    }
+
+    private void OnConfirmDeviationClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _mode != PickingPageMode.Completion || !HasPickingDeviation)
+        {
+            return;
+        }
+
+        _deviationConfirmed = true;
+        ErrorLabel.Text = string.Empty;
+        RefreshActionAvailability();
+    }
+
+    private async void OnCancelCompletionClicked(object? sender, EventArgs e)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        if (_pendingCompletionRequestId is not null)
+        {
+            ErrorLabel.Text = "Сначала повторите завершение отбора.";
+            return;
+        }
+
+        _deviationConfirmed = false;
+        ConfirmCompletionButton.Text = "Подтвердить завершение";
+        ErrorLabel.Text = string.Empty;
+        SetMode(PickingPageMode.Scanning);
+        await UpdateCameraAsync();
+    }
+
+    private async void OnConfirmCompletionClicked(object? sender, EventArgs e)
+    {
+        if (_busy
+            || _mode != PickingPageMode.Completion
+            || (HasPickingDeviation && !_deviationConfirmed)
+            || (HasPendingCommand && _pendingCompletionRequestId is null))
+        {
+            return;
+        }
+
+        _pendingCompletionRequestId ??= Guid.NewGuid();
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var response = await _apiClient.CompleteShippingOrderPickingAsync(
+                Details.Order.Id,
+                _pendingCompletionRequestId.Value);
+            _pendingCompletionRequestId = null;
+            ConfirmCompletionButton.Text = "Подтвердить завершение";
+            ApplyDetails(response.Details);
+
+            if (_isVisible)
+            {
+                var shippingPage = _services.GetRequiredService<ShippingOrderShippingPage>();
+                shippingPage.Show(response.Details);
+                await Navigation.PushAsync(shippingPage);
+                Navigation.RemovePage(this);
+            }
+        }
+        catch (MobileApiException exception)
+        {
+            _pendingCompletionRequestId = null;
+            ConfirmCompletionButton.Text = "Подтвердить завершение";
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ConfirmCompletionButton.Text = "Повторить завершение";
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите завершение отбора.";
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
     private void ApplyDetails(MobileShippingOrderDetailsResponse details)
     {
         _details = details;
@@ -535,8 +635,27 @@ public partial class ShippingOrderPickingPage : ContentPage
             + $"из {details.Order.Progress.PlanQuantity:g}";
         CommentLabel.Text = details.Order.Comment;
         CommentLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Order.Comment);
+        ApplyCompletionSummary(details);
         SynchronizeLines(details);
         RefreshActionAvailability();
+    }
+
+    private void ApplyCompletionSummary(MobileShippingOrderDetailsResponse details)
+    {
+        var progress = details.Order.Progress;
+        var deviation = progress.PlanQuantity - progress.FactQuantity;
+        CompletionLinesLabel.Text = $"Полностью: {progress.FullyPickedLineCount}; "
+            + $"частично: {progress.PartiallyPickedLineCount}; "
+            + $"нулевой факт: {progress.ZeroPickedLineCount}.";
+        CompletionQuantitiesLabel.Text = $"План: {progress.PlanQuantity:g}; "
+            + $"факт: {progress.FactQuantity:g}; отклонение: {deviation:g}.";
+        CompletionLocationLabel.Text = details.Order.ShippingLocation is null
+            ? "Позиция отгрузки не указана."
+            : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}.";
+        CompletionWarningLabel.Text = deviation == 0
+            ? "Отбор выполнен полностью."
+            : "Отбор выполнен не полностью. Неотобранное количество будет передано в 1С.";
+        CompletionWarningLabel.TextColor = deviation == 0 ? Colors.Green : Colors.DarkOrange;
     }
 
     private void SynchronizeLines(MobileShippingOrderDetailsResponse details)
@@ -581,6 +700,7 @@ public partial class ShippingOrderPickingPage : ContentPage
         LocationConfirmationPanel.IsVisible = mode == PickingPageMode.LocationConfirmation;
         LineCandidatesPanel.IsVisible = mode == PickingPageMode.CandidateSelection;
         LineSearchPanel.IsVisible = mode == PickingPageMode.Searching;
+        CompletionPanel.IsVisible = mode == PickingPageMode.Completion;
         (StepLabel.Text, InstructionLabel.Text) = mode switch
         {
             PickingPageMode.Ready => (
@@ -598,6 +718,9 @@ public partial class ShippingOrderPickingPage : ContentPage
             PickingPageMode.Searching => (
                 "Ручной выбор строки",
                 "Выберите строку с положительным остатком к отбору."),
+            PickingPageMode.Completion => (
+                "Завершение отбора",
+                "Проверьте итог и подтвердите завершение."),
             _ => (
                 "Отбор товара",
                 "Отсканируйте товар или выберите строку ниже.")
@@ -642,6 +765,14 @@ public partial class ShippingOrderPickingPage : ContentPage
             && Details.Lines.Any(x => x.RemainingQuantity > 0);
         LineSearchPrompt.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
         LineSearchPrompt.IsEnabled = CanStartMovement;
+        CompletePickingButton.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
+        CompletePickingButton.IsEnabled = !_busy && !HasPendingCommand;
+        ConfirmDeviationButton.IsVisible = HasPickingDeviation && !_deviationConfirmed;
+        ConfirmDeviationButton.IsEnabled = !_busy && _pendingCompletionRequestId is null;
+        DeviationConfirmedLabel.IsVisible = HasPickingDeviation && _deviationConfirmed;
+        ConfirmCompletionButton.IsEnabled = !_busy
+            && (!HasPickingDeviation || _deviationConfirmed);
+        CancelCompletionButton.IsEnabled = !_busy && _pendingCompletionRequestId is null;
         foreach (var line in LineStates)
         {
             line.SetActionAvailability(
@@ -689,6 +820,7 @@ public partial class ShippingOrderPickingPage : ContentPage
         LocationConfirmation,
         Scanning,
         CandidateSelection,
-        Searching
+        Searching,
+        Completion
     }
 }
