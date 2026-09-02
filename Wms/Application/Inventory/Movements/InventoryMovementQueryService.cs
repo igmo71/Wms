@@ -18,7 +18,9 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.SourceStorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.DestinationStorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
             .Where(x => x.PostedAtUtc != null);
 
@@ -174,9 +176,19 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
             "SourceStorageLocation" or "SourceStorageLocation.Name" => sortDescending
                 ? query.OrderByDescending(x => x.SourceStorageLocation!.Name)
                 : query.OrderBy(x => x.SourceStorageLocation!.Name),
+            "SourceStorageLocation.Code" => sortDescending
+                ? query.OrderByDescending(x => x.SourceStorageLocation!.Zone!.Code)
+                    .ThenByDescending(x => x.SourceStorageLocation!.Code)
+                : query.OrderBy(x => x.SourceStorageLocation!.Zone!.Code)
+                    .ThenBy(x => x.SourceStorageLocation!.Code),
             "DestinationStorageLocation" or "DestinationStorageLocation.Name" => sortDescending
                 ? query.OrderByDescending(x => x.DestinationStorageLocation!.Name)
                 : query.OrderBy(x => x.DestinationStorageLocation!.Name),
+            "DestinationStorageLocation.Code" => sortDescending
+                ? query.OrderByDescending(x => x.DestinationStorageLocation!.Zone!.Code)
+                    .ThenByDescending(x => x.DestinationStorageLocation!.Code)
+                : query.OrderBy(x => x.DestinationStorageLocation!.Zone!.Code)
+                    .ThenBy(x => x.DestinationStorageLocation!.Code),
             "StockKeepingUnit" or "StockKeepingUnit.Name" => sortDescending
                 ? query.OrderByDescending(x => x.StockKeepingUnit!.Name)
                 : query.OrderBy(x => x.StockKeepingUnit!.Name),

@@ -157,7 +157,7 @@ public partial class Picking
     }
 
     private static string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation) =>
-        $"{sourceLocation.StorageLocation.Name} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
+        $"{StorageLocationDisplay.Format(sourceLocation.StorageLocation)} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
 
     private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
 

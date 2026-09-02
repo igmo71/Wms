@@ -124,7 +124,7 @@
                         HeightRequest="60"
                         IsVisible="False"
                         Loaded="OnActionButtonLoaded"
-                        Text="Подтвердить" />
+                        Text="Переместить" />
                     <ActivityIndicator
                         x:Name="ProgressIndicator"
                         IsRunning="False"

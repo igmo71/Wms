@@ -27,7 +27,7 @@
                          SearchFunc="SearchWarehousesAsync" ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
                          Label="Склад" Clearable="true" Class="ml-4" />
         <MudAutocomplete T="StorageLocation" Value="_storageLocation" ValueChanged="OnStorageLocationChangedAsync"
-                         SearchFunc="SearchStorageLocationsAsync" ToStringFunc="storageLocation => storageLocation?.Name ?? string.Empty"
+                         SearchFunc="SearchStorageLocationsAsync" ToStringFunc="StorageLocationDisplay.Format"
                          Label="Ячейка хранения" Clearable="true" Class="ml-4" />
         <MudAutocomplete T="StockKeepingUnit" Value="_stockKeepingUnit" ValueChanged="OnStockKeepingUnitChangedAsync"
                          SearchFunc="SearchStockKeepingUnitsAsync" ToStringFunc="stockKeepingUnit => stockKeepingUnit?.Name ?? string.Empty"
@@ -40,8 +40,12 @@
     <Columns>
         <PropertyColumn Property="x => x.PostedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" Sortable="true" />
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
-        <PropertyColumn Property="x => x.SourceStorageLocation == null ? string.Empty : x.SourceStorageLocation.Name" Title="Из ячейки" Sortable="true" />
-        <PropertyColumn Property="x => x.DestinationStorageLocation == null ? string.Empty : x.DestinationStorageLocation.Name" Title="В ячейку" Sortable="true" />
+        <PropertyColumn Property="x => x.SourceStorageLocation == null ? string.Empty : x.SourceStorageLocation.Code" Title="Из ячейки" Sortable="true">
+            <CellTemplate>@StorageLocationDisplay.FormatOrDash(context.Item.SourceStorageLocation)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.DestinationStorageLocation == null ? string.Empty : x.DestinationStorageLocation.Code" Title="В ячейку" Sortable="true">
+            <CellTemplate>@StorageLocationDisplay.FormatOrDash(context.Item.DestinationStorageLocation)</CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
         <PropertyColumn Property="x => x.Quantity" Title="Количество" Sortable="true" />
         <TemplateColumn Title="Вес" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightKg)</CellTemplate></TemplateColumn>

@@ -46,11 +46,6 @@
                 FontSize="18"
                 HorizontalOptions="Center" />
 
-            <Label
-                FontAttributes="Bold"
-                FontSize="20"
-                Text="Выберите действие" />
-
             <Button
                 Clicked="OnInventoryTransferClicked"
                 FontSize="18"

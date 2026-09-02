@@ -25,7 +25,7 @@ else
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_transfer.Warehouse?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Тележка</MudText><MudText>@(_transfer.TransitStorageLocation?.Name ?? "—")</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Тележка</MudText><MudText>@StorageLocationDisplay.FormatOrDash(_transfer.TransitStorageLocation)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_transfer.Status.GetChipColor()">@_transfer.Status.GetDisplayName()</MudChip></MudItem>
                 <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.caption">Вес размещённого</MudText><MudText>@WeightDisplay.FormatTotal(KnownPlacedWeightKg, IsPlacedWeightComplete)</MudText></MudItem>
             </MudGrid>
@@ -44,8 +44,8 @@ else
                 <RowTemplate>
                     <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
                     <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
-                    <MudTd DataLabel="Из ячейки">@context.SourceStorageLocation?.Name</MudTd>
-                    <MudTd DataLabel="В ячейку">@context.DestinationStorageLocation?.Name</MudTd>
+                    <MudTd DataLabel="Из ячейки">@StorageLocationDisplay.FormatOrDash(context.SourceStorageLocation)</MudTd>
+                    <MudTd DataLabel="В ячейку">@StorageLocationDisplay.FormatOrDash(context.DestinationStorageLocation)</MudTd>
                     <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
                     <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>

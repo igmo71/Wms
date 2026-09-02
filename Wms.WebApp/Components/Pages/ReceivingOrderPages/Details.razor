@@ -121,7 +121,7 @@ else
                                          Value="_receivingLocation"
                                          ValueChanged="OnReceivingLocationChanged"
                                          SearchFunc="SearchReceivingLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty"
+                                         ToStringFunc="StorageLocationDisplay.Format"
                                          Disabled="@(_receivingZone is null)"
                                          Variant="Variant.Text"
                                          Dense="true"
@@ -130,7 +130,7 @@ else
                     }
                     else
                     {
-                        <MudText>@(_receivingLocation?.Name ?? "—")</MudText>
+                        <MudText>@StorageLocationDisplay.FormatOrDash(_receivingLocation)</MudText>
                     }
                 </MudItem>
                 <MudItem xs="12" md="6">

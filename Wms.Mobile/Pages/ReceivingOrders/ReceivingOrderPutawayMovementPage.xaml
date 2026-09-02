@@ -82,7 +82,7 @@
                                 Clicked="OnConfirmMovementClicked"
                                 HeightRequest="54"
                                 Loaded="OnNonScanControlLoaded"
-                                Text="Подтвердить" />
+                                Text="Разместить" />
                             <Button
                                 x:Name="BackToQuantityButton"
                                 Clicked="OnBackToQuantityClicked"

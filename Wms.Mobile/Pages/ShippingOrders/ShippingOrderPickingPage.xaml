@@ -35,14 +35,6 @@
                         HeightRequest="58"
                         Loaded="OnNonScanControlLoaded"
                         Text="Начать отбор" />
-                    <Button
-                        x:Name="NewMovementButton"
-                        Clicked="OnNewMovementClicked"
-                        HeightRequest="58"
-                        IsVisible="False"
-                        Loaded="OnNonScanControlLoaded"
-                        Text="Новое движение отбора" />
-
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
 
                     <VerticalStackLayout x:Name="LocationConfirmationPanel" IsVisible="False" Spacing="10">
@@ -53,7 +45,7 @@
                                 Clicked="OnConfirmLocationClicked"
                                 HeightRequest="54"
                                 Loaded="OnNonScanControlLoaded"
-                                Text="Подтвердить" />
+                                Text="Начать" />
                             <Button
                                 x:Name="CancelLocationButton"
                                 Clicked="OnCancelLocationClicked"
@@ -108,7 +100,7 @@
                                 FontSize="18"
                                 Placeholder="Наименование, код или штрихкод"
                                 TextChanged="OnLineSearchTextChanged" />
-                            <Label Grid.Column="1" FontSize="16" Text="Отмена" VerticalTextAlignment="Center">
+                            <Label Grid.Column="1" FontSize="22" SemanticProperties.Description="Закрыть поиск" Text="✕" VerticalTextAlignment="Center">
                                 <Label.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnCancelLineSearchTapped" />
                                 </Label.GestureRecognizers>
@@ -166,7 +158,7 @@
                         Clicked="OnConfirmDeviationClicked"
                         HeightRequest="54"
                         Loaded="OnNonScanControlLoaded"
-                        Text="Подтвердить отклонения" />
+                        Text="Принять отклонения" />
                     <Label
                         x:Name="DeviationConfirmedLabel"
                         FontAttributes="Bold"
@@ -179,14 +171,14 @@
                             Clicked="OnConfirmCompletionClicked"
                             HeightRequest="58"
                             Loaded="OnNonScanControlLoaded"
-                            Text="Подтвердить завершение" />
+                            Text="Завершить" />
                         <Button
                             x:Name="CancelCompletionButton"
                             Clicked="OnCancelCompletionClicked"
                             Grid.Column="1"
                             HeightRequest="58"
                             Loaded="OnNonScanControlLoaded"
-                            Text="Вернуться к отбору" />
+                            Text="Назад" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>

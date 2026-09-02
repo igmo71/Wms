@@ -121,11 +121,8 @@ public partial class Putaway
         return await PutawayQueryService.SearchDestinationsAsync(_order.WarehouseId, searchText, ct);
     }
 
-    private static string FormatDestination(StorageLocation? location) => location is null
-        ? string.Empty
-        : location.Zone is null
-            ? location.Name ?? string.Empty
-            : $"{location.Zone.Name} / {location.Name}";
+    private static string FormatDestination(StorageLocation? location) =>
+        StorageLocationDisplay.Format(location);
 
     private async Task SaveMovementAsync()
     {

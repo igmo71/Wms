@@ -99,9 +99,8 @@ public partial class Index
         return result.Items;
     }
 
-    private static string GetLocationText(StorageLocation? location) => location is null
-        ? string.Empty
-        : $"{location.Zone?.Code}-{location.Code} · {location.Name}";
+    private static string GetLocationText(StorageLocation? location) =>
+        StorageLocationDisplay.Format(location);
 
     private async Task CreateAsync()
     {

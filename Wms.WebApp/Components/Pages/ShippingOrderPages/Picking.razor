@@ -78,8 +78,7 @@ else
             </MudGrid>
             <MudDivider Class="my-1" />
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона отгрузки</MudText><MudText>@_order.ShippingLocation?.Zone?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место отгрузки</MudText><MudText>@_order.ShippingLocation?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Позиция отгрузки</MudText><MudText>@StorageLocationDisplay.FormatOrDash(_order.ShippingLocation)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>
                 <MudItem xs="12" sm="6" md="4">
                     <MudTooltip Text="@(_order.Comment ?? "—")">
@@ -134,7 +133,9 @@ else
                         <MudPaper Class="pa-3 ma-2" Elevation="0" Outlined="true">
                             <MudDataGrid T="InventoryMovement" Items="_movements" Hover="true" Striped="true" Dense="true">
                                 <Columns>
-                                    <PropertyColumn Property="x => x.SourceStorageLocation == null ? string.Empty : x.SourceStorageLocation.Name" Title="Ячейка-источник" />
+                                    <TemplateColumn Title="Ячейка-источник">
+                                        <CellTemplate Context="sourceContext">@StorageLocationDisplay.FormatOrDash(sourceContext.Item.SourceStorageLocation)</CellTemplate>
+                                    </TemplateColumn>
                                     <PropertyColumn Property="x => x.Quantity" Title="Количество" />
                                     <TemplateColumn Title="Вес"><CellTemplate Context="weightContext">@WeightDisplay.Format(weightContext.Item.WeightKg)</CellTemplate></TemplateColumn>
                                     <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" />
@@ -153,7 +154,7 @@ else
                                     <MudSelect T="StorageLocation"
                                                Label="Ячейка-источник"
                                                @bind-Value="_selectedSourceLocation"
-                                               ToStringFunc="location => location?.Name ?? string.Empty"
+                                               ToStringFunc="StorageLocationDisplay.Format"
                                                Clearable="true">
                                         @foreach (var sourceLocation in _availableSourceLocations)
                                         {

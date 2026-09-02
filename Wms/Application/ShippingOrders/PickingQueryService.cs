@@ -17,6 +17,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
         return await dbContext.InventoryMovements
             .AsNoTracking()
             .Include(x => x.SourceStorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
             .Where(x => x.PostedAtUtc == null
                 && x.RecorderType == RecorderType.ShippingOrder

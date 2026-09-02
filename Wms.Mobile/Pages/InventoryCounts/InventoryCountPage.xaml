@@ -21,7 +21,7 @@
                         x:Name="StepLabel"
                         FontAttributes="Bold"
                         FontSize="22"
-                        Text="1. Выберите склад" />
+                        Text="Выберите склад" />
                     <Label
                         x:Name="InstructionLabel"
                         FontSize="18"

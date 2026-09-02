@@ -46,7 +46,7 @@
                                 FontSize="18"
                                 Placeholder="Наименование, код или штрихкод"
                                 TextChanged="OnSkuSearchTextChanged" />
-                            <Label Grid.Column="1" FontSize="16" Text="Отмена" VerticalTextAlignment="Center">
+                            <Label Grid.Column="1" FontSize="22" SemanticProperties.Description="Закрыть поиск" Text="✕" VerticalTextAlignment="Center">
                                 <Label.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnCancelSkuSearchTapped" />
                                 </Label.GestureRecognizers>

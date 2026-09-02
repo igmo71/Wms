@@ -93,7 +93,7 @@ public partial class InventoryCountPage : ContentPage
 
         ErrorLabel.Text = string.Empty;
         _pendingBarcode = null;
-        StepLabel.Text = SelectedWarehouse is null ? "1. Выберите склад" : "2. Ячейка";
+        StepLabel.Text = SelectedWarehouse is null ? "Выберите склад" : "Ячейка";
         InstructionLabel.Text = SelectedWarehouse is null
             ? "После выбора склада отсканируйте QR ячейки хранения."
             : "Отсканируйте QR ячейки. Свободная ячейка будет заблокирована для пересчёта.";

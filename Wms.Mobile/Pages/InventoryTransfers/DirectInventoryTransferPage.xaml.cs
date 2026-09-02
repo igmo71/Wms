@@ -126,7 +126,7 @@ public partial class DirectInventoryTransferPage : ContentPage
                 SourceLocationLabel.Text =
                     $"{_sourceLocation.Address} · {_sourceLocation.Name}";
                 SourceCard.IsVisible = true;
-                StepLabel.Text = "2. Товар";
+                StepLabel.Text = "Товар";
                 InstructionLabel.Text = "Отсканируйте штрихкод товара.";
                 SkuSearchPrompt.IsVisible = true;
             }
@@ -345,7 +345,7 @@ public partial class DirectInventoryTransferPage : ContentPage
             $"Доступно: {sku.AvailableQuantity:0.###}{unit}";
         SkuCard.IsVisible = true;
         QuantityPanel.IsVisible = true;
-        StepLabel.Text = "3. Количество";
+        StepLabel.Text = "Количество";
         InstructionLabel.Text = "Введите количество перемещения.";
         if (focusQuantity)
         {
@@ -422,7 +422,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         QuantityPanel.IsVisible = false;
         SelectedQuantityLabel.Text = $"Количество: {quantity:0.###}";
         SelectedQuantityLabel.IsVisible = true;
-        StepLabel.Text = "4. Ячейка назначения";
+        StepLabel.Text = "Ячейка назначения";
         InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
         await UpdateCameraAsync();
     }

@@ -387,6 +387,11 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             "TransitStorageLocation" or "TransitStorageLocation.Name" => listQuery.SortDescending
                 ? query.OrderByDescending(x => x.TransitStorageLocation!.Name)
                 : query.OrderBy(x => x.TransitStorageLocation!.Name),
+            "TransitStorageLocation.Code" => listQuery.SortDescending
+                ? query.OrderByDescending(x => x.TransitStorageLocation!.Zone!.Code)
+                    .ThenByDescending(x => x.TransitStorageLocation!.Code)
+                : query.OrderBy(x => x.TransitStorageLocation!.Zone!.Code)
+                    .ThenBy(x => x.TransitStorageLocation!.Code),
             "Status" => listQuery.SortDescending
                 ? query.OrderByDescending(x => x.Status)
                 : query.OrderBy(x => x.Status),

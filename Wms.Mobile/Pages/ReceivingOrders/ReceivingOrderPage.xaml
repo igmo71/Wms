@@ -26,7 +26,7 @@
                             x:Name="ScanStepLabel"
                             FontAttributes="Bold"
                             FontSize="22"
-                            Text="1. Выберите склад" />
+                            Text="Выберите склад" />
                         <Label
                             x:Name="ScanInstructionLabel"
                             FontSize="18"

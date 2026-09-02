@@ -159,7 +159,7 @@ public partial class ShippingOrderShippingPage : ContentPage
 
         _scannedLocation = null;
         _scannedLocationBarcode = null;
-        ConfirmShippingButton.Text = "Подтвердить отгрузку";
+        ConfirmShippingButton.Text = "Отгрузить";
         ErrorLabel.Text = string.Empty;
         SetMode(ShippingPageMode.LocationScanning);
         await UpdateCameraAsync();
@@ -182,7 +182,7 @@ public partial class ShippingOrderShippingPage : ContentPage
                 _scannedLocationBarcode,
                 _pendingShippingRequestId.Value);
             _pendingShippingRequestId = null;
-            ConfirmShippingButton.Text = "Подтвердить отгрузку";
+            ConfirmShippingButton.Text = "Отгрузить";
             ApplyDetails(response.Details);
             if (_isVisible)
             {
@@ -196,7 +196,7 @@ public partial class ShippingOrderShippingPage : ContentPage
         catch (MobileApiException exception)
         {
             _pendingShippingRequestId = null;
-            ConfirmShippingButton.Text = "Подтвердить отгрузку";
+            ConfirmShippingButton.Text = "Отгрузить";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)

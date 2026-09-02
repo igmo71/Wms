@@ -19,7 +19,7 @@
 
                 <Border Padding="16">
                     <VerticalStackLayout Spacing="12">
-                        <Label x:Name="ScanStepLabel" FontAttributes="Bold" FontSize="22" Text="1. Выберите склад" />
+                        <Label x:Name="ScanStepLabel" FontAttributes="Bold" FontSize="22" Text="Выберите склад" />
                         <Label
                             x:Name="ScanInstructionLabel"
                             FontSize="18"

@@ -53,7 +53,11 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         _source = null;
         _sourceAvailability = null;
         _sourceBarcode = null;
+        _quantity = 0;
         _pendingRequestId = null;
+        ConfirmMovementButton.Text = "Отобрать";
+        QuantityEntry.Text = string.Empty;
+        ErrorLabel.Text = string.Empty;
         NumberLabel.Text = $"Ордер {details.Order.Number}";
         ApplySelectedLine();
         SetMode(selectedLine is null
@@ -296,18 +300,14 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
             return;
         }
 
-        if (!TryReadQuantity(out _quantity))
+        if (_pendingRequestId is null && !TryReadQuantity(out _quantity))
         {
             return;
         }
 
         QuantityEntry.Unfocus();
         await QuantityEntry.HideSoftInputAsync(CancellationToken.None);
-        ConfirmationLabel.Text = $"{_selectedLine.SkuName}\n"
-            + $"Строка: {_selectedLine.LineNumber}\n"
-            + $"Источник: {_source.Address}\n"
-            + $"Количество: {_quantity:0.###} {_selectedLine.UnitOfMeasure}";
-        SetMode(MovementPageMode.Confirmation);
+        await SubmitMovementAsync();
     }
 
     private bool TryReadQuantity(out double quantity)
@@ -343,18 +343,7 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         await UpdateCameraAsync();
     }
 
-    private void OnBackToQuantityClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _pendingRequestId is not null)
-        {
-            return;
-        }
-
-        SetMode(MovementPageMode.Quantity);
-        Dispatcher.Dispatch(() => QuantityEntry.Focus());
-    }
-
-    private async void OnConfirmMovementClicked(object? sender, EventArgs e)
+    private async Task SubmitMovementAsync()
     {
         if (_busy
             || _selectedLine is null
@@ -385,7 +374,7 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         catch (MobileApiException exception)
         {
             _pendingRequestId = null;
-            ConfirmMovementButton.Text = "Подтвердить";
+            ConfirmMovementButton.Text = "Отобрать";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -431,24 +420,20 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         CandidatePanel.IsVisible = mode == MovementPageMode.CandidateSelection;
         SourceHintsPanel.IsVisible = mode == MovementPageMode.SourceScanning;
         QuantityPanel.IsVisible = mode == MovementPageMode.Quantity;
-        ConfirmationPanel.IsVisible = mode == MovementPageMode.Confirmation;
         (StepLabel.Text, InstructionLabel.Text) = mode switch
         {
             MovementPageMode.SkuScanning => (
-                "1. Товар",
+                "Товар",
                 "Отсканируйте товар с остатком к отбору."),
             MovementPageMode.CandidateSelection => (
-                "1. Строка",
+                "Строка",
                 "Товар найден в нескольких строках. Выберите нужную."),
             MovementPageMode.SourceScanning => (
-                "2. Источник",
+                "Источник",
                 "Отсканируйте позицию-источник в зоне хранения."),
-            MovementPageMode.Quantity => (
-                "3. Количество",
-                "Указан безопасный максимум. Уменьшите его при необходимости."),
             _ => (
-                "4. Подтверждение",
-                "Проверьте товар, источник и количество.")
+                "Количество",
+                "Проверьте количество и нажмите «Отобрать».")
         };
         RefreshActionAvailability();
     }
@@ -477,7 +462,8 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
     private void RefreshActionAvailability()
     {
         ConfirmMovementButton.IsEnabled = !_busy;
-        BackToQuantityButton.IsEnabled = !_busy && _pendingRequestId is null;
+        QuantityEntry.IsEnabled = !_busy && _pendingRequestId is null;
+        RescanSourceButton.IsEnabled = !_busy && _pendingRequestId is null;
         CancelFlowButton.IsEnabled = !_busy && _pendingRequestId is null;
     }
 
@@ -505,7 +491,6 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         SkuScanning,
         CandidateSelection,
         SourceScanning,
-        Quantity,
-        Confirmation
+        Quantity
     }
 }

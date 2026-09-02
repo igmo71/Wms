@@ -70,7 +70,7 @@
                     <MudAutocomplete T="StorageLocation"
                                      @bind-Value="_transitStorageLocation"
                                      SearchFunc="SearchTransitStorageLocationsAsync"
-                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                     ToStringFunc="StorageLocationDisplay.Format"
                                      Label="Тележка"
                                      Clearable="true"
                                      Margin="Margin.Dense"
@@ -125,7 +125,7 @@
                                                      Value="_pickSource"
                                                      ValueChanged="SetPickSourceAsync"
                                                      SearchFunc="SearchStorageLocationsAsync"
-                                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                                   ToStringFunc="StorageLocationDisplay.Format"
                                                      Label="Из ячейки"
                                                      Clearable="true"
                                                      Margin="Margin.Dense"
@@ -168,7 +168,7 @@
                                     <MudAutocomplete T="StorageLocation"
                                                      @bind-Value="_putDestination"
                                                      SearchFunc="SearchStorageLocationsAsync"
-                                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                                   ToStringFunc="StorageLocationDisplay.Format"
                                                      Label="В ячейку"
                                                      Clearable="true"
                                                      Margin="Margin.Dense"
@@ -211,11 +211,11 @@
                                 <MudText Typo="Typo.h6">Прямое перемещение</MudText>
                                 <MudStack Spacing="2" Class="mt-3">
                                     <MudAutocomplete T="StorageLocation" Value="_directSource" ValueChanged="SetDirectSourceAsync" SearchFunc="SearchStorageLocationsAsync"
-                                                     ToStringFunc="location => location?.Name ?? string.Empty" Label="Из ячейки"
+                                                   ToStringFunc="StorageLocationDisplay.Format" Label="Из ячейки"
                                                      Clearable="true" Margin="Margin.Dense"
                                                      Disabled="@(!CanEdit || _isSaving)" />
                                     <MudAutocomplete T="StorageLocation" @bind-Value="_directDestination" SearchFunc="SearchStorageLocationsAsync"
-                                                     ToStringFunc="location => location?.Name ?? string.Empty" Label="В ячейку"
+                                                   ToStringFunc="StorageLocationDisplay.Format" Label="В ячейку"
                                                      Clearable="true" Margin="Margin.Dense"
                                                      Disabled="@(!CanEdit || _isSaving)" />
                                     <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
@@ -250,11 +250,11 @@
                         <MudText Typo="Typo.h6">Прямое перемещение</MudText>
                         <MudStack Spacing="2" Class="mt-3">
                             <MudAutocomplete T="StorageLocation" Value="_directSource" ValueChanged="SetDirectSourceAsync" SearchFunc="SearchStorageLocationsAsync"
-                                             ToStringFunc="location => location?.Name ?? string.Empty" Label="Из ячейки"
+                                             ToStringFunc="StorageLocationDisplay.Format" Label="Из ячейки"
                                              Clearable="true" Margin="Margin.Dense"
                                              Disabled="@(!CanEdit || _isSaving)" />
                             <MudAutocomplete T="StorageLocation" @bind-Value="_directDestination" SearchFunc="SearchStorageLocationsAsync"
-                                             ToStringFunc="location => location?.Name ?? string.Empty" Label="В ячейку"
+                                             ToStringFunc="StorageLocationDisplay.Format" Label="В ячейку"
                                              Clearable="true" Margin="Margin.Dense"
                                              Disabled="@(!CanEdit || _isSaving)" />
                             <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
@@ -295,8 +295,8 @@
                 <RowTemplate>
                     <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
                     <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
-                    <MudTd DataLabel="Из ячейки">@context.SourceStorageLocation?.Name</MudTd>
-                    <MudTd DataLabel="В ячейку">@context.DestinationStorageLocation?.Name</MudTd>
+                    <MudTd DataLabel="Из ячейки">@StorageLocationDisplay.FormatOrDash(context.SourceStorageLocation)</MudTd>
+                    <MudTd DataLabel="В ячейку">@StorageLocationDisplay.FormatOrDash(context.DestinationStorageLocation)</MudTd>
                     <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
                     <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>

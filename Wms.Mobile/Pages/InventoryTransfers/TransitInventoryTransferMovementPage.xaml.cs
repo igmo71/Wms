@@ -51,7 +51,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         if (mode == TransitInventoryTransferMovementMode.Pick)
         {
             Title = "В транзит";
-            StepLabel.Text = "1. Исходная ячейка";
+            StepLabel.Text = "Исходная ячейка";
             InstructionLabel.Text = "Отсканируйте QR исходной ячейки.";
         }
         else
@@ -202,9 +202,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
 
     private void ShowSkuStep()
     {
-        StepLabel.Text = _mode == TransitInventoryTransferMovementMode.Pick
-            ? "2. Товар"
-            : "1. Товар";
+        StepLabel.Text = "Товар";
         InstructionLabel.Text = _mode == TransitInventoryTransferMovementMode.Put
             ? "Отсканируйте товар или выберите его из содержимого."
             : "Отсканируйте штрихкод товара.";
@@ -273,9 +271,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         AvailableQuantityLabel.Text = $"Доступно: {sku.AvailableQuantity:0.###}{unit}";
         SkuCard.IsVisible = true;
         QuantityPanel.IsVisible = true;
-        StepLabel.Text = _mode == TransitInventoryTransferMovementMode.Pick
-            ? "3. Количество"
-            : "2. Количество";
+        StepLabel.Text = "Количество";
         InstructionLabel.Text = "Введите количество перемещения.";
         if (focusQuantity)
         {
@@ -318,7 +314,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         }
         else
         {
-            StepLabel.Text = "3. Ячейка назначения";
+            StepLabel.Text = "Ячейка назначения";
             InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
             await UpdateCameraAsync();
         }
@@ -329,8 +325,8 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         StepLabel.Text = "Проверьте перемещение";
         InstructionLabel.Text = "До подтверждения складские остатки не изменены.";
         ConfirmButton.Text = _mode == TransitInventoryTransferMovementMode.Pick
-            ? "Подтвердить в транзит"
-            : "Подтвердить из транзита";
+            ? "В транзит"
+            : "Из транзита";
         ConfirmButton.IsVisible = true;
         ConfirmButton.IsEnabled = !_busy;
         ConfirmButton.Unfocus();

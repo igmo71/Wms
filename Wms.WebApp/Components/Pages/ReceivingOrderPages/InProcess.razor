@@ -84,7 +84,7 @@ else
                                      Value="_receivingLocation"
                                      ValueChanged="OnReceivingLocationChanged"
                                      SearchFunc="SearchReceivingLocationsAsync"
-                                     ToStringFunc="location => location?.Name ?? string.Empty"
+                                     ToStringFunc="StorageLocationDisplay.Format"
                                      Disabled="@(_order.Status != ReceivingOrderStatus.InReceiving || _receivingZone is null)"
                                      Variant="Variant.Text"
                                      Dense="true"

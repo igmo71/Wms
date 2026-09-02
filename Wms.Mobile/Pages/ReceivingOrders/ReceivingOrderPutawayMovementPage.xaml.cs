@@ -327,7 +327,7 @@ public partial class ReceivingOrderPutawayMovementPage : ContentPage
         catch (MobileApiException exception)
         {
             _pendingRequestId = null;
-            ConfirmMovementButton.Text = "Подтвердить";
+            ConfirmMovementButton.Text = "Разместить";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -367,19 +367,19 @@ public partial class ReceivingOrderPutawayMovementPage : ContentPage
         (StepLabel.Text, InstructionLabel.Text) = mode switch
         {
             MovementPageMode.SkuScanning => (
-                "1. Товар",
+                "Товар",
                 "Отсканируйте товар с остатком к размещению."),
             MovementPageMode.CandidateSelection => (
-                "1. Строка",
+                "Строка",
                 "Товар найден в нескольких строках. Выберите нужную."),
             MovementPageMode.DestinationScanning => (
-                "2. Позиция хранения",
+                "Позиция хранения",
                 "Отсканируйте позицию назначения в зоне хранения."),
             MovementPageMode.Quantity => (
-                "3. Количество",
+                "Количество",
                 "Указан весь остаток строки. Уменьшите его для разделения партии."),
             _ => (
-                "4. Подтверждение",
+                "Подтверждение",
                 "Проверьте товар, адрес и количество.")
         };
         RefreshActionAvailability();

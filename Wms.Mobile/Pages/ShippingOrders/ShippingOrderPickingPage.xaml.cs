@@ -209,14 +209,14 @@ public partial class ShippingOrderPickingPage : ContentPage
             _pendingStartRequestId = null;
             _scannedLocation = null;
             _scannedLocationBarcode = null;
-            ConfirmLocationButton.Text = "Подтвердить";
+            ConfirmLocationButton.Text = "Начать";
             ApplyDetails(response.Details);
             SetMode(PickingPageMode.Scanning);
         }
         catch (MobileApiException exception)
         {
             _pendingStartRequestId = null;
-            ConfirmLocationButton.Text = "Подтвердить";
+            ConfirmLocationButton.Text = "Начать";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -246,7 +246,7 @@ public partial class ShippingOrderPickingPage : ContentPage
 
         _scannedLocation = null;
         _scannedLocationBarcode = null;
-        ConfirmLocationButton.Text = "Подтвердить";
+        ConfirmLocationButton.Text = "Начать";
         SetMode(PickingPageMode.LocationScanning);
         await UpdateCameraAsync();
     }
@@ -309,14 +309,6 @@ public partial class ShippingOrderPickingPage : ContentPage
         OnPropertyChanged(nameof(ScanCandidates));
         SetMode(PickingPageMode.Scanning);
         await UpdateCameraAsync();
-    }
-
-    private async void OnNewMovementClicked(object? sender, EventArgs e)
-    {
-        if (CanStartMovement)
-        {
-            await OpenMovementPageAsync(null);
-        }
     }
 
     private async void OnAddLineMovementTapped(object? sender, TappedEventArgs e)
@@ -563,7 +555,7 @@ public partial class ShippingOrderPickingPage : ContentPage
         }
 
         _deviationConfirmed = false;
-        ConfirmCompletionButton.Text = "Подтвердить завершение";
+        ConfirmCompletionButton.Text = "Завершить";
         ErrorLabel.Text = string.Empty;
         SetMode(PickingPageMode.Scanning);
         await UpdateCameraAsync();
@@ -588,7 +580,7 @@ public partial class ShippingOrderPickingPage : ContentPage
                 Details.Order.Id,
                 _pendingCompletionRequestId.Value);
             _pendingCompletionRequestId = null;
-            ConfirmCompletionButton.Text = "Подтвердить завершение";
+            ConfirmCompletionButton.Text = "Завершить";
             ApplyDetails(response.Details);
 
             if (_isVisible)
@@ -602,7 +594,7 @@ public partial class ShippingOrderPickingPage : ContentPage
         catch (MobileApiException exception)
         {
             _pendingCompletionRequestId = null;
-            ConfirmCompletionButton.Text = "Подтвердить завершение";
+            ConfirmCompletionButton.Text = "Завершить";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -760,9 +752,6 @@ public partial class ShippingOrderPickingPage : ContentPage
         StartPickingButton.IsEnabled = !_busy && !HasPendingCommand;
         ConfirmLocationButton.IsEnabled = !_busy && _scannedLocationBarcode is not null;
         CancelLocationButton.IsEnabled = !_busy && _pendingStartRequestId is null;
-        NewMovementButton.IsVisible = IsEditable;
-        NewMovementButton.IsEnabled = CanStartMovement
-            && Details.Lines.Any(x => x.RemainingQuantity > 0);
         LineSearchPrompt.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
         LineSearchPrompt.IsEnabled = CanStartMovement;
         CompletePickingButton.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;

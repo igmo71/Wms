@@ -186,7 +186,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         catch (MobileApiException exception)
         {
             _pendingStartRequestId = null;
-            ConfirmLocationButton.Text = "Подтвердить";
+            ConfirmLocationButton.Text = "Начать";
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -216,7 +216,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
 
         _scannedLocation = null;
         _scannedLocationBarcode = null;
-        ConfirmLocationButton.Text = "Подтвердить";
+        ConfirmLocationButton.Text = "Начать";
         SetMode(ReceivingPageMode.LocationScanning);
         await UpdateCameraAsync();
     }

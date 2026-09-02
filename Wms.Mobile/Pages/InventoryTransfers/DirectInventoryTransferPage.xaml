@@ -21,7 +21,7 @@
                         x:Name="StepLabel"
                         FontAttributes="Bold"
                         FontSize="22"
-                        Text="1. Исходная ячейка" />
+                        Text="Исходная ячейка" />
                     <Label
                         x:Name="InstructionLabel"
                         FontSize="18"
@@ -110,7 +110,7 @@
                         HeightRequest="60"
                         IsVisible="False"
                         Loaded="OnConfirmButtonLoaded"
-                        Text="Подтвердить перемещение" />
+                        Text="Переместить" />
 
                     <ActivityIndicator
                         x:Name="ProgressIndicator"

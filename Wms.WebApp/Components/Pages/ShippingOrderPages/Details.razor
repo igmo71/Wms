@@ -120,12 +120,12 @@ else
                     @if (_order.Status == ShippingOrderStatus.Prepared)
                     {
                         <MudAutocomplete T="StorageLocation" Value="_shippingLocation" ValueChanged="OnShippingLocationChanged" SearchFunc="SearchShippingLocationsAsync"
-                                         ToStringFunc="location => location?.Name ?? string.Empty" Disabled="@(_shippingZone is null)"
+                                         ToStringFunc="StorageLocationDisplay.Format" Disabled="@(_shippingZone is null)"
                                          Variant="Variant.Text" Dense="true" Clearable="true" Margin="Margin.Dense" />
                     }
                     else
                     {
-                        <MudText>@(_shippingLocation?.Name ?? "—")</MudText>
+                        <MudText>@StorageLocationDisplay.FormatOrDash(_shippingLocation)</MudText>
                     }
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Планируемая дата отгрузки</MudText><MudText>@FormatDateTime(_order.PlannedShippingDate)</MudText></MudItem>

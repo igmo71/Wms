@@ -30,7 +30,7 @@
                          Value="_storageLocation"
                          ValueChanged="OnStorageLocationChangedAsync"
                          SearchFunc="SearchStorageLocationsAsync"
-                         ToStringFunc="storageLocation => storageLocation?.Name ?? string.Empty"
+                         ToStringFunc="StorageLocationDisplay.Format"
                          Label="Ячейка хранения"
                          Clearable="true"
                          Class="ml-4" />
@@ -56,7 +56,9 @@
              RowsPerPage="25">
     <Columns>
         <PropertyColumn Property="x => x.Warehouse!.Name" Title="Склад" Sortable="true" />
-        <PropertyColumn Property="x => x.StorageLocation!.Name" Title="Ячейка хранения" Sortable="true" />
+        <PropertyColumn Property="x => x.StorageLocation!.Code" Title="Ячейка хранения" Sortable="true">
+            <CellTemplate>@StorageLocationDisplay.Format(context.Item.StorageLocation)</CellTemplate>
+        </PropertyColumn>
         <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
         <PropertyColumn Property="x => x.StockKeepingUnit!.Code" Title="Код" Sortable="false" />
         <PropertyColumn Property="x => x.Quantity" Title="Количество" Sortable="true" />

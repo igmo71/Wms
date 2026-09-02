@@ -18,6 +18,7 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.StorageLocation)
+                .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
             .Include(x => x.InventoryMovement);
 
@@ -156,6 +157,11 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
             "StorageLocation" or "StorageLocation.Name" => sortDescending
                 ? query.OrderByDescending(x => x.StorageLocation!.Name)
                 : query.OrderBy(x => x.StorageLocation!.Name),
+            "StorageLocation.Code" => sortDescending
+                ? query.OrderByDescending(x => x.StorageLocation!.Zone!.Code)
+                    .ThenByDescending(x => x.StorageLocation!.Code)
+                : query.OrderBy(x => x.StorageLocation!.Zone!.Code)
+                    .ThenBy(x => x.StorageLocation!.Code),
             "StockKeepingUnit" or "StockKeepingUnit.Name" => sortDescending
                 ? query.OrderByDescending(x => x.StockKeepingUnit!.Name)
                 : query.OrderBy(x => x.StockKeepingUnit!.Name),

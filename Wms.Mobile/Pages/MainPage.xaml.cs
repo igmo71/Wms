@@ -130,7 +130,7 @@ public partial class MainPage : ContentPage
     private void ShowLoggedIn(MobileCurrentUserResponse user)
     {
         _currentUserLoaded = true;
-        CurrentUserLabel.Text = $"{user.DisplayName}\n{user.Email}";
+        CurrentUserLabel.Text = user.DisplayName;
         LoginPanel.IsVisible = false;
         SessionPanel.IsVisible = true;
     }

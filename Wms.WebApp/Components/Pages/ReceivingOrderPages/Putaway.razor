@@ -74,8 +74,7 @@ else
             </MudGrid>
             <MudDivider Class="my-1" />
             <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона приёмки</MudText><MudText>@_order.ReceivingLocation?.Zone?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место приёмки</MudText><MudText>@_order.ReceivingLocation?.Name</MudText></MudItem>
+                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Позиция приёмки</MudText><MudText>@StorageLocationDisplay.FormatOrDash(_order.ReceivingLocation)</MudText></MudItem>
                 <MudItem xs="12" md="6">
                     <MudTooltip Text="@(_order.Comment ?? "—")">
                         <MudText Typo="Typo.caption">Комментарий</MudText>

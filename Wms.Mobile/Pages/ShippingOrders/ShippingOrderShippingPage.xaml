@@ -48,7 +48,7 @@
                                 Clicked="OnConfirmShippingClicked"
                                 HeightRequest="58"
                                 Loaded="OnNonScanControlLoaded"
-                                Text="Подтвердить отгрузку" />
+                                Text="Отгрузить" />
                             <Button
                                 x:Name="CancelShippingButton"
                                 Clicked="OnCancelShippingClicked"

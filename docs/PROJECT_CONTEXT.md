@@ -437,6 +437,20 @@ draft movements from scanned ordinary storage locations, and explicitly accepts
 a full, partial, or zero result. Final shipment requires rescanning the saved
 shipping location and removes the shipped order from the mobile work queues.
 
+Operational WebApp screens identify a storage location by the full address
+`{Zone.Code}-{StorageLocation.Code}`, not by its potentially repeated display
+name. This applies to warehouse-operation filters, selectors, cards, and
+tables; topology maintenance may continue to show the descriptive name.
+
+Mobile operator step headings are semantic and are not numbered. Changing
+actions use short explicit verbs; an icon without text is reserved for a safe
+local action such as closing a search field. The picking screen starts a draft
+movement directly from SKU scanning, manual line search, or a line action. Its
+quantity button creates the still-deletable draft movement, so there is no
+separate generic new-movement button or repeated review step. Completion keeps
+its own confirmation because it ends the editable picking stage and may accept
+an incomplete result.
+
 The accepted foundation and first-vertical scope are retained under
 [`specs/mobile-wms/`](../specs/mobile-wms/) as a frozen reference. Each
 subsequent mobile warehouse process is specified separately.

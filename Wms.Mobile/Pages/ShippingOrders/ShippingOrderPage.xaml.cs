@@ -102,8 +102,8 @@ public partial class ShippingOrderPage : ContentPage
     {
         ErrorLabel.Text = string.Empty;
         ScanStepLabel.Text = SelectedWarehouse is null
-            ? "1. Выберите склад"
-            : "2. Расходный ордер";
+            ? "Выберите склад"
+            : "Расходный ордер";
         ScanInstructionLabel.Text = SelectedWarehouse is null
             ? "После выбора склада отсканируйте штрихкод расходного ордера."
             : "Отсканируйте штрихкод расходного ордера или выберите его в очереди ниже.";

@@ -31,9 +31,8 @@ public partial class Details
     private bool IsDraft => _inventoryCount?.Status == InventoryCountStatus.Draft;
     private int CountedItems => _inventoryCount?.Items.Count(x => x.IsCounted) ?? 0;
     private int UncountedItems => _inventoryCount?.Items.Count(x => !x.IsCounted) ?? 0;
-    private string LocationText => _inventoryCount?.StorageLocation is null
-        ? "—"
-        : $"{_inventoryCount.StorageLocation.Zone?.Code}-{_inventoryCount.StorageLocation.Code} · {_inventoryCount.StorageLocation.Name}";
+    private string LocationText =>
+        StorageLocationDisplay.FormatOrDash(_inventoryCount?.StorageLocation);
 
     protected override Task OnParametersSetAsync() => ReloadAsync();
 
