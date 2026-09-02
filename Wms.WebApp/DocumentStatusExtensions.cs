@@ -5,6 +5,30 @@ namespace Wms.WebApp;
 
 internal static class DocumentStatusExtensions
 {
+    public static string GetDisplayText(this OrderSynchronizationLevel level) => level switch
+    {
+        OrderSynchronizationLevel.Synchronized => "Синхронизирован",
+        OrderSynchronizationLevel.RequiresOperatorDecision => "Требует решения оператора",
+        OrderSynchronizationLevel.Blocking => "Работа заблокирована",
+        _ => "Неизвестно"
+    };
+
+    public static string GetIcon(this OrderSynchronizationLevel level) => level switch
+    {
+        OrderSynchronizationLevel.Synchronized => Icons.Material.Filled.CheckCircle,
+        OrderSynchronizationLevel.RequiresOperatorDecision => Icons.Material.Filled.Warning,
+        OrderSynchronizationLevel.Blocking => Icons.Material.Filled.Error,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    public static Color GetColor(this OrderSynchronizationLevel level) => level switch
+    {
+        OrderSynchronizationLevel.Synchronized => Color.Success,
+        OrderSynchronizationLevel.RequiresOperatorDecision => Color.Warning,
+        OrderSynchronizationLevel.Blocking => Color.Error,
+        _ => Color.Default
+    };
+
     public static string GetIcon(this ReceivingOrderQueue queue) => queue switch
     {
         ReceivingOrderQueue.ForClient => Icons.Material.Filled.Person,

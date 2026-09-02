@@ -85,6 +85,48 @@ public class ReceivingOrderCommandService(
         return assessment;
     }
 
+    internal async Task<OperationResult> AcknowledgeSynchronizationAsync(
+        ReceivingOrderImportSnapshot snapshot,
+        string expectedFingerprint,
+        string userId,
+        CancellationToken ct = default)
+    {
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        ReceivingOrder? order = await dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == snapshot.Id, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Приходный ордер '{snapshot.Id}' не найден в WMS.");
+        }
+
+        OrderSynchronizationAssessment assessment =
+            ReceivingOrderSynchronizationComparer.Compare(order, snapshot);
+        if (!string.Equals(assessment.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
+        {
+            OperationResult<ReceivingOrderReconciliation> reconciliationResult =
+                order.Reconcile(snapshot, DateTimeOffset.UtcNow);
+            if (!reconciliationResult.IsSuccess)
+                return reconciliationResult.Error!;
+
+            OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+            if (!saveResult.IsSuccess)
+                return saveResult;
+
+            return OperationError.Conflict(
+                "Приходный ордер в 1С изменился. Просмотрите новые расхождения.");
+        }
+
+        OperationResult acknowledgeResult = order.AcknowledgeSynchronization(
+            snapshot,
+            assessment,
+            DateTimeOffset.UtcNow,
+            userId);
+        return acknowledgeResult.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : acknowledgeResult;
+    }
+
     public async Task<OperationResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

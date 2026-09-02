@@ -85,6 +85,12 @@ else
             <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
         }
 
+        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
+                                   IsAcknowledging="_isAcknowledgingSynchronization"
+                                   OnAcknowledge="AcknowledgeSynchronizationAsync"
+                                   AcknowledgedBy="@GetUserName(_order.ExternalSynchronizationAcknowledgedBy)"
+                                   AcknowledgedAtUtc="_order.ExternalSynchronizationAcknowledgedAtUtc" />
+
         @if (_isRollingBack)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />

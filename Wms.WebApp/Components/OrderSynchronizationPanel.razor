@@ -1,0 +1,74 @@
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+@if (Assessment is { Level: not OrderSynchronizationLevel.Synchronized } assessment)
+{
+    <MudAlert Severity="@(assessment.Level == OrderSynchronizationLevel.Blocking ? Severity.Error : Severity.Warning)"
+              Variant="Variant.Outlined">
+        <MudStack Spacing="1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@assessment.Level.GetIcon()" Color="@assessment.Level.GetColor()" />
+                <MudText Typo="Typo.subtitle1"><b>@assessment.Level.GetDisplayText()</b></MudText>
+            </MudStack>
+            <MudText Typo="Typo.body2">
+                @(assessment.Level == OrderSynchronizationLevel.Blocking
+                    ? "Расхождения затрагивают складские данные. Продолжение операции недопустимо до исправления источника."
+                    : "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.")
+            </MudText>
+
+            <MudTable T="OrderSynchronizationDifference"
+                      Items="assessment.Differences"
+                      Dense="true"
+                      Hover="true"
+                      Elevation="0">
+                <HeaderContent>
+                    <MudTh>Поле</MudTh>
+                    <MudTh>WMS</MudTh>
+                    <MudTh>1С</MudTh>
+                    <MudTh>Уровень</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Поле">@context.FieldName</MudTd>
+                    <MudTd DataLabel="WMS">@(context.WmsValue ?? "—")</MudTd>
+                    <MudTd DataLabel="1С">@(context.OneCValue ?? "—")</MudTd>
+                    <MudTd DataLabel="Уровень">@context.Level.GetDisplayText()</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            @if (assessment.Level == OrderSynchronizationLevel.RequiresOperatorDecision)
+            {
+                <MudButton Color="Color.Warning"
+                           Variant="Variant.Filled"
+                           Disabled="IsAcknowledging"
+                           StartIcon="@Icons.Material.Filled.DoneAll"
+                           OnClick="OnAcknowledge">
+                    Принять изменения из 1С
+                </MudButton>
+            }
+        </MudStack>
+    </MudAlert>
+}
+
+@if (AcknowledgedAtUtc is DateTimeOffset acknowledgedAtUtc)
+{
+    <MudText Typo="Typo.caption">
+        Последнее подтверждение: @AcknowledgedBy, @acknowledgedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+    </MudText>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public OrderSynchronizationAssessment? Assessment { get; set; }
+
+    [Parameter]
+    public bool IsAcknowledging { get; set; }
+
+    [Parameter]
+    public EventCallback OnAcknowledge { get; set; }
+
+    [Parameter]
+    public string AcknowledgedBy { get; set; } = "—";
+
+    [Parameter]
+    public DateTimeOffset? AcknowledgedAtUtc { get; set; }
+}

@@ -19,7 +19,7 @@ else
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Расходный ордер №@_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isCompleting || !IsPickingEditable)" StartIcon="@Icons.Material.Filled.Check" OnClick="SetReadyForShipmentAsync">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isCompleting || !CanCompletePicking)" StartIcon="@Icons.Material.Filled.Check" OnClick="SetReadyForShipmentAsync">
                 Готов к отгрузке
             </MudButton>
             @if (CanRollback)
@@ -49,6 +49,17 @@ else
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
+
+        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
+        }
+
+        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
+                                   IsAcknowledging="_isAcknowledgingSynchronization"
+                                   OnAcknowledge="AcknowledgeSynchronizationAsync"
+                                   AcknowledgedBy="@GetUserName(_order.ExternalSynchronizationAcknowledgedBy)"
+                                   AcknowledgedAtUtc="_order.ExternalSynchronizationAcknowledgedAtUtc" />
 
         @if (_isRollingBack)
         {

@@ -8,6 +8,7 @@ using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -25,6 +26,8 @@ public partial class InProcess
     [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject]
+    private ReceivingOrderSynchronizationService SynchronizationService { get; set; } = null!;
+    [Inject]
     private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject]
     private ZoneQueryService ZoneQueryService { get; set; } = null!;
@@ -39,13 +42,23 @@ public partial class InProcess
     private StorageLocation? _receivingLocation;
     private bool _isLoading = true;
     private bool _isCompleting;
+    private bool _isAcknowledgingSynchronization;
     private bool _completeFailed;
     private string? _errorMessage;
+    private string? _synchronizationErrorMessage;
+    private OrderSynchronizationAssessment? _synchronizationAssessment;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
+        OperationResult<OrderSynchronizationAssessment> synchronizationResult =
+            await SynchronizationService.CheckAsync(Id);
+        _synchronizationAssessment = synchronizationResult.Value;
+        _synchronizationErrorMessage = synchronizationResult.IsSuccess
+            ? null
+            : synchronizationResult.Error?.Message
+                ?? "Не удалось сверить приходный ордер с 1С.";
         _order = await OrderQueryService.GetOrderAsync(Id);
         _userNames = _order is null
             ? new Dictionary<string, string>()
@@ -53,10 +66,39 @@ public partial class InProcess
                 _order.StartedBy,
                 _order.CompletedBy,
                 _order.PutawayStartedBy,
-                _order.PutawayCompletedBy]);
+                _order.PutawayCompletedBy,
+                _order.ExternalSynchronizationAcknowledgedBy]);
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;
         _isLoading = false;
+    }
+
+    private async Task AcknowledgeSynchronizationAsync()
+    {
+        if (_synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
+            return;
+
+        string? userId = await GetCurrentUserIdAsync();
+        if (userId is null)
+        {
+            _synchronizationErrorMessage = "Не удалось определить текущего пользователя.";
+            return;
+        }
+
+        _isAcknowledgingSynchronization = true;
+        OperationResult result = await SynchronizationService.AcknowledgeAsync(
+            Id, assessment.Fingerprint, userId);
+        _isAcknowledgingSynchronization = false;
+        if (!result.IsSuccess)
+        {
+            _synchronizationErrorMessage = result.Error?.Message
+                ?? "Не удалось подтвердить расхождения.";
+            return;
+        }
+
+        _synchronizationErrorMessage = null;
+        _synchronizationAssessment = new OrderSynchronizationAssessment(assessment.Fingerprint, []);
+        _order = await OrderQueryService.GetOrderAsync(Id);
     }
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)

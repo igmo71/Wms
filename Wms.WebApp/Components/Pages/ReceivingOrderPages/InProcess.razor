@@ -21,7 +21,7 @@ else
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="@(_isCompleting || _receivingLocation is null || _order.UnconfirmedItemCount > 0)"
+                       Disabled="@(_isCompleting || _receivingLocation is null || _order.UnconfirmedItemCount > 0 || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="SetReceivedAsync">
                 Завершить
@@ -41,6 +41,17 @@ else
         {
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
+
+        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
+        }
+
+        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
+                                   IsAcknowledging="_isAcknowledgingSynchronization"
+                                   OnAcknowledge="AcknowledgeSynchronizationAsync"
+                                   AcknowledgedBy="@GetUserName(_order.ExternalSynchronizationAcknowledgedBy)"
+                                   AcknowledgedAtUtc="_order.ExternalSynchronizationAcknowledgedAtUtc" />
 
         @if (_order.UnconfirmedItemCount > 0)
         {

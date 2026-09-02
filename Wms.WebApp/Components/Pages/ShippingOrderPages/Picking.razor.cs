@@ -7,6 +7,7 @@ using Wms.Application.Users;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.ShippingOrderPages;
 
@@ -17,6 +18,7 @@ public partial class Picking
     [Inject] private ShippingOrderQueryService OrderQueryService { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
+    [Inject] private ShippingOrderSynchronizationService SynchronizationService { get; set; } = null!;
     [Inject] private PickingQueryService PickingQueryService { get; set; } = null!;
     [Inject] private PickingCommandService PickingCommandService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
@@ -35,8 +37,11 @@ public partial class Picking
     private bool _isLoading = true;
     private bool _isCompleting;
     private bool _isRollingBack;
+    private bool _isAcknowledgingSynchronization;
     private bool _operationFailed;
     private string? _errorMessage;
+    private string? _synchronizationErrorMessage;
+    private OrderSynchronizationAssessment? _synchronizationAssessment;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool IsPickingEditable => _order?.Status is ShippingOrderStatus.ReadyForPicking
@@ -49,6 +54,10 @@ public partial class Picking
         or ShippingOrderStatus.InVerification
         or ShippingOrderStatus.Verified
         or ShippingOrderStatus.ReadyForShipment;
+
+    private bool CanCompletePicking => IsPickingEditable
+        && _synchronizationAssessment?.Level == OrderSynchronizationLevel.Synchronized
+        && string.IsNullOrWhiteSpace(_synchronizationErrorMessage);
 
     private PickingSourceLocationAvailability? SelectedSourceLocationAvailability => _selectedSourceLocation is null
         ? null
@@ -73,6 +82,13 @@ public partial class Picking
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
+        OperationResult<OrderSynchronizationAssessment> synchronizationResult =
+            await SynchronizationService.CheckAsync(Id);
+        _synchronizationAssessment = synchronizationResult.Value;
+        _synchronizationErrorMessage = synchronizationResult.IsSuccess
+            ? null
+            : synchronizationResult.Error?.Message
+                ?? "Не удалось сверить расходный ордер с 1С.";
         _order = await OrderQueryService.GetOrderAsync(Id);
         _userNames = _order is null
             ? new Dictionary<string, string>()
@@ -80,13 +96,49 @@ public partial class Picking
                 _order.PickingStartedBy,
                 _order.ReadyForShipmentBy,
                 _order.ShippedBy,
-                _order.RolledBackBy]);
+                _order.RolledBackBy,
+                _order.ExternalSynchronizationAcknowledgedBy]);
         _selectedLine = null;
         _expandedLineNumber = null;
         _movements = [];
         _availableSourceLocations = [];
         CancelEditing();
         _isLoading = false;
+    }
+
+    private async Task AcknowledgeSynchronizationAsync()
+    {
+        if (_synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
+            return;
+
+        string? userId = await GetCurrentUserIdAsync();
+        if (userId is null)
+        {
+            _synchronizationErrorMessage = "Не удалось определить текущего пользователя.";
+            return;
+        }
+
+        _isAcknowledgingSynchronization = true;
+        OperationResult result = await SynchronizationService.AcknowledgeAsync(
+            Id, assessment.Fingerprint, userId);
+        _isAcknowledgingSynchronization = false;
+        if (!result.IsSuccess)
+        {
+            _synchronizationErrorMessage = result.Error?.Message
+                ?? "Не удалось подтвердить расхождения.";
+            if (result.Error?.Type == OperationErrorType.Conflict)
+            {
+                OperationResult<OrderSynchronizationAssessment> latest =
+                    await SynchronizationService.CheckAsync(Id);
+                if (latest.IsSuccess)
+                    _synchronizationAssessment = latest.Value;
+            }
+            return;
+        }
+
+        _synchronizationErrorMessage = null;
+        _synchronizationAssessment = new OrderSynchronizationAssessment(assessment.Fingerprint, []);
+        _order = await OrderQueryService.GetOrderAsync(Id);
     }
 
     private static string FormatDateTime(DateTime? value) =>

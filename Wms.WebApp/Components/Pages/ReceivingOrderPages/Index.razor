@@ -134,9 +134,9 @@
         </PropertyColumn>
         <TemplateColumn Title="1C" Sortable="false">
             <CellTemplate>
-                <MudTooltip Text="@(context.Item.ExternalChangeDetected ? "Ордер 1С изменен" : "Синхронизирован с 1С")">
-                    <MudIcon Icon="@(context.Item.ExternalChangeDetected ? Icons.Material.Filled.Warning : Icons.Material.Filled.CheckCircle)"
-                             Color="@(context.Item.ExternalChangeDetected ? Color.Warning : Color.Success)" />
+                <MudTooltip Text="@context.Item.ExternalSynchronizationLevel.GetDisplayText()">
+                    <MudIcon Icon="@context.Item.ExternalSynchronizationLevel.GetIcon()"
+                             Color="@context.Item.ExternalSynchronizationLevel.GetColor()" />
                 </MudTooltip>
             </CellTemplate>
         </TemplateColumn>

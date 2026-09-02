@@ -34,9 +34,11 @@ public partial class Details
     private bool _isStarting;
     private bool _isShipping;
     private bool _isRollingBack;
+    private bool _isAcknowledgingSynchronization;
     private bool _startOrderFailed;
     private string? _errorMessage;
     private string? _synchronizationErrorMessage;
+    private OrderSynchronizationAssessment? _synchronizationAssessment;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool CanRollback => _order?.Status is ShippingOrderStatus.ReadyForPicking
@@ -57,6 +59,7 @@ public partial class Details
         {
             OperationResult<OrderSynchronizationAssessment> synchronizationResult =
                 await SynchronizationService.CheckAsync(Id);
+            _synchronizationAssessment = synchronizationResult.Value;
             _synchronizationErrorMessage = synchronizationResult.IsSuccess
                 ? null
                 : synchronizationResult.Error?.Message
@@ -72,8 +75,47 @@ public partial class Details
                 _order.PickingStartedBy,
                 _order.ReadyForShipmentBy,
                 _order.ShippedBy,
-                _order.RolledBackBy]);
+                _order.RolledBackBy,
+                _order.ExternalSynchronizationAcknowledgedBy]);
         _isLoading = false;
+    }
+
+    private async Task AcknowledgeSynchronizationAsync()
+    {
+        if (_synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
+            return;
+
+        string? userId = await GetCurrentUserIdAsync();
+        if (userId is null)
+        {
+            _synchronizationErrorMessage = "Не удалось определить текущего пользователя.";
+            return;
+        }
+
+        _isAcknowledgingSynchronization = true;
+        OperationResult result = await SynchronizationService.AcknowledgeAsync(
+            Id,
+            assessment.Fingerprint,
+            userId);
+        _isAcknowledgingSynchronization = false;
+        if (!result.IsSuccess)
+        {
+            _synchronizationErrorMessage = result.Error?.Message
+                ?? "Не удалось подтвердить расхождения.";
+            if (result.Error?.Type == OperationErrorType.Conflict)
+            {
+                OperationResult<OrderSynchronizationAssessment> latestAssessment =
+                    await SynchronizationService.CheckAsync(Id);
+                if (latestAssessment.IsSuccess)
+                    _synchronizationAssessment = latestAssessment.Value;
+                await ReloadAsync();
+            }
+            return;
+        }
+
+        _synchronizationErrorMessage = null;
+        _synchronizationAssessment = new OrderSynchronizationAssessment(assessment.Fingerprint, []);
+        await ReloadAsync();
     }
 
     private static string FormatDateTime(DateTime? value) =>

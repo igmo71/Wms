@@ -261,6 +261,14 @@ only transport, malformed-response, missing-local-order, and persistence
 failures are returned as operation errors. Notifications may create a new
 source order, while an explicit check requires the order to exist in WMS.
 
+Web order lists distinguish synchronized, operator-decision, and blocking
+states. Details show each changed field with WMS and 1C values. Only an
+operator-decision assessment can be acknowledged. Acknowledgement performs a
+fresh fingerprint check, applies only source-owned metadata from 1C to WMS,
+and records the user and time. A changed fingerprint or blocking assessment
+cannot be acknowledged; quantity, identity, composition, and warehouse facts
+are never overwritten by this action.
+
 ## Mobile platform rules
 
 The client is Android-only and online-only and communicates through

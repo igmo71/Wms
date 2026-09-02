@@ -87,6 +87,49 @@ public class ShippingOrderCommandService(
         return assessment;
     }
 
+    internal async Task<OperationResult> AcknowledgeSynchronizationAsync(
+        ShippingOrderImportSnapshot snapshot,
+        string expectedFingerprint,
+        string userId,
+        CancellationToken ct = default)
+    {
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        ShippingOrder? order = await dbContext.ShippingOrders
+            .Include(x => x.Items)
+            .Include(x => x.BaseItems)
+            .FirstOrDefaultAsync(x => x.Id == snapshot.Id, ct);
+        if (order is null)
+        {
+            return OperationError.NotFound($"Расходный ордер '{snapshot.Id}' не найден в WMS.");
+        }
+
+        OrderSynchronizationAssessment assessment =
+            ShippingOrderSynchronizationComparer.Compare(order, snapshot);
+        if (!string.Equals(assessment.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
+        {
+            OperationResult<ShippingOrderReconciliation> reconciliationResult =
+                order.Reconcile(snapshot, DateTimeOffset.UtcNow);
+            if (!reconciliationResult.IsSuccess)
+                return reconciliationResult.Error!;
+
+            OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+            if (!saveResult.IsSuccess)
+                return saveResult;
+
+            return OperationError.Conflict(
+                "Расходный ордер в 1С изменился. Просмотрите новые расхождения.");
+        }
+
+        OperationResult acknowledgeResult = order.AcknowledgeSynchronization(
+            snapshot,
+            assessment,
+            DateTimeOffset.UtcNow,
+            userId);
+        return acknowledgeResult.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : acknowledgeResult;
+    }
+
     public async Task<OperationResult> StartPickingAsync(
         Guid orderId,
         Guid shippingLocationId,

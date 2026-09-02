@@ -186,6 +186,48 @@ public class ShippingOrder
         return changed;
     }
 
+    internal OperationResult AcknowledgeSynchronization(
+        ShippingOrderImportSnapshot snapshot,
+        OrderSynchronizationAssessment assessment,
+        DateTimeOffset acknowledgedAtUtc,
+        string userId)
+    {
+        OperationResult auditResult = ValidateAudit(
+            acknowledgedAtUtc,
+            userId,
+            "Пользователь, подтверждающий расхождения, обязателен.");
+        if (!auditResult.IsSuccess)
+        {
+            return auditResult;
+        }
+
+        if (assessment.Level != OrderSynchronizationLevel.RequiresOperatorDecision)
+        {
+            return OperationError.Conflict(
+                "Подтвердить можно только расхождения, требующие решения оператора.");
+        }
+
+        Number = snapshot.Number;
+        Date = snapshot.Date;
+        Comment = snapshot.Comment;
+        Status = snapshot.Status;
+        Queue = snapshot.Queue;
+        PlannedShippingDate = snapshot.PlannedShippingDate;
+        DeliveryDirectionId = snapshot.DeliveryDirectionId;
+        ReceiverId = snapshot.ReceiverId;
+        ReceiverType = snapshot.ReceiverType;
+        ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
+        ExternalSynchronizationCheckedAtUtc = acknowledgedAtUtc;
+        ExternalSynchronizationDetectedAtUtc = null;
+        ExternalSynchronizationFingerprint = assessment.Fingerprint;
+        ExternalSynchronizationAcknowledgedFingerprint = assessment.Fingerprint;
+        ExternalSynchronizationAcknowledgedAtUtc = acknowledgedAtUtc;
+        ExternalSynchronizationAcknowledgedBy = userId;
+        UpdatedAtUtc = acknowledgedAtUtc;
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
+
     public OperationResult SetShippingLocation(Guid shippingLocationId)
     {
         if (shippingLocationId == Guid.Empty)
