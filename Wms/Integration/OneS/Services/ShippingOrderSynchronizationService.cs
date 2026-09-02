@@ -3,13 +3,11 @@ using Microsoft.Extensions.Options;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
-using Wms.Integration.OneS.Models;
-using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
 
 public sealed class ShippingOrderSynchronizationService(
-    OneCClient oneCClient,
+    IShippingOrderSource orderSource,
     ShippingOrderCommandService shippingOrderCommandService,
     IOptions<WmsSettings> options,
     ILogger<ShippingOrderSynchronizationService> logger)
@@ -69,20 +67,8 @@ public sealed class ShippingOrderSynchronizationService(
         if (applyNotificationDelay)
             await Task.Delay(TimeSpan.FromSeconds(_wmsSettings.ImportDelay), ct);
 
-        OperationResult<RootObject<Document>?> fetchResult = await oneCClient
-            .GetValueAsync<RootObject<Document>>(Document.GetUri(refKey), ct);
-        if (!fetchResult.IsSuccess)
-            return fetchResult.Error!;
-
-        IReadOnlyList<Document>? documents = fetchResult.Value?.Value;
-        if (documents is null || documents.Count != 1)
-        {
-            return OperationError.Failure(
-                "1С вернула некорректный ответ: ожидался один расходный ордер.");
-        }
-
-        Document document = documents[0];
-        logger.LogDebug("Получен документ {@Document}", document);
-        return Document.MapToImportSnapshot(document);
+        return Guid.TryParse(refKey, out Guid orderId)
+            ? await orderSource.GetSnapshotAsync(orderId, ct)
+            : OperationError.Invalid("Некорректный идентификатор расходного ордера 1С.");
     }
 }

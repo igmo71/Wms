@@ -14,6 +14,7 @@ namespace Wms.Application.ReceivingOrders;
 public class ReceivingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     InventoryPostingService inventoryPostingService,
+    IReceivingOrderSource orderSource,
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderCommandService> logger)
 {
@@ -158,6 +159,10 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
+        OperationResult synchronizationResult = EnsureSynchronizationAllowsWork(order);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
+
         var locationResult = await StageSetReceivingLocationAsync(
             dbContext,
             order,
@@ -188,6 +193,10 @@ public class ReceivingOrderCommandService(
             logger.LogError("Приходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
+
+        OperationResult synchronizationResult = EnsureSynchronizationAllowsWork(order);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
 
         return await StageSetInReceivingAsync(order, userId, ct);
     }
@@ -242,6 +251,14 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
+        OperationResult synchronizationResult = await VerifyFreshSynchronizationAsync(
+            dbContext,
+            order,
+            expectReceivedTarget: true,
+            ct);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
+
         var now = DateTimeOffset.UtcNow;
         var transitionResult = order.SetReceived(now, userId);
         if (!transitionResult.IsSuccess)
@@ -289,6 +306,46 @@ public class ReceivingOrderCommandService(
 
         return OperationResult.Success();
     }
+
+    private async Task<OperationResult> VerifyFreshSynchronizationAsync(
+        ApplicationDbContext dbContext,
+        ReceivingOrder order,
+        bool expectReceivedTarget,
+        CancellationToken ct)
+    {
+        OperationResult<ReceivingOrderImportSnapshot> snapshotResult =
+            await orderSource.GetSnapshotAsync(order.Id, ct);
+        if (!snapshotResult.IsSuccess)
+            return snapshotResult.Error!;
+
+        ReceivingOrderImportSnapshot snapshot = snapshotResult.Value!;
+        OrderSynchronizationAssessment sourceAssessment =
+            ReceivingOrderSynchronizationComparer.Compare(order, snapshot);
+        OrderSynchronizationAssessment targetAssessment = expectReceivedTarget
+            ? ReceivingOrderSynchronizationComparer.CompareReceivedTarget(order, snapshot)
+            : sourceAssessment;
+        OrderSynchronizationAssessment assessment = sourceAssessment.Level == OrderSynchronizationLevel.Synchronized
+            ? sourceAssessment
+            : targetAssessment.Level == OrderSynchronizationLevel.Synchronized
+                ? targetAssessment
+                : sourceAssessment;
+
+        order.ApplySynchronizationAssessment(assessment, DateTimeOffset.UtcNow);
+        OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess
+            ? EnsureSynchronizationAllowsWork(order)
+            : saveResult;
+    }
+
+    private static OperationResult EnsureSynchronizationAllowsWork(ReceivingOrder order) =>
+        order.ExternalSynchronizationLevel switch
+        {
+            OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
+            OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(
+                "Приходный ордер требует решения оператора по изменениям 1С."),
+            _ => OperationError.Conflict(
+                "Работа с приходным ордером заблокирована из-за расхождений с 1С.")
+        };
 
     public async Task<OperationResult> UpdateOrderItemFactQuantityAsync(
         Guid receivingOrderId,

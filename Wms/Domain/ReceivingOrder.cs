@@ -146,7 +146,7 @@ public class ReceivingOrder
             : ReceivingOrderReconciliation.Unchanged;
     }
 
-    private bool ApplySynchronizationAssessment(
+    internal bool ApplySynchronizationAssessment(
         OrderSynchronizationAssessment assessment,
         DateTimeOffset checkedAtUtc)
     {

@@ -15,6 +15,7 @@ namespace Wms.Application.ShippingOrders;
 public class ShippingOrderCommandService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     InventoryPostingService inventoryPostingService,
+    IShippingOrderSource orderSource,
     Document_РасходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ShippingOrderCommandService> logger)
 {
@@ -168,6 +169,10 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
+        OperationResult synchronizationResult = EnsureSynchronizationAllowsWork(order);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
+
         OperationResult locationResult = await StageSetShippingLocationAsync(
             dbContext,
             order,
@@ -237,6 +242,14 @@ public class ShippingOrderCommandService(
             logger.LogError("Расходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
+
+        OperationResult synchronizationResult = await VerifyFreshSynchronizationAsync(
+            dbContext,
+            existingOrder,
+            ShippingSynchronizationTarget.ReadyForShipment,
+            ct);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
 
         List<InventoryMovement> draftPickingMovements = await dbContext.InventoryMovements
             .Where(x => x.PostedAtUtc == null
@@ -309,6 +322,7 @@ public class ShippingOrderCommandService(
 
         ShippingOrder? existingOrder = await dbContext.ShippingOrders
             .Include(x => x.Items)
+            .Include(x => x.BaseItems)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (existingOrder is null)
@@ -316,6 +330,14 @@ public class ShippingOrderCommandService(
             logger.LogError("Расходный ордер {OrderId} не найден", orderId);
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
+
+        OperationResult synchronizationResult = await VerifyFreshSynchronizationAsync(
+            dbContext,
+            existingOrder,
+            ShippingSynchronizationTarget.Shipped,
+            ct);
+        if (!synchronizationResult.IsSuccess)
+            return synchronizationResult;
 
         OperationResult locationResult = await ValidateShippingLocationAsync(
             dbContext,
@@ -364,6 +386,55 @@ public class ShippingOrderCommandService(
         // so the same command can recover after external success and local save failure.
         return OperationResult.Success();
     }
+
+    private enum ShippingSynchronizationTarget
+    {
+        ReadyForShipment,
+        Shipped
+    }
+
+    private async Task<OperationResult> VerifyFreshSynchronizationAsync(
+        ApplicationDbContext dbContext,
+        ShippingOrder order,
+        ShippingSynchronizationTarget target,
+        CancellationToken ct)
+    {
+        OperationResult<ShippingOrderImportSnapshot> snapshotResult =
+            await orderSource.GetSnapshotAsync(order.Id, ct);
+        if (!snapshotResult.IsSuccess)
+            return snapshotResult.Error!;
+
+        ShippingOrderImportSnapshot snapshot = snapshotResult.Value!;
+        OrderSynchronizationAssessment sourceAssessment =
+            ShippingOrderSynchronizationComparer.Compare(order, snapshot);
+        OrderSynchronizationAssessment targetAssessment = target switch
+        {
+            ShippingSynchronizationTarget.ReadyForShipment =>
+                ShippingOrderSynchronizationComparer.CompareReadyForShipmentTarget(order, snapshot),
+            _ => ShippingOrderSynchronizationComparer.CompareShippedTarget(order, snapshot)
+        };
+        OrderSynchronizationAssessment assessment = sourceAssessment.Level == OrderSynchronizationLevel.Synchronized
+            ? sourceAssessment
+            : targetAssessment.Level == OrderSynchronizationLevel.Synchronized
+                ? targetAssessment
+                : sourceAssessment;
+
+        order.ApplySynchronizationAssessment(assessment, DateTimeOffset.UtcNow);
+        OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess
+            ? EnsureSynchronizationAllowsWork(order)
+            : saveResult;
+    }
+
+    private static OperationResult EnsureSynchronizationAllowsWork(ShippingOrder order) =>
+        order.ExternalSynchronizationLevel switch
+        {
+            OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
+            OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(
+                "Расходный ордер требует решения оператора по изменениям 1С."),
+            _ => OperationError.Conflict(
+                "Работа с расходным ордером заблокирована из-за расхождений с 1С.")
+        };
 
     private static async Task<OperationResult> ValidateShippingLocationAsync(
         ApplicationDbContext dbContext,

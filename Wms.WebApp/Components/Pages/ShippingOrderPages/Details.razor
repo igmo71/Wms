@@ -23,7 +23,7 @@ else
             {
                 <MudTooltip Text="Чтобы взять ордер в отбор, выберите зону и место отгрузки.">
                     <span>
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isStarting || _shippingLocation is null)"
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_isStarting || _shippingLocation is null || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))"
                                    StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="SetReadyForPickingAsync">
                             Взять в отбор
                         </MudButton>
@@ -46,7 +46,7 @@ else
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="_isShipping"
+                           Disabled="@(_isShipping || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))"
                            StartIcon="@Icons.Material.Filled.LocalShipping"
                            OnClick="SetShippedAsync">
                     Отгрузить

@@ -157,7 +157,7 @@ public class ShippingOrder
             : ShippingOrderReconciliation.Unchanged;
     }
 
-    private bool ApplySynchronizationAssessment(
+    internal bool ApplySynchronizationAssessment(
         OrderSynchronizationAssessment assessment,
         DateTimeOffset checkedAtUtc)
     {

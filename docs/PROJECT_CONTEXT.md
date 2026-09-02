@@ -269,6 +269,14 @@ and records the user and time. A changed fingerprint or blocking assessment
 cannot be acknowledged; quantity, identity, composition, and warehouse facts
 are never overwritten by this action.
 
+Starting receiving or picking uses the synchronization result obtained when
+the order was opened and refuses a known unresolved state. Completing
+receiving, completing picking, and final shipping each fetch a fresh 1C
+snapshot before local transitions, inventory posting, or outbound mutation.
+An exact source state or the exact repeat-safe target of the requested command
+may continue; technical verification failure, an unacknowledged decision, or a
+blocking assessment stops the transition and preserves the new compact state.
+
 ## Mobile platform rules
 
 The client is Android-only and online-only and communicates through
