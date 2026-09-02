@@ -428,7 +428,7 @@ internal static class MobileReceivingOrderEndpoints
         line.UnitOfMeasure,
         line.PlanQuantity,
         line.FactQuantity,
-        line.FactQuantity is double factQuantity
+        line.FactQuantity is decimal factQuantity
             ? factQuantity - line.PlanQuantity
             : null,
         line.AllocatedQuantity,

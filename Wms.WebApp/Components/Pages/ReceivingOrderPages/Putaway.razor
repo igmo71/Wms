@@ -153,7 +153,7 @@ else
                                                      Clearable="true" />
                                 </MudItem>
                                 <MudItem xs="12" md="3">
-                                    <MudNumericField T="double" Label="Количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumQuantity" HideSpinButtons="true" />
+                                    <MudNumericField T="decimal" Label="Количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumQuantity" HideSpinButtons="true" />
                                     <MudText Typo="Typo.caption">Можно разместить: @FormatQuantity(MaximumQuantity)</MudText>
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(WeightCalculation.CalculateKg(_movementQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                 </MudItem>

@@ -4,8 +4,8 @@ namespace Wms.Common;
 
 public static class WeightCalculation
 {
-    public static double? CalculateKg(double quantity, StockKeepingUnit? stockKeepingUnit) =>
+    public static double? CalculateKg(decimal quantity, StockKeepingUnit? stockKeepingUnit) =>
         stockKeepingUnit?.WeightKg is double unitWeightKg
-            ? quantity * unitWeightKg
+            ? (double)quantity * unitWeightKg
             : null;
 }

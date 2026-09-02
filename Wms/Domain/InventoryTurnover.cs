@@ -15,9 +15,9 @@ public class InventoryTurnover
     public StorageLocation? StorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double QuantityDelta { get; private set; }
-    public double BalanceBefore { get; private set; }
-    public double BalanceAfter { get; private set; }
+    public decimal QuantityDelta { get; private set; }
+    public decimal BalanceBefore { get; private set; }
+    public decimal BalanceAfter { get; private set; }
     public double? WeightDeltaKg => WeightCalculation.CalculateKg(QuantityDelta, StockKeepingUnit);
     public double? WeightBeforeKg => WeightCalculation.CalculateKg(BalanceBefore, StockKeepingUnit);
     public double? WeightAfterKg => WeightCalculation.CalculateKg(BalanceAfter, StockKeepingUnit);
@@ -43,9 +43,9 @@ public class InventoryTurnover
             return OperationError.Invalid("Идентификаторы оборота обязательны.");
         }
 
-        if (!double.IsFinite(change.BalanceBefore)
-            || !double.IsFinite(change.QuantityDelta)
-            || !double.IsFinite(change.BalanceAfter)
+        if (!WarehouseQuantity.IsNonNegative(change.BalanceBefore)
+            || !WarehouseQuantity.IsSupported(change.QuantityDelta)
+            || !WarehouseQuantity.IsNonNegative(change.BalanceAfter)
             || change.QuantityDelta == 0
             || change.BalanceBefore < 0
             || change.BalanceAfter < 0

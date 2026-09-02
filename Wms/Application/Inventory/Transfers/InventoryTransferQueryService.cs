@@ -56,7 +56,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .FirstOrDefaultAsync(x => x.Id == id, ct);
     }
 
-    public async Task<OperationResult<double>> GetAvailableDirectQuantityAsync(
+    public async Task<OperationResult<decimal>> GetAvailableDirectQuantityAsync(
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid stockKeepingUnitId,
@@ -111,7 +111,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .Where(x => x.WarehouseId == transfer.WarehouseId
                 && x.StorageLocationId == sourceStorageLocationId
                 && x.StockKeepingUnitId == stockKeepingUnitId)
-            .Select(x => (double?)x.Quantity)
+            .Select(x => (decimal?)x.Quantity)
             .SingleOrDefaultAsync(ct) ?? 0;
     }
 
@@ -209,7 +209,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .ToList();
     }
 
-    public async Task<OperationResult<double>> GetAvailableTransitQuantityAsync(
+    public async Task<OperationResult<decimal>> GetAvailableTransitQuantityAsync(
         Guid transferId,
         Guid stockKeepingUnitId,
         CancellationToken ct = default)
@@ -240,7 +240,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             .AsNoTracking()
             .Where(x => x.StorageLocationId == transitStorageLocationId
                 && x.StockKeepingUnitId == stockKeepingUnitId)
-            .Select(x => (double?)x.Quantity)
+            .Select(x => (decimal?)x.Quantity)
             .SingleOrDefaultAsync(ct) ?? 0;
     }
 

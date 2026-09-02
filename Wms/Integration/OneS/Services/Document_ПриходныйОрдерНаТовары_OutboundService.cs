@@ -71,8 +71,8 @@ public class Document_ПриходныйОрдерНаТовары_OutboundServi
         public Guid Ref_Key { get; set; }
         public int LineNumber { get; set; }
         public Guid Номенклатура_Key { get; set; }
-        public double КоличествоУпаковок { get; set; }
-        public double Количество { get; set; }
+        public decimal КоличествоУпаковок { get; set; }
+        public decimal Количество { get; set; }
         public string? Комментарий { get; set; }
 
         public static PatchItem From(ReceivingOrderItem orderItem) => new()

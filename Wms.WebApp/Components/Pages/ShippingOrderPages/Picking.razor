@@ -167,7 +167,7 @@ else
                                     }
                                 </MudItem>
                                 <MudItem xs="12" md="3">
-                                    <MudNumericField T="double" Label="Фактическое количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumPickingQuantity" HideSpinButtons="true" />
+                                    <MudNumericField T="decimal" Label="Фактическое количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumPickingQuantity" HideSpinButtons="true" />
                                     <MudText Typo="Typo.caption">Можно отобрать: @FormatQuantity(MaximumPickingQuantity)</MudText>
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(WeightCalculation.CalculateKg(_movementQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                 </MudItem>

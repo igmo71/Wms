@@ -29,8 +29,8 @@ public sealed record MobileShippingOrderSummary(
     int FullyPickedLineCount,
     int PartiallyPickedLineCount,
     int ZeroPickedLineCount,
-    double PlanQuantity,
-    double FactQuantity,
+    decimal PlanQuantity,
+    decimal FactQuantity,
     DateTimeOffset? PickingStartedAtUtc,
     DateTimeOffset? ReadyForShipmentAtUtc,
     DateTimeOffset? ShippedAtUtc);
@@ -41,15 +41,15 @@ public sealed record MobileShippingOrderLine(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double FactQuantity,
+    decimal PlanQuantity,
+    decimal FactQuantity,
     string? Comment);
 
 public sealed record MobileShippingOrderMovement(
     Guid Id,
     int LineNumber,
     Guid StockKeepingUnitId,
-    double Quantity,
+    decimal Quantity,
     MobileShippingOrderLocation Source,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc,
@@ -70,8 +70,8 @@ public sealed record MobileShippingOrderLineCandidate(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double FactQuantity,
+    decimal PlanQuantity,
+    decimal FactQuantity,
     bool IsExactMatch);
 
 public sealed record MobileShippingOrderLineSearchResult(
@@ -80,5 +80,5 @@ public sealed record MobileShippingOrderLineSearchResult(
 
 public sealed record MobileShippingOrderSourceAvailability(
     MobileShippingOrderLocation Source,
-    double PhysicalQuantity,
-    double DraftQuantity);
+    decimal PhysicalQuantity,
+    decimal DraftQuantity);

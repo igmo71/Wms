@@ -13,19 +13,19 @@ public class ReceivingOrderItem
     public int LineNumber { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double PlanQuantity { get; private set; }
-    public double? FactQuantity { get; private set; }
+    public decimal PlanQuantity { get; private set; }
+    public decimal? FactQuantity { get; private set; }
     public string? Comment { get; private set; }
 
-    public double? RemainingQuantity => FactQuantity is double factQuantity
+    public decimal? RemainingQuantity => FactQuantity is decimal factQuantity
         ? PlanQuantity - factQuantity
         : null;
-    public double? FactWeightKg => FactQuantity is double factQuantity
+    public double? FactWeightKg => FactQuantity is decimal factQuantity
         ? WeightCalculation.CalculateKg(factQuantity, StockKeepingUnit)
         : null;
     public bool IsFactConfirmed => FactQuantity.HasValue;
     public bool IsFullyReceived => FactQuantity == PlanQuantity;
-    public bool IsPlanFactDifference => FactQuantity is double factQuantity
+    public bool IsPlanFactDifference => FactQuantity is decimal factQuantity
         && factQuantity != PlanQuantity;
 
     internal static OperationResult<ReceivingOrderItem> Create(
@@ -66,9 +66,9 @@ public class ReceivingOrderItem
         return OperationResult.Success();
     }
 
-    internal OperationResult UpdateFact(double factQuantity, string? comment)
+    internal OperationResult UpdateFact(decimal factQuantity, string? comment)
     {
-        if (!double.IsFinite(factQuantity) || factQuantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(factQuantity))
         {
             return OperationError.Invalid(
                 "Фактическое количество должно быть конечным неотрицательным числом.");
@@ -82,7 +82,7 @@ public class ReceivingOrderItem
     internal OperationResult IncrementFact()
     {
         var factQuantity = (FactQuantity ?? 0) + 1;
-        if (!double.IsFinite(factQuantity))
+        if (!WarehouseQuantity.IsNonNegative(factQuantity))
         {
             return OperationError.Invalid(
                 "Фактическое количество должно быть конечным неотрицательным числом.");
@@ -117,7 +117,7 @@ public class ReceivingOrderItem
             return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
-        if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(snapshot.PlanQuantity))
         {
             return OperationError.Invalid(
                 "Плановое количество должно быть конечным неотрицательным числом.");

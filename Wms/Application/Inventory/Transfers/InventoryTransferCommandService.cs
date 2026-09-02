@@ -94,7 +94,7 @@ public class InventoryTransferCommandService(
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct = default) =>
         PostMovementAsync(
@@ -111,7 +111,7 @@ public class InventoryTransferCommandService(
         Guid transferId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct = default) =>
         PostMovementAsync(
@@ -129,7 +129,7 @@ public class InventoryTransferCommandService(
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct = default) =>
         PostMovementAsync(
@@ -148,7 +148,7 @@ public class InventoryTransferCommandService(
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct) =>
         StageMovementAsync(
@@ -167,7 +167,7 @@ public class InventoryTransferCommandService(
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct) =>
         StageMovementAsync(
@@ -186,7 +186,7 @@ public class InventoryTransferCommandService(
         Guid transferId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct) =>
         StageMovementAsync(
@@ -252,7 +252,7 @@ public class InventoryTransferCommandService(
         Guid? enteredSourceStorageLocationId,
         Guid? enteredDestinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct)
     {
@@ -282,11 +282,11 @@ public class InventoryTransferCommandService(
         Guid? enteredSourceStorageLocationId,
         Guid? enteredDestinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         string userId,
         CancellationToken ct)
     {
-        if (!double.IsFinite(quantity) || quantity <= 0)
+        if (!WarehouseQuantity.IsPositive(quantity))
         {
             return OperationError.Invalid(
                 "Количество движения должно быть конечным числом больше нуля.");

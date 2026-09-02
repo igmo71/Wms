@@ -13,7 +13,7 @@ public class ShippingOrderBaseItem
     public int LineNumber { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double PlanQuantity { get; private set; }
+    public decimal PlanQuantity { get; private set; }
     public Guid BaseOrderId { get; private set; }
     public string? BaseOrderType { get; private set; }
 
@@ -79,7 +79,7 @@ public class ShippingOrderBaseItem
             return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
-        if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(snapshot.PlanQuantity))
         {
             return OperationError.Invalid(
                 "Плановое количество должно быть конечным неотрицательным числом.");

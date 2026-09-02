@@ -13,11 +13,11 @@ public class ShippingOrderItem
     public int LineNumber { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double PlanQuantity { get; private set; }
-    public double FactQuantity { get; private set; }
+    public decimal PlanQuantity { get; private set; }
+    public decimal FactQuantity { get; private set; }
     public string? Comment { get; private set; }
 
-    public double RemainingQuantity => PlanQuantity - FactQuantity;
+    public decimal RemainingQuantity => PlanQuantity - FactQuantity;
     public double? FactWeightKg => WeightCalculation.CalculateKg(FactQuantity, StockKeepingUnit);
     public bool IsFullyShipped => FactQuantity == PlanQuantity;
 
@@ -59,9 +59,9 @@ public class ShippingOrderItem
         return OperationResult.Success();
     }
 
-    internal OperationResult UpdateFact(double factQuantity)
+    internal OperationResult UpdateFact(decimal factQuantity)
     {
-        if (!double.IsFinite(factQuantity) || factQuantity < 0 || factQuantity > PlanQuantity)
+        if (!WarehouseQuantity.IsNonNegative(factQuantity) || factQuantity > PlanQuantity)
         {
             return OperationError.Invalid(
                 "Фактическое количество должно быть конечным числом от нуля до планового количества.");
@@ -96,7 +96,7 @@ public class ShippingOrderItem
             return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
         }
 
-        if (!double.IsFinite(snapshot.PlanQuantity) || snapshot.PlanQuantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(snapshot.PlanQuantity))
         {
             return OperationError.Invalid(
                 "Плановое количество должно быть конечным неотрицательным числом.");

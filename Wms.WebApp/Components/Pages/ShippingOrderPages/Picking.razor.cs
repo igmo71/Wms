@@ -31,7 +31,7 @@ public partial class Picking
     private List<PickingSourceLocationAvailability> _availableSourceLocations = [];
     private InventoryMovement? _editingMovement;
     private StorageLocation? _selectedSourceLocation;
-    private double _movementQuantity;
+    private decimal _movementQuantity;
     private bool _isLoading = true;
     private bool _isCompleting;
     private bool _isRollingBack;
@@ -54,17 +54,17 @@ public partial class Picking
         ? null
         : _availableSourceLocations.FirstOrDefault(x => x.StorageLocation.Id == _selectedSourceLocation.Id);
 
-    private double SelectedSourcePhysicalQuantity => SelectedSourceLocationAvailability?.PhysicalQuantity ?? 0;
+    private decimal SelectedSourcePhysicalQuantity => SelectedSourceLocationAvailability?.PhysicalQuantity ?? 0;
 
-    private double SelectedSourceAvailableQuantity => Math.Max(0,
+    private decimal SelectedSourceAvailableQuantity => Math.Max(0,
         (SelectedSourceLocationAvailability?.PhysicalQuantity ?? 0)
         - (SelectedSourceLocationAvailability?.DraftQuantity ?? 0)
         + GetEditedMovementQuantityForSelectedSource());
 
-    private double RemainingPlanQuantity => Math.Max(0,
+    private decimal RemainingPlanQuantity => Math.Max(0,
         (_selectedLine?.RemainingQuantity ?? 0) + (_editingMovement?.Quantity ?? 0));
 
-    private double MaximumPickingQuantity => Math.Min(SelectedSourceAvailableQuantity, RemainingPlanQuantity);
+    private decimal MaximumPickingQuantity => Math.Min(SelectedSourceAvailableQuantity, RemainingPlanQuantity);
 
     private bool CanSaveMovement => _selectedSourceLocation is not null
         && _movementQuantity > 0
@@ -147,7 +147,7 @@ public partial class Picking
         _movementQuantity = movement.Quantity;
     }
 
-    private double GetEditedMovementQuantityForSelectedSource()
+    private decimal GetEditedMovementQuantityForSelectedSource()
     {
         InventoryMovement? editingMovement = _editingMovement;
 
@@ -159,7 +159,7 @@ public partial class Picking
     private static string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation) =>
         $"{StorageLocationDisplay.Format(sourceLocation.StorageLocation)} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
 
-    private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
+    private static string FormatQuantity(decimal quantity) => quantity.ToString("0.###");
 
     private void CancelEditing()
     {

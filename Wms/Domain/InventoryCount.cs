@@ -60,7 +60,7 @@ public class InventoryCount
     public OperationResult<InventoryCountItem> AddExpectedItem(
         Guid itemId,
         Guid stockKeepingUnitId,
-        double expectedQuantity,
+        decimal expectedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
@@ -93,7 +93,7 @@ public class InventoryCount
 
     public OperationResult SetCountedQuantity(
         Guid itemId,
-        double countedQuantity,
+        decimal countedQuantity,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -112,7 +112,7 @@ public class InventoryCount
     public OperationResult<InventoryCountItem> SetSkuCountedQuantity(
         Guid itemId,
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -176,8 +176,8 @@ public class InventoryCount
     private OperationResult<InventoryCountItem> AddItem(
         Guid itemId,
         Guid stockKeepingUnitId,
-        double expectedQuantity,
-        double? countedQuantity,
+        decimal expectedQuantity,
+        decimal? countedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {

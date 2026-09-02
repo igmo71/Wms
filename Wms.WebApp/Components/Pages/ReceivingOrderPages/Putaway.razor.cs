@@ -27,7 +27,7 @@ public partial class Putaway
     private List<InventoryMovement> _movements = [];
     private InventoryMovement? _editingMovement;
     private StorageLocation? _selectedDestination;
-    private double _movementQuantity;
+    private decimal _movementQuantity;
     private bool _isLoading = true;
     private bool _isCompleting;
     private bool _operationFailed;
@@ -38,7 +38,7 @@ public partial class Putaway
     private List<InventoryMovement> SelectedLineMovements => _selectedLine is null
         ? []
         : _movements.Where(x => x.RecorderLineNumber == _selectedLine.LineNumber).ToList();
-    private double MaximumQuantity => _selectedLine is null
+    private decimal MaximumQuantity => _selectedLine is null
         ? 0
         : Math.Max(0, GetRemainingQuantity(_selectedLine) + (_editingMovement?.Quantity ?? 0));
     private bool CanSaveMovement => _selectedDestination is not null
@@ -198,13 +198,13 @@ public partial class Putaway
         }
     }
 
-    private double GetAllocatedQuantity(int lineNumber) =>
+    private decimal GetAllocatedQuantity(int lineNumber) =>
         _movements.Where(x => x.RecorderLineNumber == lineNumber).Sum(x => x.Quantity);
 
-    private double GetRemainingQuantity(ReceivingOrderItem item) =>
+    private decimal GetRemainingQuantity(ReceivingOrderItem item) =>
         Math.Max(0, item.FactQuantity!.Value - GetAllocatedQuantity(item.LineNumber));
 
-    private static string FormatQuantity(double quantity) => quantity.ToString("0.###");
+    private static string FormatQuantity(decimal quantity) => quantity.ToString("0.###");
 
     private void SetError(string message)
     {

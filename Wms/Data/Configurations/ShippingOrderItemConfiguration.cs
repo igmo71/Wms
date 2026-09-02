@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Wms.Common;
 using Wms.Domain;
 
 namespace Wms.Data.Configurations;
@@ -11,6 +12,10 @@ internal class ShippingOrderItemConfiguration : IEntityTypeConfiguration<Shippin
         builder.HasKey(x => new { x.ShippingOrderId, x.LineNumber });
 
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
+        builder.Property(x => x.PlanQuantity)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.FactQuantity)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
 
         builder.HasOne(x => x.ShippingOrder).WithMany(x => x.Items)
             .HasForeignKey(x => x.ShippingOrderId).HasPrincipalKey(x => x.Id)

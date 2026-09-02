@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Wms.Common;
 using Wms.Domain;
 
 namespace Wms.Data.Configurations;
@@ -34,8 +35,8 @@ internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<Inventor
         .IsUnique()
         .HasDatabaseName(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex);
 
-        //builder.Property(x => x.Quantity)
-        //    .HasPrecision(18, 3);
+        builder.Property(x => x.Quantity)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
 
         builder.Property(x => x.RowVersion)
             .IsRowVersion();

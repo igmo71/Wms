@@ -13,7 +13,7 @@ public partial class DirectInventoryTransferPage : ContentPage
     private readonly Action<MobileMoveDirectInventoryTransferResponse> _movementCompleted;
     private MobileStorageLocationResponse? _sourceLocation;
     private MobileDirectTransferSkuResponse? _sku;
-    private double? _quantity;
+    private decimal? _quantity;
     private MobileStorageLocationResponse? _destinationLocation;
     private MobileMoveDirectInventoryTransferResponse? _confirmedMovement;
     private Guid? _pendingMoveRequestId;
@@ -396,12 +396,12 @@ public partial class DirectInventoryTransferPage : ContentPage
 
         var value = QuantityEntry.Text?.Trim().Replace(',', '.');
         QuantityErrorLabel.Text = string.Empty;
-        if (!double.TryParse(
+        if (!decimal.TryParse(
                 value,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
                 out var quantity)
-            || !double.IsFinite(quantity)
+            || !WarehouseQuantityInput.IsSupported(quantity)
             || quantity <= 0)
         {
             QuantityErrorLabel.Text = "Введите количество больше нуля.";
@@ -431,7 +431,7 @@ public partial class DirectInventoryTransferPage : ContentPage
     {
         if (_sourceLocation is null
             || _sku is null
-            || _quantity is not double quantity
+            || _quantity is not decimal quantity
             || _destinationLocation is null)
         {
             return;

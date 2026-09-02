@@ -18,7 +18,7 @@ public class InventoryMovement
     public StorageLocation? DestinationStorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double Quantity { get; private set; }
+    public decimal Quantity { get; private set; }
     public double? WeightKg => WeightCalculation.CalculateKg(Quantity, StockKeepingUnit);
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
@@ -34,7 +34,7 @@ public class InventoryMovement
         Guid? sourceStorageLocationId,
         Guid? destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset createdAtUtc,
         RecorderType recorderType,
         Guid? recorderId,
@@ -98,7 +98,7 @@ public class InventoryMovement
         Guid? sourceStorageLocationId,
         Guid? destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset updatedAtUtc)
     {
         var draftResult = ValidateDraft();
@@ -182,9 +182,9 @@ public class InventoryMovement
     private static OperationResult ValidateState(
         Guid? sourceStorageLocationId,
         Guid? destinationStorageLocationId,
-        double quantity)
+        decimal quantity)
     {
-        if (!double.IsFinite(quantity) || quantity <= 0)
+        if (!WarehouseQuantity.IsPositive(quantity))
         {
             return OperationError.Invalid(
                 "Количество движения должно быть конечным числом больше нуля.");

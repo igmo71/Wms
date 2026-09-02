@@ -10,9 +10,9 @@ public sealed class ShippingOrderPickingLineViewState : INotifyPropertyChanged
     public string SkuCode { get; private set; } = string.Empty;
     public string SkuName { get; private set; } = string.Empty;
     public string? UnitOfMeasure { get; private set; }
-    public double PlanQuantity { get; private set; }
-    public double FactQuantity { get; private set; }
-    public double RemainingQuantity { get; private set; }
+    public decimal PlanQuantity { get; private set; }
+    public decimal FactQuantity { get; private set; }
+    public decimal RemainingQuantity { get; private set; }
     public string? Comment { get; private set; }
     public bool ActionsEnabled { get; private set; }
     public bool IsAccented { get; private set; }

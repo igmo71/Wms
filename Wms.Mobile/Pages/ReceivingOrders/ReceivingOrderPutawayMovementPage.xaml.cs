@@ -18,7 +18,7 @@ public partial class ReceivingOrderPutawayMovementPage : ContentPage
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
-    private double _quantity;
+    private decimal _quantity;
     private Guid? _pendingRequestId;
 
     public ReceivingOrderPutawayMovementPage(
@@ -253,12 +253,12 @@ public partial class ReceivingOrderPutawayMovementPage : ContentPage
         SetMode(MovementPageMode.Confirmation);
     }
 
-    private bool TryReadQuantity(out double quantity)
+    private bool TryReadQuantity(out decimal quantity)
     {
         var value = (QuantityEntry.Text ?? string.Empty).Trim().Replace(',', '.');
         var remaining = _selectedLine?.RemainingPutawayQuantity ?? 0;
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out quantity)
-            && double.IsFinite(quantity)
+        if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out quantity)
+            && WarehouseQuantityInput.IsSupported(quantity)
             && quantity > 0
             && quantity <= remaining)
         {

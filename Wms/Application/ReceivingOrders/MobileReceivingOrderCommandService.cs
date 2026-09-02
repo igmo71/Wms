@@ -60,7 +60,7 @@ public sealed class MobileReceivingOrderCommandService(
     public Task<OperationResult<Guid>> SetItemFactQuantityAsync(
         Guid orderId,
         int lineNumber,
-        double factQuantity,
+        decimal factQuantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -118,7 +118,7 @@ public sealed class MobileReceivingOrderCommandService(
         Guid orderId,
         int lineNumber,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -209,22 +209,22 @@ public sealed class MobileReceivingOrderCommandService(
             orderId.ToString("N"),
             lineNumber.ToString(CultureInfo.InvariantCulture)));
 
-    private static string Hash(Guid orderId, int lineNumber, double quantity) =>
+    private static string Hash(Guid orderId, int lineNumber, decimal quantity) =>
         MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             orderId.ToString("N"),
             lineNumber.ToString(CultureInfo.InvariantCulture),
-            quantity.ToString("R", CultureInfo.InvariantCulture)));
+            quantity.ToString("G29", CultureInfo.InvariantCulture)));
 
     private static string Hash(
         Guid orderId,
         int lineNumber,
         Guid destinationStorageLocationId,
-        double quantity) =>
+        decimal quantity) =>
         MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             orderId.ToString("N"),
             lineNumber.ToString(CultureInfo.InvariantCulture),
             destinationStorageLocationId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture)));
+            quantity.ToString("G29", CultureInfo.InvariantCulture)));
 }

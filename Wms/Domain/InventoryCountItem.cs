@@ -12,8 +12,8 @@ public class InventoryCountItem
     public int LineNumber { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double ExpectedQuantity { get; private set; }
-    public double? CountedQuantity { get; private set; }
+    public decimal ExpectedQuantity { get; private set; }
+    public decimal? CountedQuantity { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string CreatedBy { get; private set; } = null!;
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
@@ -21,7 +21,7 @@ public class InventoryCountItem
 
     public bool IsExpected => ExpectedQuantity > 0;
     public bool IsCounted => CountedQuantity.HasValue;
-    public double? DifferenceQuantity => CountedQuantity - ExpectedQuantity;
+    public decimal? DifferenceQuantity => CountedQuantity - ExpectedQuantity;
     public double? CountedWeightKg => CountedQuantity.HasValue
         ? WeightCalculation.CalculateKg(CountedQuantity.Value, StockKeepingUnit)
         : null;
@@ -31,8 +31,8 @@ public class InventoryCountItem
         Guid inventoryCountId,
         int lineNumber,
         Guid stockKeepingUnitId,
-        double expectedQuantity,
-        double? countedQuantity,
+        decimal expectedQuantity,
+        decimal? countedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
@@ -71,7 +71,7 @@ public class InventoryCountItem
             return auditResult;
 
         var countedQuantity = (CountedQuantity ?? 0) + 1;
-        if (!double.IsFinite(countedQuantity))
+        if (!WarehouseQuantity.IsNonNegative(countedQuantity))
             return OperationError.Invalid("Фактическое количество стало слишком большим.");
 
         CountedQuantity = countedQuantity;
@@ -81,7 +81,7 @@ public class InventoryCountItem
     }
 
     internal OperationResult SetCountedQuantity(
-        double countedQuantity,
+        decimal countedQuantity,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -110,11 +110,11 @@ public class InventoryCountItem
             : OperationResult.Success();
     }
 
-    private static OperationResult ValidateQuantities(double expectedQuantity, double? countedQuantity)
+    private static OperationResult ValidateQuantities(decimal expectedQuantity, decimal? countedQuantity)
     {
-        if (!double.IsFinite(expectedQuantity) || expectedQuantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(expectedQuantity))
             return OperationError.Invalid("Ожидаемое количество должно быть конечным неотрицательным числом.");
-        if (countedQuantity is double quantity && (!double.IsFinite(quantity) || quantity < 0))
+        if (countedQuantity is decimal quantity && !WarehouseQuantity.IsNonNegative(quantity))
             return OperationError.Invalid("Фактическое количество должно быть конечным неотрицательным числом.");
         return OperationResult.Success();
     }

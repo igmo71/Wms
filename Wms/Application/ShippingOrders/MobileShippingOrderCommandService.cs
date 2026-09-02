@@ -51,7 +51,7 @@ public sealed class MobileShippingOrderCommandService(
         Guid orderId,
         int lineNumber,
         string? sourceStorageLocationBarcode,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default)
@@ -160,11 +160,11 @@ public sealed class MobileShippingOrderCommandService(
         Guid orderId,
         int lineNumber,
         Guid sourceStorageLocationId,
-        double quantity) =>
+        decimal quantity) =>
         MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             orderId.ToString("N"),
             lineNumber.ToString(CultureInfo.InvariantCulture),
             sourceStorageLocationId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture)));
+            quantity.ToString("G29", CultureInfo.InvariantCulture)));
 }

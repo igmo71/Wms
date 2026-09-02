@@ -98,7 +98,7 @@ public sealed record MobileInventoryTransferMovementResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double Quantity,
+    decimal Quantity,
     MobileInventoryMovementLocationResponse Source,
     MobileInventoryMovementLocationResponse Destination);
 
@@ -112,7 +112,7 @@ public sealed record MobileInventoryTransferSkuBalanceResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileCreateInventoryTransferRequest(
     Guid ClientRequestId,
@@ -128,14 +128,14 @@ public sealed record MobileDirectTransferSkuResponse(
     string Code,
     string Name,
     string? UnitOfMeasure,
-    double AvailableQuantity);
+    decimal AvailableQuantity);
 
 public sealed record MobileDirectTransferSkuSearchResponse(
     Guid Id,
     string Code,
     string Name,
     string? UnitOfMeasure,
-    double AvailableQuantity,
+    decimal AvailableQuantity,
     bool IsExactMatch);
 
 public sealed record MobileResolveTransitTransferSkuRequest(string Barcode);
@@ -144,13 +144,13 @@ public sealed record MobilePickToTransitRequest(
     Guid ClientRequestId,
     Guid SourceStorageLocationId,
     Guid StockKeepingUnitId,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobilePutFromTransitRequest(
     Guid ClientRequestId,
     Guid DestinationStorageLocationId,
     Guid StockKeepingUnitId,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileTransitInventoryTransferMovementResponse(
     Guid MovementId,
@@ -162,7 +162,7 @@ public sealed record MobileMoveDirectInventoryTransferRequest(
     Guid SourceStorageLocationId,
     Guid DestinationStorageLocationId,
     Guid StockKeepingUnitId,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileInventoryMovementLocationResponse(
     Guid Id,
@@ -177,7 +177,7 @@ public sealed record MobileMoveDirectInventoryTransferResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double Quantity,
+    decimal Quantity,
     MobileInventoryMovementLocationResponse Source,
     MobileInventoryMovementLocationResponse Destination,
     DateTimeOffset PostedAtUtc,
@@ -216,9 +216,9 @@ public sealed record MobileInventoryCountItemResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double ExpectedQuantity,
-    double? CountedQuantity,
-    double? DifferenceQuantity,
+    decimal ExpectedQuantity,
+    decimal? CountedQuantity,
+    decimal? DifferenceQuantity,
     bool IsExpected);
 
 public sealed record MobileInventoryCountDetailsResponse(
@@ -247,12 +247,12 @@ public sealed record MobileInventoryCountSkuSearchResponse(
 
 public sealed record MobileSetInventoryCountItemQuantityRequest(
     Guid ClientRequestId,
-    double CountedQuantity);
+    decimal CountedQuantity);
 
 public sealed record MobileSetInventoryCountSkuQuantityRequest(
     Guid ClientRequestId,
     Guid StockKeepingUnitId,
-    double CountedQuantity);
+    decimal CountedQuantity);
 
 public sealed record MobileInventoryCountCommandRequest(Guid ClientRequestId);
 
@@ -286,9 +286,9 @@ public sealed record MobileReceivingOrderProgressResponse(
     int ConfirmedLineCount,
     int PositiveLineCount,
     int FullyAllocatedLineCount,
-    double PlanQuantity,
-    double FactQuantity,
-    double AllocatedQuantity);
+    decimal PlanQuantity,
+    decimal FactQuantity,
+    decimal AllocatedQuantity);
 
 public sealed record MobileReceivingOrderSummaryResponse(
     Guid Id,
@@ -316,18 +316,18 @@ public sealed record MobileReceivingOrderLineResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double? FactQuantity,
-    double? DifferenceQuantity,
-    double AllocatedQuantity,
-    double? RemainingPutawayQuantity,
+    decimal PlanQuantity,
+    decimal? FactQuantity,
+    decimal? DifferenceQuantity,
+    decimal AllocatedQuantity,
+    decimal? RemainingPutawayQuantity,
     string? Comment);
 
 public sealed record MobileReceivingOrderMovementResponse(
     Guid Id,
     int LineNumber,
     Guid StockKeepingUnitId,
-    double Quantity,
+    decimal Quantity,
     MobileReceivingOrderLocationResponse Destination,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc,
@@ -348,10 +348,10 @@ public sealed record MobileReceivingOrderLineCandidateResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double? FactQuantity,
-    double AllocatedQuantity,
-    double? RemainingPutawayQuantity,
+    decimal PlanQuantity,
+    decimal? FactQuantity,
+    decimal AllocatedQuantity,
+    decimal? RemainingPutawayQuantity,
     bool IsExactMatch);
 
 public sealed record MobileReceivingOrderLineSearchResponse(
@@ -372,13 +372,13 @@ public sealed record MobileReceivingOrderCommandRequest(Guid ClientRequestId);
 
 public sealed record MobileSetReceivingOrderLineQuantityRequest(
     Guid ClientRequestId,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileAddReceivingOrderPutawayMovementRequest(
     Guid ClientRequestId,
     int LineNumber,
     string DestinationStorageLocationBarcode,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileReceivingOrderCommandResponse(
     MobileReceivingOrderDetailsResponse Details,
@@ -408,8 +408,8 @@ public sealed record MobileShippingOrderProgressResponse(
     int FullyPickedLineCount,
     int PartiallyPickedLineCount,
     int ZeroPickedLineCount,
-    double PlanQuantity,
-    double FactQuantity);
+    decimal PlanQuantity,
+    decimal FactQuantity);
 
 public sealed record MobileShippingOrderSummaryResponse(
     Guid Id,
@@ -436,16 +436,16 @@ public sealed record MobileShippingOrderLineResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double FactQuantity,
-    double RemainingQuantity,
+    decimal PlanQuantity,
+    decimal FactQuantity,
+    decimal RemainingQuantity,
     string? Comment);
 
 public sealed record MobileShippingOrderMovementResponse(
     Guid Id,
     int LineNumber,
     Guid StockKeepingUnitId,
-    double Quantity,
+    decimal Quantity,
     MobileShippingOrderLocationResponse Source,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc,
@@ -466,9 +466,9 @@ public sealed record MobileShippingOrderLineCandidateResponse(
     string SkuCode,
     string SkuName,
     string? UnitOfMeasure,
-    double PlanQuantity,
-    double FactQuantity,
-    double RemainingQuantity,
+    decimal PlanQuantity,
+    decimal FactQuantity,
+    decimal RemainingQuantity,
     bool IsExactMatch);
 
 public sealed record MobileShippingOrderLineSearchResponse(
@@ -477,9 +477,9 @@ public sealed record MobileShippingOrderLineSearchResponse(
 
 public sealed record MobileShippingOrderSourceAvailabilityResponse(
     MobileShippingOrderLocationResponse Source,
-    double PhysicalQuantity,
-    double DraftQuantity,
-    double AvailableQuantity);
+    decimal PhysicalQuantity,
+    decimal DraftQuantity,
+    decimal AvailableQuantity);
 
 public sealed record MobileResolveShippingOrderDocumentRequest(
     Guid WarehouseId,
@@ -495,7 +495,7 @@ public sealed record MobileAddShippingOrderPickingMovementRequest(
     Guid ClientRequestId,
     int LineNumber,
     string SourceStorageLocationBarcode,
-    double Quantity);
+    decimal Quantity);
 
 public sealed record MobileShippingOrderCommandRequest(Guid ClientRequestId);
 

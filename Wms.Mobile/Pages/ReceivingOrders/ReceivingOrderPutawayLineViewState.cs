@@ -10,9 +10,9 @@ public sealed class ReceivingOrderPutawayLineViewState : INotifyPropertyChanged
     public string SkuCode { get; private set; } = string.Empty;
     public string SkuName { get; private set; } = string.Empty;
     public string? UnitOfMeasure { get; private set; }
-    public double FactQuantity { get; private set; }
-    public double AllocatedQuantity { get; private set; }
-    public double RemainingQuantity { get; private set; }
+    public decimal FactQuantity { get; private set; }
+    public decimal AllocatedQuantity { get; private set; }
+    public decimal RemainingQuantity { get; private set; }
     public bool ActionsEnabled { get; private set; }
     public IReadOnlyList<ReceivingOrderPutawayMovementViewState> Movements { get; private set; } = [];
 

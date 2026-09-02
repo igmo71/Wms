@@ -17,7 +17,7 @@ public class PickingCommandService(
         Guid orderId,
         int lineNumber,
         Guid sourceStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct = default)
     {
         using IDisposable? scope = logger.BeginScope("Picking AddMovement {OrderId} {LineNumber}", orderId, lineNumber);
@@ -43,7 +43,7 @@ public class PickingCommandService(
         Guid orderId,
         int lineNumber,
         Guid sourceStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct)
     {
         ShippingOrder? order = await LoadOrderAsync(dbContext, orderId, ct);
@@ -87,7 +87,7 @@ public class PickingCommandService(
     public async Task<OperationResult> UpdatePickingMovementAsync(
         Guid movementId,
         Guid sourceStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct = default)
     {
         using IDisposable? scope = logger.BeginScope("Picking UpdateMovement {MovementId}", movementId);
@@ -276,7 +276,7 @@ public class PickingCommandService(
                 && x.StorageLocationId == movement.SourceStorageLocationId
                 && x.StockKeepingUnitId == movement.StockKeepingUnitId, ct);
 
-        double sourceQuantity = draftMovements
+        decimal sourceQuantity = draftMovements
             .Where(x => x.Id != excludedMovementId
                 && x.SourceStorageLocationId == movement.SourceStorageLocationId
                 && x.StockKeepingUnitId == movement.StockKeepingUnitId)

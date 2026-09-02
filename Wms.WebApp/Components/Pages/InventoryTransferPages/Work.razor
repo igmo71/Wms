@@ -140,7 +140,7 @@
                                             </MudSelectItem>
                                         }
                                     </MudSelect>
-                                    <MudNumericField T="double" @bind-Value="_pickQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                    <MudNumericField T="decimal" @bind-Value="_pickQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanUseTransit || _isSaving)" Margin="Margin.Dense" />
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetPickWeightKg())</MudText>
                                     <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AddShoppingCart"
@@ -173,7 +173,7 @@
                                                      Clearable="true"
                                                      Margin="Margin.Dense"
                                                      Disabled="@(!CanPutAnything || _isSaving)" />
-                                    <MudNumericField T="double" @bind-Value="_putQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                    <MudNumericField T="decimal" @bind-Value="_putQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanPutAnything || _isSaving)" Margin="Margin.Dense" />
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetPutWeightKg())</MudText>
                                     <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Unarchive"
@@ -228,7 +228,7 @@
                                             </MudSelectItem>
                                         }
                                     </MudSelect>
-                                    <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                                    <MudNumericField T="decimal" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                                      Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetDirectWeightKg())</MudText>
                                     <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"
@@ -267,7 +267,7 @@
                                     </MudSelectItem>
                                 }
                             </MudSelect>
-                            <MudNumericField T="double" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
+                            <MudNumericField T="decimal" @bind-Value="_directQuantity" Label="Количество" Min="0" HideSpinButtons="true"
                                              Disabled="@(!CanEdit || _isSaving)" Margin="Margin.Dense" />
                             <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(GetDirectWeightKg())</MudText>
                             <MudButton Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SwapHoriz"

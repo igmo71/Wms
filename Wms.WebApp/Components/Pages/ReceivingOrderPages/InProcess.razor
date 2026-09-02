@@ -118,7 +118,7 @@ else
                 <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
-                        <MudNumericField T="double?"
+                        <MudNumericField T="decimal?"
                                          Value="context.Item.FactQuantity"
                                          ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
                                          Placeholder="Не проверено"

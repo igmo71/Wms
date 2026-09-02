@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Wms.Common;
 using Wms.Domain;
 
 namespace Wms.Data.Configurations;
@@ -9,6 +10,12 @@ internal class InventoryTurnoverConfiguration : IEntityTypeConfiguration<Invento
     public void Configure(EntityTypeBuilder<InventoryTurnover> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.QuantityDelta)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.BalanceBefore)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.BalanceAfter)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
 
         builder.HasOne(x => x.StockKeepingUnit)
             .WithMany()

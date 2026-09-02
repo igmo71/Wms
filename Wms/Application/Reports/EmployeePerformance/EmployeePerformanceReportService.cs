@@ -195,7 +195,7 @@ public sealed class EmployeePerformanceReportService(
                 PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),
                 KnownFactWeightKg = order.Items
                     .Where(x => x.FactQuantity > 0 && x.StockKeepingUnit!.WeightKg != null)
-                    .Sum(x => (double?)(x.FactQuantity * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
+                    .Sum(x => (double?)((double)x.FactQuantity!.Value * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
                 IsFactWeightComplete = !order.Items.Any(x => x.FactQuantity > 0
                     && x.StockKeepingUnit!.WeightKg == null),
                 StartedAtUtc = order.StartedAtUtc!.Value,
@@ -228,7 +228,7 @@ public sealed class EmployeePerformanceReportService(
                 PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),
                 KnownFactWeightKg = order.Items
                     .Where(x => x.FactQuantity > 0 && x.StockKeepingUnit!.WeightKg != null)
-                    .Sum(x => (double?)(x.FactQuantity * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
+                    .Sum(x => (double?)((double)x.FactQuantity * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
                 IsFactWeightComplete = !order.Items.Any(x => x.FactQuantity > 0
                     && x.StockKeepingUnit!.WeightKg == null),
                 StartedAtUtc = order.PickingStartedAtUtc!.Value,

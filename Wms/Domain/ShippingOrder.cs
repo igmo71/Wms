@@ -212,7 +212,7 @@ public class ShippingOrder
         Guid movementId,
         int lineNumber,
         Guid sourceStorageLocationId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset createdAtUtc,
         IReadOnlyCollection<InventoryMovement> draftMovements)
     {
@@ -235,7 +235,7 @@ public class ShippingOrder
                 $"Строка {lineNumber} расходного ордера '{Id}' не найдена.");
         }
 
-        OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, null);
+        OperationResult<decimal> factResult = CalculatePickingLineFact(item, quantity, draftMovements, null);
         if (!factResult.IsSuccess)
         {
             return factResult.Error!;
@@ -270,7 +270,7 @@ public class ShippingOrder
     public OperationResult UpdatePickingMovement(
         InventoryMovement movement,
         Guid sourceStorageLocationId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset updatedAtUtc,
         IReadOnlyCollection<InventoryMovement> draftMovements)
     {
@@ -299,7 +299,7 @@ public class ShippingOrder
                 $"Строка {movement.RecorderLineNumber} расходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
         }
 
-        OperationResult<double> factResult = CalculatePickingLineFact(item, quantity, draftMovements, movement.Id);
+        OperationResult<decimal> factResult = CalculatePickingLineFact(item, quantity, draftMovements, movement.Id);
         if (!factResult.IsSuccess)
         {
             return factResult.Error!;
@@ -354,7 +354,7 @@ public class ShippingOrder
                 $"Строка {movement.RecorderLineNumber} расходного ордера '{Id}' для движения '{movement.Id}' не найдена.");
         }
 
-        double factQuantity = draftMovements
+        decimal factQuantity = draftMovements
             .Where(x => x.Id != movement.Id
                 && x.RecorderLineNumber == item.LineNumber)
             .Sum(x => x.Quantity);
@@ -603,7 +603,7 @@ public class ShippingOrder
             || x.SourceStorageLocationId is null
             || x.DestinationStorageLocationId != ShippingLocationId
             || x.RecorderLineNumber is null
-            || !double.IsFinite(x.Quantity)
+            || !WarehouseQuantity.IsPositive(x.Quantity)
             || x.Quantity <= 0))
         {
             return OperationError.Invalid(
@@ -632,19 +632,19 @@ public class ShippingOrder
         return OperationResult.Success();
     }
 
-    private static OperationResult<double> CalculatePickingLineFact(
+    private static OperationResult<decimal> CalculatePickingLineFact(
         ShippingOrderItem item,
-        double quantity,
+        decimal quantity,
         IReadOnlyCollection<InventoryMovement> draftMovements,
         Guid? excludedMovementId)
     {
-        if (!double.IsFinite(quantity) || quantity <= 0)
+        if (!WarehouseQuantity.IsPositive(quantity))
         {
             return OperationError.Invalid(
                 "Количество отбора должно быть конечным числом больше нуля.");
         }
 
-        double lineQuantity = draftMovements
+        decimal lineQuantity = draftMovements
             .Where(x => x.Id != excludedMovementId
                 && x.RecorderLineNumber == item.LineNumber)
             .Sum(x => x.Quantity) + quantity;

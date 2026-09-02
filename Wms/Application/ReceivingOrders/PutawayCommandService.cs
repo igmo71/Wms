@@ -54,7 +54,7 @@ public class PutawayCommandService(
         Guid orderId,
         int lineNumber,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -78,7 +78,7 @@ public class PutawayCommandService(
         Guid orderId,
         int lineNumber,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct)
     {
         var order = await LoadEditableOrderAsync(dbContext, orderId, ct);
@@ -123,7 +123,7 @@ public class PutawayCommandService(
     public async Task<OperationResult> UpdateMovementAsync(
         Guid movementId,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -145,7 +145,7 @@ public class PutawayCommandService(
         ApplicationDbContext dbContext,
         Guid movementId,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         CancellationToken ct)
     {
         var movement = await dbContext.InventoryMovements

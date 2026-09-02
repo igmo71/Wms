@@ -303,7 +303,7 @@ public sealed class MobileApiClient
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default)
     {
@@ -332,7 +332,7 @@ public sealed class MobileApiClient
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default)
     {
@@ -360,7 +360,7 @@ public sealed class MobileApiClient
         Guid transferId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default)
     {
@@ -531,7 +531,7 @@ public sealed class MobileApiClient
         Guid orderId,
         int lineNumber,
         string sourceStorageLocationBarcode,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostShippingOrderCommandAsync(
@@ -674,7 +674,7 @@ public sealed class MobileApiClient
     public Task<MobileReceivingOrderCommandResponse> SetReceivingOrderLineQuantityAsync(
         Guid orderId,
         int lineNumber,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostReceivingOrderCommandAsync(
@@ -704,7 +704,7 @@ public sealed class MobileApiClient
         Guid orderId,
         int lineNumber,
         string destinationStorageLocationBarcode,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostReceivingOrderCommandAsync(
@@ -785,7 +785,7 @@ public sealed class MobileApiClient
     public Task<MobileInventoryCountDetailsResponse> SetInventoryCountSkuQuantityAsync(
         Guid inventoryCountId,
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostInventoryCountDetailsAsync(
@@ -799,7 +799,7 @@ public sealed class MobileApiClient
     public Task<MobileInventoryCountDetailsResponse> SetInventoryCountItemQuantityAsync(
         Guid inventoryCountId,
         Guid itemId,
-        double countedQuantity,
+        decimal countedQuantity,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostInventoryCountDetailsAsync(

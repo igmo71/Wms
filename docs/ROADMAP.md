@@ -9,46 +9,113 @@ by dependency, not by a promised release date.
 
 ## Delivery sequence
 
-1. **Staging baseline:** reproducible deployment, trusted HTTPS, migration
-   validation, and Android connectivity.
-2. **Pilot prerequisites:** security boundaries, inventory confidence, and an
+1. **Decimal warehouse quantities:** align WMS calculations and persistence
+   with the 1C `Number(15,3)` quantity boundary.
+2. **Order synchronization decisions:** show meaningful differences between
+   WMS and fresh 1C orders and separate operator decisions from blocking
+   conflicts.
+3. **Standalone deployment baseline:** reproducible launch outside Visual
+   Studio, trusted HTTPS, migration validation, and Android connectivity.
+4. **Pilot prerequisites:** security boundaries, inventory confidence, and an
    operator recovery procedure for partial 1C failures.
-3. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
+5. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
    exist.
-4. **Product increments:** quantity fidelity, capacity, and optional processes
-   whose inputs and business need are confirmed.
-5. **Production maintenance:** dependency, diagnostics, and administrative
+6. **Product increments:** capacity and optional processes whose inputs and
+   business need are confirmed.
+7. **Production maintenance:** dependency, diagnostics, and administrative
    concurrency work that does not block staging.
 
-## Next delivery — staging baseline
+## Next delivery — decimal warehouse quantities
 
 ### Outcome
 
-A clean machine can deploy the current WMS to staging, apply migrations, expose
-WebApp and Mobile V1 through trusted HTTPS, and connect the Android client
-without certificate-validation workarounds.
+All operational warehouse quantities use exact C# `decimal` values and SQL
+Server `decimal(15,3)`, matching the size and fractional precision of the
+current 1C quantity fields. Weight, volume, dimensions, coordinates, and
+conversion coefficients remain `double`.
 
 ### Work
 
-1. Record the staging host, DNS names, hosting or reverse-proxy model, database,
-   secret storage, and Android network path.
+1. Replace warehouse quantities in the domain, application services, reports,
+   Mobile V1 contracts, WebApp, and Android client.
+2. Read and write 1C document quantities through the exact WMS decimal model.
+3. Reject values outside the 15-digit, 3-fractional-digit boundary rather than
+   silently rounding them.
+4. Change persisted quantity columns from SQL Server `float` to
+   `decimal(15,3)`. The current database may be cleared before migration, so no
+   compatibility conversion is required.
+
+### Done when
+
+- inventory plans, facts, movements, balances, turnovers, and counts no longer
+  use binary floating point;
+- WebApp and Mobile accept and display up to three fractional digits;
+- the 1C boundary preserves the same `Number(15,3)` values;
+- the solution builds without introducing a second quantity policy.
+
+## Following delivery — order synchronization decisions
+
+### Outcome
+
+An operator can understand every detected difference between the local WMS
+order and its current 1C document. Safe continuation always requires an
+explicit, audited decision; changes capable of corrupting warehouse facts
+remain blocked.
+
+### Work
+
+1. Replace the current undifferentiated conflict result with a structured list
+   of changed fields and lines.
+2. Use two levels:
+   - **Requires operator decision** for changed comments, queues, dates,
+     directions, non-final compatible statuses, and other differences that do
+     not change warehouse quantities or identity;
+   - **Blocking** for changed quantities, SKU or line composition, warehouse,
+     deletion, incompatible warehouse operation, posting, or final status.
+3. Fetch the fresh 1C document when details are opened and immediately before
+   an allowed final operation. Do not persist a second full 1C snapshot.
+4. Show detailed differences and the audited decision in WebApp. Show a short
+   severity summary in Mobile and direct blocking cases to WebApp or external
+   resolution.
+5. Store only the marker, level, detection time, and decision audit or checked
+   state fingerprint required to invalidate an acknowledgement after another
+   1C change.
+6. Clear `ExternalChangeDetected` when a fresh 1C document matches WMS again;
+   the current early `Unchanged` result leaves a previously set marker stale.
+7. Treat an already posted or final 1C order as blocking unless existing
+   repeat-safe recovery logic proves that it is the exact result of the WMS
+   operation being resumed.
+
+## Standalone deployment baseline
+
+### Outcome
+
+The current solution can be published and launched independently of Visual
+Studio, apply migrations, expose WebApp and Mobile V1 through trusted HTTPS,
+and connect the Android client without certificate-validation workarounds.
+Connection addresses, credentials, logging detail, and sensitive-data logging
+may remain the same as in the current development environment for this stage.
+
+### Work
+
+1. Record the target host, DNS names, hosting or reverse-proxy model, database,
+   configuration source, and Android network path.
 2. Define certificate issuance, trust chain, installation, renewal, and the
    exact WebApp and WebApi URLs.
-3. Separate staging configuration and secrets from development defaults.
-4. Establish reproducible restore, build, publish, deployment, and migration
+3. Establish reproducible restore, build, publish, deployment, and migration
    commands independent of IDE or running-process file locks.
-5. Validate required zone and storage-location code migrations against a safe
+4. Validate required zone and storage-location code migrations against a safe
    copy of an existing database.
-6. Keep unauthenticated 1C endpoints inside a trusted network boundary or
+5. Keep unauthenticated 1C endpoints inside a trusted network boundary or
    disable external access to them until caller verification is implemented.
-7. Deploy the applications and manually exercise login plus one short happy
+6. Deploy the applications and manually exercise login plus one short happy
    path for transfer, inventory count, receiving/putaway, and picking/shipping.
 
 ### Done when
 
 - WebApp and Mobile V1 are reachable through trusted HTTPS;
 - Android connects without bypassing certificate validation;
-- fresh and repeated deployments are documented and reproducible;
+- fresh and repeated standalone deployments are documented and reproducible;
 - database migration has a verified backup and restore procedure;
 - all four accepted mobile processes reach the staging API;
 - unverified 1C endpoints are not publicly exposed.
@@ -88,7 +155,7 @@ pilot prerequisites are complete. It must cover backup and restore, migration,
 authentication, the four warehouse processes, 1C exchange, an interrupted
 command, and the operator recovery procedure.
 
-## 1C resilience after the baseline
+## 1C resilience after synchronization visibility
 
 - Persist the latest conflicting 1C revision of an active receiving order.
 - Show header and line differences in WebApp and Mobile and block work while a
@@ -103,18 +170,13 @@ command, and the operator recovery procedure.
 
 ## Product increments
 
-### Quantity and source-data fidelity
+### Source-data fidelity
 
-- Replace binary floating-point operational quantities with a decimal model
-  aligned with the 1C `Number(15,3)` boundary. Define precision, rounding,
-  comparison, API representation, and migration together.
 - Before supporting packaging, capture real line and catalog examples and
   define the relationship between `Количество`, `КоличествоУпаковок`, and the
   packaging coefficient.
 - Confirm characteristic identity from real catalog, document-line, and
   barcode-register examples before changing the SKU or inventory key.
-- Confirm shipping table behavior for `Отгружать` and `НеОтгружать`; add line
-  splitting only after the business decision.
 
 ### Capacity
 
@@ -134,6 +196,14 @@ command, and the operator recovery procedure.
 - Treat offline commands, mass label printing, fleet management, and broader
   device certification as separate epics.
 
+### Mobile operator notifications
+
+- Define which warehouse events require an immediate notification and which
+  operator or role receives each event.
+- Add server push delivery, device-token lifecycle, notification privacy, and
+  deep links into the corresponding Mobile order or operation only after the
+  operational event model and recipient rules are stable.
+
 ## Production maintenance
 
 - Disable sensitive EF data logging and detailed errors outside approved
@@ -147,7 +217,7 @@ command, and the operator recovery procedure.
 
 ## Inputs needed for later work
 
-- staging host, DNS, certificate, database, and secret-management constraints;
+- standalone host, DNS, certificate, database, and configuration constraints;
 - a safe copy or representative snapshot of an existing database;
 - printer model, label size, and print-path constraints;
 - real 1C packaging, characteristic, and shipping-flag examples;

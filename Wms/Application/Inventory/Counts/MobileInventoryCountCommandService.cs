@@ -65,7 +65,7 @@ public sealed class MobileInventoryCountCommandService(
     public Task<OperationResult<Guid>> SetCountedQuantityAsync(
         Guid inventoryCountId,
         Guid itemId,
-        double countedQuantity,
+        decimal countedQuantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -76,7 +76,7 @@ public sealed class MobileInventoryCountCommandService(
                 '|',
                 inventoryCountId.ToString("N"),
                 itemId.ToString("N"),
-                countedQuantity.ToString("R", CultureInfo.InvariantCulture))),
+                countedQuantity.ToString("G29", CultureInfo.InvariantCulture))),
             userId,
             async (dbContext, token) =>
             {
@@ -114,7 +114,7 @@ public sealed class MobileInventoryCountCommandService(
     public Task<OperationResult<Guid>> SetSkuCountedQuantityAsync(
         Guid inventoryCountId,
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -125,7 +125,7 @@ public sealed class MobileInventoryCountCommandService(
                 '|',
                 inventoryCountId.ToString("N"),
                 stockKeepingUnitId.ToString("N"),
-                countedQuantity.ToString("R", CultureInfo.InvariantCulture))),
+                countedQuantity.ToString("G29", CultureInfo.InvariantCulture))),
             userId,
             async (dbContext, token) =>
             {

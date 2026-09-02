@@ -22,7 +22,7 @@ public partial class Details
 
     private InventoryCount? _inventoryCount;
     private InventoryCountSkuSearchResult? _selectedSku;
-    private double? _manualQuantity;
+    private decimal? _manualQuantity;
     private bool _isLoading = true;
     private bool _isBusy;
     private bool _operationFailed;
@@ -57,7 +57,7 @@ public partial class Details
 
     private async Task SaveManualQuantityAsync()
     {
-        if (_isBusy || _selectedSku is null || _manualQuantity is not double quantity)
+        if (_isBusy || _selectedSku is null || _manualQuantity is not decimal quantity)
             return;
 
         await RunOperationAsync(
@@ -72,7 +72,7 @@ public partial class Details
 
     private async Task<OperationResult> SetSkuCountedQuantityAsync(
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         string userId)
     {
         var result = await InventoryCountCommandService.SetSkuCountedQuantityAsync(
@@ -83,7 +83,7 @@ public partial class Details
         return result.IsSuccess ? OperationResult.Success() : result.Error!;
     }
 
-    private Task UpdateQuantityAsync(InventoryCountItem item, double? quantity) =>
+    private Task UpdateQuantityAsync(InventoryCountItem item, decimal? quantity) =>
         quantity is null || _isBusy
             ? Task.CompletedTask
             : RunOperationAsync(
@@ -200,5 +200,5 @@ public partial class Details
             : await action(userId);
     }
 
-    private static string FormatQuantity(double? quantity) => quantity?.ToString("0.###") ?? "—";
+    private static string FormatQuantity(decimal? quantity) => quantity?.ToString("0.###") ?? "—";
 }

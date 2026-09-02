@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace Wms.Integration.OneS.Models;
 
@@ -10,8 +10,8 @@ internal class Document_РасходныйОрдерНаТовары_Отгру�
     public int LineNumber { get; set; }
 
     public Guid Номенклатура_Key { get; set; }
-    public double Количество { get; set; }
-    public double КоличествоУпаковок { get; set; }
+    public decimal Количество { get; set; }
+    public decimal КоличествоУпаковок { get; set; }
     public string? Действие { get; set; }
     public Guid? Характеристика_Key { get; set; }
     public Guid? Назначение_Key { get; set; }

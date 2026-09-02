@@ -48,7 +48,7 @@ public class ReceivingOrder
     public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
-    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is double factQuantity
+    public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is decimal factQuantity
         && (factQuantity == 0 || x.FactWeightKg.HasValue));
     public int UnconfirmedItemCount => _items.Count(x => !x.IsFactConfirmed);
 
@@ -207,7 +207,7 @@ public class ReceivingOrder
 
     public OperationResult UpdateItemFact(
         int lineNumber,
-        double factQuantity,
+        decimal factQuantity,
         string? comment)
     {
         var editingResult = ValidateReceivingEditing();
@@ -256,7 +256,7 @@ public class ReceivingOrder
         return result;
     }
 
-    public OperationResult UpdateItemFactQuantity(int lineNumber, double factQuantity)
+    public OperationResult UpdateItemFactQuantity(int lineNumber, decimal factQuantity)
     {
         var editingResult = ValidateReceivingEditing();
         if (!editingResult.IsSuccess)
@@ -418,7 +418,7 @@ public class ReceivingOrder
         Guid movementId,
         int lineNumber,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset createdAtUtc,
         IReadOnlyCollection<InventoryMovement> draftMovements)
     {
@@ -463,7 +463,7 @@ public class ReceivingOrder
     public OperationResult UpdatePutawayMovement(
         InventoryMovement movement,
         Guid destinationStorageLocationId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset updatedAtUtc,
         IReadOnlyCollection<InventoryMovement> draftMovements)
     {
@@ -637,11 +637,11 @@ public class ReceivingOrder
 
     private static OperationResult ValidatePutawayLineQuantity(
         ReceivingOrderItem item,
-        double quantity,
+        decimal quantity,
         IReadOnlyCollection<InventoryMovement> draftMovements,
         Guid? excludedMovementId)
     {
-        if (!double.IsFinite(quantity) || quantity <= 0)
+        if (!WarehouseQuantity.IsPositive(quantity))
         {
             return OperationError.Invalid(
                 "Количество размещения должно быть конечным числом больше нуля.");

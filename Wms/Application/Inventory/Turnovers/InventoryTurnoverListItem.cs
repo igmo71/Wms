@@ -13,9 +13,9 @@ public class InventoryTurnoverListItem
     public Warehouse? Warehouse => Turnover.Warehouse;
     public StorageLocation? StorageLocation => Turnover.StorageLocation;
     public StockKeepingUnit? StockKeepingUnit => Turnover.StockKeepingUnit;
-    public double QuantityDelta => Turnover.QuantityDelta;
-    public double BalanceBefore => Turnover.BalanceBefore;
-    public double BalanceAfter => Turnover.BalanceAfter;
+    public decimal QuantityDelta => Turnover.QuantityDelta;
+    public decimal BalanceBefore => Turnover.BalanceBefore;
+    public decimal BalanceAfter => Turnover.BalanceAfter;
     public double? WeightDeltaKg => Turnover.WeightDeltaKg;
     public double? WeightBeforeKg => Turnover.WeightBeforeKg;
     public double? WeightAfterKg => Turnover.WeightAfterKg;

@@ -114,7 +114,7 @@ public partial class InProcess
         return Task.CompletedTask;
     }
 
-    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, double? factQuantity)
+    private async Task UpdateFactQuantityAsync(ReceivingOrderItem item, decimal? factQuantity)
     {
         if (factQuantity is null)
         {
@@ -156,7 +156,7 @@ public partial class InProcess
         }
     }
 
-    private async Task UpdateOrderItemFactAsync(ReceivingOrderItem item, double factQuantity, string? comment)
+    private async Task UpdateOrderItemFactAsync(ReceivingOrderItem item, decimal factQuantity, string? comment)
     {
         _completeFailed = false;
 
@@ -185,7 +185,7 @@ public partial class InProcess
         }
     }
 
-    private static string FormatQuantity(double? quantity) =>
+    private static string FormatQuantity(decimal? quantity) =>
         quantity?.ToString("0.###") ?? "—";
 
     private async Task SetReceivedAsync()

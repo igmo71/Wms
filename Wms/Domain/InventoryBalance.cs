@@ -15,7 +15,7 @@ public class InventoryBalance
     public StorageLocation? StorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
-    public double Quantity { get; private set; }
+    public decimal Quantity { get; private set; }
     public double? WeightKg => WeightCalculation.CalculateKg(Quantity, StockKeepingUnit);
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
@@ -26,7 +26,7 @@ public class InventoryBalance
         Guid warehouseId,
         Guid storageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         DateTimeOffset createdAtUtc)
     {
         if (id == Guid.Empty
@@ -37,7 +37,7 @@ public class InventoryBalance
             return OperationError.Invalid("Идентификаторы складского остатка обязательны.");
         }
 
-        if (!double.IsFinite(quantity) || quantity < 0)
+        if (!WarehouseQuantity.IsNonNegative(quantity))
         {
             return OperationError.Invalid(
                 "Количество остатка должно быть конечным неотрицательным числом.");
@@ -60,10 +60,10 @@ public class InventoryBalance
     }
 
     public OperationResult<InventoryBalanceChange> Adjust(
-        double quantityDelta,
+        decimal quantityDelta,
         DateTimeOffset updatedAtUtc)
     {
-        if (!double.IsFinite(quantityDelta) || quantityDelta == 0)
+        if (!WarehouseQuantity.IsSupported(quantityDelta) || quantityDelta == 0)
         {
             return OperationError.Invalid(
                 "Изменение остатка должно быть конечным ненулевым числом.");
@@ -76,7 +76,7 @@ public class InventoryBalance
         }
 
         var balanceAfter = Quantity + quantityDelta;
-        if (!double.IsFinite(balanceAfter) || balanceAfter < 0)
+        if (!WarehouseQuantity.IsNonNegative(balanceAfter))
         {
             return OperationError.Invalid("Складской остаток не может быть отрицательным.");
         }
@@ -89,6 +89,6 @@ public class InventoryBalance
 }
 
 public readonly record struct InventoryBalanceChange(
-    double BalanceBefore,
-    double QuantityDelta,
-    double BalanceAfter);
+    decimal BalanceBefore,
+    decimal QuantityDelta,
+    decimal BalanceAfter);

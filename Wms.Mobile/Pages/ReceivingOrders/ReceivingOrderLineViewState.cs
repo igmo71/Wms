@@ -14,9 +14,9 @@ public sealed class ReceivingOrderLineViewState : INotifyPropertyChanged
     public string SkuCode { get; private set; } = string.Empty;
     public string SkuName { get; private set; } = string.Empty;
     public string? UnitOfMeasure { get; private set; }
-    public double PlanQuantity { get; private set; }
-    public double? FactQuantity { get; private set; }
-    public double? DifferenceQuantity { get; private set; }
+    public decimal PlanQuantity { get; private set; }
+    public decimal? FactQuantity { get; private set; }
+    public decimal? DifferenceQuantity { get; private set; }
     public string? Comment { get; private set; }
     public bool CanEdit { get; private set; }
     public bool IsEditing { get; private set; }
@@ -130,12 +130,12 @@ public sealed class ReceivingOrderLineViewState : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasQuantityError));
     }
 
-    private static string Format(double value) => value.ToString("0.###");
+    private static string Format(decimal value) => value.ToString("0.###");
 
-    private static string FormatFact(double? value) =>
+    private static string FormatFact(decimal? value) =>
         value?.ToString("0.###") ?? "Не проверено";
 
-    private static string FormatDifference(double? value) => value switch
+    private static string FormatDifference(decimal? value) => value switch
     {
         null => "—",
         > 0 => $"+{value.Value:0.###}",

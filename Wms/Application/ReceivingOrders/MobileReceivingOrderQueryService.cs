@@ -343,7 +343,7 @@ public sealed class MobileReceivingOrderQueryService(
 
     private static MobileReceivingOrderLine MapLine(
         ReceivingOrderItem item,
-        IReadOnlyDictionary<int, double> allocatedByLine)
+        IReadOnlyDictionary<int, decimal> allocatedByLine)
     {
         var allocatedQuantity = GetAllocatedQuantity(allocatedByLine, item.LineNumber);
         return new MobileReceivingOrderLine(
@@ -355,7 +355,7 @@ public sealed class MobileReceivingOrderQueryService(
             item.PlanQuantity,
             item.FactQuantity,
             allocatedQuantity,
-            item.FactQuantity is double factQuantity
+            item.FactQuantity is decimal factQuantity
                 ? Math.Max(0, factQuantity - allocatedQuantity)
                 : null,
             item.Comment);
@@ -373,7 +373,7 @@ public sealed class MobileReceivingOrderQueryService(
 
     private static MobileReceivingOrderLineCandidate MapCandidate(
         ReceivingOrderItem item,
-        IReadOnlyDictionary<int, double> allocatedByLine,
+        IReadOnlyDictionary<int, decimal> allocatedByLine,
         bool isExactMatch)
     {
         var allocatedQuantity = GetAllocatedQuantity(allocatedByLine, item.LineNumber);
@@ -386,7 +386,7 @@ public sealed class MobileReceivingOrderQueryService(
             item.PlanQuantity,
             item.FactQuantity,
             allocatedQuantity,
-            item.FactQuantity is double factQuantity
+            item.FactQuantity is decimal factQuantity
                 ? Math.Max(0, factQuantity - allocatedQuantity)
                 : null,
             isExactMatch);
@@ -399,15 +399,15 @@ public sealed class MobileReceivingOrderQueryService(
         location.ZoneId,
         location.Zone?.Name ?? string.Empty);
 
-    private static Dictionary<int, double> BuildAllocatedByLine(
+    private static Dictionary<int, decimal> BuildAllocatedByLine(
         IEnumerable<InventoryMovement> movements) =>
         movements
             .Where(x => x.RecorderLineNumber.HasValue)
             .GroupBy(x => x.RecorderLineNumber!.Value)
             .ToDictionary(x => x.Key, x => x.Sum(movement => movement.Quantity));
 
-    private static double GetAllocatedQuantity(
-        IReadOnlyDictionary<int, double> allocatedByLine,
+    private static decimal GetAllocatedQuantity(
+        IReadOnlyDictionary<int, decimal> allocatedByLine,
         int lineNumber) =>
         allocatedByLine.TryGetValue(lineNumber, out var quantity) ? quantity : 0;
 
@@ -465,5 +465,5 @@ public sealed class MobileReceivingOrderQueryService(
     private sealed record ReceivingOrderLineWork(
         ReceivingOrder Order,
         ReceivingOrderLineContext Context,
-        IReadOnlyDictionary<int, double> AllocatedByLine);
+        IReadOnlyDictionary<int, decimal> AllocatedByLine);
 }

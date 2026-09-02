@@ -43,7 +43,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -76,7 +76,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid transferId,
         Guid sourceStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -95,7 +95,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid transferId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default) =>
@@ -136,7 +136,7 @@ public sealed class MobileInventoryTransferCommandService(
         Guid transferId,
         Guid enteredStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity,
+        decimal quantity,
         Guid clientRequestId,
         string userId,
         bool isPick,
@@ -188,26 +188,26 @@ public sealed class MobileInventoryTransferCommandService(
         Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity) =>
+        decimal quantity) =>
         MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             sourceStorageLocationId.ToString("N"),
             destinationStorageLocationId.ToString("N"),
             stockKeepingUnitId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture)));
+            quantity.ToString("G29", CultureInfo.InvariantCulture)));
 
     private static string ComputeTransitMovementHash(
         Guid transferId,
         Guid enteredStorageLocationId,
         Guid stockKeepingUnitId,
-        double quantity) =>
+        decimal quantity) =>
         MobileCommandExecutor.ComputeHash(string.Join(
             '|',
             transferId.ToString("N"),
             enteredStorageLocationId.ToString("N"),
             stockKeepingUnitId.ToString("N"),
-            quantity.ToString("R", CultureInfo.InvariantCulture)));
+            quantity.ToString("G29", CultureInfo.InvariantCulture)));
 
     private static string ComputeCompleteHash(Guid transferId) =>
         MobileCommandExecutor.ComputeHash(transferId.ToString("N"));

@@ -23,12 +23,12 @@ public sealed record ShippingOrderImportSnapshot(
 public sealed record ShippingOrderItemImportSnapshot(
     int LineNumber,
     Guid StockKeepingUnitId,
-    double PlanQuantity);
+    decimal PlanQuantity);
 
 public sealed record ShippingOrderBaseItemImportSnapshot(
     int LineNumber,
     Guid StockKeepingUnitId,
-    double PlanQuantity,
+    decimal PlanQuantity,
     Guid BaseOrderId,
     string? BaseOrderType);
 

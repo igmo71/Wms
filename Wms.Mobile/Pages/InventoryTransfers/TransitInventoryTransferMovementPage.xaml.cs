@@ -20,7 +20,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
     private readonly Action<MobileTransitInventoryTransferMovementResponse> _completed;
     private MobileStorageLocationResponse? _storageLocation;
     private MobileDirectTransferSkuResponse? _sku;
-    private double? _quantity;
+    private decimal? _quantity;
     private Guid? _pendingRequestId;
     private CancellationTokenSource? _searchCancellation;
     private bool _scannerSubscribed;
@@ -288,8 +288,8 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
 
         var value = QuantityEntry.Text?.Trim().Replace(',', '.');
         QuantityErrorLabel.Text = string.Empty;
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var quantity)
-            || !double.IsFinite(quantity)
+        if (!decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var quantity)
+            || !WarehouseQuantityInput.IsSupported(quantity)
             || quantity <= 0)
         {
             QuantityErrorLabel.Text = "Введите количество больше нуля.";
@@ -334,7 +334,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
 
     private async void OnConfirmClicked(object? sender, EventArgs e)
     {
-        if (_storageLocation is null || _sku is null || _quantity is not double quantity)
+        if (_storageLocation is null || _sku is null || _quantity is not decimal quantity)
         {
             return;
         }

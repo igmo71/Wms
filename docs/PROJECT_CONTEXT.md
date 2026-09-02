@@ -31,7 +31,7 @@ implementation details.
 - `Wms` contains the domain, application services, EF Core persistence, and 1C
   integration.
 - `Wms.WebApp` is the authenticated Blazor/MudBlazor operator application.
-- `Wms.WebApi` hosts authenticated Mobile V1 and development application
+- `Wms.WebApi` hosts authenticated Mobile V1 and application
   endpoints plus separate 1C integration endpoints. Verification of 1C callers
   is not yet implemented.
 - `Wms.Contracts` contains versioned Mobile V1 transport contracts.
@@ -100,7 +100,8 @@ reason. A locked location remains visible in topology and history but is
 excluded from operational selectors and cannot participate in final posting.
 It cannot be deactivated or converted to a folder. Administrators manage
 manual locks; inventory-count documents own their location lock until posting
-or explicit draft deletion.
+or explicit draft deletion. Releasing a lock deletes the active lock record;
+separate lock history is not retained.
 
 Optional dimensions use meters, volume uses cubic meters, maximum weight uses
 kilograms, and coordinates use the warehouse-local meter system.
@@ -114,6 +115,12 @@ properties to kilograms per canonical unit (`WeightKg`) and cubic meters per
 canonical unit (`VolumeM3`). Invalid, missing, incompatible, negative, or
 non-finite values become `null`, not zero. Stored values are not rounded;
 current UI precision is three decimals for weight and six for volume.
+
+Operational warehouse quantities use C# `decimal` and are persisted in SQL
+Server as `decimal(15,3)`, matching the current 1C `Number(15,3)` boundary.
+Values outside that range or with more than three fractional digits are
+rejected rather than rounded. Physical properties such as weight, volume,
+dimensions, coordinates, and conversion coefficients remain `double`.
 
 Physical properties are current catalog values, not historical snapshots.
 Changing a SKU therefore changes displayed historical weights. A nonzero fact

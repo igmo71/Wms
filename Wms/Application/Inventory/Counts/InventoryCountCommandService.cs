@@ -151,7 +151,7 @@ public sealed class InventoryCountCommandService(
     public async Task<OperationResult> SetCountedQuantityAsync(
         Guid inventoryCountId,
         Guid itemId,
-        double countedQuantity,
+        decimal countedQuantity,
         string userId,
         CancellationToken ct = default)
     {
@@ -172,7 +172,7 @@ public sealed class InventoryCountCommandService(
         ApplicationDbContext dbContext,
         Guid inventoryCountId,
         Guid itemId,
-        double countedQuantity,
+        decimal countedQuantity,
         string userId,
         CancellationToken ct)
     {
@@ -185,7 +185,7 @@ public sealed class InventoryCountCommandService(
     public async Task<OperationResult<InventoryCountItem>> SetSkuCountedQuantityAsync(
         Guid inventoryCountId,
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         string userId,
         CancellationToken ct = default)
     {
@@ -208,7 +208,7 @@ public sealed class InventoryCountCommandService(
         ApplicationDbContext dbContext,
         Guid inventoryCountId,
         Guid stockKeepingUnitId,
-        double countedQuantity,
+        decimal countedQuantity,
         string userId,
         CancellationToken ct)
     {

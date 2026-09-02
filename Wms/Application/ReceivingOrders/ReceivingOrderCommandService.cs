@@ -238,7 +238,7 @@ public class ReceivingOrderCommandService(
     public async Task<OperationResult> UpdateOrderItemFactQuantityAsync(
         Guid receivingOrderId,
         int lineNumber,
-        double factQuantity,
+        decimal factQuantity,
         string? comment,
         CancellationToken ct = default)
     {
@@ -262,7 +262,7 @@ public class ReceivingOrderCommandService(
         ApplicationDbContext dbContext,
         Guid orderId,
         int lineNumber,
-        double factQuantity,
+        decimal factQuantity,
         string? comment,
         CancellationToken ct)
     {
@@ -294,7 +294,7 @@ public class ReceivingOrderCommandService(
         ApplicationDbContext dbContext,
         Guid orderId,
         int lineNumber,
-        double factQuantity,
+        decimal factQuantity,
         CancellationToken ct)
     {
         var order = await LoadOrderAsync(dbContext, orderId, ct);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -10,6 +11,8 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
     public void Configure(EntityTypeBuilder<InventoryMovement> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Quantity)
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
         builder.Property(x => x.ConfirmedBy).HasMaxLength(DefaultConfiguration.Guid);
 
         builder.HasOne(x => x.Warehouse)

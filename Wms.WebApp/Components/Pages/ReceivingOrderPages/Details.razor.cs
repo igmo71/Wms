@@ -13,7 +13,7 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
 public partial class Details
 {
-    private static string FormatQuantity(double? quantity, string emptyText = "—") =>
+    private static string FormatQuantity(decimal? quantity, string emptyText = "—") =>
         quantity?.ToString("0.###") ?? emptyText;
 
     [Parameter]

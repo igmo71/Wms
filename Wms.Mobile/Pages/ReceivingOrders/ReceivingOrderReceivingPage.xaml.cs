@@ -701,11 +701,11 @@ public partial class ReceivingOrderReceivingPage : ContentPage
 
     private static bool TryReadQuantity(
         ReceivingOrderLineViewState line,
-        out double quantity)
+        out decimal quantity)
     {
         var value = line.QuantityText.Trim().Replace(',', '.');
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out quantity)
-            && double.IsFinite(quantity)
+        if (decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out quantity)
+            && WarehouseQuantityInput.IsSupported(quantity)
             && quantity >= 0)
         {
             return true;

@@ -13,9 +13,9 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     public Guid StockKeepingUnitId { get; private set; }
     public string SkuName { get; private set; } = string.Empty;
     public string? UnitOfMeasure { get; private set; }
-    public double ExpectedQuantity { get; private set; }
-    public double? CountedQuantity { get; private set; }
-    public double? DifferenceQuantity { get; private set; }
+    public decimal ExpectedQuantity { get; private set; }
+    public decimal? CountedQuantity { get; private set; }
+    public decimal? DifferenceQuantity { get; private set; }
     public bool IsExpected { get; private set; }
     public bool IsPending { get; private set; }
     public bool CanEdit { get; private set; }
@@ -161,7 +161,7 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasQuantityError));
     }
 
-    private static string Format(double? value) => value?.ToString("0.###") ?? "—";
+    private static string Format(decimal? value) => value?.ToString("0.###") ?? "—";
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

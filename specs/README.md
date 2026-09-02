@@ -19,7 +19,9 @@ establish an otherwise undocumented rule.
 
 ## Current selection
 
-There is no active or queued specification.
+| Created | Status | Problem | Path |
+| --- | --- | --- | --- |
+| 2026-09-02 | Active | Decimal warehouse quantities | [`2026-09-02-decimal-warehouse-quantities/spec.md`](2026-09-02-decimal-warehouse-quantities/spec.md) |
 
 ## Recent governing references
 

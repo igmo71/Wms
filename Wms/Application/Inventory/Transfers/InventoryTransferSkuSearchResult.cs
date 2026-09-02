@@ -5,5 +5,5 @@ public sealed record InventoryTransferSkuSearchResult(
     string Code,
     string Name,
     string? UnitOfMeasure,
-    double AvailableQuantity,
+    decimal AvailableQuantity,
     bool IsExactMatch);
