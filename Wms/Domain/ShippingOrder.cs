@@ -106,6 +106,9 @@ public class ShippingOrder
             order._baseItems.Add(itemResult.Value!);
         }
 
+        order.ExternalSynchronizationFingerprint =
+            ShippingOrderSynchronizationComparer.Compare(order, snapshot).Fingerprint;
+
         return order;
     }
 
@@ -119,61 +122,60 @@ public class ShippingOrder
                 "Идентификатор импортируемого расходного ордера не совпадает с существующим.");
         }
 
-        if (!HasExternalChanges(snapshot))
+        if (updatedAtUtc == default)
         {
-            return ShippingOrderReconciliation.Unchanged;
-        }
-
-        if (Status != ShippingOrderStatus.Prepared)
-        {
-            if (ExternalSynchronizationLevel != OrderSynchronizationLevel.Blocking)
-            {
-                if (ExternalSynchronizationLevel == OrderSynchronizationLevel.Synchronized)
-                {
-                    ExternalSynchronizationDetectedAtUtc = updatedAtUtc;
-                }
-
-                ExternalSynchronizationLevel = OrderSynchronizationLevel.Blocking;
-                ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
-                ExternalSynchronizationFingerprint = null;
-                AdvanceOperationalRevision();
-            }
-
-            return ShippingOrderReconciliation.Conflict;
-        }
-
-        OperationResult validationResult = ValidateImport(snapshot, updatedAtUtc);
-        if (!validationResult.IsSuccess)
-        {
-            return validationResult.Error!;
+            return OperationError.Invalid("Время сверки расходного ордера обязательно.");
         }
 
         if (updatedAtUtc < CreatedAtUtc)
         {
             return OperationError.Invalid(
-                "Время изменения расходного ордера не может предшествовать времени его создания.");
+                "Время сверки расходного ордера не может предшествовать времени его создания.");
         }
 
-        OperationResult itemsResult = ReconcileItems(snapshot.Items);
-        if (!itemsResult.IsSuccess)
+        OrderSynchronizationAssessment assessment =
+            ShippingOrderSynchronizationComparer.Compare(this, snapshot);
+        bool synchronizationStateChanged = ApplySynchronizationAssessment(
+            assessment,
+            updatedAtUtc);
+
+        if (assessment.Level != OrderSynchronizationLevel.Synchronized)
         {
-            return itemsResult.Error!;
+            return ShippingOrderReconciliation.Conflict;
         }
 
-        OperationResult baseItemsResult = ReconcileBaseItems(snapshot.BaseItems);
-        if (!baseItemsResult.IsSuccess)
+        return synchronizationStateChanged
+            ? ShippingOrderReconciliation.Updated
+            : ShippingOrderReconciliation.Unchanged;
+    }
+
+    private bool ApplySynchronizationAssessment(
+        OrderSynchronizationAssessment assessment,
+        DateTimeOffset checkedAtUtc)
+    {
+        DateTimeOffset? detectedAtUtc = assessment.Level == OrderSynchronizationLevel.Synchronized
+            ? null
+            : ExternalSynchronizationLevel == assessment.Level
+                && ExternalSynchronizationFingerprint == assessment.Fingerprint
+                    ? ExternalSynchronizationDetectedAtUtc
+                    : checkedAtUtc;
+
+        bool changed = ExternalSynchronizationLevel != assessment.Level
+            || ExternalSynchronizationCheckedAtUtc != checkedAtUtc
+            || ExternalSynchronizationDetectedAtUtc != detectedAtUtc
+            || ExternalSynchronizationFingerprint != assessment.Fingerprint;
+
+        ExternalSynchronizationLevel = assessment.Level;
+        ExternalSynchronizationCheckedAtUtc = checkedAtUtc;
+        ExternalSynchronizationDetectedAtUtc = detectedAtUtc;
+        ExternalSynchronizationFingerprint = assessment.Fingerprint;
+
+        if (changed)
         {
-            return baseItemsResult.Error!;
+            AdvanceOperationalRevision();
         }
 
-        ApplyImport(snapshot);
-        UpdatedAtUtc = updatedAtUtc;
-        ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
-        ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
-        ExternalSynchronizationDetectedAtUtc = null;
-        ExternalSynchronizationFingerprint = null;
-        AdvanceOperationalRevision();
-        return ShippingOrderReconciliation.Updated;
+        return changed;
     }
 
     public OperationResult SetShippingLocation(Guid shippingLocationId)

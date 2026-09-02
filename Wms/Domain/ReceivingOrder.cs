@@ -97,6 +97,9 @@ public class ReceivingOrder
             order._items.Add(itemResult.Value!);
         }
 
+        order.ExternalSynchronizationFingerprint =
+            ReceivingOrderSynchronizationComparer.Compare(order, snapshot).Fingerprint;
+
         return order;
     }
 
@@ -110,55 +113,60 @@ public class ReceivingOrder
                 "Импортируемый приходный ордер должен соответствовать существующему ордеру.");
         }
 
-        if (!HasExternalChanges(snapshot))
+        if (updatedAtUtc == default)
         {
-            return ReceivingOrderReconciliation.Unchanged;
-        }
-
-        if (Status != ReceivingOrderStatus.ReadyForReceiving)
-        {
-            if (ExternalSynchronizationLevel != OrderSynchronizationLevel.Blocking)
-            {
-                if (ExternalSynchronizationLevel == OrderSynchronizationLevel.Synchronized)
-                {
-                    ExternalSynchronizationDetectedAtUtc = updatedAtUtc;
-                }
-
-                ExternalSynchronizationLevel = OrderSynchronizationLevel.Blocking;
-                ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
-                ExternalSynchronizationFingerprint = null;
-                AdvanceOperationalRevision();
-            }
-
-            return ReceivingOrderReconciliation.Conflict;
-        }
-
-        var validationResult = ValidateImport(snapshot, updatedAtUtc);
-        if (!validationResult.IsSuccess)
-        {
-            return validationResult.Error!;
+            return OperationError.Invalid("Время сверки приходного ордера обязательно.");
         }
 
         if (updatedAtUtc < CreatedAtUtc)
         {
             return OperationError.Invalid(
-                "Время изменения приходного ордера не может предшествовать времени его создания.");
+                "Время сверки приходного ордера не может предшествовать времени его создания.");
         }
 
-        var itemsResult = ReconcileItems(snapshot.Items);
-        if (!itemsResult.IsSuccess)
+        OrderSynchronizationAssessment assessment =
+            ReceivingOrderSynchronizationComparer.Compare(this, snapshot);
+        bool synchronizationStateChanged = ApplySynchronizationAssessment(
+            assessment,
+            updatedAtUtc);
+
+        if (assessment.Level != OrderSynchronizationLevel.Synchronized)
         {
-            return itemsResult.Error!;
+            return ReceivingOrderReconciliation.Conflict;
         }
 
-        ApplyImport(snapshot);
-        UpdatedAtUtc = updatedAtUtc;
-        ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
-        ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
-        ExternalSynchronizationDetectedAtUtc = null;
-        ExternalSynchronizationFingerprint = null;
-        AdvanceOperationalRevision();
-        return ReceivingOrderReconciliation.Updated;
+        return synchronizationStateChanged
+            ? ReceivingOrderReconciliation.Updated
+            : ReceivingOrderReconciliation.Unchanged;
+    }
+
+    private bool ApplySynchronizationAssessment(
+        OrderSynchronizationAssessment assessment,
+        DateTimeOffset checkedAtUtc)
+    {
+        DateTimeOffset? detectedAtUtc = assessment.Level == OrderSynchronizationLevel.Synchronized
+            ? null
+            : ExternalSynchronizationLevel == assessment.Level
+                && ExternalSynchronizationFingerprint == assessment.Fingerprint
+                    ? ExternalSynchronizationDetectedAtUtc
+                    : checkedAtUtc;
+
+        bool changed = ExternalSynchronizationLevel != assessment.Level
+            || ExternalSynchronizationCheckedAtUtc != checkedAtUtc
+            || ExternalSynchronizationDetectedAtUtc != detectedAtUtc
+            || ExternalSynchronizationFingerprint != assessment.Fingerprint;
+
+        ExternalSynchronizationLevel = assessment.Level;
+        ExternalSynchronizationCheckedAtUtc = checkedAtUtc;
+        ExternalSynchronizationDetectedAtUtc = detectedAtUtc;
+        ExternalSynchronizationFingerprint = assessment.Fingerprint;
+
+        if (changed)
+        {
+            AdvanceOperationalRevision();
+        }
+
+        return changed;
     }
 
     public OperationResult SetReceivingLocation(Guid receivingLocationId)

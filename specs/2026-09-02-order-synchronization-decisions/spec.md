@@ -74,6 +74,13 @@ This level covers changed source metadata that does not change warehouse facts:
 The acknowledgement is valid only for the fingerprint that the operator saw.
 A later 1C change invalidates it automatically.
 
+Acknowledgement means accepting the fresh source-owned values from 1C into
+WMS; it never writes stale WMS metadata back to 1C. The server verifies that
+the displayed fingerprint is still current before applying the values. If 1C
+changed again, the operator must review the new differences. A compatible
+status may be aligned only inside the same workflow phase and must not alter
+local facts, movements, timestamps, or user audit.
+
 ### Blocking
 
 This level covers:
@@ -91,9 +98,10 @@ This level covers:
   unambiguously.
 
 Blocking means that the operational transition cannot continue. It does not
-silently replace the local plan. If an order has no local work, a later,
-explicit plan-refresh resolution may be added separately; active local work is
-never discarded by this synchronization flow.
+write either side over the other and does not silently replace the local plan.
+If an order has no local work, a later, explicit plan-refresh resolution may be
+added separately; active local work is never discarded by this synchronization
+flow.
 
 ## Recognizing WMS-owned changes
 
@@ -162,6 +170,7 @@ equals the current one.
 - order details show each changed field with WMS and 1C values;
 - consequences and the required next action are written in plain language;
 - only requires-decision differences can be acknowledged;
+- acknowledgement applies the reviewed source-owned values from 1C to WMS;
 - acknowledgement records the current user and time;
 - blocking differences have no continue-anyway action.
 
@@ -189,4 +198,3 @@ equals the current one.
 - notifications remain best-effort and no durable queue or polling is added;
 - WebApp shows details and audit while Mobile shows the agreed summary;
 - no tests are added or run.
-
