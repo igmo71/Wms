@@ -18,6 +18,13 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
         builder.Property(x => x.PutawayStartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.PutawayCompletedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.BaseOrderType).HasMaxLength(DefaultConfiguration.Name);
+        builder.Property(x => x.ExternalSynchronizationFingerprint)
+            .HasMaxLength(DefaultConfiguration.Fingerprint);
+        builder.Property(x => x.ExternalSynchronizationAcknowledgedFingerprint)
+            .HasMaxLength(DefaultConfiguration.Fingerprint);
+        builder.Property(x => x.ExternalSynchronizationAcknowledgedBy)
+            .HasMaxLength(DefaultConfiguration.Guid);
+        builder.Ignore(x => x.ExternalChangeDetected);
         builder.Ignore(x => x.Shipper);
 
         builder.HasOne(X => X.Warehouse).WithMany()

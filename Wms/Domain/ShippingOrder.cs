@@ -40,7 +40,15 @@ public class ShippingOrder
     public string? ShippedBy { get; private set; }
     public string? RolledBackBy { get; private set; }
     public string? RollbackReason { get; private set; }
-    public bool ExternalChangeDetected { get; private set; }
+    public OrderSynchronizationLevel ExternalSynchronizationLevel { get; private set; }
+    public DateTimeOffset? ExternalSynchronizationCheckedAtUtc { get; private set; }
+    public DateTimeOffset? ExternalSynchronizationDetectedAtUtc { get; private set; }
+    public string? ExternalSynchronizationFingerprint { get; private set; }
+    public string? ExternalSynchronizationAcknowledgedFingerprint { get; private set; }
+    public DateTimeOffset? ExternalSynchronizationAcknowledgedAtUtc { get; private set; }
+    public string? ExternalSynchronizationAcknowledgedBy { get; private set; }
+    public bool ExternalChangeDetected =>
+        ExternalSynchronizationLevel != OrderSynchronizationLevel.Synchronized;
     public Guid ReceiverId { get; private set; }
     public PartyType ReceiverType { get; private set; }
     public PartyInfo? Receiver { get; private set; }
@@ -70,7 +78,9 @@ public class ShippingOrder
         var order = new ShippingOrder
         {
             Id = snapshot.Id,
-            CreatedAtUtc = createdAtUtc
+            CreatedAtUtc = createdAtUtc,
+            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized,
+            ExternalSynchronizationCheckedAtUtc = createdAtUtc
         };
 
         order.ApplyImport(snapshot);
@@ -116,9 +126,16 @@ public class ShippingOrder
 
         if (Status != ShippingOrderStatus.Prepared)
         {
-            if (!ExternalChangeDetected)
+            if (ExternalSynchronizationLevel != OrderSynchronizationLevel.Blocking)
             {
-                ExternalChangeDetected = true;
+                if (ExternalSynchronizationLevel == OrderSynchronizationLevel.Synchronized)
+                {
+                    ExternalSynchronizationDetectedAtUtc = updatedAtUtc;
+                }
+
+                ExternalSynchronizationLevel = OrderSynchronizationLevel.Blocking;
+                ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
+                ExternalSynchronizationFingerprint = null;
                 AdvanceOperationalRevision();
             }
 
@@ -151,7 +168,10 @@ public class ShippingOrder
 
         ApplyImport(snapshot);
         UpdatedAtUtc = updatedAtUtc;
-        ExternalChangeDetected = false;
+        ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
+        ExternalSynchronizationCheckedAtUtc = updatedAtUtc;
+        ExternalSynchronizationDetectedAtUtc = null;
+        ExternalSynchronizationFingerprint = null;
         AdvanceOperationalRevision();
         return ShippingOrderReconciliation.Updated;
     }

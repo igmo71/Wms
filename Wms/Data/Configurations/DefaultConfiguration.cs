@@ -6,4 +6,5 @@ internal static class DefaultConfiguration
     public const int Name = 200;
     public const int Description = 1000;
     public const int Guid = 36;
+    public const int Fingerprint = 64;
 }
