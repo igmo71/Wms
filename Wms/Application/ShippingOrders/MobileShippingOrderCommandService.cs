@@ -126,21 +126,14 @@ public sealed class MobileShippingOrderCommandService(
 
     public Task<OperationResult<Guid>> ShipAsync(
         Guid orderId,
-        string? shippingLocationBarcode,
         Guid clientRequestId,
         string userId,
         CancellationToken ct = default)
     {
-        if (!StorageLocation.TryParseBarcode(shippingLocationBarcode, out var shippingLocationId))
-        {
-            return Task.FromResult<OperationResult<Guid>>(
-                OperationError.Invalid("Некорректный QR-код ячейки."));
-        }
-
         return mobileCommandExecutor.ExecuteAsync(
             ShipCommand,
             clientRequestId,
-            Hash(orderId, shippingLocationId),
+            Hash(orderId),
             userId,
             async (dbContext, token) =>
             {
@@ -148,7 +141,6 @@ public sealed class MobileShippingOrderCommandService(
                     dbContext,
                     orderId,
                     userId,
-                    shippingLocationId,
                     token);
                 return result.IsSuccess ? orderId : result.Error!;
             },

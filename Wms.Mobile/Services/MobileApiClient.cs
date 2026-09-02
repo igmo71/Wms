@@ -565,14 +565,11 @@ public sealed class MobileApiClient
 
     public Task<MobileShippingOrderCommandResponse> ShipShippingOrderAsync(
         Guid orderId,
-        string shippingLocationBarcode,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostShippingOrderCommandAsync(
             $"{MobileApiRoutes.ShippingOrders}/{orderId:D}/ship",
-            new MobileShipShippingOrderRequest(
-                clientRequestId,
-                shippingLocationBarcode),
+            new MobileShippingOrderCommandRequest(clientRequestId),
             ct);
 
     public async Task<MobileReceivingOrderWorkQueueResponse> GetReceivingOrderWorkQueueAsync(

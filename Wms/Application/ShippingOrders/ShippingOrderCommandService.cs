@@ -235,7 +235,6 @@ public class ShippingOrderCommandService(
             dbContext,
             orderId,
             userId,
-            confirmedShippingLocationId: null,
             ct: ct);
 
         return result.IsSuccess
@@ -247,7 +246,6 @@ public class ShippingOrderCommandService(
         ApplicationDbContext dbContext,
         Guid orderId,
         string userId,
-        Guid? confirmedShippingLocationId,
         CancellationToken ct)
     {
         using IDisposable? scope = logger.BeginScope("ShippingOrder SetShipped {OrderId}", orderId);
@@ -263,17 +261,13 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound($"Расходный ордер '{orderId}' не найден.");
         }
 
-        if (confirmedShippingLocationId is Guid scannedLocationId)
+        OperationResult locationResult = await ValidateShippingLocationAsync(
+            dbContext,
+            existingOrder,
+            ct);
+        if (!locationResult.IsSuccess)
         {
-            OperationResult locationResult = await ValidateShippingLocationConfirmationAsync(
-                dbContext,
-                existingOrder,
-                scannedLocationId,
-                ct);
-            if (!locationResult.IsSuccess)
-            {
-                return locationResult;
-            }
+            return locationResult;
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -315,16 +309,20 @@ public class ShippingOrderCommandService(
         return OperationResult.Success();
     }
 
-    private static async Task<OperationResult> ValidateShippingLocationConfirmationAsync(
+    private static async Task<OperationResult> ValidateShippingLocationAsync(
         ApplicationDbContext dbContext,
         ShippingOrder order,
-        Guid scannedLocationId,
         CancellationToken ct)
     {
+        if (order.ShippingLocationId is not Guid shippingLocationId)
+        {
+            return OperationError.Invalid("Для отгрузки не указана позиция отгрузки.");
+        }
+
         StorageLocation? location = await dbContext.StorageLocations
             .Include(x => x.Zone)
             .Include(x => x.ActiveLock)
-            .SingleOrDefaultAsync(x => x.Id == scannedLocationId, ct);
+            .SingleOrDefaultAsync(x => x.Id == shippingLocationId, ct);
 
         if (location is null
             || location.WarehouseId != order.WarehouseId
@@ -334,7 +332,7 @@ public class ShippingOrderCommandService(
             || location.Zone?.Type != ZoneType.Shipping)
         {
             return OperationError.Invalid(
-                "Подтверждение отгрузки требует активную позицию зоны отгрузки склада ордера.");
+                "Для отгрузки требуется активная позиция зоны отгрузки склада ордера.");
         }
 
         OperationResult availabilityResult = StorageLocationAvailability.ValidateUnlocked(location);
@@ -343,10 +341,7 @@ public class ShippingOrderCommandService(
             return availabilityResult;
         }
 
-        return order.ShippingLocationId == scannedLocationId
-            ? OperationResult.Success()
-            : OperationError.Invalid(
-                "Отсканированная позиция не совпадает с позицией отгрузки ордера.");
+        return OperationResult.Success();
     }
 
     private static async Task<OperationResult> StageSetShippingLocationAsync(

@@ -499,10 +499,6 @@ public sealed record MobileAddShippingOrderPickingMovementRequest(
 
 public sealed record MobileShippingOrderCommandRequest(Guid ClientRequestId);
 
-public sealed record MobileShipShippingOrderRequest(
-    Guid ClientRequestId,
-    string ShippingLocationBarcode);
-
 public sealed record MobileShippingOrderCommandResponse(
     MobileShippingOrderDetailsResponse Details,
     int? ChangedLineNumber = null,

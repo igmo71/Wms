@@ -1,5 +1,4 @@
 using Wms.Contracts.Mobile.V1;
-using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
@@ -7,24 +6,16 @@ namespace Wms.Mobile;
 public partial class ShippingOrderShippingPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
-    private readonly IOperationalBarcodeScanner _scanner;
     private MobileShippingOrderDetailsResponse? _details;
     private ShippingPageMode _mode = ShippingPageMode.Ready;
-    private MobileStorageLocationResponse? _scannedLocation;
-    private string? _scannedLocationBarcode;
     private Guid? _pendingShippingRequestId;
     private bool _isVisible;
-    private bool _scannerSubscribed;
     private bool _busy;
 
-    public ShippingOrderShippingPage(
-        MobileApiClient apiClient,
-        IOperationalBarcodeScanner scanner)
+    public ShippingOrderShippingPage(MobileApiClient apiClient)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        _scanner = scanner;
-        CameraScannerView.Configure(scanner);
     }
 
     public IReadOnlyList<MobileShippingOrderLineResponse> Lines { get; private set; } = [];
@@ -32,43 +23,24 @@ public partial class ShippingOrderShippingPage : ContentPage
     private MobileShippingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Расходный ордер не загружен.");
 
-    private bool IsScanExpected => _isVisible
-        && !_busy
-        && _pendingShippingRequestId is null
-        && _mode == ShippingPageMode.LocationScanning;
-
     public void Show(MobileShippingOrderDetailsResponse details)
     {
-        _scannedLocation = null;
-        _scannedLocationBarcode = null;
         _pendingShippingRequestId = null;
+        ConfirmShippingButton.Text = "Отгрузить";
+        ErrorLabel.Text = string.Empty;
         ApplyDetails(details);
         SetMode(ShippingPageMode.Ready);
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
         _isVisible = true;
-        if (!_scannerSubscribed)
-        {
-            _scanner.ScanReceived += OnScanReceived;
-            _scannerSubscribed = true;
-        }
-
-        await UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
         _isVisible = false;
-        CameraScannerView.Stop();
-        if (_scannerSubscribed)
-        {
-            _scanner.ScanReceived -= OnScanReceived;
-            _scannerSubscribed = false;
-        }
-
         base.OnDisappearing();
     }
 
@@ -77,7 +49,7 @@ public partial class ShippingOrderShippingPage : ContentPage
         if (_busy || _pendingShippingRequestId is not null)
         {
             ErrorLabel.Text = _pendingShippingRequestId is not null
-                ? "Сначала повторите отгрузку с той же позицией."
+                ? "Сначала повторите отгрузку."
                 : "Дождитесь завершения операции.";
             return true;
         }
@@ -85,7 +57,7 @@ public partial class ShippingOrderShippingPage : ContentPage
         return base.OnBackButtonPressed();
     }
 
-    private async void OnStartShippingClicked(object? sender, EventArgs e)
+    private void OnStartShippingClicked(object? sender, EventArgs e)
     {
         if (_busy
             || _pendingShippingRequestId is not null
@@ -95,56 +67,10 @@ public partial class ShippingOrderShippingPage : ContentPage
         }
 
         ErrorLabel.Text = string.Empty;
-        SetMode(ShippingPageMode.LocationScanning);
-        await UpdateCameraAsync();
+        SetMode(ShippingPageMode.Confirmation);
     }
 
-    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
-        MainThread.BeginInvokeOnMainThread(async () => await ResolveShippingLocationAsync(scanEvent.Value));
-
-    private async Task ResolveShippingLocationAsync(string barcode)
-    {
-        if (!IsScanExpected)
-        {
-            return;
-        }
-
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try
-        {
-            var location = await _apiClient.ResolveStorageLocationAsync(
-                barcode,
-                Details.Order.WarehouseId,
-                MobileStorageLocationContext.Shipping);
-            if (Details.Order.ShippingLocation is not { } expectedLocation
-                || location.Id != expectedLocation.Id)
-            {
-                ErrorLabel.Text = "Отсканирована не та позиция отгрузки, которая указана в ордере.";
-                return;
-            }
-
-            _scannedLocation = location;
-            _scannedLocationBarcode = barcode;
-            ScannedLocationLabel.Text = $"Позиция подтверждена: {location.Address} · {location.Name}";
-            SetMode(ShippingPageMode.Confirmation);
-        }
-        catch (MobileApiException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование позиции.";
-        }
-        finally
-        {
-            SetBusy(false);
-            await UpdateCameraAsync();
-        }
-    }
-
-    private async void OnCancelShippingClicked(object? sender, EventArgs e)
+    private void OnCancelShippingClicked(object? sender, EventArgs e)
     {
         if (_busy)
         {
@@ -153,21 +79,18 @@ public partial class ShippingOrderShippingPage : ContentPage
 
         if (_pendingShippingRequestId is not null)
         {
-            ErrorLabel.Text = "Сначала повторите отгрузку с той же позицией.";
+            ErrorLabel.Text = "Сначала повторите отгрузку.";
             return;
         }
 
-        _scannedLocation = null;
-        _scannedLocationBarcode = null;
         ConfirmShippingButton.Text = "Отгрузить";
         ErrorLabel.Text = string.Empty;
-        SetMode(ShippingPageMode.LocationScanning);
-        await UpdateCameraAsync();
+        SetMode(ShippingPageMode.Ready);
     }
 
     private async void OnConfirmShippingClicked(object? sender, EventArgs e)
     {
-        if (_busy || _scannedLocation is null || _scannedLocationBarcode is null)
+        if (_busy || Details.Order.Status != MobileShippingOrderStatus.ReadyForShipment)
         {
             return;
         }
@@ -179,7 +102,6 @@ public partial class ShippingOrderShippingPage : ContentPage
         {
             var response = await _apiClient.ShipShippingOrderAsync(
                 Details.Order.Id,
-                _scannedLocationBarcode,
                 _pendingShippingRequestId.Value);
             _pendingShippingRequestId = null;
             ConfirmShippingButton.Text = "Отгрузить";
@@ -202,12 +124,11 @@ public partial class ShippingOrderShippingPage : ContentPage
         catch (HttpRequestException)
         {
             ConfirmShippingButton.Text = "Повторить отгрузку";
-            ErrorLabel.Text = "Ответ сервера не получен. Повторите отгрузку с той же позицией.";
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите отгрузку.";
         }
         finally
         {
             SetBusy(false);
-            await UpdateCameraAsync();
         }
     }
 
@@ -233,29 +154,14 @@ public partial class ShippingOrderShippingPage : ContentPage
         ConfirmationPanel.IsVisible = mode == ShippingPageMode.Confirmation;
         (StepLabel.Text, InstructionLabel.Text) = mode switch
         {
-            ShippingPageMode.LocationScanning => (
-                "Позиция отгрузки",
-                "Повторно отсканируйте позицию отгрузки, указанную в ордере."),
             ShippingPageMode.Confirmation => (
                 "Подтверждение отгрузки",
-                "Проверьте позицию и итоговое количество."),
+                "Проверьте позицию и итоговое количество, затем подтвердите отгрузку."),
             _ => (
                 "Финальная отгрузка",
                 "Проверьте итог ордера и нажмите «Отгрузить».")
         };
         RefreshActionAvailability();
-    }
-
-    private async Task UpdateCameraAsync()
-    {
-        if (_scanner.ActiveSource == BarcodeScanSource.Camera && IsScanExpected)
-        {
-            await CameraScannerView.StartAsync();
-        }
-        else
-        {
-            CameraScannerView.Stop();
-        }
     }
 
     private void SetBusy(bool busy)
@@ -269,7 +175,7 @@ public partial class ShippingOrderShippingPage : ContentPage
     {
         StartShippingButton.IsVisible = _mode == ShippingPageMode.Ready;
         StartShippingButton.IsEnabled = !_busy && _pendingShippingRequestId is null;
-        ConfirmShippingButton.IsEnabled = !_busy && _scannedLocationBarcode is not null;
+        ConfirmShippingButton.IsEnabled = !_busy;
         CancelShippingButton.IsEnabled = !_busy && _pendingShippingRequestId is null;
     }
 
@@ -295,7 +201,6 @@ public partial class ShippingOrderShippingPage : ContentPage
     private enum ShippingPageMode
     {
         Ready,
-        LocationScanning,
         Confirmation
     }
 }

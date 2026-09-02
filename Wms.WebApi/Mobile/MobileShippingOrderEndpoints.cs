@@ -210,7 +210,7 @@ internal static class MobileShippingOrderEndpoints
 
     private static async Task<IResult> ShipAsync(
         Guid orderId,
-        MobileShipShippingOrderRequest request,
+        MobileShippingOrderCommandRequest request,
         ClaimsPrincipal principal,
         MobileShippingOrderQueryService queryService,
         MobileShippingOrderCommandService commandService,
@@ -224,7 +224,6 @@ internal static class MobileShippingOrderEndpoints
 
         var result = await commandService.ShipAsync(
             orderId,
-            request.ShippingLocationBarcode,
             request.ClientRequestId,
             userId,
             ct);

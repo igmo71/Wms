@@ -4,7 +4,6 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
-    xmlns:local="clr-namespace:Wms.Mobile"
     Title="Отгрузка">
 
     <ScrollView>
@@ -33,10 +32,7 @@
                         Loaded="OnNonScanControlLoaded"
                         Text="Отгрузить" />
 
-                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-
                     <VerticalStackLayout x:Name="ConfirmationPanel" IsVisible="False" Spacing="10">
-                        <Label x:Name="ScannedLocationLabel" FontAttributes="Bold" FontSize="19" />
                         <Label x:Name="ShippingSummaryLabel" FontSize="17" />
                         <Label
                             FontAttributes="Bold"

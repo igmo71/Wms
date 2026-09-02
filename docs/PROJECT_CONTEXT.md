@@ -70,7 +70,7 @@ is in [`specs/architecture-alignment/spec.md`](../specs/architecture-alignment/s
   completion, and idempotent retry of uncertain changing responses. The
   picking and shipping mobile section implements the full online path from a
   warehouse-scoped queue or document scan through picking movements and result
-  confirmation to a rescanned shipping location and final shipment.
+  confirmation to an explicitly confirmed final shipment.
 
 The mobile foundation and the intra-warehouse transfer, location-based
 inventory-count, and receiving/putaway workflows are accepted. Device checks
@@ -290,8 +290,8 @@ idempotently add a draft movement from a scanned eligible storage location and
 delete a draft movement; each movement change and its receipt share one save
 boundary and reuse the Web picking rules. It can idempotently complete full,
 partial, or zero picking through the existing 1C update and inventory posting,
-and can ship only after rescanning the order's active unlocked shipping
-location. The mobile UI implements the warehouse queues, document scan, stage
+and can ship only from the order's assigned active unlocked shipping location.
+The mobile UI implements the warehouse queues, document scan, stage
 routing, and start-picking flow with stable retry identity. It also shows the
 picking plan, facts, remaining quantities, and draft movements; an operator can
 select a line by SKU scan or manual search, scan an eligible source, confirm a
@@ -300,9 +300,11 @@ editing it in place. Source availability is only a hint: the source itself must
 be physically scanned. The picking screen presents the full, partial, or zero
 result before completion and requires a separate acknowledgement of any
 shortage. Successful completion opens the final shipping screen with fresh
-facts. Shipping requires rescanning the order's saved shipping location and an
-explicit final confirmation; success returns to the refreshed work queue, where
-the shipped order is no longer present.
+facts. Shipping shows the assigned location, quantities, and irreversible-effect
+warning, then requires an explicit final confirmation without rescanning the
+already assigned location. The server validates that location from the order;
+success returns to the refreshed work queue, where the shipped order is no
+longer present.
 
 An unfinished cycle may be rolled back locally to prepared: drafts are deleted
 and already posted movements from that cycle are offset by new reverse
@@ -434,8 +436,9 @@ The fourth accepted mobile process is picking and shipping of one 1C shipping
 order. A warehouse queue or document barcode opens the applicable stage.
 Picking starts against a scanned shipping location, records possibly split
 draft movements from scanned ordinary storage locations, and explicitly accepts
-a full, partial, or zero result. Final shipment requires rescanning the saved
-shipping location and removes the shipped order from the mobile work queues.
+a full, partial, or zero result. Final shipment explicitly confirms the shown
+result without rescanning the already assigned shipping location and removes
+the shipped order from the mobile work queues.
 
 Operational WebApp screens identify a storage location by the full address
 `{Zone.Code}-{StorageLocation.Code}`, not by its potentially repeated display
