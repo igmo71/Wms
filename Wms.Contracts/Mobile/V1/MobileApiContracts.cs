@@ -274,6 +274,20 @@ public enum MobilePutawayStatus
     Completed = 3
 }
 
+public enum MobileOrderSynchronizationLevel
+{
+    Synchronized = 0,
+    RequiresOperatorDecision = 1,
+    Blocking = 2
+}
+
+public sealed record MobileOrderSynchronizationResponse(
+    MobileOrderSynchronizationLevel Level,
+    bool IsFresh,
+    IReadOnlyList<string> ChangedFields,
+    bool CommentChanged,
+    string? OneCComment);
+
 public sealed record MobileReceivingOrderLocationResponse(
     Guid Id,
     string Name,
@@ -302,6 +316,7 @@ public sealed record MobileReceivingOrderSummaryResponse(
     string BusinessOperation,
     MobileReceivingOrderStatus Status,
     MobilePutawayStatus PutawayStatus,
+    MobileOrderSynchronizationResponse Synchronization,
     string? Comment,
     MobileReceivingOrderLocationResponse? ReceivingLocation,
     MobileReceivingOrderProgressResponse Progress,
@@ -421,6 +436,7 @@ public sealed record MobileShippingOrderSummaryResponse(
     string Queue,
     string WarehouseOperation,
     MobileShippingOrderStatus Status,
+    MobileOrderSynchronizationResponse Synchronization,
     string? Comment,
     DateTime? PlannedShippingDate,
     string? DeliveryDirection,

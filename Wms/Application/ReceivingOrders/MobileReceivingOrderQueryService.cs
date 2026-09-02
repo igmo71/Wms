@@ -325,6 +325,7 @@ public sealed class MobileReceivingOrderQueryService(
             order.BusinessOperation,
             order.Status,
             order.PutawayStatus,
+            order.ExternalSynchronizationLevel,
             order.Comment,
             order.ReceivingLocation is null ? null : MapLocation(order.ReceivingLocation),
             order.Items.Count,

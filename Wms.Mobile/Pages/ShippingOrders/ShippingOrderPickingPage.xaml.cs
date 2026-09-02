@@ -51,6 +51,9 @@ public partial class ShippingOrderPickingPage : ContentPage
         MobileShippingOrderStatus.InVerification or
         MobileShippingOrderStatus.Verified;
 
+    private bool IsSynchronizationResolved =>
+        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+
     private bool HasPendingCommand => _pendingStartRequestId is not null
         || _pendingDeleteRequestId is not null
         || _pendingCompletionRequestId is not null;
@@ -627,6 +630,12 @@ public partial class ShippingOrderPickingPage : ContentPage
             + $"из {details.Order.Progress.PlanQuantity:g}";
         CommentLabel.Text = details.Order.Comment;
         CommentLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Order.Comment);
+        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
+            details.Order.Synchronization);
+        SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
+            details.Order.Synchronization);
+        SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
+            details.Order.Synchronization);
         ApplyCompletionSummary(details);
         SynchronizeLines(details);
         RefreshActionAvailability();
@@ -749,17 +758,22 @@ public partial class ShippingOrderPickingPage : ContentPage
         }
 
         StartPickingButton.IsVisible = _mode == PickingPageMode.Ready;
-        StartPickingButton.IsEnabled = !_busy && !HasPendingCommand;
+        StartPickingButton.IsEnabled = !_busy
+            && !HasPendingCommand
+            && IsSynchronizationResolved;
         ConfirmLocationButton.IsEnabled = !_busy && _scannedLocationBarcode is not null;
         CancelLocationButton.IsEnabled = !_busy && _pendingStartRequestId is null;
         LineSearchPrompt.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
         LineSearchPrompt.IsEnabled = CanStartMovement;
         CompletePickingButton.IsVisible = IsEditable && _mode == PickingPageMode.Scanning;
-        CompletePickingButton.IsEnabled = !_busy && !HasPendingCommand;
+        CompletePickingButton.IsEnabled = !_busy
+            && !HasPendingCommand
+            && IsSynchronizationResolved;
         ConfirmDeviationButton.IsVisible = HasPickingDeviation && !_deviationConfirmed;
         ConfirmDeviationButton.IsEnabled = !_busy && _pendingCompletionRequestId is null;
         DeviationConfirmedLabel.IsVisible = HasPickingDeviation && _deviationConfirmed;
         ConfirmCompletionButton.IsEnabled = !_busy
+            && IsSynchronizationResolved
             && (!HasPickingDeviation || _deviationConfirmed);
         CancelCompletionButton.IsEnabled = !_busy && _pendingCompletionRequestId is null;
         foreach (var line in LineStates)

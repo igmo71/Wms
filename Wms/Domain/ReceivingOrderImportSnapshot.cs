@@ -31,5 +31,5 @@ public enum ReceivingOrderReconciliation
 {
     Unchanged,
     Updated,
-    Conflict
+    DifferencesDetected
 }

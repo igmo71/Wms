@@ -10,6 +10,8 @@ public sealed class ReceivingOrderQueueItemViewState
     public required string StatusText { get; init; }
     public required string DetailsText { get; init; }
     public required string ProgressText { get; init; }
+    public required bool HasSynchronizationIssue { get; init; }
+    public required string SynchronizationText { get; init; }
 
     public static ReceivingOrderQueueItemViewState ForReceiving(
         MobileReceivingOrderSummaryResponse order) => new()
@@ -25,6 +27,8 @@ public sealed class ReceivingOrderQueueItemViewState
             _ => "Приёмка"
         },
         DetailsText = BuildReceivingDetails(order),
+        HasSynchronizationIssue = !OrderSynchronizationPresentation.IsSynchronized(order.Synchronization),
+        SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         ProgressText = $"Факт: {order.Progress.FactQuantity:g} из {order.Progress.PlanQuantity:g} · "
             + $"Проверено строк: {order.Progress.ConfirmedLineCount} из {order.Progress.TotalLineCount}"
     };
@@ -41,6 +45,8 @@ public sealed class ReceivingOrderQueueItemViewState
         DetailsText = order.ReceivingLocation is null
             ? "Позиция приёмки не указана"
             : $"Позиция приёмки: {order.ReceivingLocation.Address}",
+        HasSynchronizationIssue = !OrderSynchronizationPresentation.IsSynchronized(order.Synchronization),
+        SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         ProgressText = $"Размещено: {order.Progress.AllocatedQuantity:g} из {order.Progress.FactQuantity:g} · "
             + $"Строк: {order.Progress.FullyAllocatedLineCount} из {order.Progress.PositiveLineCount}"
     };

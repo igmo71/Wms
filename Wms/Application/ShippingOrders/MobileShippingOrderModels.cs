@@ -21,6 +21,7 @@ public sealed record MobileShippingOrderSummary(
     ShippingOrderQueue Queue,
     WarehouseOperation WarehouseOperation,
     ShippingOrderStatus Status,
+    OrderSynchronizationLevel SynchronizationLevel,
     string? Comment,
     DateTime? PlannedShippingDate,
     string? DeliveryDirection,

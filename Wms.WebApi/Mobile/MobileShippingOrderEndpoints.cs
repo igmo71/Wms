@@ -2,7 +2,9 @@ using System.Security.Claims;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
+using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApi.Mobile;
 
@@ -58,33 +60,49 @@ internal static class MobileShippingOrderEndpoints
 
         var queue = await queryService.GetWorkQueueAsync(warehouseId, ct);
         return TypedResults.Ok(new MobileShippingOrderWorkQueueResponse(
-            queue.Picking.Select(MapSummary).ToList(),
-            queue.Shipping.Select(MapSummary).ToList()));
+            queue.Picking.Select(x => MapSummary(x)).ToList(),
+            queue.Shipping.Select(x => MapSummary(x)).ToList()));
     }
 
     private static async Task<IResult> ResolveDocumentAsync(
         MobileResolveShippingOrderDocumentRequest request,
         MobileShippingOrderQueryService queryService,
+        ShippingOrderSynchronizationService synchronizationService,
         CancellationToken ct)
     {
         var result = await queryService.ResolveDocumentAsync(
             request.WarehouseId,
             request.Barcode,
             ct);
-        return result.IsSuccess
-            ? TypedResults.Ok(MapDetails(result.Value!))
-            : MobileEndpointResults.CommandProblem(result.Error!);
+        if (!result.IsSuccess)
+        {
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        }
+
+        var synchronizationResult = await synchronizationService.CheckAsync(
+            result.Value!.Order.Id,
+            ct);
+        return synchronizationResult.IsSuccess
+            ? TypedResults.Ok(MapDetails(result.Value!, synchronizationResult.Value))
+            : MobileEndpointResults.CommandProblem(synchronizationResult.Error!);
     }
 
     private static async Task<IResult> GetDetailsAsync(
         Guid orderId,
         MobileShippingOrderQueryService queryService,
+        ShippingOrderSynchronizationService synchronizationService,
         CancellationToken ct)
     {
         var result = await queryService.GetDetailsAsync(orderId, ct);
-        return result.IsSuccess
-            ? TypedResults.Ok(MapDetails(result.Value!))
-            : MobileEndpointResults.CommandProblem(result.Error!);
+        if (!result.IsSuccess)
+        {
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        }
+
+        var synchronizationResult = await synchronizationService.CheckAsync(orderId, ct);
+        return synchronizationResult.IsSuccess
+            ? TypedResults.Ok(MapDetails(result.Value!, synchronizationResult.Value))
+            : MobileEndpointResults.CommandProblem(synchronizationResult.Error!);
     }
 
     private static async Task<IResult> ResolveSkuAsync(
@@ -265,8 +283,9 @@ internal static class MobileShippingOrderEndpoints
     }
 
     private static MobileShippingOrderDetailsResponse MapDetails(
-        MobileShippingOrderDetails details) => new(
-        MapSummary(details.Order),
+        MobileShippingOrderDetails details,
+        OrderSynchronizationAssessment? assessment = null) => new(
+        MapSummary(details.Order, assessment),
         details.Lines.Select(MapLine).ToList(),
         details.Movements.Select(MapMovement).ToList());
 
@@ -293,7 +312,8 @@ internal static class MobileShippingOrderEndpoints
     }
 
     private static MobileShippingOrderSummaryResponse MapSummary(
-        MobileShippingOrderSummary order) => new(
+        MobileShippingOrderSummary order,
+        OrderSynchronizationAssessment? assessment = null) => new(
         order.Id,
         order.Number,
         order.Date,
@@ -303,6 +323,7 @@ internal static class MobileShippingOrderEndpoints
         order.Queue.GetDisplayName(),
         order.WarehouseOperation.GetDisplayName(),
         MapStatus(order.Status),
+        MapSynchronization(order.SynchronizationLevel, assessment),
         order.Comment,
         order.PlannedShippingDate,
         order.DeliveryDirection,
@@ -317,6 +338,29 @@ internal static class MobileShippingOrderEndpoints
         order.PickingStartedAtUtc,
         order.ReadyForShipmentAtUtc,
         order.ShippedAtUtc);
+
+    private static MobileOrderSynchronizationResponse MapSynchronization(
+        OrderSynchronizationLevel persistedLevel,
+        OrderSynchronizationAssessment? assessment)
+    {
+        var commentDifference = assessment?.Differences
+            .LastOrDefault(x => x.FieldCode == "comment");
+        return new MobileOrderSynchronizationResponse(
+            MapSynchronizationLevel(assessment?.Level ?? persistedLevel),
+            assessment is not null,
+            assessment?.Differences.Select(x => x.FieldName).Distinct().ToList() ?? [],
+            commentDifference is not null,
+            commentDifference?.OneCValue);
+    }
+
+    private static MobileOrderSynchronizationLevel MapSynchronizationLevel(
+        OrderSynchronizationLevel level) => level switch
+        {
+            OrderSynchronizationLevel.Synchronized => MobileOrderSynchronizationLevel.Synchronized,
+            OrderSynchronizationLevel.RequiresOperatorDecision => MobileOrderSynchronizationLevel.RequiresOperatorDecision,
+            OrderSynchronizationLevel.Blocking => MobileOrderSynchronizationLevel.Blocking,
+            _ => throw new InvalidOperationException($"Неизвестный уровень синхронизации: {level}.")
+        };
 
     private static MobileShippingOrderLineResponse MapLine(
         MobileShippingOrderLine line) => new(

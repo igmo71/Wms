@@ -48,6 +48,9 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         MobileReceivingOrderStatus.InReceiving or
         MobileReceivingOrderStatus.ProcessingRequired;
 
+    private bool IsSynchronizationResolved =>
+        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+
     private bool HasPendingCommand => _pendingStartRequestId is not null
         || _pendingScanRequestId is not null
         || _pendingQuantityRequestId is not null
@@ -670,6 +673,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             + $"{details.Order.Progress.PlanQuantity:g} · Проверено строк: "
             + $"{details.Order.Progress.ConfirmedLineCount} из "
             + $"{details.Order.Progress.TotalLineCount}";
+        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
+            details.Order.Synchronization);
+        SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
+            details.Order.Synchronization);
+        SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
+            details.Order.Synchronization);
         SynchronizeLineStates(details.Lines);
         RefreshActionAvailability();
     }
@@ -804,7 +813,9 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             return;
         }
 
-        StartReceivingButton.IsEnabled = !_busy && !HasPendingCommand;
+        StartReceivingButton.IsEnabled = !_busy
+            && !HasPendingCommand
+            && IsSynchronizationResolved;
         ConfirmLocationButton.IsEnabled = !_busy
             && (!HasPendingCommand || _pendingStartRequestId is not null);
         CancelLocationButton.IsEnabled = !_busy && _pendingStartRequestId is null;
@@ -813,6 +824,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         CompleteReceivingButton.IsVisible = IsActiveReceiving;
         CompleteReceivingButton.IsEnabled = !_busy
             && _mode == ReceivingPageMode.Scanning
+            && IsSynchronizationResolved
             && (!HasPendingCommand || _pendingCompletionRequestId is not null)
             && Details.Lines.All(x => x.FactQuantity.HasValue);
         foreach (var line in LineStates)

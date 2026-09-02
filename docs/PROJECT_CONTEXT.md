@@ -277,6 +277,15 @@ An exact source state or the exact repeat-safe target of the requested command
 may continue; technical verification failure, an unacknowledged decision, or a
 blocking assessment stops the transition and preserves the new compact state.
 
+Mobile receiving and shipping queues show the last known synchronization
+level. Opening active receiving, picking, or final shipping performs the fresh
+check and returns concise changed-field names plus the changed 1C comment when
+applicable. Mobile cannot acknowledge a discrepancy: an operator-decision
+state points to WebApp, while a blocking state points to external resolution.
+The corresponding start and completion actions remain unavailable until the
+same fingerprint is resolved. Opening the local putaway process does not query
+1C again.
+
 ## Mobile platform rules
 
 The client is Android-only and online-only and communicates through

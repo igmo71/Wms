@@ -1,6 +1,6 @@
 # Order synchronization decisions
 
-Status: **Active**
+Status: **Frozen reference**
 
 ## Outcome
 
@@ -19,7 +19,7 @@ by WMS itself is recognized as synchronized.
 - detailed WebApp presentation and acknowledgement;
 - short Mobile V1 and Android status presentation;
 - enforcement at the agreed workflow checkpoints;
-- correction of the sticky `ExternalChangeDetected` behavior.
+- correction of the previously sticky synchronization issue.
 
 Durable delivery of 1C notifications, an outbox, periodic polling, a second
 persisted copy of the complete 1C document, and automatic external rollback

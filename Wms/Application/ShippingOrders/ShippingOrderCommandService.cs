@@ -77,7 +77,7 @@ public class ShippingOrderCommandService(
             return saveResult.Error!;
         }
 
-        if (reconciliationResult.Value == ShippingOrderReconciliation.Conflict)
+        if (reconciliationResult.Value == ShippingOrderReconciliation.DifferencesDetected)
         {
             logger.LogWarning(
                 "При сверке расходного ордера с 1С обнаружены расхождения. Уровень: {Level}, поля: {Fields}",

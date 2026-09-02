@@ -23,6 +23,9 @@ public partial class ShippingOrderShippingPage : ContentPage
     private MobileShippingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Расходный ордер не загружен.");
 
+    private bool IsSynchronizationResolved =>
+        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+
     public void Show(MobileShippingOrderDetailsResponse details)
     {
         _pendingShippingRequestId = null;
@@ -144,6 +147,12 @@ public partial class ShippingOrderShippingPage : ContentPage
             ? "Позиция отгрузки не указана"
             : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}";
         ProgressLabel.Text = $"К отгрузке: {details.Order.Progress.FactQuantity:g}";
+        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
+            details.Order.Synchronization);
+        SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
+            details.Order.Synchronization);
+        SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
+            details.Order.Synchronization);
         ShippingSummaryLabel.Text = $"Строк: {details.Lines.Count}; "
             + $"фактическое количество: {details.Order.Progress.FactQuantity:g}.";
     }
@@ -174,8 +183,10 @@ public partial class ShippingOrderShippingPage : ContentPage
     private void RefreshActionAvailability()
     {
         StartShippingButton.IsVisible = _mode == ShippingPageMode.Ready;
-        StartShippingButton.IsEnabled = !_busy && _pendingShippingRequestId is null;
-        ConfirmShippingButton.IsEnabled = !_busy;
+        StartShippingButton.IsEnabled = !_busy
+            && _pendingShippingRequestId is null
+            && IsSynchronizationResolved;
+        ConfirmShippingButton.IsEnabled = !_busy && IsSynchronizationResolved;
         CancelShippingButton.IsEnabled = !_busy && _pendingShippingRequestId is null;
     }
 

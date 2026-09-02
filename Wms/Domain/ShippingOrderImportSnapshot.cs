@@ -38,5 +38,5 @@ public enum ShippingOrderReconciliation
 {
     Unchanged,
     Updated,
-    Conflict
+    DifferencesDetected
 }

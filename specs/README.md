@@ -19,14 +19,13 @@ establish an otherwise undocumented rule.
 
 ## Current selection
 
-| Created | Status | Problem | Path |
-| --- | --- | --- | --- |
-| 2026-09-02 | Active | Order synchronization decisions | [`2026-09-02-order-synchronization-decisions/spec.md`](2026-09-02-order-synchronization-decisions/spec.md) |
+No specification is active.
 
 ## Recent governing references
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
+| 2026-09-02 | Frozen reference | Order synchronization decisions | [`2026-09-02-order-synchronization-decisions/spec.md`](2026-09-02-order-synchronization-decisions/spec.md) |
 | 2026-09-02 | Frozen reference | Decimal warehouse quantities | [`2026-09-02-decimal-warehouse-quantities/spec.md`](2026-09-02-decimal-warehouse-quantities/spec.md) |
 | 2026-09-01 | Frozen reference | Operational location display and mobile operator UX | [`2026-09-01-operator-location-mobile-ux/spec.md`](2026-09-01-operator-location-mobile-ux/spec.md) |
 | 2026-09-01 | Frozen reference | Mobile WMS stabilization | [`2026-09-01-mobile-wms-stabilization/spec.md`](2026-09-01-mobile-wms-stabilization/spec.md) |

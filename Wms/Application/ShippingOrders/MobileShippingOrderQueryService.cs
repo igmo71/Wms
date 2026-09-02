@@ -366,6 +366,7 @@ public sealed class MobileShippingOrderQueryService(
             order.Queue,
             order.WarehouseOperation,
             order.Status,
+            order.ExternalSynchronizationLevel,
             order.Comment,
             order.PlannedShippingDate,
             order.DeliveryDirection?.Description,

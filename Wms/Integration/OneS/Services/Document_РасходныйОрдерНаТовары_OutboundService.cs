@@ -91,7 +91,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
         if (freshBaseItemsByLine.Count != shippingOrder.BaseItems.Count
             || freshItemsByLine.Count(x => Document.IsRegularShippingItem(x.Value)) != shippingOrder.Items.Count)
         {
-            return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
+            return PlanChangedAfterSynchronization();
         }
 
         foreach (var localBaseItem in shippingOrder.BaseItems)
@@ -100,7 +100,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshBaseItem.Номенклатура_Key != localBaseItem.StockKeepingUnitId
                 || freshBaseItem.Количество != localBaseItem.PlanQuantity)
             {
-                return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
+                return PlanChangedAfterSynchronization();
             }
         }
 
@@ -111,7 +111,7 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
                 || freshItem.КоличествоУпаковок != localItem.PlanQuantity
                 || ODataEnumMapper.Parse<ShippingOrderAction>(freshItem.Действие) != ShippingOrderAction.PickUp)
             {
-                return OperationError.Conflict("План расходного ордера в 1С отличается от плана в WMS.");
+                return PlanChangedAfterSynchronization();
             }
         }
 
@@ -179,6 +179,10 @@ public class Document_РасходныйОрдерНаТовары_OutboundServi
             ОтгружаемыеТовары = patchItems
         };
     }
+
+    private static OperationError PlanChangedAfterSynchronization() =>
+        OperationError.Conflict(
+            "Строки расходного ордера в 1С изменились после проверки синхронизации. Работа заблокирована; откройте ордер заново.");
 
     private static bool HasAmbiguousSkuLines(ShippingOrder shippingOrder) =>
         shippingOrder.Items.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)

@@ -29,6 +29,7 @@ public sealed record MobileReceivingOrderSummary(
     BusinessOperation BusinessOperation,
     ReceivingOrderStatus Status,
     PutawayStatus PutawayStatus,
+    OrderSynchronizationLevel SynchronizationLevel,
     string? Comment,
     MobileReceivingOrderLocation? ReceivingLocation,
     int TotalLineCount,

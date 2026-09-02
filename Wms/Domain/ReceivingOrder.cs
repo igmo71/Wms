@@ -44,8 +44,6 @@ public class ReceivingOrder
     public string? ExternalSynchronizationAcknowledgedFingerprint { get; private set; }
     public DateTimeOffset? ExternalSynchronizationAcknowledgedAtUtc { get; private set; }
     public string? ExternalSynchronizationAcknowledgedBy { get; private set; }
-    public bool ExternalChangeDetected =>
-        ExternalSynchronizationLevel != OrderSynchronizationLevel.Synchronized;
     public Guid ShipperId { get; private set; }
     public PartyType ShipperType { get; private set; }
     public PartyInfo? Shipper { get; private set; }
@@ -138,7 +136,7 @@ public class ReceivingOrder
 
         if (assessment.Level != OrderSynchronizationLevel.Synchronized)
         {
-            return ReceivingOrderReconciliation.Conflict;
+            return ReceivingOrderReconciliation.DifferencesDetected;
         }
 
         return synchronizationStateChanged

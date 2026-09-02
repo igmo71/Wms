@@ -91,6 +91,11 @@
                                         <Label
                                             FontAttributes="Bold"
                                             Text="{Binding StatusText}" />
+                                        <Label
+                                            FontAttributes="Bold"
+                                            IsVisible="{Binding HasSynchronizationIssue}"
+                                            Text="{Binding SynchronizationText}"
+                                            TextColor="DarkOrange" />
                                         <Label Text="{Binding DetailsText}" />
                                         <Label
                                             FontSize="16"
@@ -137,6 +142,11 @@
                                         <Label
                                             FontAttributes="Bold"
                                             Text="{Binding StatusText}" />
+                                        <Label
+                                            FontAttributes="Bold"
+                                            IsVisible="{Binding HasSynchronizationIssue}"
+                                            Text="{Binding SynchronizationText}"
+                                            TextColor="DarkOrange" />
                                         <Label Text="{Binding DetailsText}" />
                                         <Label
                                             FontSize="16"

@@ -21,6 +21,17 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border x:Name="SynchronizationPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        x:Name="SynchronizationTitleLabel"
+                        FontAttributes="Bold"
+                        FontSize="18"
+                        TextColor="DarkOrange" />
+                    <Label x:Name="SynchronizationDetailsLabel" />
+                </VerticalStackLayout>
+            </Border>
+
             <Border Padding="16">
                 <VerticalStackLayout Spacing="12">
                     <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
