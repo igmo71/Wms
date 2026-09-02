@@ -1,107 +1,154 @@
 # WMS roadmap
 
 This roadmap contains unfinished work only. Completed behavior belongs in
-[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md), and detailed accepted rules belong
-in `specs/`.
+[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md), and detailed accepted decisions
+belong in `specs/`.
 
-## Current MVP focus
+Only **Next delivery** is recommended immediate work. Later sections are ordered
+by dependency, not by a promised release date.
 
-- Manually validate and harden the implemented web workflows after the
-  rich-model, authorization, storage-topology, and SKU-import refactoring.
-- Prove that existing databases can be migrated safely to required zone and
-  storage-location codes before an operational pilot.
-- Continue capacity work from stored geometry/weight limits and normalized SKU
-  weight/volume after the missing-data policy is accepted.
+## Delivery sequence
 
-## Before an operational pilot
+1. **Staging baseline:** reproducible deployment, trusted HTTPS, migration
+   validation, and Android connectivity.
+2. **Pilot prerequisites:** security boundaries, inventory confidence, and an
+   operator recovery procedure for partial 1C failures.
+3. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
+   exist.
+4. **Product increments:** quantity fidelity, capacity, and optional processes
+   whose inputs and business need are confirmed.
+5. **Production maintenance:** dependency, diagnostics, and administrative
+   concurrency work that does not block staging.
 
-### Security and external boundaries
+## Next delivery — staging baseline
 
-- Define and verify the staging build and deployment configuration, including
-  HTTPS certificate issuance, trust, installation, renewal, and the Android
-  client connection to the staging API.
-- Authenticate or otherwise verify 1C webhook/import callers before exposing
-  their endpoints outside a trusted network.
+### Outcome
+
+A clean machine can deploy the current WMS to staging, apply migrations, expose
+WebApp and Mobile V1 through trusted HTTPS, and connect the Android client
+without certificate-validation workarounds.
+
+### Work
+
+1. Record the staging host, DNS names, hosting or reverse-proxy model, database,
+   secret storage, and Android network path.
+2. Define certificate issuance, trust chain, installation, renewal, and the
+   exact WebApp and WebApi URLs.
+3. Separate staging configuration and secrets from development defaults.
+4. Establish reproducible restore, build, publish, deployment, and migration
+   commands independent of IDE or running-process file locks.
+5. Validate required zone and storage-location code migrations against a safe
+   copy of an existing database.
+6. Keep unauthenticated 1C endpoints inside a trusted network boundary or
+   disable external access to them until caller verification is implemented.
+7. Deploy the applications and manually exercise login plus one short happy
+   path for transfer, inventory count, receiving/putaway, and picking/shipping.
+
+### Done when
+
+- WebApp and Mobile V1 are reachable through trusted HTTPS;
+- Android connects without bypassing certificate validation;
+- fresh and repeated deployments are documented and reproducible;
+- database migration has a verified backup and restore procedure;
+- all four accepted mobile processes reach the staging API;
+- unverified 1C endpoints are not publicly exposed.
+
+## Pilot prerequisites
+
+### Security and device access
+
+- Authenticate or otherwise verify 1C webhook and import callers before their
+  endpoints leave a trusted network.
 - Define session lifetime, refresh, and operational revocation for a lost or
   retired device.
-- Disable sensitive EF data logging outside development.
+- Keep fine-grained operation permissions and per-warehouse assignments
+  deferred until the pilot demonstrates a concrete need.
 
-Web roles, administrator-managed confirmed accounts, display names, and initial
-administrator bootstrap are implemented. Fine-grained operation permissions
-and per-warehouse assignments remain deferred until a pilot needs them.
+### Inventory and authorization confidence
 
-### Database transition and inventory confidence
-
-- Replace or explicitly validate the topology migration strategy that adds
-  required unique zone/location codes to databases containing existing rows.
+- Manually validate the implemented WebApp workflows after the completed
+  domain, authorization, topology, and catalog refactoring.
 - Add focused integration tests for receiving, putaway, picking, shipping,
-  inventory count, and transfer posting: balance deltas, turnover records,
-  invalid transitions, folder rejection, and insufficient balance.
-- Add authorization boundary tests for web roles and the authenticated mobile
-  API.
-- Establish a clean reproducible build and migration-check path independent of
-  files locked by an IDE or running WebApp process.
+  inventory count, and transfer posting: balance deltas, turnovers, invalid
+  transitions, folder rejection, and insufficient balance.
+- Add authorization-boundary tests for web roles and authenticated Mobile V1.
 
-### 1C failure recovery
+### Operator recovery for partial 1C failures
 
-- Define an operator-visible recovery procedure when a WMS-to-1C PATCH or post
-  succeeds but a later external or local save step fails.
-- Decide whether persistent retry/outbox processing is justified after the
-  manual recovery procedure is exercised.
-- Define expected notification delivery semantics. The current in-memory
-  channel can lose queued notifications on restart and has no retry queue.
-- Persist the latest conflicting 1C revision of an active receiving order,
-  show field/line differences in web and mobile UI, and block further warehouse
-  work while a material conflict is unresolved.
-- Add explicit safe conflict-resolution commands: automatically rebase only
-  changes that preserve recorded WMS facts, and route removed/changed worked
-  lines or post-putaway conflicts to an audited responsible-user workflow.
+- Define what an operator does when a WMS-to-1C PATCH or post succeeds but a
+  later external or local save step fails.
+- Record the evidence needed to distinguish safe repeat, already-applied
+  success, and manual escalation.
+- Exercise the procedure under representative staging failures.
 
-## Mobile WMS — next delivery path
+## Pilot rehearsal
 
-The mobile foundation, scanning, direct/transit intra-warehouse movement,
-storage-location locking, location-based inventory counting, receiving and
-putaway, and picking and shipping are accepted. Before another mobile process
-is selected, the shared Mobile V1 server and Android client are undergoing a
-focused stabilization pass. Any later mobile process must be specified
-separately before implementation.
+Run one documented end-to-end rehearsal only after the staging baseline and
+pilot prerequisites are complete. It must cover backup and restore, migration,
+authentication, the four warehouse processes, 1C exchange, an interrupted
+command, and the operator recovery procedure.
 
-External inputs still required: printer/label constraints before finalizing
-label geometry and a safe badge-login decision if badge login remains
-desirable.
+## 1C resilience after the baseline
 
-Offline inventory commands, mass label printing, fleet management, and broader
-device certification remain separate later epics.
+- Persist the latest conflicting 1C revision of an active receiving order.
+- Show header and line differences in WebApp and Mobile and block work while a
+  material conflict is unresolved.
+- Add audited resolution commands. Automatically rebase only changes that
+  preserve recorded WMS facts; route changed worked lines and post-putaway
+  conflicts to a responsible user.
+- Define notification delivery semantics. The current in-memory channel can
+  lose queued notifications on restart and has no retry queue.
+- Decide whether persistent retry or an outbox is justified from evidence
+  gathered during recovery-procedure exercises.
 
-## Process and integration backlog
+## Product increments
+
+### Quantity and source-data fidelity
 
 - Replace binary floating-point operational quantities with a decimal model
-  aligned with the 1C `Number(15,3)` boundary. Define database/API precision,
-  rounding, comparison, and migration rules together before changing receiving,
-  putaway, movements, balances, and related reports.
-- Keep packaging conversion deferred for the current deployment: its existing
-  receiving lines have no nonempty `Упаковка_Key`, and both quantities are
-  treated 1:1. Before onboarding a consumer that uses packaging, capture real
-  line/catalog examples, define the relationship between `Количество`,
-  `КоличествоУпаковок`, and the packaging coefficient, then implement one
-  shared directional conversion.
+  aligned with the 1C `Number(15,3)` boundary. Define precision, rounding,
+  comparison, API representation, and migration together.
+- Before supporting packaging, capture real line and catalog examples and
+  define the relationship between `Количество`, `КоличествоУпаковок`, and the
+  packaging coefficient.
 - Confirm characteristic identity from real catalog, document-line, and
-  barcode-register examples before changing the SKU/inventory key.
-- Display occupied/free location weight and volume, show incomplete capacity
-  separately from zero, and block known excesses during putaway and direct
-  movement.
-- Confirm shipping table-section behavior for `Отгружать` and
-  `НеОтгружать`; add line splitting only after the business decision.
-- Implement manual batch import of receiving and shipping documents when its
-  operator workflow is defined.
+  barcode-register examples before changing the SKU or inventory key.
+- Confirm shipping table behavior for `Отгружать` and `НеОтгружать`; add line
+  splitting only after the business decision.
+
+### Capacity
+
+- Display occupied and free location weight and volume.
+- Show incomplete capacity separately from numeric zero.
+- Block known excesses during putaway and direct movement after the
+  missing-data policy and operational exceptions are accepted.
+
+### Optional operator processes
+
+- Define the operator workflow before implementing manual batch import of
+  receiving and shipping documents.
 - Add recounts, reservations, inventory tasks, or assignment queues only after
   their business rules and pilot need are agreed.
+- Finalize label geometry after printer and label constraints are available.
+- Revisit badge login only after a safe identity and revocation decision.
+- Treat offline commands, mass label printing, fleet management, and broader
+  device certification as separate epics.
 
-## Technical maintenance
+## Production maintenance
 
-- Update or replace the transitive vulnerable `Microsoft.OpenApi` 2.0.0
-  dependency reported by NU1903 in `Wms.WebApi`.
+- Disable sensitive EF data logging and detailed errors outside approved
+  non-production environments before production rollout.
+- Update or replace the transitive vulnerable `Microsoft.OpenApi 2.0.0`
+  dependency reported by `NU1903` before production rollout.
 - Review .NET SDK and package versions before production rollout.
 - Review non-atomic multi-step Identity role updates and concurrent protection
   of the last active administrator before relying on them under multiple
   administrators.
+
+## Inputs needed for later work
+
+- staging host, DNS, certificate, database, and secret-management constraints;
+- a safe copy or representative snapshot of an existing database;
+- printer model, label size, and print-path constraints;
+- real 1C packaging, characteristic, and shipping-flag examples;
+- a business decision on badge login and any new warehouse process.

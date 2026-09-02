@@ -7,17 +7,15 @@ WMS favors a direct, readable implementation over framework-driven layering:
 ```text
 UI or HTTP endpoint
   -> application service
-  -> domain operation
-  -> EF Core DbContext
+       -> EF Core DbContext (load, query, save)
+       -> domain operation (in-memory invariants and transitions)
+       -> integration service when the use case crosses into 1C
 
 Manual 1C synchronization UI
   -> corresponding 1C integration service
   -> catalog application service
   -> EF Core DbContext
 ```
-
-Existing features move toward this structure when they are deliberately
-refactored. The guide does not authorize unrelated cleanup.
 
 ## Responsibilities
 
@@ -67,7 +65,7 @@ refactored. The guide does not authorize unrelated cleanup.
 | Read projection | report and list items | Data-only; immutable where practical |
 
 `Warehouse` remains a simple 1C-owned import model until WMS owns a concrete
-warehouse operation that justifies more behavior.
+local warehouse lifecycle or invariant that justifies more behavior.
 
 ## Application organization
 
@@ -154,27 +152,21 @@ last-resort user-facing response and logging.
   live under `Wms.Application.Persistence`; they are not inventory services or
   a repository abstraction.
 
-## Coding and verification
+## Project conventions and verification
 
-- New and changed C# follows Microsoft's common C# conventions pragmatically,
-  with readability and consistency of the surrounding code taking priority
-  over mechanical formatting.
 - User-facing messages, expected operation errors, and log messages are written
   in Russian. External protocol values and technical identifiers retain their
   original spelling.
-- Names describe business intent; helpers describe one rule or step.
 - A class is `public` only when it is consumed by another project or is a
   deliberate boundary of the `Wms` assembly. Assembly implementation details
   are `internal`; their member modifiers may remain `public` when that keeps
   the local API straightforward.
-- Each refactoring stage preserves documented behavior, builds the affected
-  projects and complete solution, and checks EF migration drift when the model
-  changes.
-- Repository-wide `dotnet format` runs are not part of ordinary feature work.
-- Broad automated coverage remains deferred for the current MVP. Focused
-  integration tests are required where behavior depends on authentication,
-  idempotency, optimistic concurrency, transactions, or database constraints
-  and cannot be established reliably by static inspection or mock-only tests.
+- Broad automated coverage is not the current MVP strategy. Before an
+  operational pilot, use focused integration tests for authentication,
+  idempotency, optimistic concurrency, transaction boundaries, and database
+  constraints where static inspection cannot establish the guarantee.
+- A model change requires an EF migration and an explicit migration-drift
+  check. Other verification follows the scope and risk of the task.
 
 ## Deliberate non-goals
 
