@@ -84,7 +84,10 @@ internal static class MobileShippingOrderEndpoints
             ct);
         return synchronizationResult.IsSuccess
             ? TypedResults.Ok(MapDetails(result.Value!, synchronizationResult.Value))
-            : MobileEndpointResults.CommandProblem(synchronizationResult.Error!);
+            : TypedResults.Ok(MapDetails(
+                result.Value!,
+                verificationError: synchronizationResult.Error?.Message
+                    ?? "Не удалось сверить расходный ордер с 1С."));
     }
 
     private static async Task<IResult> GetDetailsAsync(
@@ -102,7 +105,10 @@ internal static class MobileShippingOrderEndpoints
         var synchronizationResult = await synchronizationService.CheckAsync(orderId, ct);
         return synchronizationResult.IsSuccess
             ? TypedResults.Ok(MapDetails(result.Value!, synchronizationResult.Value))
-            : MobileEndpointResults.CommandProblem(synchronizationResult.Error!);
+            : TypedResults.Ok(MapDetails(
+                result.Value!,
+                verificationError: synchronizationResult.Error?.Message
+                    ?? "Не удалось сверить расходный ордер с 1С."));
     }
 
     private static async Task<IResult> ResolveSkuAsync(
@@ -284,8 +290,9 @@ internal static class MobileShippingOrderEndpoints
 
     private static MobileShippingOrderDetailsResponse MapDetails(
         MobileShippingOrderDetails details,
-        OrderSynchronizationAssessment? assessment = null) => new(
-        MapSummary(details.Order, assessment),
+        OrderSynchronizationAssessment? assessment = null,
+        string? verificationError = null) => new(
+        MapSummary(details.Order, assessment, verificationError),
         details.Lines.Select(MapLine).ToList(),
         details.Movements.Select(MapMovement).ToList());
 
@@ -313,7 +320,8 @@ internal static class MobileShippingOrderEndpoints
 
     private static MobileShippingOrderSummaryResponse MapSummary(
         MobileShippingOrderSummary order,
-        OrderSynchronizationAssessment? assessment = null) => new(
+        OrderSynchronizationAssessment? assessment = null,
+        string? verificationError = null) => new(
         order.Id,
         order.Number,
         order.Date,
@@ -323,7 +331,7 @@ internal static class MobileShippingOrderEndpoints
         order.Queue.GetDisplayName(),
         order.WarehouseOperation.GetDisplayName(),
         MapStatus(order.Status),
-        MapSynchronization(order.SynchronizationLevel, assessment),
+        MapSynchronization(order.SynchronizationLevel, assessment, verificationError),
         order.Comment,
         order.PlannedShippingDate,
         order.DeliveryDirection,
@@ -341,7 +349,8 @@ internal static class MobileShippingOrderEndpoints
 
     private static MobileOrderSynchronizationResponse MapSynchronization(
         OrderSynchronizationLevel persistedLevel,
-        OrderSynchronizationAssessment? assessment)
+        OrderSynchronizationAssessment? assessment,
+        string? verificationError = null)
     {
         var commentDifference = assessment?.Differences
             .LastOrDefault(x => x.FieldCode == "comment");
@@ -350,7 +359,8 @@ internal static class MobileShippingOrderEndpoints
             assessment is not null,
             assessment?.Differences.Select(x => x.FieldName).Distinct().ToList() ?? [],
             commentDifference is not null,
-            commentDifference?.OneCValue);
+            commentDifference?.OneCValue,
+            verificationError);
     }
 
     private static MobileOrderSynchronizationLevel MapSynchronizationLevel(

@@ -25,6 +25,7 @@ No specification is active.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
+| 2026-09-02 | Frozen reference | Order synchronization simplification | [`2026-09-02-order-synchronization-simplification/spec.md`](2026-09-02-order-synchronization-simplification/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization decisions | [`2026-09-02-order-synchronization-decisions/spec.md`](2026-09-02-order-synchronization-decisions/spec.md) |
 | 2026-09-02 | Frozen reference | Decimal warehouse quantities | [`2026-09-02-decimal-warehouse-quantities/spec.md`](2026-09-02-decimal-warehouse-quantities/spec.md) |
 | 2026-09-01 | Frozen reference | Operational location display and mobile operator UX | [`2026-09-01-operator-location-mobile-ux/spec.md`](2026-09-01-operator-location-mobile-ux/spec.md) |

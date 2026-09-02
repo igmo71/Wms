@@ -21,7 +21,7 @@ public sealed class ShippingOrderQueueItemViewState
         DateText = order.Date.ToString("dd.MM.yyyy HH:mm"),
         StatusText = MapStatus(order.Status),
         DetailsText = BuildDetails(order),
-        HasSynchronizationIssue = !OrderSynchronizationPresentation.IsSynchronized(order.Synchronization),
+        HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         ProgressText = $"Отобрано: {order.Progress.FactQuantity:g} из {order.Progress.PlanQuantity:g} · "
             + $"Строк: {order.Progress.FullyPickedLineCount} из {order.Progress.TotalLineCount}"
@@ -35,7 +35,7 @@ public sealed class ShippingOrderQueueItemViewState
         DateText = order.Date.ToString("dd.MM.yyyy HH:mm"),
         StatusText = "Готов к отгрузке",
         DetailsText = BuildDetails(order),
-        HasSynchronizationIssue = !OrderSynchronizationPresentation.IsSynchronized(order.Synchronization),
+        HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         ProgressText = $"К отгрузке: {order.Progress.FactQuantity:g} · "
             + $"Строк: {order.Progress.TotalLineCount}"

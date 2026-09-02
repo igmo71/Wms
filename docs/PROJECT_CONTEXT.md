@@ -284,7 +284,15 @@ applicable. Mobile cannot acknowledge a discrepancy: an operator-decision
 state points to WebApp, while a blocking state points to external resolution.
 The corresponding start and completion actions remain unavailable until the
 same fingerprint is resolved. Opening the local putaway process does not query
-1C again.
+1C again. If a fresh Mobile check fails technically, the order and its last
+known synchronization level remain visible with the verification error, while
+critical transitions stay unavailable.
+
+Orders persist the current synchronization level and fingerprint, the
+detection time of the current issue, and acknowledgement audit. They do not
+persist the time of every successful check. Repeating an exact assessment
+therefore does not advance the order's `OperationalRevision`; a changed level
+or fingerprint still does.
 
 ## Mobile platform rules
 

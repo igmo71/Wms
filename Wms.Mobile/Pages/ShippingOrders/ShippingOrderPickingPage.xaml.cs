@@ -11,6 +11,7 @@ public partial class ShippingOrderPickingPage : ContentPage
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
     private MobileShippingOrderDetailsResponse? _details;
+    private MobileOrderSynchronizationResponse? _synchronization;
     private PickingPageMode _mode = PickingPageMode.Ready;
     private MobileStorageLocationResponse? _scannedLocation;
     private string? _scannedLocationBarcode;
@@ -52,7 +53,8 @@ public partial class ShippingOrderPickingPage : ContentPage
         MobileShippingOrderStatus.Verified;
 
     private bool IsSynchronizationResolved =>
-        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+        _synchronization is not null
+        && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
 
     private bool HasPendingCommand => _pendingStartRequestId is not null
         || _pendingDeleteRequestId is not null
@@ -73,6 +75,7 @@ public partial class ShippingOrderPickingPage : ContentPage
 
     public void Show(MobileShippingOrderDetailsResponse details)
     {
+        _synchronization = null;
         _scannedLocation = null;
         _scannedLocationBarcode = null;
         _pendingStartRequestId = null;
@@ -615,6 +618,9 @@ public partial class ShippingOrderPickingPage : ContentPage
     private void ApplyDetails(MobileShippingOrderDetailsResponse details)
     {
         _details = details;
+        _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
+            _synchronization,
+            details.Order.Synchronization);
         NumberLabel.Text = $"Ордер {details.Order.Number}";
         StatusLabel.Text = MapStatus(details.Order.Status);
         WarehouseLabel.Text = $"Склад: {details.Order.WarehouseName}";
@@ -630,12 +636,12 @@ public partial class ShippingOrderPickingPage : ContentPage
             + $"из {details.Order.Progress.PlanQuantity:g}";
         CommentLabel.Text = details.Order.Comment;
         CommentLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Order.Comment);
-        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
-            details.Order.Synchronization);
+        SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(
+            _synchronization);
         SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
-            details.Order.Synchronization);
+            _synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
-            details.Order.Synchronization);
+            _synchronization);
         ApplyCompletionSummary(details);
         SynchronizeLines(details);
         RefreshActionAvailability();

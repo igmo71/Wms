@@ -7,6 +7,7 @@ public partial class ShippingOrderShippingPage : ContentPage
 {
     private readonly MobileApiClient _apiClient;
     private MobileShippingOrderDetailsResponse? _details;
+    private MobileOrderSynchronizationResponse? _synchronization;
     private ShippingPageMode _mode = ShippingPageMode.Ready;
     private Guid? _pendingShippingRequestId;
     private bool _isVisible;
@@ -24,10 +25,12 @@ public partial class ShippingOrderShippingPage : ContentPage
         _details ?? throw new InvalidOperationException("Расходный ордер не загружен.");
 
     private bool IsSynchronizationResolved =>
-        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+        _synchronization is not null
+        && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
 
     public void Show(MobileShippingOrderDetailsResponse details)
     {
+        _synchronization = null;
         _pendingShippingRequestId = null;
         ConfirmShippingButton.Text = "Отгрузить";
         ErrorLabel.Text = string.Empty;
@@ -138,6 +141,9 @@ public partial class ShippingOrderShippingPage : ContentPage
     private void ApplyDetails(MobileShippingOrderDetailsResponse details)
     {
         _details = details;
+        _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
+            _synchronization,
+            details.Order.Synchronization);
         Lines = details.Lines;
         OnPropertyChanged(nameof(Lines));
         NumberLabel.Text = $"Ордер {details.Order.Number}";
@@ -147,12 +153,12 @@ public partial class ShippingOrderShippingPage : ContentPage
             ? "Позиция отгрузки не указана"
             : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}";
         ProgressLabel.Text = $"К отгрузке: {details.Order.Progress.FactQuantity:g}";
-        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
-            details.Order.Synchronization);
+        SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(
+            _synchronization);
         SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
-            details.Order.Synchronization);
+            _synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
-            details.Order.Synchronization);
+            _synchronization);
         ShippingSummaryLabel.Text = $"Строк: {details.Lines.Count}; "
             + $"фактическое количество: {details.Order.Progress.FactQuantity:g}.";
     }

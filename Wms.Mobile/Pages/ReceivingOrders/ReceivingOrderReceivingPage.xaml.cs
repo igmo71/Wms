@@ -11,6 +11,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private readonly MobileApiClient _apiClient;
     private readonly IOperationalBarcodeScanner _scanner;
     private MobileReceivingOrderDetailsResponse? _details;
+    private MobileOrderSynchronizationResponse? _synchronization;
     private ReceivingPageMode _mode = ReceivingPageMode.Ready;
     private ReceivingOrderLineViewState? _editingLine;
     private MobileStorageLocationResponse? _scannedLocation;
@@ -49,7 +50,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         MobileReceivingOrderStatus.ProcessingRequired;
 
     private bool IsSynchronizationResolved =>
-        OrderSynchronizationPresentation.IsSynchronized(Details.Order.Synchronization);
+        _synchronization is not null
+        && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
 
     private bool HasPendingCommand => _pendingStartRequestId is not null
         || _pendingScanRequestId is not null
@@ -68,6 +70,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
 
     public void Show(MobileReceivingOrderDetailsResponse details)
     {
+        _synchronization = null;
         ApplyDetails(details);
         SetMode(details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
             ? ReceivingPageMode.Ready
@@ -656,6 +659,9 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void ApplyDetails(MobileReceivingOrderDetailsResponse details)
     {
         _details = details;
+        _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
+            _synchronization,
+            details.Order.Synchronization);
         NumberLabel.Text = $"Приёмка ордера {details.Order.Number}";
         StatusLabel.Text = details.Order.Status switch
         {
@@ -673,12 +679,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             + $"{details.Order.Progress.PlanQuantity:g} · Проверено строк: "
             + $"{details.Order.Progress.ConfirmedLineCount} из "
             + $"{details.Order.Progress.TotalLineCount}";
-        SynchronizationPanel.IsVisible = !OrderSynchronizationPresentation.IsSynchronized(
-            details.Order.Synchronization);
+        SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(
+            _synchronization);
         SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
-            details.Order.Synchronization);
+            _synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
-            details.Order.Synchronization);
+            _synchronization);
         SynchronizeLineStates(details.Lines);
         RefreshActionAvailability();
     }

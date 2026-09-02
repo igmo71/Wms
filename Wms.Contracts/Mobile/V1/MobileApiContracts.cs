@@ -286,7 +286,8 @@ public sealed record MobileOrderSynchronizationResponse(
     bool IsFresh,
     IReadOnlyList<string> ChangedFields,
     bool CommentChanged,
-    string? OneCComment);
+    string? OneCComment,
+    string? VerificationError);
 
 public sealed record MobileReceivingOrderLocationResponse(
     Guid Id,

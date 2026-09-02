@@ -38,7 +38,6 @@ public class ReceivingOrder
     public string? PutawayStartedBy { get; private set; }
     public string? PutawayCompletedBy { get; private set; }
     public OrderSynchronizationLevel ExternalSynchronizationLevel { get; private set; }
-    public DateTimeOffset? ExternalSynchronizationCheckedAtUtc { get; private set; }
     public DateTimeOffset? ExternalSynchronizationDetectedAtUtc { get; private set; }
     public string? ExternalSynchronizationFingerprint { get; private set; }
     public string? ExternalSynchronizationAcknowledgedFingerprint { get; private set; }
@@ -85,8 +84,7 @@ public class ReceivingOrder
             Id = snapshot.Id,
             CreatedAtUtc = createdAtUtc,
             PutawayStatus = PutawayStatus.Inactive,
-            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized,
-            ExternalSynchronizationCheckedAtUtc = createdAtUtc
+            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized
         };
 
         order.ApplyImport(snapshot);
@@ -156,12 +154,10 @@ public class ReceivingOrder
                     : checkedAtUtc;
 
         bool changed = ExternalSynchronizationLevel != assessment.Level
-            || ExternalSynchronizationCheckedAtUtc != checkedAtUtc
             || ExternalSynchronizationDetectedAtUtc != detectedAtUtc
             || ExternalSynchronizationFingerprint != assessment.Fingerprint;
 
         ExternalSynchronizationLevel = assessment.Level;
-        ExternalSynchronizationCheckedAtUtc = checkedAtUtc;
         ExternalSynchronizationDetectedAtUtc = detectedAtUtc;
         ExternalSynchronizationFingerprint = assessment.Fingerprint;
 
@@ -202,7 +198,6 @@ public class ReceivingOrder
         ShipperId = snapshot.ShipperId;
         ShipperType = snapshot.ShipperType;
         ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
-        ExternalSynchronizationCheckedAtUtc = acknowledgedAtUtc;
         ExternalSynchronizationDetectedAtUtc = null;
         ExternalSynchronizationFingerprint = assessment.Fingerprint;
         ExternalSynchronizationAcknowledgedFingerprint = assessment.Fingerprint;

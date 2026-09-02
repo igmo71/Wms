@@ -41,7 +41,6 @@ public class ShippingOrder
     public string? RolledBackBy { get; private set; }
     public string? RollbackReason { get; private set; }
     public OrderSynchronizationLevel ExternalSynchronizationLevel { get; private set; }
-    public DateTimeOffset? ExternalSynchronizationCheckedAtUtc { get; private set; }
     public DateTimeOffset? ExternalSynchronizationDetectedAtUtc { get; private set; }
     public string? ExternalSynchronizationFingerprint { get; private set; }
     public string? ExternalSynchronizationAcknowledgedFingerprint { get; private set; }
@@ -85,8 +84,7 @@ public class ShippingOrder
         {
             Id = snapshot.Id,
             CreatedAtUtc = createdAtUtc,
-            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized,
-            ExternalSynchronizationCheckedAtUtc = createdAtUtc
+            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized
         };
 
         order.ApplyImport(snapshot);
@@ -167,12 +165,10 @@ public class ShippingOrder
                     : checkedAtUtc;
 
         bool changed = ExternalSynchronizationLevel != assessment.Level
-            || ExternalSynchronizationCheckedAtUtc != checkedAtUtc
             || ExternalSynchronizationDetectedAtUtc != detectedAtUtc
             || ExternalSynchronizationFingerprint != assessment.Fingerprint;
 
         ExternalSynchronizationLevel = assessment.Level;
-        ExternalSynchronizationCheckedAtUtc = checkedAtUtc;
         ExternalSynchronizationDetectedAtUtc = detectedAtUtc;
         ExternalSynchronizationFingerprint = assessment.Fingerprint;
 
@@ -215,7 +211,6 @@ public class ShippingOrder
         ReceiverId = snapshot.ReceiverId;
         ReceiverType = snapshot.ReceiverType;
         ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
-        ExternalSynchronizationCheckedAtUtc = acknowledgedAtUtc;
         ExternalSynchronizationDetectedAtUtc = null;
         ExternalSynchronizationFingerprint = assessment.Fingerprint;
         ExternalSynchronizationAcknowledgedFingerprint = assessment.Fingerprint;
