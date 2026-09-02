@@ -97,7 +97,7 @@ public partial class Picking
                 _order.ReadyForShipmentBy,
                 _order.ShippedBy,
                 _order.RolledBackBy,
-                _order.ExternalSynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy]);
         _selectedLine = null;
         _expandedLineNumber = null;
         _movements = [];

@@ -50,8 +50,8 @@ else
         <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
                                    IsAcknowledging="_isAcknowledgingSynchronization"
                                    OnAcknowledge="AcknowledgeSynchronizationAsync"
-                                   AcknowledgedBy="@GetUserName(_order.ExternalSynchronizationAcknowledgedBy)"
-                                   AcknowledgedAtUtc="_order.ExternalSynchronizationAcknowledgedAtUtc" />
+                                   AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
+                                   AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
 
         @if (_order.UnconfirmedItemCount > 0)
         {

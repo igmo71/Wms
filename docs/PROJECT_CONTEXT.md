@@ -289,10 +289,11 @@ known synchronization level remain visible with the verification error, while
 critical transitions stay unavailable.
 
 Orders persist the current synchronization level and fingerprint, the
-detection time of the current issue, and acknowledgement audit. They do not
-persist the time of every successful check. Repeating an exact assessment
-therefore does not advance the order's `OperationalRevision`; a changed level
-or fingerprint still does.
+detection time of the current issue, and the acknowledgement user and time.
+They do not retain a separate fingerprint for a historical acknowledgement or
+the time of every successful check. Repeating an exact assessment therefore
+does not advance the order's `OperationalRevision`; a changed level or
+fingerprint still does.
 
 ## Mobile platform rules
 

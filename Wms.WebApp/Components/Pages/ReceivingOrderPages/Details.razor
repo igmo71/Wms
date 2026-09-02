@@ -85,8 +85,8 @@ else
         <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
                                    IsAcknowledging="_isAcknowledgingSynchronization"
                                    OnAcknowledge="AcknowledgeSynchronizationAsync"
-                                   AcknowledgedBy="@GetUserName(_order.ExternalSynchronizationAcknowledgedBy)"
-                                   AcknowledgedAtUtc="_order.ExternalSynchronizationAcknowledgedAtUtc" />
+                                   AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
+                                   AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
 
         <MudPaper Class="pa-2" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">

@@ -67,7 +67,7 @@ public partial class InProcess
                 _order.CompletedBy,
                 _order.PutawayStartedBy,
                 _order.PutawayCompletedBy,
-                _order.ExternalSynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy]);
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;
         _isLoading = false;

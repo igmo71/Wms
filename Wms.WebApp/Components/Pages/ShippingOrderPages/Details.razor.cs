@@ -76,7 +76,7 @@ public partial class Details
                 _order.ReadyForShipmentBy,
                 _order.ShippedBy,
                 _order.RolledBackBy,
-                _order.ExternalSynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy]);
         _isLoading = false;
     }
 

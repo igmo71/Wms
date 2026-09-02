@@ -18,11 +18,9 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
         builder.Property(x => x.ShippedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.RolledBackBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.RollbackReason).HasMaxLength(DefaultConfiguration.Description);
-        builder.Property(x => x.ExternalSynchronizationFingerprint)
+        builder.Property(x => x.SynchronizationFingerprint)
             .HasMaxLength(DefaultConfiguration.Fingerprint);
-        builder.Property(x => x.ExternalSynchronizationAcknowledgedFingerprint)
-            .HasMaxLength(DefaultConfiguration.Fingerprint);
-        builder.Property(x => x.ExternalSynchronizationAcknowledgedBy)
+        builder.Property(x => x.SynchronizationAcknowledgedBy)
             .HasMaxLength(DefaultConfiguration.Guid);
         builder.Ignore(x => x.Receiver);
 

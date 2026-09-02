@@ -79,7 +79,7 @@ public partial class Details
                 _order.CompletedBy,
                 _order.PutawayStartedBy,
                 _order.PutawayCompletedBy,
-                _order.ExternalSynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy]);
     }
 
     private async Task AcknowledgeSynchronizationAsync()

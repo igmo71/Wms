@@ -40,12 +40,11 @@ public class ShippingOrder
     public string? ShippedBy { get; private set; }
     public string? RolledBackBy { get; private set; }
     public string? RollbackReason { get; private set; }
-    public OrderSynchronizationLevel ExternalSynchronizationLevel { get; private set; }
-    public DateTimeOffset? ExternalSynchronizationDetectedAtUtc { get; private set; }
-    public string? ExternalSynchronizationFingerprint { get; private set; }
-    public string? ExternalSynchronizationAcknowledgedFingerprint { get; private set; }
-    public DateTimeOffset? ExternalSynchronizationAcknowledgedAtUtc { get; private set; }
-    public string? ExternalSynchronizationAcknowledgedBy { get; private set; }
+    public OrderSynchronizationLevel SynchronizationLevel { get; private set; }
+    public DateTimeOffset? SynchronizationDetectedAtUtc { get; private set; }
+    public string? SynchronizationFingerprint { get; private set; }
+    public DateTimeOffset? SynchronizationAcknowledgedAtUtc { get; private set; }
+    public string? SynchronizationAcknowledgedBy { get; private set; }
     public Guid ReceiverId { get; private set; }
     public PartyType ReceiverType { get; private set; }
     public PartyInfo? Receiver { get; private set; }
@@ -84,7 +83,7 @@ public class ShippingOrder
         {
             Id = snapshot.Id,
             CreatedAtUtc = createdAtUtc,
-            ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized
+            SynchronizationLevel = OrderSynchronizationLevel.Synchronized
         };
 
         order.ApplyImport(snapshot);
@@ -110,7 +109,7 @@ public class ShippingOrder
             order._baseItems.Add(itemResult.Value!);
         }
 
-        order.ExternalSynchronizationFingerprint =
+        order.SynchronizationFingerprint =
             ShippingOrderSynchronizationComparer.Compare(order, snapshot).Fingerprint;
 
         return order;
@@ -159,18 +158,18 @@ public class ShippingOrder
     {
         DateTimeOffset? detectedAtUtc = assessment.Level == OrderSynchronizationLevel.Synchronized
             ? null
-            : ExternalSynchronizationLevel == assessment.Level
-                && ExternalSynchronizationFingerprint == assessment.Fingerprint
-                    ? ExternalSynchronizationDetectedAtUtc
+            : SynchronizationLevel == assessment.Level
+                && SynchronizationFingerprint == assessment.Fingerprint
+                    ? SynchronizationDetectedAtUtc
                     : checkedAtUtc;
 
-        bool changed = ExternalSynchronizationLevel != assessment.Level
-            || ExternalSynchronizationDetectedAtUtc != detectedAtUtc
-            || ExternalSynchronizationFingerprint != assessment.Fingerprint;
+        bool changed = SynchronizationLevel != assessment.Level
+            || SynchronizationDetectedAtUtc != detectedAtUtc
+            || SynchronizationFingerprint != assessment.Fingerprint;
 
-        ExternalSynchronizationLevel = assessment.Level;
-        ExternalSynchronizationDetectedAtUtc = detectedAtUtc;
-        ExternalSynchronizationFingerprint = assessment.Fingerprint;
+        SynchronizationLevel = assessment.Level;
+        SynchronizationDetectedAtUtc = detectedAtUtc;
+        SynchronizationFingerprint = assessment.Fingerprint;
 
         if (changed)
         {
@@ -210,12 +209,11 @@ public class ShippingOrder
         DeliveryDirectionId = snapshot.DeliveryDirectionId;
         ReceiverId = snapshot.ReceiverId;
         ReceiverType = snapshot.ReceiverType;
-        ExternalSynchronizationLevel = OrderSynchronizationLevel.Synchronized;
-        ExternalSynchronizationDetectedAtUtc = null;
-        ExternalSynchronizationFingerprint = assessment.Fingerprint;
-        ExternalSynchronizationAcknowledgedFingerprint = assessment.Fingerprint;
-        ExternalSynchronizationAcknowledgedAtUtc = acknowledgedAtUtc;
-        ExternalSynchronizationAcknowledgedBy = userId;
+        SynchronizationLevel = OrderSynchronizationLevel.Synchronized;
+        SynchronizationDetectedAtUtc = null;
+        SynchronizationFingerprint = assessment.Fingerprint;
+        SynchronizationAcknowledgedAtUtc = acknowledgedAtUtc;
+        SynchronizationAcknowledgedBy = userId;
         UpdatedAtUtc = acknowledgedAtUtc;
         AdvanceOperationalRevision();
         return OperationResult.Success();

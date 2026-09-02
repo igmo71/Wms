@@ -427,7 +427,7 @@ public class ShippingOrderCommandService(
     }
 
     private static OperationResult EnsureSynchronizationAllowsWork(ShippingOrder order) =>
-        order.ExternalSynchronizationLevel switch
+        order.SynchronizationLevel switch
         {
             OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
             OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(

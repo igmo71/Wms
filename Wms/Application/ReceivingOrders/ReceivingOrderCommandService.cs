@@ -338,7 +338,7 @@ public class ReceivingOrderCommandService(
     }
 
     private static OperationResult EnsureSynchronizationAllowsWork(ReceivingOrder order) =>
-        order.ExternalSynchronizationLevel switch
+        order.SynchronizationLevel switch
         {
             OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
             OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(
