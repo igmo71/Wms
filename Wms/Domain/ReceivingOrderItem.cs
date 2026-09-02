@@ -123,6 +123,12 @@ public class ReceivingOrderItem
                 "Плановое количество должно быть конечным неотрицательным числом.");
         }
 
+        if (!WarehouseQuantity.IsNonNegative(snapshot.Quantity))
+        {
+            return OperationError.Invalid(
+                "Количество в строке 1С должно быть конечным неотрицательным числом.");
+        }
+
         return OperationResult.Success();
     }
 }

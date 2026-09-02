@@ -23,7 +23,9 @@ public sealed record ReceivingOrderImportSnapshot(
 public sealed record ReceivingOrderItemImportSnapshot(
     int LineNumber,
     Guid StockKeepingUnitId,
-    decimal PlanQuantity);
+    decimal PlanQuantity,
+    decimal Quantity,
+    string? Comment);
 
 public enum ReceivingOrderReconciliation
 {

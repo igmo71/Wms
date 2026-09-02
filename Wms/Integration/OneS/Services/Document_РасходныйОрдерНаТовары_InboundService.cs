@@ -40,15 +40,6 @@ internal class Document_РасходныйОрдерНаТовары_InboundServ
 
         logger.LogDebug("Получен документ {@fetchedDocument}", fetchedDocument);
 
-        var unexpectedPreparedItemActions = Document.GetUnexpectedPreparedItemActions(fetchedDocument);
-        if (unexpectedPreparedItemActions.Count > 0)
-        {
-            logger.LogWarning("Подготовленный расходный ордер {OrderId} не импортирован: действия обычных строк отличаются от PickUp: {@UnexpectedActions}",
-                fetchedDocument.Ref_Key, unexpectedPreparedItemActions.Select(x => new { x.LineNumber, x.Действие }).ToList());
-            return OperationError.Conflict(
-                "Расходный ордер не импортирован: действие одной или нескольких строк отличается от 'К отбору'.");
-        }
-
         var snapshot = Document.MapToImportSnapshot(fetchedDocument);
         return await shippingOrderCommandService.ImportOrderAsync(snapshot, ct);
     }

@@ -76,6 +76,12 @@ public class ReceivingOrder
                 "Приходный ордер можно создать только в статусе готовности к приёмке.");
         }
 
+        if (snapshot.Items.Any(x => x.Quantity != x.PlanQuantity))
+        {
+            return OperationError.Invalid(
+                "Приходный ордер можно создать, только если количество и количество упаковок в строках 1С совпадают.");
+        }
+
         var order = new ReceivingOrder
         {
             Id = snapshot.Id,

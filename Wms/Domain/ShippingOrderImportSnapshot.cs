@@ -23,7 +23,9 @@ public sealed record ShippingOrderImportSnapshot(
 public sealed record ShippingOrderItemImportSnapshot(
     int LineNumber,
     Guid StockKeepingUnitId,
-    decimal PlanQuantity);
+    decimal PlanQuantity,
+    decimal Quantity,
+    ShippingOrderAction Action);
 
 public sealed record ShippingOrderBaseItemImportSnapshot(
     int LineNumber,

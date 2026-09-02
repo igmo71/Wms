@@ -62,7 +62,9 @@ internal class Document_ПриходныйОрдерНаТовары
             .Select(x => new ReceivingOrderItemImportSnapshot(
                 x.LineNumber,
                 x.Номенклатура_Key,
-                x.КоличествоУпаковок)) // В текущем внедрении упаковки не используются, количества в 1С совпадают 1:1.
+                x.КоличествоУпаковок,
+                x.Количество,
+                x.Комментарий)) // В текущем внедрении упаковки не используются, количества в 1С совпадают 1:1.
             .ToList();
 
         return new ReceivingOrderImportSnapshot(

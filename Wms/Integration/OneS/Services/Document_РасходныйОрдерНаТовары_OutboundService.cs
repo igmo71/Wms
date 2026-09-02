@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Domain;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS.Models;
 using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
 

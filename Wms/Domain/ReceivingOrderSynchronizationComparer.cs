@@ -6,29 +6,44 @@ public static class ReceivingOrderSynchronizationComparer
 {
     public static OrderSynchronizationAssessment Compare(
         ReceivingOrder order,
-        ReceivingOrderImportSnapshot snapshot)
+        ReceivingOrderImportSnapshot snapshot) =>
+        Compare(order, snapshot, expectReceivedTarget: order.Status == ReceivingOrderStatus.Received);
+
+    public static OrderSynchronizationAssessment CompareReceivedTarget(
+        ReceivingOrder order,
+        ReceivingOrderImportSnapshot snapshot) =>
+        Compare(order, snapshot, expectReceivedTarget: true);
+
+    private static OrderSynchronizationAssessment Compare(
+        ReceivingOrder order,
+        ReceivingOrderImportSnapshot snapshot,
+        bool expectReceivedTarget)
     {
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(snapshot);
 
         var comparison = new OrderSynchronizationComparisonBuilder(CreateFingerprint(snapshot));
+        ReceivingOrderStatus expectedStatus = expectReceivedTarget
+            ? ReceivingOrderStatus.Received
+            : order.Status;
+        bool expectedPosted = expectReceivedTarget || order.Posted;
 
         comparison.AddIfDifferent("id", "Идентификатор ордера", order.Id, snapshot.Id, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("deletionMark", "Пометка удаления", order.DeletionMark, snapshot.DeletionMark, OrderSynchronizationLevel.Blocking);
-        comparison.AddIfDifferent("posted", "Проведение", order.Posted, snapshot.Posted, OrderSynchronizationLevel.Blocking);
+        comparison.AddIfDifferent("posted", "Проведение", expectedPosted, snapshot.Posted, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("number", "Номер", order.Number, snapshot.Number, OrderSynchronizationLevel.RequiresOperatorDecision);
         comparison.AddIfDifferent("date", "Дата", order.Date, snapshot.Date, OrderSynchronizationLevel.RequiresOperatorDecision);
         comparison.AddIfDifferent("warehouse", "Склад", order.WarehouseId, snapshot.WarehouseId, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("comment", "Комментарий", order.Comment, snapshot.Comment, OrderSynchronizationLevel.RequiresOperatorDecision);
 
-        if (order.Status != snapshot.Status)
+        if (expectedStatus != snapshot.Status)
         {
             comparison.Add(
                 "status",
                 "Статус",
-                order.Status,
+                expectedStatus,
                 snapshot.Status,
-                IsCompatibleStatusChange(order.Status, snapshot.Status)
+                !expectReceivedTarget && IsCompatibleStatusChange(expectedStatus, snapshot.Status)
                     ? OrderSynchronizationLevel.RequiresOperatorDecision
                     : OrderSynchronizationLevel.Blocking);
         }
@@ -41,22 +56,23 @@ public static class ReceivingOrderSynchronizationComparer
         comparison.AddIfDifferent("baseOrder.id", "Документ-основание", order.BaseOrderId, snapshot.BaseOrderId, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("baseOrder.type", "Тип документа-основания", order.BaseOrderType, snapshot.BaseOrderType, OrderSynchronizationLevel.Blocking);
 
-        CompareItems(comparison, order.Items, snapshot.Items);
+        CompareItems(comparison, order, snapshot.Items, expectReceivedTarget);
         return comparison.Build();
     }
 
     private static void CompareItems(
         OrderSynchronizationComparisonBuilder comparison,
-        IReadOnlyCollection<ReceivingOrderItem> localItems,
-        IReadOnlyCollection<ReceivingOrderItemImportSnapshot>? externalItems)
+        ReceivingOrder order,
+        IReadOnlyCollection<ReceivingOrderItemImportSnapshot>? externalItems,
+        bool expectReceivedTarget)
     {
         if (externalItems is null)
         {
-            comparison.Add("items", "Строки", localItems.Count, null, OrderSynchronizationLevel.Blocking);
+            comparison.Add("items", "Строки", order.Items.Count, null, OrderSynchronizationLevel.Blocking);
             return;
         }
 
-        var localByLine = localItems.ToDictionary(x => x.LineNumber);
+        var localByLine = order.Items.ToDictionary(x => x.LineNumber);
         var externalByLine = externalItems.ToLookup(x => x.LineNumber);
         var lineNumbers = localByLine.Keys
             .Concat(externalItems.Select(x => x.LineNumber))
@@ -83,7 +99,29 @@ public static class ReceivingOrderSynchronizationComparer
 
             ReceivingOrderItemImportSnapshot externalItem = externalLines[0];
             comparison.AddIfDifferent($"{prefix}.sku", $"Строка {lineNumber}: номенклатура", localItem!.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
-            comparison.AddIfDifferent($"{prefix}.planQuantity", $"Строка {lineNumber}: плановое количество", localItem.PlanQuantity, externalItem.PlanQuantity, OrderSynchronizationLevel.Blocking);
+
+            decimal? expectedQuantity = expectReceivedTarget
+                ? localItem.FactQuantity
+                : localItem.PlanQuantity;
+            if (expectedQuantity is null)
+            {
+                comparison.Add(
+                    $"{prefix}.factQuantity",
+                    $"Строка {lineNumber}: фактическое количество",
+                    "Не подтверждено",
+                    externalItem.Quantity,
+                    OrderSynchronizationLevel.Blocking);
+                continue;
+            }
+
+            string quantityKind = expectReceivedTarget ? "фактическое" : "плановое";
+            comparison.AddIfDifferent($"{prefix}.quantity", $"Строка {lineNumber}: {quantityKind} количество", expectedQuantity.Value, externalItem.Quantity, OrderSynchronizationLevel.Blocking);
+            comparison.AddIfDifferent($"{prefix}.packageQuantity", $"Строка {lineNumber}: {quantityKind} количество упаковок", expectedQuantity.Value, externalItem.PlanQuantity, OrderSynchronizationLevel.Blocking);
+
+            if (expectReceivedTarget && order.HasPlanFactDifference)
+            {
+                comparison.AddIfDifferent($"{prefix}.comment", $"Строка {lineNumber}: комментарий", localItem.Comment, externalItem.Comment, OrderSynchronizationLevel.Blocking);
+            }
         }
     }
 
@@ -125,12 +163,16 @@ public static class ReceivingOrderSynchronizationComparer
             foreach (ReceivingOrderItemImportSnapshot item in snapshot.Items
                 .OrderBy(x => x.LineNumber)
                 .ThenBy(x => x.StockKeepingUnitId)
-                .ThenBy(x => x.PlanQuantity))
+                .ThenBy(x => x.PlanQuantity)
+                .ThenBy(x => x.Quantity)
+                .ThenBy(x => x.Comment))
             {
                 string prefix = $"items[{index++}]";
                 fingerprint.Add($"{prefix}.line", item.LineNumber);
                 fingerprint.Add($"{prefix}.sku", item.StockKeepingUnitId);
-                fingerprint.Add($"{prefix}.planQuantity", item.PlanQuantity);
+                fingerprint.Add($"{prefix}.packageQuantity", item.PlanQuantity);
+                fingerprint.Add($"{prefix}.quantity", item.Quantity);
+                fingerprint.Add($"{prefix}.comment", item.Comment);
             }
         }
 

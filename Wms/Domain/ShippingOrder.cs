@@ -75,6 +75,14 @@ public class ShippingOrder
                 "Расходный ордер можно создать только в подготовленном статусе.");
         }
 
+        if (snapshot.Items.Any(x =>
+                x.Quantity != x.PlanQuantity
+                || x.Action != ShippingOrderAction.PickUp))
+        {
+            return OperationError.Invalid(
+                "Расходный ордер можно создать, только если количества в строках 1С совпадают, а действие указано «Отобрать».");
+        }
+
         var order = new ShippingOrder
         {
             Id = snapshot.Id,
