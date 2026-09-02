@@ -1,6 +1,6 @@
 # Decimal warehouse quantities
 
-Status: **Active**
+Status: **Frozen reference**
 
 ## Outcome
 

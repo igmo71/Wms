@@ -9,51 +9,21 @@ by dependency, not by a promised release date.
 
 ## Delivery sequence
 
-1. **Decimal warehouse quantities:** align WMS calculations and persistence
-   with the 1C `Number(15,3)` quantity boundary.
-2. **Order synchronization decisions:** show meaningful differences between
+1. **Order synchronization decisions:** show meaningful differences between
    WMS and fresh 1C orders and separate operator decisions from blocking
    conflicts.
-3. **Standalone deployment baseline:** reproducible launch outside Visual
+2. **Standalone deployment baseline:** reproducible launch outside Visual
    Studio, trusted HTTPS, migration validation, and Android connectivity.
-4. **Pilot prerequisites:** security boundaries, inventory confidence, and an
+3. **Pilot prerequisites:** security boundaries, inventory confidence, and an
    operator recovery procedure for partial 1C failures.
-5. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
+4. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
    exist.
-6. **Product increments:** capacity and optional processes whose inputs and
+5. **Product increments:** capacity and optional processes whose inputs and
    business need are confirmed.
-7. **Production maintenance:** dependency, diagnostics, and administrative
+6. **Production maintenance:** dependency, diagnostics, and administrative
    concurrency work that does not block staging.
 
-## Next delivery — decimal warehouse quantities
-
-### Outcome
-
-All operational warehouse quantities use exact C# `decimal` values and SQL
-Server `decimal(15,3)`, matching the size and fractional precision of the
-current 1C quantity fields. Weight, volume, dimensions, coordinates, and
-conversion coefficients remain `double`.
-
-### Work
-
-1. Replace warehouse quantities in the domain, application services, reports,
-   Mobile V1 contracts, WebApp, and Android client.
-2. Read and write 1C document quantities through the exact WMS decimal model.
-3. Reject values outside the 15-digit, 3-fractional-digit boundary rather than
-   silently rounding them.
-4. Change persisted quantity columns from SQL Server `float` to
-   `decimal(15,3)`. The current database may be cleared before migration, so no
-   compatibility conversion is required.
-
-### Done when
-
-- inventory plans, facts, movements, balances, turnovers, and counts no longer
-  use binary floating point;
-- WebApp and Mobile accept and display up to three fractional digits;
-- the 1C boundary preserves the same `Number(15,3)` values;
-- the solution builds without introducing a second quantity policy.
-
-## Following delivery — order synchronization decisions
+## Next delivery — order synchronization decisions
 
 ### Outcome
 
