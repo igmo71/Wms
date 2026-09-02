@@ -25,6 +25,8 @@ by dependency, not by a promised release date.
 
 ## Next delivery — order synchronization decisions
 
+Active specification: [`../specs/2026-09-02-order-synchronization-decisions/spec.md`](../specs/2026-09-02-order-synchronization-decisions/spec.md).
+
 ### Outcome
 
 An operator can understand every detected difference between the local WMS

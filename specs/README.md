@@ -19,9 +19,9 @@ establish an otherwise undocumented rule.
 
 ## Current selection
 
-There is no active specification. The next recommended work is order
-synchronization decisions from `docs/ROADMAP.md`; create its focused
-specification before implementation.
+| Created | Status | Problem | Path |
+| --- | --- | --- | --- |
+| 2026-09-02 | Active | Order synchronization decisions | [`2026-09-02-order-synchronization-decisions/spec.md`](2026-09-02-order-synchronization-decisions/spec.md) |
 
 ## Recent governing references
 
