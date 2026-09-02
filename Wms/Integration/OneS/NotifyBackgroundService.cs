@@ -68,11 +68,11 @@ internal class NotifyBackgroundService(
                 await services.GetRequiredService<Catalog_ФизическиеЛица_Service>()
                     .ImportAsync(notifyRecord.Ref_Key, ct),
             nameof(Document_ПриходныйОрдерНаТовары) =>
-                await services.GetRequiredService<Document_ПриходныйОрдерНаТовары_InboundService>()
-                    .ImportDocumentAsync(notifyRecord.Ref_Key, ct),
+                await services.GetRequiredService<ReceivingOrderSynchronizationService>()
+                    .HandleNotificationAsync(notifyRecord.Ref_Key, ct),
             nameof(Document_РасходныйОрдерНаТовары) =>
-                await services.GetRequiredService<Document_РасходныйОрдерНаТовары_InboundService>()
-                    .ImportDocumentAsync(notifyRecord.Ref_Key, ct),
+                await services.GetRequiredService<ShippingOrderSynchronizationService>()
+                    .HandleNotificationAsync(notifyRecord.Ref_Key, ct),
             nameof(InformationRegister_ШтрихкодыНоменклатуры) =>
                 await services.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>()
                     .ImportAsync(notifyRecord.Ref_Key, ct),

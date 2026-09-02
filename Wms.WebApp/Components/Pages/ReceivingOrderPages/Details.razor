@@ -77,6 +77,11 @@ else
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
+        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
+        }
+
         <MudPaper Class="pa-2" Elevation="0" Outlined="true">
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>

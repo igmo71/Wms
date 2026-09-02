@@ -254,6 +254,13 @@ need an operator recovery procedure for external success followed by local
 failure. Shipping completion recognizes an already-applied exact 1C item-table
 target as success; target status and posting calls are deliberately repeatable.
 
+Document notifications and explicit fresh checks use the same receiving or
+shipping synchronization service. A successfully fetched document produces a
+structured synchronization assessment even when business differences exist;
+only transport, malformed-response, missing-local-order, and persistence
+failures are returned as operation errors. Notifications may create a new
+source order, while an explicit check requires the order to exist in WMS.
+
 ## Mobile platform rules
 
 The client is Android-only and online-only and communicates through

@@ -80,6 +80,11 @@ else
             <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
         }
 
+        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
+        }
+
         @if (_isRollingBack)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />

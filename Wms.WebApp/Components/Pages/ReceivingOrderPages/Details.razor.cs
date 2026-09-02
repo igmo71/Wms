@@ -8,6 +8,7 @@ using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -21,6 +22,8 @@ public partial class Details
 
     [Inject]
     private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject]
+    private ReceivingOrderSynchronizationService SynchronizationService { get; set; } = null!;
     [Inject]
     private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject]
@@ -44,12 +47,19 @@ public partial class Details
     private bool _isStartingPutaway;
     private bool _startOrderFailed;
     private string? _errorMessage;
+    private string? _synchronizationErrorMessage;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
 
+        OperationResult<OrderSynchronizationAssessment> synchronizationResult =
+            await SynchronizationService.CheckAsync(Id);
+        _synchronizationErrorMessage = synchronizationResult.IsSuccess
+            ? null
+            : synchronizationResult.Error?.Message
+                ?? "Не удалось сверить приходный ордер с 1С.";
         _order = await OrderQueryService.GetOrderAsync(Id);
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;

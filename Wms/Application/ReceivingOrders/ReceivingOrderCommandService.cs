@@ -17,12 +17,13 @@ public class ReceivingOrderCommandService(
     Document_ПриходныйОрдерНаТовары_OutboundService outboundService,
     ILogger<ReceivingOrderCommandService> logger)
 {
-    public async Task<OperationResult> ImportOrderAsync(
+    internal async Task<OperationResult<OrderSynchronizationAssessment>> SynchronizeOrderAsync(
         ReceivingOrderImportSnapshot snapshot,
+        bool allowCreate,
         CancellationToken ct = default)
     {
-        using var scope = logger.BeginScope("ReceivingOrder Import {OrderId}", snapshot.Id);
-        using var activity = AppTracing.StartActivity("ReceivingOrder.Import", nameof(ReceivingOrderCommandService));
+        using var scope = logger.BeginScope("ReceivingOrder Synchronize {OrderId}", snapshot.Id);
+        using var activity = AppTracing.StartActivity("ReceivingOrder.Synchronize", nameof(ReceivingOrderCommandService));
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -33,16 +34,28 @@ public class ReceivingOrderCommandService(
         var now = DateTimeOffset.UtcNow;
         if (existingOrder is null)
         {
+            if (!allowCreate)
+            {
+                return OperationError.NotFound(
+                    $"Приходный ордер '{snapshot.Id}' не найден в WMS.");
+            }
+
             var creationResult = ReceivingOrder.Create(snapshot, now);
             if (!creationResult.IsSuccess)
             {
                 return creationResult.Error!;
             }
 
-            dbContext.ReceivingOrders.Add(creationResult.Value!);
-            return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+            ReceivingOrder createdOrder = creationResult.Value!;
+            dbContext.ReceivingOrders.Add(createdOrder);
+            OperationResult saveCreationResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+            return saveCreationResult.IsSuccess
+                ? ReceivingOrderSynchronizationComparer.Compare(createdOrder, snapshot)
+                : saveCreationResult.Error!;
         }
 
+        OrderSynchronizationAssessment assessment =
+            ReceivingOrderSynchronizationComparer.Compare(existingOrder, snapshot);
         var reconciliationResult = existingOrder.Reconcile(snapshot, now);
         if (!reconciliationResult.IsSuccess)
         {
@@ -52,24 +65,24 @@ public class ReceivingOrderCommandService(
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Unchanged)
         {
             logger.LogDebug("Изменения документа в 1С не обнаружены");
-            return OperationResult.Success();
+            return assessment;
         }
 
         var saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         if (!saveResult.IsSuccess)
         {
-            return saveResult;
+            return saveResult.Error!;
         }
 
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Conflict)
         {
-            logger.LogWarning("Изменения приходного ордера в 1С конфликтуют с локальными. Локальный статус: {LocalStatus}, статус 1С: {ExternalStatus}",
-                existingOrder.Status, snapshot.Status);
-            return OperationError.Conflict(
-                "Изменения приходного ордера в 1С конфликтуют с локальной обработкой.");
+            logger.LogWarning(
+                "При сверке приходного ордера с 1С обнаружены расхождения. Уровень: {Level}, поля: {Fields}",
+                assessment.Level,
+                assessment.Differences.Select(x => x.FieldCode).ToArray());
         }
 
-        return OperationResult.Success();
+        return assessment;
     }
 
     public async Task<OperationResult> SetInReceivingAsync(Guid orderId, string userId, CancellationToken ct = default)

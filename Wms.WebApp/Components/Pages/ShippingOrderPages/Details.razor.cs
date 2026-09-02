@@ -9,6 +9,7 @@ using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS.Services;
 
 namespace Wms.WebApp.Components.Pages.ShippingOrderPages;
 
@@ -17,6 +18,7 @@ public partial class Details
     [Parameter] public Guid Id { get; set; }
 
     [Inject] private ShippingOrderQueryService OrderQueryService { get; set; } = null!;
+    [Inject] private ShippingOrderSynchronizationService SynchronizationService { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
@@ -34,6 +36,7 @@ public partial class Details
     private bool _isRollingBack;
     private bool _startOrderFailed;
     private string? _errorMessage;
+    private string? _synchronizationErrorMessage;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private bool CanRollback => _order?.Status is ShippingOrderStatus.ReadyForPicking
@@ -44,12 +47,22 @@ public partial class Details
 
     protected override async Task OnParametersSetAsync()
     {
-        await ReloadAsync();
+        await ReloadAsync(checkSynchronization: true);
     }
 
-    private async Task ReloadAsync()
+    private async Task ReloadAsync(bool checkSynchronization = false)
     {
         _isLoading = true;
+        if (checkSynchronization)
+        {
+            OperationResult<OrderSynchronizationAssessment> synchronizationResult =
+                await SynchronizationService.CheckAsync(Id);
+            _synchronizationErrorMessage = synchronizationResult.IsSuccess
+                ? null
+                : synchronizationResult.Error?.Message
+                    ?? "Не удалось сверить расходный ордер с 1С.";
+        }
+
         _order = await OrderQueryService.GetOrderAsync(Id);
         _shippingZone = _order?.ShippingLocation?.Zone;
         _shippingLocation = _order?.ShippingLocation;
