@@ -57,13 +57,14 @@ public class ShippingOrderCommandService(
                 : saveCreationResult.Error!;
         }
 
-        OrderSynchronizationAssessment assessment =
-            ShippingOrderSynchronizationComparer.Compare(existingOrder, snapshot);
         OperationResult<ShippingOrderReconciliation> reconciliationResult = existingOrder.Reconcile(snapshot, now);
         if (!reconciliationResult.IsSuccess)
         {
             return reconciliationResult.Error!;
         }
+
+        OrderSynchronizationAssessment assessment =
+            existingOrder.AssessSynchronization(snapshot, now);
 
         if (reconciliationResult.Value == ShippingOrderReconciliation.Unchanged)
         {
@@ -104,12 +105,13 @@ public class ShippingOrderCommandService(
             return OperationError.NotFound($"Расходный ордер '{snapshot.Id}' не найден в WMS.");
         }
 
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         OrderSynchronizationAssessment assessment =
-            ShippingOrderSynchronizationComparer.Compare(order, snapshot);
+            order.AssessSynchronization(snapshot, now);
         if (!string.Equals(assessment.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
         {
             OperationResult<ShippingOrderReconciliation> reconciliationResult =
-                order.Reconcile(snapshot, DateTimeOffset.UtcNow);
+                order.Reconcile(snapshot, now);
             if (!reconciliationResult.IsSuccess)
                 return reconciliationResult.Error!;
 
@@ -405,8 +407,9 @@ public class ShippingOrderCommandService(
             return snapshotResult.Error!;
 
         ShippingOrderImportSnapshot snapshot = snapshotResult.Value!;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         OrderSynchronizationAssessment sourceAssessment =
-            ShippingOrderSynchronizationComparer.Compare(order, snapshot);
+            order.AssessSynchronization(snapshot, now);
         OrderSynchronizationAssessment targetAssessment = target switch
         {
             ShippingSynchronizationTarget.ReadyForShipment =>
@@ -419,7 +422,7 @@ public class ShippingOrderCommandService(
                 ? targetAssessment
                 : sourceAssessment;
 
-        order.ApplySynchronizationAssessment(assessment, DateTimeOffset.UtcNow);
+        order.ApplySynchronizationAssessment(assessment, now);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess
             ? EnsureSynchronizationAllowsWork(order)

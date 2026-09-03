@@ -9,16 +9,50 @@ by dependency, not by a promised release date.
 
 ## Delivery sequence
 
-1. **Standalone deployment baseline:** reproducible launch outside Visual
+1. **Architecture and process-boundary review:** inspect the completed product
+   for competing command paths, unclear transaction ownership, dead code, and
+   unnecessary complexity before another large functional increment.
+2. **Standalone deployment baseline:** reproducible launch outside Visual
    Studio, trusted HTTPS, migration validation, and Android connectivity.
-2. **Pilot prerequisites:** security boundaries, inventory confidence, and an
+3. **Pilot prerequisites:** security boundaries, inventory confidence, and an
    operator recovery procedure for partial 1C failures.
-3. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
+4. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
    exist.
-4. **Product increments:** capacity and optional processes whose inputs and
+5. **Product increments:** capacity and optional processes whose inputs and
    business need are confirmed.
-5. **Production maintenance:** dependency, diagnostics, and administrative
+6. **Production maintenance:** dependency, diagnostics, and administrative
    concurrency work that does not block staging.
+
+## Architecture and process-boundary review
+
+### Outcome
+
+Produce an evidence-based simplification proposal before changing the current
+architecture. Each business action should have one recognizable server-side
+path shared by WebApp and Mobile, with explicit ownership of local persistence,
+1C calls, idempotency, and concurrency handling.
+
+### Work
+
+1. Trace receiving, putaway, picking, shipping, rollback, inventory count, and
+   transfer commands from UI or API through application, domain, integration,
+   and persistence code.
+2. Find actions implemented through different WebApp and Mobile command
+   sequences, especially partial local saves and duplicated validation.
+3. Review external-call and database-save ordering, retry behavior, transaction
+   boundaries, and the meaning of `Stage...` methods.
+4. Identify unreachable code, accidental abstractions, oversized services, and
+   domain rules obscured by persistence or transport details.
+5. Separate concrete defects and safe cleanup from optional architectural
+   redesign; prepare staged recommendations before implementation.
+
+### Done when
+
+- findings cite concrete code paths and operational consequences;
+- recommended changes are prioritized by correctness and simplification value;
+- any proposed architectural shape is justified by repeated evidence rather
+  than introduced speculatively;
+- no broad refactoring begins until the review is accepted.
 
 ## Standalone deployment baseline
 
@@ -91,9 +125,6 @@ command, and the operator recovery procedure.
 
 ## Further 1C resilience
 
-- Define a separate, explicit plan-refresh operation for a blocking source
-  change only when the order has no local work. Never replace an active local
-  plan through synchronization.
 - Define notification delivery semantics. The current in-memory channel can
   lose queued notifications on restart and has no retry queue.
 - Decide whether persistent retry or an outbox is justified from evidence

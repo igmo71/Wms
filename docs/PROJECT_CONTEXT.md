@@ -167,9 +167,10 @@ comment. Every line must have an explicit fact before completion.
 
 The mobile flow opens an order from a warehouse queue or document barcode,
 requires a scanned receiving location, and supports draft putaway to scanned
-destinations. `ReceivingOrder.OperationalRevision` protects plan
-reconciliation, facts, transitions, and draft movements from stale web or
-mobile saves.
+destinations. Selecting the receiving location and starting receiving form one
+local save boundary in both WebApp and Mobile. `ReceivingOrder.OperationalRevision`
+protects plan reconciliation, facts, transitions, and draft movements from
+stale web or mobile saves.
 
 ### Picking and shipping
 
@@ -196,9 +197,11 @@ quantity, and irreversible-effect warning, then requires explicit confirmation
 without rescanning the already assigned location. The server validates that
 location from the order.
 
-An unfinished cycle may be rolled back to prepared. Drafts are deleted and
-posted movements from that cycle are offset by new reverse movements, preserving
-turnover history. Final posting always rechecks physical balance.
+An unfinished cycle may be rolled back to prepared. Drafts are deleted, posted
+movements from that cycle are offset by new reverse movements, and the assigned
+shipping location and current facts are cleared while turnover history is
+preserved. The returned prepared order follows a newly supplied admissible 1C
+plan until picking starts again. Final posting always rechecks physical balance.
 
 ### Inventory counts
 
@@ -260,6 +263,16 @@ structured synchronization assessment even when business differences exist;
 only transport, malformed-response, missing-local-order, and persistence
 failures are returned as operation errors. Notifications may create a new
 source order, while an explicit check requires the order to exist in WMS.
+
+Before warehouse work starts, an admissible initial source document remains
+owned by 1C. Receiving orders without `StartedAtUtc` and shipping orders without
+`PickingStartedAtUtc` automatically replace their source-owned metadata and
+complete plan-line composition while both WMS and 1C remain in their matching
+initial statuses. A successful shipping rollback returns the order to this
+mode. A deletion-mark or posting change, departure from the initial source
+status, malformed plan, or unsupported initial line semantics is not copied
+into the local workflow and remains blocking. Once work starts, synchronization
+never replaces the protected WMS plan or warehouse fact.
 
 Web order lists distinguish synchronized, operator-decision, and blocking
 states. Details show each changed field with WMS and 1C values. Only an

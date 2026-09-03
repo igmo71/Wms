@@ -25,6 +25,7 @@ No specification is active.
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
+| 2026-09-03 | Frozen reference | Initial order plan synchronization | [`2026-09-03-initial-order-plan-synchronization/spec.md`](2026-09-03-initial-order-plan-synchronization/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization state cleanup | [`2026-09-02-order-synchronization-state-cleanup/spec.md`](2026-09-02-order-synchronization-state-cleanup/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization simplification | [`2026-09-02-order-synchronization-simplification/spec.md`](2026-09-02-order-synchronization-simplification/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization decisions | [`2026-09-02-order-synchronization-decisions/spec.md`](2026-09-02-order-synchronization-decisions/spec.md) |

@@ -55,13 +55,14 @@ public class ReceivingOrderCommandService(
                 : saveCreationResult.Error!;
         }
 
-        OrderSynchronizationAssessment assessment =
-            ReceivingOrderSynchronizationComparer.Compare(existingOrder, snapshot);
         var reconciliationResult = existingOrder.Reconcile(snapshot, now);
         if (!reconciliationResult.IsSuccess)
         {
             return reconciliationResult.Error!;
         }
+
+        OrderSynchronizationAssessment assessment =
+            existingOrder.AssessSynchronization(snapshot, now);
 
         if (reconciliationResult.Value == ReceivingOrderReconciliation.Unchanged)
         {
@@ -101,12 +102,13 @@ public class ReceivingOrderCommandService(
             return OperationError.NotFound($"Приходный ордер '{snapshot.Id}' не найден в WMS.");
         }
 
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         OrderSynchronizationAssessment assessment =
-            ReceivingOrderSynchronizationComparer.Compare(order, snapshot);
+            order.AssessSynchronization(snapshot, now);
         if (!string.Equals(assessment.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
         {
             OperationResult<ReceivingOrderReconciliation> reconciliationResult =
-                order.Reconcile(snapshot, DateTimeOffset.UtcNow);
+                order.Reconcile(snapshot, now);
             if (!reconciliationResult.IsSuccess)
                 return reconciliationResult.Error!;
 
@@ -138,6 +140,25 @@ public class ReceivingOrderCommandService(
         }
 
         return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+    }
+
+    public async Task<OperationResult> StartReceivingAsync(
+        Guid orderId,
+        Guid receivingLocationId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        OperationResult result = await StageStartReceivingAsync(
+            dbContext,
+            orderId,
+            receivingLocationId,
+            userId,
+            ct);
+
+        return result.IsSuccess
+            ? await ApplicationPersistence.SaveChangesAsync(dbContext, ct)
+            : result;
     }
 
     internal async Task<OperationResult> StageStartReceivingAsync(
@@ -319,8 +340,9 @@ public class ReceivingOrderCommandService(
             return snapshotResult.Error!;
 
         ReceivingOrderImportSnapshot snapshot = snapshotResult.Value!;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         OrderSynchronizationAssessment sourceAssessment =
-            ReceivingOrderSynchronizationComparer.Compare(order, snapshot);
+            order.AssessSynchronization(snapshot, now);
         OrderSynchronizationAssessment targetAssessment = expectReceivedTarget
             ? ReceivingOrderSynchronizationComparer.CompareReceivedTarget(order, snapshot)
             : sourceAssessment;
@@ -330,7 +352,7 @@ public class ReceivingOrderCommandService(
                 ? targetAssessment
                 : sourceAssessment;
 
-        order.ApplySynchronizationAssessment(assessment, DateTimeOffset.UtcNow);
+        order.ApplySynchronizationAssessment(assessment, now);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess
             ? EnsureSynchronizationAllowsWork(order)

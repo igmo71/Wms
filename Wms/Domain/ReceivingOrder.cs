@@ -60,7 +60,7 @@ public class ReceivingOrder
         ReceivingOrderImportSnapshot snapshot,
         DateTimeOffset createdAtUtc)
     {
-        var validationResult = ValidateImport(snapshot, createdAtUtc);
+        var validationResult = ValidateInitialSourcePlan(snapshot, createdAtUtc);
         if (!validationResult.IsSuccess)
         {
             return validationResult.Error!;
@@ -70,12 +70,6 @@ public class ReceivingOrder
         {
             return OperationError.Invalid(
                 "Приходный ордер можно создать только в статусе готовности к приёмке.");
-        }
-
-        if (snapshot.Items.Any(x => x.Quantity != x.PlanQuantity))
-        {
-            return OperationError.Invalid(
-                "Приходный ордер можно создать, только если количество и количество упаковок в строках 1С совпадают.");
         }
 
         var order = new ReceivingOrder
@@ -126,7 +120,32 @@ public class ReceivingOrder
         }
 
         OrderSynchronizationAssessment assessment =
-            ReceivingOrderSynchronizationComparer.Compare(this, snapshot);
+            AssessSynchronization(snapshot, updatedAtUtc);
+
+        if (CanApplyInitialSourceDocument(snapshot))
+        {
+            OperationResult validationResult = ValidateInitialSourcePlan(snapshot, updatedAtUtc);
+            if (!validationResult.IsSuccess)
+            {
+                assessment = EnsureBlockingAssessment(assessment, validationResult.Error!.Message);
+            }
+            else if (assessment.Level != OrderSynchronizationLevel.Synchronized
+                || SynchronizationFingerprint != assessment.Fingerprint)
+            {
+                OperationResult itemsResult = ReconcileItems(snapshot.Items);
+                if (!itemsResult.IsSuccess)
+                {
+                    return itemsResult.Error!;
+                }
+
+                ApplyImport(snapshot);
+                UpdatedAtUtc = updatedAtUtc;
+                assessment = AssessSynchronization(snapshot, updatedAtUtc);
+                ApplySynchronizationAssessment(assessment, updatedAtUtc);
+                return ReceivingOrderReconciliation.Updated;
+            }
+        }
+
         bool synchronizationStateChanged = ApplySynchronizationAssessment(
             assessment,
             updatedAtUtc);
@@ -139,6 +158,24 @@ public class ReceivingOrder
         return synchronizationStateChanged
             ? ReceivingOrderReconciliation.Updated
             : ReceivingOrderReconciliation.Unchanged;
+    }
+
+    internal OrderSynchronizationAssessment AssessSynchronization(
+        ReceivingOrderImportSnapshot snapshot,
+        DateTimeOffset checkedAtUtc)
+    {
+        OrderSynchronizationAssessment assessment =
+            ReceivingOrderSynchronizationComparer.Compare(this, snapshot);
+
+        if (!CanApplyInitialSourceDocument(snapshot))
+        {
+            return assessment;
+        }
+
+        OperationResult validationResult = ValidateInitialSourcePlan(snapshot, checkedAtUtc);
+        return validationResult.IsSuccess
+            ? assessment
+            : EnsureBlockingAssessment(assessment, validationResult.Error!.Message);
     }
 
     internal bool ApplySynchronizationAssessment(
@@ -767,46 +804,46 @@ public class ReceivingOrder
         return OperationResult.Success();
     }
 
-    private bool HasExternalChanges(ReceivingOrderImportSnapshot snapshot)
+    private static OperationResult ValidateInitialSourcePlan(
+        ReceivingOrderImportSnapshot snapshot,
+        DateTimeOffset occurredAtUtc)
     {
-        if (snapshot.Items is null)
+        OperationResult validationResult = ValidateImport(snapshot, occurredAtUtc);
+        if (!validationResult.IsSuccess)
         {
-            return true;
+            return validationResult;
         }
 
-        if (BaseOrderId != snapshot.BaseOrderId
-            || BaseOrderType != snapshot.BaseOrderType
-            || Status != snapshot.Status
-            || Queue != snapshot.Queue
-            || BusinessOperation != snapshot.BusinessOperation
-            || WarehouseOperation != snapshot.WarehouseOperation
-            || Comment != snapshot.Comment
-            || Posted != snapshot.Posted
-            || DeletionMark != snapshot.DeletionMark
-            || Date != snapshot.Date
-            || Number != snapshot.Number
-            || WarehouseId != snapshot.WarehouseId
-            || ShipperId != snapshot.ShipperId
-            || ShipperType != snapshot.ShipperType
-            || _items.Count != snapshot.Items.Count)
-        {
-            return true;
-        }
-
-        var importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
-        foreach (var existingItem in _items)
-        {
-            var importedLine = importedItems[existingItem.LineNumber].ToList();
-            if (importedLine.Count != 1
-                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
-                || existingItem.PlanQuantity != importedLine[0].PlanQuantity)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return snapshot.Items.Any(x => x.Quantity != x.PlanQuantity)
+            ? OperationError.Invalid(
+                "В начальном приходном ордере количество и количество упаковок в строках 1С должны совпадать.")
+            : OperationResult.Success();
     }
+
+    private bool CanApplyInitialSourceDocument(ReceivingOrderImportSnapshot snapshot) =>
+        Status == ReceivingOrderStatus.ReadyForReceiving
+        && StartedAtUtc is null
+        && snapshot.Status == ReceivingOrderStatus.ReadyForReceiving
+        && !DeletionMark
+        && !snapshot.DeletionMark
+        && Posted == snapshot.Posted;
+
+    private static OrderSynchronizationAssessment EnsureBlockingAssessment(
+        OrderSynchronizationAssessment assessment,
+        string reason) =>
+        assessment.Level == OrderSynchronizationLevel.Blocking
+            ? assessment
+            : new OrderSynchronizationAssessment(
+                assessment.Fingerprint,
+                [
+                    .. assessment.Differences,
+                    new OrderSynchronizationDifference(
+                        "initialPlan",
+                        "Начальный план",
+                        "Допустимый план WMS",
+                        reason,
+                        OrderSynchronizationLevel.Blocking)
+                ]);
 
     private OperationResult ReconcileItems(
         IReadOnlyCollection<ReceivingOrderItemImportSnapshot> snapshots)

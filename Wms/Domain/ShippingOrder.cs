@@ -59,7 +59,7 @@ public class ShippingOrder
         ShippingOrderImportSnapshot snapshot,
         DateTimeOffset createdAtUtc)
     {
-        OperationResult validationResult = ValidateImport(snapshot, createdAtUtc);
+        OperationResult validationResult = ValidateInitialSourcePlan(snapshot, createdAtUtc);
         if (!validationResult.IsSuccess)
         {
             return validationResult.Error!;
@@ -69,14 +69,6 @@ public class ShippingOrder
         {
             return OperationError.Invalid(
                 "Расходный ордер можно создать только в подготовленном статусе.");
-        }
-
-        if (snapshot.Items.Any(x =>
-                x.Quantity != x.PlanQuantity
-                || x.Action != ShippingOrderAction.PickUp))
-        {
-            return OperationError.Invalid(
-                "Расходный ордер можно создать, только если количества в строках 1С совпадают, а действие указано «Отобрать».");
         }
 
         var order = new ShippingOrder
@@ -137,7 +129,38 @@ public class ShippingOrder
         }
 
         OrderSynchronizationAssessment assessment =
-            ShippingOrderSynchronizationComparer.Compare(this, snapshot);
+            AssessSynchronization(snapshot, updatedAtUtc);
+
+        if (CanApplyInitialSourceDocument(snapshot))
+        {
+            OperationResult validationResult = ValidateInitialSourcePlan(snapshot, updatedAtUtc);
+            if (!validationResult.IsSuccess)
+            {
+                assessment = EnsureBlockingAssessment(assessment, validationResult.Error!.Message);
+            }
+            else if (assessment.Level != OrderSynchronizationLevel.Synchronized
+                || SynchronizationFingerprint != assessment.Fingerprint)
+            {
+                OperationResult itemsResult = ReconcileItems(snapshot.Items);
+                if (!itemsResult.IsSuccess)
+                {
+                    return itemsResult.Error!;
+                }
+
+                OperationResult baseItemsResult = ReconcileBaseItems(snapshot.BaseItems);
+                if (!baseItemsResult.IsSuccess)
+                {
+                    return baseItemsResult.Error!;
+                }
+
+                ApplyImport(snapshot);
+                UpdatedAtUtc = updatedAtUtc;
+                assessment = AssessSynchronization(snapshot, updatedAtUtc);
+                ApplySynchronizationAssessment(assessment, updatedAtUtc);
+                return ShippingOrderReconciliation.Updated;
+            }
+        }
+
         bool synchronizationStateChanged = ApplySynchronizationAssessment(
             assessment,
             updatedAtUtc);
@@ -150,6 +173,24 @@ public class ShippingOrder
         return synchronizationStateChanged
             ? ShippingOrderReconciliation.Updated
             : ShippingOrderReconciliation.Unchanged;
+    }
+
+    internal OrderSynchronizationAssessment AssessSynchronization(
+        ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset checkedAtUtc)
+    {
+        OrderSynchronizationAssessment assessment =
+            ShippingOrderSynchronizationComparer.Compare(this, snapshot);
+
+        if (!CanApplyInitialSourceDocument(snapshot))
+        {
+            return assessment;
+        }
+
+        OperationResult validationResult = ValidateInitialSourcePlan(snapshot, checkedAtUtc);
+        return validationResult.IsSuccess
+            ? assessment
+            : EnsureBlockingAssessment(assessment, validationResult.Error!.Message);
     }
 
     internal bool ApplySynchronizationAssessment(
@@ -573,6 +614,7 @@ public class ShippingOrder
         }
 
         Status = ShippingOrderStatus.Prepared;
+        ShippingLocationId = null;
         UpdatedAtUtc = rolledBackAtUtc;
         PickingStartedAtUtc = null;
         ReadyForShipmentAtUtc = null;
@@ -807,60 +849,48 @@ public class ShippingOrder
         return OperationResult.Success();
     }
 
-    private bool HasExternalChanges(ShippingOrderImportSnapshot snapshot)
+    private static OperationResult ValidateInitialSourcePlan(
+        ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset occurredAtUtc)
     {
-        if (snapshot.Items is null || snapshot.BaseItems is null)
+        OperationResult validationResult = ValidateImport(snapshot, occurredAtUtc);
+        if (!validationResult.IsSuccess)
         {
-            return true;
+            return validationResult;
         }
 
-        if (Status != snapshot.Status
-            || Queue != snapshot.Queue
-            || WarehouseOperation != snapshot.WarehouseOperation
-            || Comment != snapshot.Comment
-            || Posted != snapshot.Posted
-            || DeletionMark != snapshot.DeletionMark
-            || Date != snapshot.Date
-            || Number != snapshot.Number
-            || WarehouseId != snapshot.WarehouseId
-            || PlannedShippingDate != snapshot.PlannedShippingDate
-            || DeliveryDirectionId != snapshot.DeliveryDirectionId
-            || ReceiverId != snapshot.ReceiverId
-            || ReceiverType != snapshot.ReceiverType
-            || _items.Count != snapshot.Items.Count
-            || _baseItems.Count != snapshot.BaseItems.Count)
-        {
-            return true;
-        }
-
-        ILookup<int, ShippingOrderItemImportSnapshot> importedItems = snapshot.Items.ToLookup(x => x.LineNumber);
-        foreach (ShippingOrderItem existingItem in _items)
-        {
-            var importedLine = importedItems[existingItem.LineNumber].ToList();
-            if (importedLine.Count != 1
-                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
-                || existingItem.PlanQuantity != importedLine[0].PlanQuantity)
-            {
-                return true;
-            }
-        }
-
-        ILookup<int, ShippingOrderBaseItemImportSnapshot> importedBaseItems = snapshot.BaseItems.ToLookup(x => x.LineNumber);
-        foreach (ShippingOrderBaseItem existingItem in _baseItems)
-        {
-            var importedLine = importedBaseItems[existingItem.LineNumber].ToList();
-            if (importedLine.Count != 1
-                || existingItem.StockKeepingUnitId != importedLine[0].StockKeepingUnitId
-                || existingItem.PlanQuantity != importedLine[0].PlanQuantity
-                || existingItem.BaseOrderId != importedLine[0].BaseOrderId
-                || existingItem.BaseOrderType != importedLine[0].BaseOrderType)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return snapshot.Items.Any(x =>
+                x.Quantity != x.PlanQuantity
+                || x.Action != ShippingOrderAction.PickUp)
+            ? OperationError.Invalid(
+                "В начальном расходном ордере количества в строках 1С должны совпадать, а действие должно быть «Отобрать».")
+            : OperationResult.Success();
     }
+
+    private bool CanApplyInitialSourceDocument(ShippingOrderImportSnapshot snapshot) =>
+        Status == ShippingOrderStatus.Prepared
+        && PickingStartedAtUtc is null
+        && snapshot.Status == ShippingOrderStatus.Prepared
+        && !DeletionMark
+        && !snapshot.DeletionMark
+        && Posted == snapshot.Posted;
+
+    private static OrderSynchronizationAssessment EnsureBlockingAssessment(
+        OrderSynchronizationAssessment assessment,
+        string reason) =>
+        assessment.Level == OrderSynchronizationLevel.Blocking
+            ? assessment
+            : new OrderSynchronizationAssessment(
+                assessment.Fingerprint,
+                [
+                    .. assessment.Differences,
+                    new OrderSynchronizationDifference(
+                        "initialPlan",
+                        "Начальный план",
+                        "Допустимый план WMS",
+                        reason,
+                        OrderSynchronizationLevel.Blocking)
+                ]);
 
     private OperationResult ReconcileItems(
         IReadOnlyCollection<ShippingOrderItemImportSnapshot> snapshots)

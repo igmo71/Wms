@@ -200,15 +200,10 @@ public partial class Details
 
         try
         {
-            var setLocationResult = await OrderCommandService.SetReceivingLocationAsync(Id, receivingLocation.Id);
-            if (!setLocationResult.IsSuccess)
-            {
-                _startOrderFailed = true;
-                _errorMessage = setLocationResult.Error?.Message ?? "Не удалось сохранить место приёмки";
-                return;
-            }
-
-            var result = await OrderCommandService.SetInReceivingAsync(Id, userId);
+            var result = await OrderCommandService.StartReceivingAsync(
+                Id,
+                receivingLocation.Id,
+                userId);
             if (!result.IsSuccess)
             {
                 _startOrderFailed = true;
