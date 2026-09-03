@@ -9,11 +9,12 @@ by dependency, not by a promised release date.
 
 ## Delivery sequence
 
-1. **Architecture and process-boundary review:** inspect the completed product
-   for competing command paths, unclear transaction ownership, dead code, and
-   unnecessary complexity before another large functional increment.
-2. **Standalone deployment baseline:** reproducible launch outside Visual
+1. **Standalone deployment baseline:** reproducible launch outside Visual
    Studio, trusted HTTPS, migration validation, and Android connectivity.
+2. **Architecture review and pilot preparation:** inspect process boundaries
+   while warehouse users evaluate the current staging build; use their
+   observations as input instead of delaying the first deployment for broad
+   refactoring.
 3. **Pilot prerequisites:** security boundaries, inventory confidence, and an
    operator recovery procedure for partial 1C failures.
 4. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
@@ -39,11 +40,15 @@ path shared by WebApp and Mobile, with explicit ownership of local persistence,
    and persistence code.
 2. Find actions implemented through different WebApp and Mobile command
    sequences, especially partial local saves and duplicated validation.
-3. Review external-call and database-save ordering, retry behavior, transaction
+3. Resolve the direct WebApp and WebApi dependencies on concrete 1C document
+   synchronization services. Define an application-facing boundary that keeps
+   `Integration.OneS` extractable into a separate library without circular
+   project dependencies.
+4. Review external-call and database-save ordering, retry behavior, transaction
    boundaries, and the meaning of `Stage...` methods.
-4. Identify unreachable code, accidental abstractions, oversized services, and
+5. Identify unreachable code, accidental abstractions, oversized services, and
    domain rules obscured by persistence or transport details.
-5. Separate concrete defects and safe cleanup from optional architectural
+6. Separate concrete defects and safe cleanup from optional architectural
    redesign; prepare staged recommendations before implementation.
 
 ### Done when

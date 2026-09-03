@@ -49,9 +49,15 @@ Manual 1C synchronization UI
 - EF configurations describe persistence, not business decisions.
 - Integration services own the 1C protocol and mapping. A WMS aggregate may
   accept a domain import snapshot, but not a 1C DTO.
-- A UI action whose explicit purpose is manual synchronization with 1C may call
-  the corresponding integration service directly. Do not add a facade that
-  only hides those concrete dependencies.
+- Application-facing integration contracts use WMS terminology, while their
+  concrete implementations under `Integration.OneS` name the corresponding 1C
+  metadata object. For example, `IShippingOrderSource` is implemented by
+  `Document_РасходныйОрдерНаТовары_InboundService`.
+- UI and HTTP boundaries should not require concrete 1C integration types.
+  Existing direct dependencies on document synchronization services are a
+  known boundary issue for the architecture review, especially before moving
+  integration into a separate project. Do not add another pass-through facade
+  before that review establishes the actual application operation boundary.
 
 ## Domain model categories
 

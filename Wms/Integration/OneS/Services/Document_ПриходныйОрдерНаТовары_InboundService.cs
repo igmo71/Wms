@@ -1,17 +1,17 @@
 using Microsoft.Extensions.Logging;
-using Wms.Application.ShippingOrders;
+using Wms.Application.ReceivingOrders;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Integration.OneS.Models;
-using Document = Wms.Integration.OneS.Models.Document_РасходныйОрдерНаТовары;
+using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрдерНаТовары;
 
 namespace Wms.Integration.OneS.Services;
 
-internal sealed class ShippingOrderOneCSource(
+internal sealed class Document_ПриходныйОрдерНаТовары_InboundService(
     OneCClient oneCClient,
-    ILogger<ShippingOrderOneCSource> logger) : IShippingOrderSource
+    ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger) : IReceivingOrderSource
 {
-    public async Task<OperationResult<ShippingOrderImportSnapshot>> GetSnapshotAsync(
+    public async Task<OperationResult<ReceivingOrderImportSnapshot>> GetSnapshotAsync(
         Guid orderId,
         CancellationToken ct = default)
     {
@@ -23,7 +23,7 @@ internal sealed class ShippingOrderOneCSource(
         IReadOnlyList<Document>? documents = fetchResult.Value?.Value;
         if (documents is null || documents.Count != 1)
             return OperationError.Failure(
-                "1С вернула некорректный ответ: ожидался один расходный ордер.");
+                "1С вернула некорректный ответ: ожидался один приходный ордер.");
 
         logger.LogDebug("Получен документ {@Document}", documents[0]);
         return Document.MapToImportSnapshot(documents[0]);

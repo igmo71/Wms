@@ -23,7 +23,7 @@ public partial class Details
     [Inject]
     private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
     [Inject]
-    private ReceivingOrderSynchronizationService SynchronizationService { get; set; } = null!;
+    private Document_ПриходныйОрдерНаТовары_SynchronizationService SynchronizationService { get; set; } = null!;
     [Inject]
     private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject]

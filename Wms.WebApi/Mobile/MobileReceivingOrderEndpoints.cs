@@ -71,7 +71,7 @@ internal static class MobileReceivingOrderEndpoints
     private static async Task<IResult> ResolveDocumentAsync(
         MobileResolveReceivingOrderDocumentRequest request,
         MobileReceivingOrderQueryService queryService,
-        ReceivingOrderSynchronizationService synchronizationService,
+        Document_ПриходныйОрдерНаТовары_SynchronizationService synchronizationService,
         CancellationToken ct)
     {
         var result = await queryService.ResolveDocumentAsync(
@@ -102,7 +102,7 @@ internal static class MobileReceivingOrderEndpoints
     private static async Task<IResult> GetDetailsAsync(
         Guid orderId,
         MobileReceivingOrderQueryService queryService,
-        ReceivingOrderSynchronizationService synchronizationService,
+        Document_ПриходныйОрдерНаТовары_SynchronizationService synchronizationService,
         CancellationToken ct)
     {
         var result = await queryService.GetDetailsAsync(orderId, ct);

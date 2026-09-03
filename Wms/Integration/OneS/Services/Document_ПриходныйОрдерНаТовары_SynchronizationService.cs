@@ -6,11 +6,11 @@ using Wms.Domain;
 
 namespace Wms.Integration.OneS.Services;
 
-public sealed class ReceivingOrderSynchronizationService(
+public sealed class Document_ПриходныйОрдерНаТовары_SynchronizationService(
     IReceivingOrderSource orderSource,
     ReceivingOrderCommandService receivingOrderCommandService,
     IOptions<WmsSettings> options,
-    ILogger<ReceivingOrderSynchronizationService> logger)
+    ILogger<Document_ПриходныйОрдерНаТовары_SynchronizationService> logger)
 {
     private readonly WmsSettings _wmsSettings = options.Value;
 
@@ -49,7 +49,7 @@ public sealed class ReceivingOrderSynchronizationService(
             refKey);
         using System.Diagnostics.Activity? activity = AppTracing.StartActivity(
             "ReceivingOrder.Synchronize",
-            nameof(ReceivingOrderSynchronizationService));
+            nameof(Document_ПриходныйОрдерНаТовары_SynchronizationService));
 
         OperationResult<ReceivingOrderImportSnapshot> snapshotResult =
             await FetchSnapshotAsync(refKey, applyNotificationDelay, ct);

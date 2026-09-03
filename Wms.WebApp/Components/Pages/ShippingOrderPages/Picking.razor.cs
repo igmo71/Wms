@@ -18,7 +18,7 @@ public partial class Picking
     [Inject] private ShippingOrderQueryService OrderQueryService { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private ShippingOrderCommandService OrderCommandService { get; set; } = null!;
-    [Inject] private ShippingOrderSynchronizationService SynchronizationService { get; set; } = null!;
+    [Inject] private Document_РасходныйОрдерНаТовары_SynchronizationService SynchronizationService { get; set; } = null!;
     [Inject] private PickingQueryService PickingQueryService { get; set; } = null!;
     [Inject] private PickingCommandService PickingCommandService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
