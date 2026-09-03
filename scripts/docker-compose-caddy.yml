@@ -1,0 +1,29 @@
+name: wms-caddy
+
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    container_name: wms-caddy
+    restart: unless-stopped
+    ports:
+      - "8216:8216"
+      - "8217:8217"
+      - "8316:8316"
+      - "8317:8317"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - xms-network
+
+volumes:
+  caddy-data:
+    name: wms-caddy-data
+  caddy-config:
+    name: wms-caddy-config
+
+networks:
+  xms-network:
+    external: true
+    name: xms-network

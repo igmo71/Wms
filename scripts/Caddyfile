@@ -1,0 +1,23 @@
+{
+	auto_https disable_redirects
+}
+
+https://vm-xms-dev:8216 {
+	tls internal
+	reverse_proxy wms-webapi-dev:8080
+}
+
+https://vm-xms-dev:8217 {
+	tls internal
+	reverse_proxy wms-webapp-dev:8080
+}
+
+https://vm-xms-dev:8316 {
+	tls internal
+	reverse_proxy wms-webapi-test:8080
+}
+
+https://vm-xms-dev:8317 {
+	tls internal
+	reverse_proxy wms-webapp-test:8080
+}

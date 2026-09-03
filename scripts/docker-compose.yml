@@ -1,38 +1,42 @@
-name: wms
+name: wms-${WMS_ENVIRONMENT}
 
 services:
   wms-webapi:
     image: 192.168.1.55:5000/wms-webapi:${WMS_TAG}
-    container_name: wms-webapi
+    container_name: wms-webapi-${WMS_ENVIRONMENT}
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
+      OneCClient__BaseAddress: "${ONEC_BASEADDRESS}"
       OneCClient__Username: "${ONEC_USERNAME}"
       OneCClient__Password: "${ONEC_PASSWORD}"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       OPENSSL_CONF: "/app/openssl-legacy.cnf"
     volumes:
       - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
     ports:
-      - "8206:8080"
+      - "${WEBAPI_PORT}:8080"
     networks:
       - xms-network
 
   wms-webapp:
     image: 192.168.1.55:5000/wms-webapp:${WMS_TAG}
-    container_name: wms-webapp
+    container_name: wms-webapp-${WMS_ENVIRONMENT}
     restart: unless-stopped
     environment:
       ConnectionStrings__DefaultConnection: "${DEFAULT_CONNECTION}"
       IdentityBootstrap__AdministratorEmail: "${ADMINISTRATOR_EMAIL}"
       IdentityBootstrap__AdministratorPassword: "${ADMINISTRATOR_PASSWORD}"
       IdentityBootstrap__AdministratorDisplayName: "${ADMINISTRATOR_DISPLAYNAME}"
+      OneCClient__BaseAddress: "${ONEC_BASEADDRESS}"
       OneCClient__Username: "${ONEC_USERNAME}"
       OneCClient__Password: "${ONEC_PASSWORD}"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       OPENSSL_CONF: "/app/openssl-legacy.cnf"
     volumes:
       - ./openssl-legacy.cnf:/app/openssl-legacy.cnf:ro
     ports:
-      - "8207:8080"
+      - "${WEBAPP_PORT}:8080"
     networks:
       - xms-network
 

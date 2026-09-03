@@ -19,7 +19,8 @@ establish an otherwise undocumented rule.
 
 ## Current selection
 
-No specification is active.
+**Active:** Standalone staging —
+[`2026-09-03-standalone-staging/spec.md`](2026-09-03-standalone-staging/spec.md).
 
 ## Recent governing references
 

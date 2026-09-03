@@ -61,6 +61,8 @@ path shared by WebApp and Mobile, with explicit ownership of local persistence,
 
 ## Standalone deployment baseline
 
+The current execution guide is [`STAGING.md`](STAGING.md).
+
 ### Outcome
 
 The current solution can be published and launched independently of Visual
@@ -75,13 +77,17 @@ may remain the same as in the current development environment for this stage.
    configuration source, and Android network path.
 2. Define certificate issuance, trust chain, installation, renewal, and the
    exact WebApp and WebApi URLs.
-3. Establish reproducible restore, build, publish, deployment, and migration
+3. Make the Mobile API address configurable before login, with a packaged
+   default. Persist the selected HTTPS address locally, validate it without
+   bypassing certificate checks, and clear the current session whenever the
+   server changes.
+4. Establish reproducible restore, build, publish, deployment, and migration
    commands independent of IDE or running-process file locks.
-4. Validate required zone and storage-location code migrations against a safe
+5. Validate required zone and storage-location code migrations against a safe
    copy of an existing database.
-5. Keep unauthenticated 1C endpoints inside a trusted network boundary or
+6. Keep unauthenticated 1C endpoints inside a trusted network boundary or
    disable external access to them until caller verification is implemented.
-6. Deploy the applications and manually exercise login plus one short happy
+7. Deploy the applications and manually exercise login plus one short happy
    path for transfer, inventory count, receiving/putaway, and picking/shipping.
 
 ### Done when
