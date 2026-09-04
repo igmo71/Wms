@@ -12,8 +12,8 @@ using Wms.Data;
 namespace Wms.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260820100242_AddApplicationUserDisplayName")]
-    partial class AddApplicationUserDisplayName
+    [Migration("20260904151251_CreateInitialWmsSchema")]
+    partial class CreateInitialWmsSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -252,6 +252,36 @@ namespace Wms.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Wms.Data.MobileCommandReceipt", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("CommandType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ClientRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("ResultResourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "CommandType", "ClientRequestId");
+
+                    b.ToTable("MobileCommandReceipts");
+                });
+
             modelBuilder.Entity("Wms.Domain.DeliveryDirection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -313,8 +343,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<double>("Quantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -341,7 +372,8 @@ namespace Wms.Data.Migrations
                     b.HasIndex("StorageLocationId");
 
                     b.HasIndex("WarehouseId", "StorageLocationId", "StockKeepingUnitId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_InventoryBalances_BusinessKey");
 
                     b.ToTable("InventoryBalances");
                 });
@@ -375,8 +407,17 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<Guid>("StorageLocationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -392,6 +433,8 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("Number");
 
+                    b.HasIndex("StorageLocationId");
+
                     b.HasIndex("WarehouseId", "Date");
 
                     b.ToTable("InventoryCounts");
@@ -403,8 +446,9 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<double>("CountedQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -414,8 +458,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
-                    b.Property<double>("ExpectedQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("ExpectedQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid>("InventoryCountId")
                         .HasColumnType("uniqueidentifier");
@@ -423,10 +468,7 @@ namespace Wms.Data.Migrations
                     b.Property<int>("LineNumber")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("StockKeepingUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("StorageLocationId")
+                    b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
@@ -440,9 +482,11 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("StockKeepingUnitId");
 
-                    b.HasIndex("StorageLocationId");
-
                     b.HasIndex("InventoryCountId", "LineNumber");
+
+                    b.HasIndex("InventoryCountId", "StockKeepingUnitId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InventoryCountItems_InventoryCountId_StockKeepingUnitId");
 
                     b.ToTable("InventoryCountItems");
                 });
@@ -466,8 +510,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset?>("PostedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<double>("Quantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid?>("RecorderId")
                         .HasColumnType("uniqueidentifier");
@@ -499,6 +544,11 @@ namespace Wms.Data.Migrations
                     b.HasIndex("StockKeepingUnitId");
 
                     b.HasIndex("WarehouseId");
+
+                    b.HasIndex("RecorderType", "RecorderId", "RecorderLineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InventoryMovements_TransferLine")
+                        .HasFilter("[RecorderType] = 4");
 
                     b.ToTable("InventoryMovements");
                 });
@@ -532,6 +582,12 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTimeOffset?>("StartedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -557,6 +613,7 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("TransitStorageLocationId")
                         .IsUnique()
+                        .HasDatabaseName("IX_InventoryTransfers_TransitStorageLocationId")
                         .HasFilter("[TransitStorageLocationId] IS NOT NULL AND [Status] IN (0, 1)");
 
                     b.HasIndex("WarehouseId", "Date");
@@ -570,11 +627,13 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<double>("BalanceAfter")
-                        .HasColumnType("float");
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
-                    b.Property<double>("BalanceBefore")
-                        .HasColumnType("float");
+                    b.Property<decimal>("BalanceBefore")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -582,8 +641,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("InventoryMovementId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<double>("QuantityDelta")
-                        .HasColumnType("float");
+                    b.Property<decimal>("QuantityDelta")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
@@ -693,12 +753,13 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("ExternalChangeDetected")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Number")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
 
                     b.Property<bool>("Posted")
                         .HasColumnType("bit");
@@ -742,6 +803,23 @@ namespace Wms.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("SynchronizationAcknowledgedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SynchronizationAcknowledgedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("SynchronizationDetectedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SynchronizationFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SynchronizationLevel")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -772,11 +850,13 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<double>("FactQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal?>("FactQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
-                    b.Property<double>("PlanQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("PlanQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
@@ -810,12 +890,13 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("DeliveryDirectionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool>("ExternalChangeDetected")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Number")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset?>("PickingStartedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -870,6 +951,23 @@ namespace Wms.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("SynchronizationAcknowledgedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SynchronizationAcknowledgedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("SynchronizationDetectedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SynchronizationFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SynchronizationLevel")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -905,8 +1003,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<double>("PlanQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("PlanQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
@@ -930,11 +1029,13 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<double>("FactQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("FactQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
-                    b.Property<double>("PlanQuantity")
-                        .HasColumnType("float");
+                    b.Property<decimal>("PlanQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
 
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
@@ -980,6 +1081,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<double?>("VolumeM3")
+                        .HasColumnType("float");
+
                     b.Property<double?>("WeightKg")
                         .HasColumnType("float");
 
@@ -1015,6 +1119,10 @@ namespace Wms.Data.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("int");
 
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1039,6 +1147,36 @@ namespace Wms.Data.Migrations
                     b.ToTable("StorageLocations");
                 });
 
+            modelBuilder.Entity("Wms.Domain.StorageLocationLock", b =>
+                {
+                    b.Property<Guid>("StorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("LockedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LockedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("OwnerType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("StorageLocationId")
+                        .HasName("PK_StorageLocationLocks");
+
+                    b.ToTable("StorageLocationLocks");
+                });
+
             modelBuilder.Entity("Wms.Domain.UnitOfMeasure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1056,18 +1194,22 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("DeletionMark")
                         .HasColumnType("bit");
 
-                    b.Property<double>("Denominator")
+                    b.Property<double?>("Denominator")
                         .HasColumnType("float");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("MeasurementType")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("Name")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<double>("Numerator")
+                    b.Property<double?>("Numerator")
                         .HasColumnType("float");
 
                     b.HasKey("Id");
@@ -1257,11 +1399,19 @@ namespace Wms.Data.Migrations
 
             modelBuilder.Entity("Wms.Domain.InventoryCount", b =>
                 {
+                    b.HasOne("Wms.Domain.StorageLocation", "StorageLocation")
+                        .WithMany()
+                        .HasForeignKey("StorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("StorageLocation");
 
                     b.Navigation("Warehouse");
                 });
@@ -1277,18 +1427,12 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
                         .WithMany()
                         .HasForeignKey("StockKeepingUnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Wms.Domain.StorageLocation", "StorageLocation")
-                        .WithMany()
-                        .HasForeignKey("StorageLocationId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("InventoryCount");
 
                     b.Navigation("StockKeepingUnit");
-
-                    b.Navigation("StorageLocation");
                 });
 
             modelBuilder.Entity("Wms.Domain.InventoryMovement", b =>
@@ -1583,6 +1727,17 @@ namespace Wms.Data.Migrations
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("Wms.Domain.StorageLocationLock", b =>
+                {
+                    b.HasOne("Wms.Domain.StorageLocation", "StorageLocation")
+                        .WithOne("ActiveLock")
+                        .HasForeignKey("Wms.Domain.StorageLocationLock", "StorageLocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StorageLocation");
+                });
+
             modelBuilder.Entity("Wms.Domain.Zone", b =>
                 {
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
@@ -1618,6 +1773,8 @@ namespace Wms.Data.Migrations
 
             modelBuilder.Entity("Wms.Domain.StorageLocation", b =>
                 {
+                    b.Navigation("ActiveLock");
+
                     b.Navigation("Children");
                 });
 

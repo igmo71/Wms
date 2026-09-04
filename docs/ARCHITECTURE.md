@@ -142,6 +142,11 @@ last-resort user-facing response and logging.
   performs one `SaveChangesAsync`; repositories or cross-context transactions
   are not introduced for this purpose.
 - Persistent invariant changes include a migration.
+- Once a migration may have been applied outside the developer's disposable
+  local database, keep it immutable: do not edit, rename, or delete it. Fix the
+  schema with a subsequent migration. Replacing migration history is allowed
+  only as an explicit pre-production baseline reset in which every affected
+  database is deleted and recreated.
 - Read-only domain collections use explicit EF backing-field configuration.
 - Optimistic concurrency is added to mutable aggregate roots or rows only when
   a stale save can break a documented lifecycle or inventory invariant. Do not
