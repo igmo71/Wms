@@ -1,5 +1,6 @@
 {
 	auto_https disable_redirects
+	default_sni vm-xms-dev
 }
 
 https://vm-xms-dev:8216 {

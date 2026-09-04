@@ -125,6 +125,11 @@ The staging Mobile manifest explicitly permits that trust only for
 Install `wms-caddy-root.crt` on the warehouse device as a CA certificate before
 opening the updated app.
 
+The Urovo Android 9 system HTTP client does not send SNI for the single-label
+host name `vm-xms-dev`. Caddy therefore uses `default_sni vm-xms-dev` to select
+the same managed certificate when SNI is absent. This does not bypass
+certificate-chain or host-name validation on the device.
+
 Install a `Release` Mobile build for autonomous testing. It uses
 `https://vm-xms-dev:8316/` from the packaged configuration; the operator does
 not enter or change the server address. A `Debug` build uses

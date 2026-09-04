@@ -6,8 +6,8 @@
 3. Establish certificate installation and manually verify HTTPS from desktop
    and Android browsers.
 4. Select the Mobile API endpoint from packaged Debug/Release configuration
-   without operator input or disabled certificate validation. **Implemented;
-   awaiting manual device verification.**
+   without operator input or disabled certificate validation. **Completed and
+   manually verified on the Urovo terminal.**
 5. Persist ASP.NET Data Protection keys across application-container
    recreation.
 6. Complete the standalone publish, migration, deployment, verification, and

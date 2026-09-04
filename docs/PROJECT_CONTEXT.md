@@ -325,7 +325,9 @@ with that fixed base address.
 The staging Android build additionally trusts user-installed certificate
 authorities only for the proven internal host `vm-xms-dev`; other configured
 hosts retain the normal system trust policy. This supports the Caddy staging
-CA without making arbitrary self-signed endpoints trusted.
+CA without making arbitrary self-signed endpoints trusted. Caddy selects the
+`vm-xms-dev` certificate as its default for the verified Urovo Android 9 client,
+which does not send SNI for this single-label intranet host.
 
 Where manual SKU search is provided, it searches by name, code, or barcode and
 continues through the same operation as scanning. Camera preview is embedded in
