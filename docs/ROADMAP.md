@@ -9,19 +9,17 @@ by dependency, not by a promised release date.
 
 ## Delivery sequence
 
-1. **Standalone deployment baseline:** reproducible launch outside Visual
-   Studio, trusted HTTPS, migration validation, and Android connectivity.
-2. **Architecture review and pilot preparation:** inspect process boundaries
+1. **Architecture review and pilot preparation:** inspect process boundaries
    while warehouse users evaluate the current staging build; use their
    observations as input instead of delaying the first deployment for broad
    refactoring.
-3. **Pilot prerequisites:** security boundaries, inventory confidence, and an
+2. **Pilot prerequisites:** security boundaries, inventory confidence, and an
    operator recovery procedure for partial 1C failures.
-4. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
+3. **Pilot rehearsal:** one documented end-to-end run after its prerequisites
    exist.
-5. **Product increments:** capacity and optional processes whose inputs and
+4. **Product increments:** capacity and optional processes whose inputs and
    business need are confirmed.
-6. **Production maintenance:** dependency, diagnostics, and administrative
+5. **Production maintenance:** dependency, diagnostics, and administrative
    concurrency work that does not block staging.
 
 ## Architecture and process-boundary review
@@ -59,54 +57,18 @@ path shared by WebApp and Mobile, with explicit ownership of local persistence,
   than introduced speculatively;
 - no broad refactoring begins until the review is accepted.
 
-## Standalone deployment baseline
-
-The current execution guide is [`STAGING.md`](STAGING.md).
-
-### Outcome
-
-The current solution can be published and launched independently of Visual
-Studio, apply migrations, expose WebApp and Mobile V1 through trusted HTTPS,
-and connect the Android client without certificate-validation workarounds.
-Connection addresses, credentials, logging detail, and sensitive-data logging
-may remain the same as in the current development environment for this stage.
-
-### Work
-
-1. Record the target host, DNS names, hosting or reverse-proxy model, database,
-   configuration source, and Android network path.
-2. Define certificate issuance, trust chain, installation, renewal, and the
-   exact WebApp and WebApi URLs.
-3. Make the Mobile API address configurable before login, with a packaged
-   default. Persist the selected HTTPS address locally, validate it without
-   bypassing certificate checks, and clear the current session whenever the
-   server changes.
-4. Establish reproducible restore, build, publish, deployment, and migration
-   commands independent of IDE or running-process file locks.
-5. Validate required zone and storage-location code migrations against a safe
-   copy of an existing database.
-6. Keep unauthenticated 1C endpoints inside a trusted network boundary or
-   disable external access to them until caller verification is implemented.
-7. Deploy the applications and manually exercise login plus one short happy
-   path for transfer, inventory count, receiving/putaway, and picking/shipping.
-
-### Done when
-
-- WebApp and Mobile V1 are reachable through trusted HTTPS;
-- Android connects without bypassing certificate validation;
-- fresh and repeated standalone deployments are documented and reproducible;
-- database migration has a verified backup and restore procedure;
-- all four accepted mobile processes reach the staging API;
-- unverified 1C endpoints are not publicly exposed.
-
 ## Pilot prerequisites
 
 ### Security and device access
 
 - Authenticate or otherwise verify 1C webhook and import callers before their
   endpoints leave a trusted network.
+- Decide when 1C notification URLs can move from the current trusted-network
+  HTTP endpoint to HTTPS and whether 1C will trust the staging CA.
 - Define session lifetime, refresh, and operational revocation for a lost or
   retired device.
+- Define managed staging-CA distribution and renewal before the device fleet
+  grows beyond manual installation.
 - Keep fine-grained operation permissions and per-warehouse assignments
   deferred until the pilot demonstrates a concrete need.
 
@@ -190,7 +152,6 @@ command, and the operator recovery procedure.
 
 ## Inputs needed for later work
 
-- standalone host, DNS, certificate, database, and configuration constraints;
 - a safe copy or representative snapshot of an existing database;
 - printer model, label size, and print-path constraints;
 - real 1C packaging, characteristic, and shipping-flag examples;

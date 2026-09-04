@@ -1,6 +1,6 @@
 # Standalone staging
 
-Status: Active
+Status: Frozen reference
 
 ## Outcome
 
@@ -47,9 +47,8 @@ and catalog notifications to the dev WebApi on port `8206`.
   build uses the standalone test API address;
 - deployment and recovery commands are reproducible outside Visual Studio.
 
-## Open questions
+## Deferred follow-up
 
-- Whether the HTTP endpoints should later be retired after 1C trusts the local
-  CA and its notification URLs move to HTTPS.
-- How the staging CA certificate will be distributed to managed warehouse
-  devices after the first manual installation.
+- Moving 1C notification URLs from HTTP to HTTPS remains a later security task.
+- Managed distribution and renewal of the staging CA remains a later device
+  administration task.

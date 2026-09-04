@@ -19,13 +19,13 @@ establish an otherwise undocumented rule.
 
 ## Current selection
 
-**Active:** Standalone staging —
-[`2026-09-03-standalone-staging/spec.md`](2026-09-03-standalone-staging/spec.md).
+**Active:** None.
 
 ## Recent governing references
 
 | Created | Status | Problem | Path |
 | --- | --- | --- | --- |
+| 2026-09-03 | Frozen reference | Standalone staging | [`2026-09-03-standalone-staging/spec.md`](2026-09-03-standalone-staging/spec.md) |
 | 2026-09-03 | Frozen reference | Initial order plan synchronization | [`2026-09-03-initial-order-plan-synchronization/spec.md`](2026-09-03-initial-order-plan-synchronization/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization state cleanup | [`2026-09-02-order-synchronization-state-cleanup/spec.md`](2026-09-02-order-synchronization-state-cleanup/spec.md) |
 | 2026-09-02 | Frozen reference | Order synchronization simplification | [`2026-09-02-order-synchronization-simplification/spec.md`](2026-09-02-order-synchronization-simplification/spec.md) |
