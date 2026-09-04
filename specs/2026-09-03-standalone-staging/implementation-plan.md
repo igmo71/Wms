@@ -5,8 +5,9 @@
 2. Add one non-disruptive Caddy instance and persistent internal CA.
 3. Establish certificate installation and manually verify HTTPS from desktop
    and Android browsers.
-4. Make the Mobile API endpoint configurable without disabling certificate
-   validation.
+4. Select the Mobile API endpoint from packaged Debug/Release configuration
+   without operator input or disabled certificate validation. **Implemented;
+   awaiting manual device verification.**
 5. Persist ASP.NET Data Protection keys across application-container
    recreation.
 6. Complete the standalone publish, migration, deployment, verification, and

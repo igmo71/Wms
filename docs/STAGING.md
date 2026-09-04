@@ -119,9 +119,16 @@ https://vm-xms-dev:8316/api/mobile/v1/me
 `401 Unauthorized` is the expected unauthenticated response and proves that
 the test WebApi is reachable through HTTPS.
 
-The current Mobile app does not yet trust user-installed Android CAs by
-default. Its network security configuration and configurable API-address UI
-are the next implementation step. Do not add a certificate-validation bypass.
+The Android system does not normally expose user-installed CAs to applications.
+The staging Mobile manifest explicitly permits that trust only for
+`vm-xms-dev`; normal certificate-chain and host-name validation still applies.
+Install `wms-caddy-root.crt` on the warehouse device as a CA certificate before
+opening the updated app.
+
+Install a `Release` Mobile build for autonomous testing. It uses
+`https://vm-xms-dev:8316/` from the packaged configuration; the operator does
+not enter or change the server address. A `Debug` build uses
+`https://localhost:7249/` for the existing Visual Studio debugging path.
 
 ## Non-destructive rollback
 

@@ -15,7 +15,8 @@ continues against a separate environment.
 - retain the current HTTP endpoints used by 1C notifications;
 - add one Caddy instance with a persistent internal CA and separate HTTPS
   entry points for both environments;
-- make the Mobile API address configurable before login;
+- select the Mobile API address from packaged debug and standalone build
+  configuration without operator input;
 - document publish, migration, deployment, certificate trust, verification,
   and rollback steps.
 
@@ -42,8 +43,8 @@ and catalog notifications to the dev WebApi on port `8206`.
 - Android resolves `vm-xms-dev` and reaches both HTTPS environments without a
   certificate-validation bypass;
 - recreating Caddy retains the same internal CA;
-- Mobile can select and persist a valid HTTPS API address and clears its
-  session when that address changes;
+- a Debug Mobile build uses the local Visual Studio API address and a Release
+  build uses the standalone test API address;
 - deployment and recovery commands are reproducible outside Visual Studio.
 
 ## Open questions

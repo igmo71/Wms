@@ -317,6 +317,16 @@ boundary. Operational screens prefer an available embedded scanner and use the
 camera otherwise. The Urovo adapter detects `android.device.ScanManager`; the
 device must still be configured for intent output.
 
+The Mobile API address is deployment configuration, not an operator setting.
+The packaged configuration contains separate debug and standalone addresses;
+the build configuration selects one when the app starts and creates one client
+with that fixed base address.
+
+The staging Android build additionally trusts user-installed certificate
+authorities only for the proven internal host `vm-xms-dev`; other configured
+hosts retain the normal system trust policy. This supports the Caddy staging
+CA without making arbitrary self-signed endpoints trusted.
+
 Where manual SKU search is provided, it searches by name, code, or barcode and
 continues through the same operation as scanning. Camera preview is embedded in
 the current step and hidden while scanning is not expected. A 1C document

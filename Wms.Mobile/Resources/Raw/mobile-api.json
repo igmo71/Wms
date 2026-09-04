@@ -1,3 +1,4 @@
 {
-  "BaseAddress": "https://localhost:7249/"
+  "DebugBaseAddress": "https://localhost:7249/",
+  "StandaloneBaseAddress": "https://vm-xms-dev:8316/"
 }
