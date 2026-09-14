@@ -25,6 +25,9 @@ internal sealed class Document_ПриходныйОрдерНаТовары_Inbo
             return OperationError.Failure(
                 "1С вернула некорректный ответ: ожидался один приходный ордер.");
 
+        if (documents[0].Ref_Key != orderId)
+            return OperationError.Failure("1С вернула другой приходный ордер.");
+
         logger.LogDebug("Получен документ {@Document}", documents[0]);
         return Document.MapToImportSnapshot(documents[0]);
     }

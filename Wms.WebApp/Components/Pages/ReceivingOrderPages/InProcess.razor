@@ -27,13 +27,14 @@ else if (_order is null)
 }
 else
 {
+    var sourceSnapshot = _order.SourceSnapshot;
     <MudStack Spacing="2">
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Приёмка приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="@(_isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && (_receivingLocation is null || _order.UnconfirmedItemCount > 0 || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
+                       Disabled="@(_pendingManagerCompletion is not null || _isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && (_receivingLocation is null || _order.UnconfirmedItemCount > 0 || _order.RequiresManagerCompletion || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="SetReceivedAsync">
                 @(_pendingCompletion is null ? "Завершить" : "Повторить завершение")
@@ -46,7 +47,7 @@ else
         @if (_isCompleting)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+            <MudText Typo="Typo.caption">Выполняется завершение приемки…</MudText>
         }
 
 
@@ -55,11 +56,28 @@ else
             <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
         }
 
-        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
+        <OrderSynchronizationPanel Receiving="true" Assessment="_synchronizationAssessment"
                                    IsAcknowledging="InputsLocked"
                                    OnAcknowledge="AcknowledgeSynchronizationAsync"
                                    AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
                                    AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
+
+        @if (_order.RequiresManagerCompletion)
+        {
+            <MudAlert Severity="Severity.Warning">Есть количественные расхождения. Завершение требует решения заведующего в Web.</MudAlert>
+        }
+        @if (_canManageReceiving && (_order.RequiresManagerCompletion || _pendingManagerCompletion is not null))
+        {
+            <MudPaper Class="pa-3" Outlined="true">
+                <MudText>Завершение с текущими фактическими количествами</MudText>
+                <MudTextField T="string" @bind-Value="_completionReason" Label="Причина завершения с расхождениями"
+                              Lines="2" MaxLength="2000" Immediate="true" Disabled="InputsLocked" />
+                <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="CompleteWithDiscrepanciesAsync"
+                           Disabled="@(_isCompleting || _isSavingItem || _pendingItem is not null || _pendingCompletion is not null || _isAcknowledgingSynchronization || (_pendingManagerCompletion is null && (string.IsNullOrWhiteSpace(_completionReason) || _receivingLocation is null || _order.UnconfirmedItemCount > 0 || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))">
+                    @(_pendingManagerCompletion is null ? "Завершить с расхождениями" : "Повторить завершение с расхождениями")
+                </MudButton>
+            </MudPaper>
+        }
 
         @if (_order.UnconfirmedItemCount > 0)
         {
@@ -134,7 +152,10 @@ else
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
+                <PropertyColumn Property="x => x.PlanQuantity" Title="План WMS" />
+                <TemplateColumn Title="Текущий план 1С">
+                    <CellTemplate>@FormatQuantity(sourceSnapshot?.Items?.FirstOrDefault(x => x.LineNumber == context.Item.LineNumber && x.StockKeepingUnitId == context.Item.StockKeepingUnitId)?.Quantity)</CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
                         <MudNumericField T="decimal?"

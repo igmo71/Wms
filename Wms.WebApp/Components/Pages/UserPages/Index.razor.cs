@@ -70,6 +70,7 @@ public partial class Index
     {
         ApplicationRoles.Administrator => "Администратор",
         ApplicationRoles.Operator => "Оператор",
+        ApplicationRoles.Manager => "Заведующий складом",
         _ => role
     };
 }

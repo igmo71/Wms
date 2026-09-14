@@ -31,6 +31,7 @@
                        Label="Роль"
                        Required="true">
                 <MudSelectItem T="string" Value="@ApplicationRoles.Operator">Оператор</MudSelectItem>
+                <MudSelectItem T="string" Value="@ApplicationRoles.Manager">Заведующий складом</MudSelectItem>
                 <MudSelectItem T="string" Value="@ApplicationRoles.Administrator">Администратор</MudSelectItem>
             </MudSelect>
             @if (User is not null)

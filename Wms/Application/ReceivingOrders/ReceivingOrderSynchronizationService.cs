@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Wms.Application.Persistence;
 using Wms.Common;
@@ -11,7 +12,8 @@ namespace Wms.Application.ReceivingOrders;
 public sealed class ReceivingOrderSynchronizationService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     IReceivingOrderSource orderSource,
-    ILogger<ReceivingOrderSynchronizationService> logger)
+    ILogger<ReceivingOrderSynchronizationService> logger,
+    IOptions<ReceivingOptions>? options = null)
 {
     public async Task<OperationResult<OrderSynchronizationAssessment>> CheckAsync(
         Guid orderId,
@@ -81,7 +83,8 @@ public sealed class ReceivingOrderSynchronizationService(
     internal async Task<OperationResult> PersistCompletionCheckpointAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool managerCompletion = false)
     {
         OperationResult<ReceivingOrderImportSnapshot> snapshotResult =
             await orderSource.GetSnapshotAsync(order.Id, ct);
@@ -93,15 +96,17 @@ public sealed class ReceivingOrderSynchronizationService(
         OrderSynchronizationAssessment sourceAssessment = order.AssessSynchronization(snapshot, now);
         OrderSynchronizationAssessment targetAssessment =
             ReceivingOrderSynchronizationComparer.CompareReceivedTarget(order, snapshot);
+        order.RememberSource(snapshot);
         OrderSynchronizationAssessment assessment = sourceAssessment.Level == OrderSynchronizationLevel.Synchronized
             ? sourceAssessment
-            : targetAssessment.Level == OrderSynchronizationLevel.Synchronized
+            : order.IntegrationMode == ReceivingIntegrationMode.Connected
+                && targetAssessment.Level == OrderSynchronizationLevel.Synchronized
                 ? targetAssessment
                 : sourceAssessment;
 
         order.ApplySynchronizationAssessment(assessment, now);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
-        return saveResult.IsSuccess ? EnsureAllowsWork(order) : saveResult;
+        return saveResult.IsSuccess ? EnsureAllowsCompletion(order, assessment, managerCompletion) : saveResult;
     }
 
     private async Task<OperationResult<OrderSynchronizationAssessment>> ApplySnapshotAsync(
@@ -125,7 +130,7 @@ public sealed class ReceivingOrderSynchronizationService(
             if (!allowCreate)
                 return OperationError.NotFound($"Приходный ордер '{snapshot.Id}' не найден в WMS.");
 
-            OperationResult<ReceivingOrder> creationResult = ReceivingOrder.Create(snapshot, now);
+            OperationResult<ReceivingOrder> creationResult = ReceivingOrder.Create(snapshot, now, options?.Value.ReceivingIntegrationMode ?? ReceivingIntegrationMode.Connected);
             if (!creationResult.IsSuccess)
                 return creationResult.Error!;
 
@@ -163,13 +168,17 @@ public sealed class ReceivingOrderSynchronizationService(
         return assessment;
     }
 
-    private static OperationResult EnsureAllowsWork(ReceivingOrder order) =>
-        order.SynchronizationLevel switch
-        {
-            OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
-            OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(
-                "Приходный ордер требует решения оператора по изменениям 1С."),
-            _ => OperationError.Conflict(
-                "Работа с приходным ордером заблокирована из-за расхождений с 1С.")
-        };
+    internal static OperationResult EnsureAllowsCompletion(ReceivingOrder order,
+        OrderSynchronizationAssessment assessment, bool managerCompletion)
+    {
+        if (assessment.Differences.Any(x => x.Level == OrderSynchronizationLevel.Blocking
+            && !ReceivingOrderSynchronizationComparer.IsQuantityDifference(x)))
+            return OperationError.Conflict("Завершение заблокировано: устраните запрещающие расхождения с 1С.");
+        if (assessment.Differences.Any(x => x.Level == OrderSynchronizationLevel.RequiresOperatorDecision))
+            return OperationError.Conflict("Подтвердите изменения реквизитов 1С перед завершением.");
+        if (!managerCompletion && (order.RequiresManagerCompletion
+            || assessment.Differences.Any(ReceivingOrderSynchronizationComparer.IsQuantityDifference)))
+            return OperationError.Conflict("Есть количественные расхождения. Требуется решение заведующего складом в Web.");
+        return OperationResult.Success();
+    }
 }

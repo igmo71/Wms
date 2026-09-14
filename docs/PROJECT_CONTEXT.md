@@ -3,8 +3,9 @@
 ## Product boundary
 
 WMS is a warehouse-management MVP. 1C owns catalogs and source receiving and
-shipping documents. WMS imports them, executes warehouse work, returns results
-to 1C, and owns operational inventory by storage location.
+shipping documents. WMS imports them, executes warehouse work, and owns
+operational inventory by storage location. Receiving supports Autonomous (no
+outbound changes to 1C) and Connected modes; shipping retains outbound results.
 
 Implemented workflows are receiving and putaway, picking and shipping, direct
 and transit intra-warehouse transfers, location inventory counts, inventory
@@ -23,9 +24,10 @@ truth.
 
 ## Identity and access
 
-WebApp uses ASP.NET Core Identity with two roles: `Operator` may run warehouse
-operations and reports; `Administrator` additionally manages configuration and
-users. Public self-registration is not offered. Administrator-created accounts
+WebApp uses ASP.NET Core Identity: `Operator` may run warehouse operations and
+reports; `Manager` additionally completes receiving with quantity discrepancies
+in Web; `Administrator` has that same receiving permission and manages
+configuration and users. Public self-registration is not offered. Administrator-created accounts
 are confirmed local accounts with one WMS role. An administrator cannot block
 or demote themselves, and the last active administrator cannot be blocked or
 demoted.
@@ -103,23 +105,45 @@ inventory concurrency failures become business conflicts.
 
 ## Warehouse workflows
 
-### Accepted receiving change (implementation pending)
-
-The active receiving specification introduces Autonomous receiving for this
-deployment alongside Connected integration. Autonomous preserves the imported
-WMS plan, reads 1C differences without outbound writes, and allows any known 1C
-status; deletion and unposting still block completion. In both modes, quantity
-differences between the retained plan, current 1C plan and warehouse fact require
-Manager or Administrator completion in Web with a mandatory reason, including
-an original plan of 10, revised 1C plan of 8 and fact of 8. Normal fact editing
-remains unchanged. Shipping is out of scope; old operational data migration
-is not required during development. These are accepted target rules, not yet
-implemented behavior; the
-sections below still describe the current implementation. Scope, unresolved
-details and the implementation plan are in
-[`the active specification`](../specs/2026-09-14-receiving-manager-completion/spec.md).
-
 ### Receiving and putaway
+
+`Receiving:ReceivingIntegrationMode` selects `Connected` or `Autonomous` for
+new imports. Both hosts are configured for Autonomous in this deployment. The
+mode is retained on the order so Web and API use the same rules; changing the
+configuration affects new orders only. Development does not require migration
+of unfinished operations between modes.
+
+Autonomous retains the imported plan immediately, initializes local receiving
+as ready, and never writes statuses, rows, comments or posting to 1C. Known 1C
+statuses (including Received) are informational and do not drive local stages.
+Source metadata and line composition changes are informational; matched-line
+quantity changes require Manager completion. Missing/new/different source SKUs
+do not add or replace local lines. Current posting and deletion flags follow
+the source. Unposted/deleted source documents and invalid or failed source
+verification prevent completion for everyone.
+
+Connected retains the existing source-plan refresh before work and protects the
+plan after receiving starts. It keeps outbound transitions, updates quantities
+when they differ from the current source, and preserves other synchronization
+restrictions. A Manager decision may resolve quantity changes, not unrelated
+Connected synchronization restrictions.
+
+In both modes any quantity difference between the retained WMS plan, current
+matched 1C lines and confirmed warehouse fact prevents ordinary completion.
+For example, initial plan 10, revised 1C plan 8 and fact 8 still requires Manager
+or Administrator completion with a mandatory reason (up to 2000 characters).
+The same applies to plan 10, current source 12 and fact 10. Fact/comment editing
+remains unchanged. Mobile explains the need for a decision; the special action
+is available only in Web, with current server-side role/account checks.
+
+The special command carries the reviewed order revision, source fingerprint,
+receiving location and reason. Fresh verification must still match the reviewed
+source; warehouse invariants remain mandatory. The final receipt, stock effects
+and immutable decision commit together. Decision JSON retains author, time,
+reason, source snapshot, retained plan, fact and assessed differences; later
+source updates cannot rewrite that evidence. Web retains the original special
+command for uncertain retries. A changed order/source requires a new review.
+The latest source snapshot is stored separately for comparison and display.
 
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
@@ -258,11 +282,13 @@ Weight totals use current SKU data and identify incomplete results.
 
 ## 1C synchronization
 
-Before warehouse work starts, an admissible source document remains owned by
-1C. While WMS and 1C remain in matching initial states, synchronization replaces
+For shipping and Connected receiving, before warehouse work starts an admissible
+source document remains owned by 1C. While WMS and 1C remain in matching initial
+states, synchronization replaces
 source-owned metadata and the complete plan. Deletion marks, posting changes,
 unexpected source status, malformed plans, and unsupported line semantics are
-blocking. After work starts, synchronization never replaces the protected WMS
+blocking in these connected workflows. Autonomous receiving follows the rules
+above. After work starts, synchronization never replaces the protected WMS
 plan or warehouse fact. A successful shipping rollback returns the order to the
 initial synchronization mode.
 
@@ -273,19 +299,24 @@ Synchronization assessments are `Synchronized`,
 `RequiresOperatorDecision`, or `Blocking`. WebApp may acknowledge only an
 operator-decision assessment after a fresh fingerprint check; acknowledgement
 copies source-owned metadata only. Mobile shows the latest assessment but
-cannot acknowledge it.
+cannot acknowledge it. Autonomous receiving differences are informational or
+quantity/verification restrictions and are never acknowledged by copying metadata.
 
 Mobile receiving, picking, and shipping screens support pull-to-refresh for a
 fresh synchronization check. A rejected completion conflict also refreshes the
 assessment; unresolved or failed verification disables completion. Refresh
 does not acknowledge source changes or replay pending commands.
 
-Starting work rejects a known unresolved assessment. Receiving completion,
+Starting work rejects a known unresolved assessment, except that Autonomous
+receiving may start with quantity differences to be resolved at completion. Receiving completion,
 picking completion, and final shipping fetch and persist a fresh checkpoint
 before local effects or outbound mutation. An exact source state, or the exact
 repeat-safe target of the requested command, may continue. Technical failure,
-an unacknowledged decision, or a blocking assessment stops the transition.
-Repeated identical assessments do not advance the order revision.
+an unacknowledged decision, or a blocking assessment stops the transition;
+receiving Manager completion may resolve the quantity differences described above.
+Identical source snapshots and assessments do not advance the order revision.
+A changed stored receiving snapshot advances its revision even if only an
+informational field changed.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
 WMS-to-1C multi-step transitions are not atomic across both systems; pilot
@@ -294,7 +325,7 @@ Shipping completion treats an already-applied exact 1C item-table target as
 success, and its target status and posting calls are repeatable.
 
 Receiving line comments are WMS-owned annotations, not warehouse facts. They
-are sent to 1C with receiving item updates, but differences in these comments
+are sent to 1C with Connected receiving item updates, but differences in these comments
 do not affect synchronization assessments or fingerprints and never block work.
 
 ## Mobile boundary

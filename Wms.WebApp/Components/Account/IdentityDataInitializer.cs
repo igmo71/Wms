@@ -37,11 +37,13 @@ internal static class IdentityDataInitializer
                 "Не удалось обновить сессию первоначального администратора");
         }
 
-        if (administrator is not null && await userManager.IsInRoleAsync(administrator, ApplicationRoles.Operator))
+        foreach (var obsoleteRole in new[] { ApplicationRoles.Operator, ApplicationRoles.Manager })
         {
+            if (administrator is null || !await userManager.IsInRoleAsync(administrator, obsoleteRole))
+                continue;
             EnsureSucceeded(
-                await userManager.RemoveFromRoleAsync(administrator, ApplicationRoles.Operator),
-                "Не удалось снять роль Operator с первоначального администратора");
+                await userManager.RemoveFromRoleAsync(administrator, obsoleteRole),
+                $"Не удалось снять роль {obsoleteRole} с первоначального администратора");
             EnsureSucceeded(
                 await userManager.UpdateSecurityStampAsync(administrator),
                 "Не удалось обновить сессию первоначального администратора");
@@ -50,7 +52,8 @@ internal static class IdentityDataInitializer
         foreach (var user in await userManager.Users.ToListAsync())
         {
             if (await userManager.IsInRoleAsync(user, ApplicationRoles.Administrator)
-                || await userManager.IsInRoleAsync(user, ApplicationRoles.Operator))
+                || await userManager.IsInRoleAsync(user, ApplicationRoles.Operator)
+                || await userManager.IsInRoleAsync(user, ApplicationRoles.Manager))
             {
                 continue;
             }

@@ -1,16 +1,17 @@
 @using Wms.Domain
 @using Wms.Domain.Enums
 
-@if (Assessment is { Level: not OrderSynchronizationLevel.Synchronized } assessment)
+@if (Assessment is { } assessment && (assessment.Level != OrderSynchronizationLevel.Synchronized || (Receiving && assessment.Differences.Count > 0)))
 {
-    <MudAlert Severity="@(assessment.Level == OrderSynchronizationLevel.Blocking ? Severity.Error : Severity.Warning)"
+    <MudAlert Severity="@(assessment.Level == OrderSynchronizationLevel.Blocking ? Severity.Error : assessment.Level == OrderSynchronizationLevel.Synchronized ? Severity.Info : Severity.Warning)"
               Variant="Variant.Outlined">
         <MudStack Spacing="1">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                <MudText Typo="Typo.subtitle1"><b>@assessment.Level.GetDisplayText()</b></MudText>
+                <MudText Typo="Typo.subtitle1"><b>@(Receiving ? "Сверка приходного ордера с 1С" : assessment.Level.GetDisplayText())</b></MudText>
             </MudStack>
             <MudText Typo="Typo.body2">
-                @(assessment.Level == OrderSynchronizationLevel.Blocking
+                @(Receiving ? "Количественные расхождения рассматривает заведующий. Удаление документа, отмена проведения и ошибки проверки не допускают завершения."
+                    : assessment.Level == OrderSynchronizationLevel.Blocking
                     ? "Расхождения затрагивают складские данные. Продолжение операции недопустимо до исправления источника."
                     : "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.")
             </MudText>
@@ -30,7 +31,7 @@
                     <MudTd DataLabel="Поле">@context.FieldName</MudTd>
                     <MudTd DataLabel="WMS">@(context.WmsValue ?? "—")</MudTd>
                     <MudTd DataLabel="1С">@(context.OneCValue ?? "—")</MudTd>
-                    <MudTd DataLabel="Уровень">@context.Level.GetDisplayText()</MudTd>
+                    <MudTd DataLabel="Уровень">@(Receiving && context.Level == OrderSynchronizationLevel.Synchronized ? "Информация" : context.Level.GetDisplayText())</MudTd>
                 </RowTemplate>
             </MudTable>
 
@@ -56,6 +57,9 @@
 }
 
 @code {
+    [Parameter]
+    public bool Receiving { get; set; }
+
     [Parameter, EditorRequired]
     public OrderSynchronizationAssessment? Assessment { get; set; }
 

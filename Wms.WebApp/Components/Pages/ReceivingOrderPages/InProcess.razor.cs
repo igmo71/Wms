@@ -39,9 +39,12 @@ public partial class InProcess
 
     private PendingReceivingCommand<CompleteReceivingCommand>? _pendingCompletion;
     private PendingItemOperation? _pendingItem;
+    private PendingReceivingCommand<CompleteReceivingWithDiscrepanciesCommand>? _pendingManagerCompletion;
+    private string? _completionReason;
+    private bool _canManageReceiving;
     private bool _isSavingItem;
     private bool InputsLocked => _isSavingItem || _pendingItem is not null || _isCompleting
-        || _pendingCompletion is not null || _isAcknowledgingSynchronization;
+        || _pendingCompletion is not null || _pendingManagerCompletion is not null || _isAcknowledgingSynchronization;
     private ReceivingOrder? _order;
     private Zone? _receivingZone;
     private StorageLocation? _receivingLocation;
@@ -60,6 +63,11 @@ public partial class InProcess
             _pendingCompletion = null;
         if (_pendingItem is { } itemPending && itemPending.OrderId != Id)
             _pendingItem = null;
+        if (_pendingManagerCompletion is { } managerPending && managerPending.Command.OrderId != Id)
+            _pendingManagerCompletion = null;
+        var principal = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        _canManageReceiving = principal.IsInRole(Wms.Data.ApplicationRoles.Manager)
+            || principal.IsInRole(Wms.Data.ApplicationRoles.Administrator);
         _isLoading = true;
         OperationResult<OrderSynchronizationAssessment> synchronizationResult =
             await SynchronizationService.CheckAsync(Id);
@@ -108,7 +116,10 @@ public partial class InProcess
                     OperationResult<OrderSynchronizationAssessment> latest =
                         await SynchronizationService.CheckAsync(Id);
                     if (latest.IsSuccess)
+                    {
                         _synchronizationAssessment = latest.Value;
+                        _order = await OrderQueryService.GetOrderAsync(Id);
+                    }
                 }
                 return;
             }
@@ -277,7 +288,7 @@ public partial class InProcess
 
     private async Task SetReceivedAsync()
     {
-        if (_isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && _receivingLocation is null))
+        if (_pendingManagerCompletion is not null || _isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && _receivingLocation is null))
             return;
 
         var orderId = Id;
@@ -324,8 +335,7 @@ public partial class InProcess
                     {
                         _synchronizationAssessment = latest.Value;
                         _synchronizationErrorMessage = null;
-                        if (_synchronizationAssessment is { Level: not OrderSynchronizationLevel.Synchronized })
-                            return;
+                        _order = await OrderQueryService.GetOrderAsync(Id);
                     }
                     else
                     {
@@ -346,6 +356,55 @@ public partial class InProcess
         {
             _isCompleting = false;
         }
+    }
+
+    private async Task CompleteWithDiscrepanciesAsync()
+    {
+        if (_isCompleting || _isSavingItem || _pendingItem is not null || _pendingCompletion is not null
+            || _isAcknowledgingSynchronization || !_canManageReceiving || _order is null)
+            return;
+        if (_pendingManagerCompletion is null && (string.IsNullOrWhiteSpace(_completionReason)
+            || _receivingLocation is null || _order.SynchronizationFingerprint is null))
+            return;
+        _isCompleting = true;
+        _completeFailed = false;
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null) return;
+            if (_pendingManagerCompletion is { } previous && previous.Context.UserId != userId)
+            {
+                _completeFailed = true;
+                _errorMessage = "Повторите операцию под пользователем, который её начал.";
+                return;
+            }
+            _pendingManagerCompletion ??= new(new(Id, _receivingLocation!.Id,
+                _order.OperationalRevision, _order.SynchronizationFingerprint!, _completionReason!),
+                new(Guid.NewGuid(), userId));
+            var pending = _pendingManagerCompletion;
+            var result = await OrderCommandService.CompleteWithDiscrepanciesAsync(pending.Command, pending.Context);
+            if (_pendingManagerCompletion != pending) return;
+            if (result.IsSuccess || result.Error?.Type != OperationErrorType.Failure)
+                _pendingManagerCompletion = null;
+            if (result.IsSuccess)
+            {
+                NavigationManager.NavigateTo($"receiving-orders/{Id}");
+                return;
+            }
+            _completeFailed = true;
+            _errorMessage = result.Error?.Message;
+            if (result.Error?.Type == OperationErrorType.Conflict)
+            {
+                _completionReason = null;
+                await OnParametersSetAsync();
+            }
+        }
+        catch
+        {
+            _completeFailed = true;
+            _errorMessage = "Результат завершения не подтвержден. Повторите исходную операцию.";
+        }
+        finally { _isCompleting = false; }
     }
 
     private async Task<string?> GetCurrentUserIdAsync()

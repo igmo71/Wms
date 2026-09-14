@@ -66,7 +66,7 @@ application ports use WMS terminology.
 Application services use `ApplicationDbContext` directly, and one operation
 normally has one explicit save boundary.
 
-Receiving start/completion and fact/comment edits, all putaway commands,
+Receiving start/completion (including Manager completion) and fact/comment edits, all putaway commands,
 picking draft add/update/delete, shipping start-picking/complete-picking/ship/rollback,
 transfer creation/movements/completion/draft deletion, and all inventory-count
 mutations enter the shared `CommandExecutor` from their public application methods. The executor
@@ -147,5 +147,6 @@ algorithms and aggregates intact.
 - Cross-project and deliberate assembly boundaries are `public`; implementation
   details are `internal`.
 - Verification is proportional to change risk. Schema changes require a
-  migration and migration-drift check; the task specification defines any
-  additional checks.
+  migration and migration-drift check. Adding, changing or running automated
+  tests requires an acute need and advance user agreement on scope; use targeted
+  review, builds and focused manual verification by default.

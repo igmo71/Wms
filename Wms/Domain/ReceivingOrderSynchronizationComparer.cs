@@ -7,7 +7,8 @@ public static class ReceivingOrderSynchronizationComparer
     public static OrderSynchronizationAssessment Compare(
         ReceivingOrder order,
         ReceivingOrderImportSnapshot snapshot) =>
-        Compare(order, snapshot, expectReceivedTarget: order.Status == ReceivingOrderStatus.Received);
+        Compare(order, snapshot, expectReceivedTarget: order.IntegrationMode == ReceivingIntegrationMode.Connected
+            && order.Status == ReceivingOrderStatus.Received);
 
     public static OrderSynchronizationAssessment CompareReceivedTarget(
         ReceivingOrder order,
@@ -57,8 +58,26 @@ public static class ReceivingOrderSynchronizationComparer
         comparison.AddIfDifferent("baseOrder.type", "Тип документа-основания", order.BaseOrderType, snapshot.BaseOrderType, OrderSynchronizationLevel.Blocking);
 
         CompareItems(comparison, order, snapshot.Items, expectReceivedTarget);
-        return comparison.Build();
+        if (snapshot.DeletionMark)
+            comparison.Add("sourceDeleted", "Документ удален", false, true, OrderSynchronizationLevel.Blocking);
+        if (!snapshot.Posted)
+            comparison.Add("sourceUnposted", "Документ не проведен", true, false, OrderSynchronizationLevel.Blocking);
+        if (snapshot.Status == ReceivingOrderStatus.Unknown || !Enum.IsDefined(snapshot.Status))
+            comparison.Add("sourceStatus", "Неизвестный статус 1С", null, snapshot.Status, OrderSynchronizationLevel.Blocking);
+        var assessment = comparison.Build();
+        return order.IntegrationMode == ReceivingIntegrationMode.Autonomous
+            ? new OrderSynchronizationAssessment(assessment.Fingerprint,
+                assessment.Differences.Select(x => IsQuantityDifference(x) || IsSourceBlocker(x)
+                    ? x : x with { Level = OrderSynchronizationLevel.Synchronized }).ToList())
+            : assessment;
     }
+
+    internal static bool IsQuantityDifference(OrderSynchronizationDifference difference) =>
+        difference.FieldCode.StartsWith("items[")
+        && (difference.FieldCode.EndsWith(".quantity") || difference.FieldCode.EndsWith(".packageQuantity"));
+
+    private static bool IsSourceBlocker(OrderSynchronizationDifference difference) =>
+        difference.FieldCode is "id" or "sourceDeleted" or "sourceUnposted" or "sourceStatus";
 
     private static void CompareItems(
         OrderSynchronizationComparisonBuilder comparison,
@@ -99,6 +118,10 @@ public static class ReceivingOrderSynchronizationComparer
 
             ReceivingOrderItemImportSnapshot externalItem = externalLines[0];
             comparison.AddIfDifferent($"{prefix}.sku", $"Строка {lineNumber}: номенклатура", localItem!.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
+
+            if (order.IntegrationMode == ReceivingIntegrationMode.Autonomous
+                && localItem.StockKeepingUnitId != externalItem.StockKeepingUnitId)
+                continue;
 
             decimal? expectedQuantity = expectReceivedTarget
                 ? localItem.FactQuantity

@@ -7,7 +7,7 @@ specifications unless a current task explicitly needs their rationale.
 ## Active
 
 - [Приемка без записи в 1С и завершение с решением заведующего](2026-09-14-receiving-manager-completion/spec.md)
-  — Правила согласованы, реализация не начата. [План](2026-09-14-receiving-manager-completion/plan.md).
+  — Реализовано; ожидается ручная приемка. [План](2026-09-14-receiving-manager-completion/plan.md).
 
 ## Frozen
 

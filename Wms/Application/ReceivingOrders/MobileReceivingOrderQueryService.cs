@@ -332,7 +332,9 @@ public sealed class MobileReceivingOrderQueryService(
             order.StartedAtUtc,
             order.CompletedAtUtc,
             order.PutawayStartedAtUtc,
-            order.PutawayCompletedAtUtc);
+            order.PutawayCompletedAtUtc,
+            order.RequiresManagerCompletion,
+            order.CanStartWithSourceDifferences);
     }
 
     private static MobileReceivingOrderLine MapLine(

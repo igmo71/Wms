@@ -452,7 +452,9 @@ internal static class MobileReceivingOrderEndpoints
         order.StartedAtUtc,
         order.CompletedAtUtc,
         order.PutawayStartedAtUtc,
-        order.PutawayCompletedAtUtc);
+        order.PutawayCompletedAtUtc,
+        order.RequiresManagerCompletion,
+        order.CanStartWithSourceDifferences);
 
     private static MobileOrderSynchronizationResponse MapSynchronization(
         OrderSynchronizationLevel persistedLevel,

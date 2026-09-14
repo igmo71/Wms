@@ -78,6 +78,9 @@ public class ReceivingOrderCommandService(
             return transitionResult;
         }
 
+        if (order.IntegrationMode == ReceivingIntegrationMode.Autonomous)
+            return OperationResult.Success();
+
         var externalResult = await executionSink.SetInReceivingAsync(order.Id, ct);
 
         if (!externalResult.IsSuccess)
@@ -188,7 +191,12 @@ public class ReceivingOrderCommandService(
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
 
-        if (order.HasPlanFactDifference)
+        if (order.IntegrationMode == ReceivingIntegrationMode.Autonomous)
+            return OperationResult.Success();
+
+        if (order.SourceSnapshot is not { } source || order.Items.Any(item =>
+            source.Items.SingleOrDefault(x => x.LineNumber == item.LineNumber
+                && x.StockKeepingUnitId == item.StockKeepingUnitId)?.Quantity != item.FactQuantity))
         {
             var externalItemsUpdateResult = await executionSink.UpdateItemsAsync(
                 order.Id,
@@ -213,8 +221,44 @@ public class ReceivingOrderCommandService(
         return OperationResult.Success();
     }
 
+    public Task<OperationResult<Guid>> CompleteWithDiscrepanciesAsync(
+        CompleteReceivingWithDiscrepanciesCommand command, CommandContext context,
+        CancellationToken ct = default) =>
+        commandExecutor.ExecuteAsync("receiving-order.complete-with-discrepancies",
+            context.RequestId, CommandExecutor.ComputeHash(JsonSerializer.Serialize(command)), context.UserId,
+            async (dbContext, token) =>
+            {
+                bool allowed = await (from user in dbContext.Users
+                    join membership in dbContext.UserRoles on user.Id equals membership.UserId
+                    join role in dbContext.Roles on membership.RoleId equals role.Id
+                    where user.Id == context.UserId && user.EmailConfirmed
+                        && (user.LockoutEnd == null || user.LockoutEnd <= DateTimeOffset.UtcNow)
+                        && (role.Name == ApplicationRoles.Manager || role.Name == ApplicationRoles.Administrator)
+                    select user.Id).AnyAsync(token);
+                if (!allowed)
+                    return OperationError.Invalid("Завершение с расхождениями доступно только заведующему или администратору.");
+                if (string.IsNullOrWhiteSpace(command.Reason) || command.Reason.Trim().Length > 2000)
+                    return OperationError.Invalid("Укажите причину завершения (до 2000 символов).");
+                var order = await LoadOrderAsync(dbContext, command.OrderId, token);
+                if (order is null) return OperationError.NotFound("Приходный ордер не найден.");
+                if (order.OperationalRevision != command.ExpectedRevision)
+                    return OperationError.Conflict("Ордер изменился. Обновите данные и повторно рассмотрите расхождения.");
+                var checkpoint = await synchronizationService.PersistCompletionCheckpointAsync(
+                    dbContext, order, token, managerCompletion: true);
+                if (!checkpoint.IsSuccess) return checkpoint.Error!;
+                if (order.SynchronizationFingerprint != command.ExpectedSourceFingerprint)
+                    return OperationError.Conflict("Документ 1С изменился. Обновите данные и повторно рассмотрите расхождения.");
+                var source = order.SourceSnapshot!;
+                var assessment = order.AssessSynchronization(source, DateTimeOffset.UtcNow);
+                var result = await CompleteReceivingCoreAsync(dbContext, order,
+                    command.ReceivingLocationId, context.UserId, token);
+                if (!result.IsSuccess) return result.Error!;
+                order.RecordCompletionDecision(command.Reason, source, assessment);
+                return order.Id;
+            }, ct);
+
     private static OperationResult EnsureSynchronizationAllowsWork(ReceivingOrder order) =>
-        order.SynchronizationLevel switch
+        order.CanStartWithSourceDifferences ? OperationResult.Success() : order.SynchronizationLevel switch
         {
             OrderSynchronizationLevel.Synchronized => OperationResult.Success(),
             OrderSynchronizationLevel.RequiresOperatorDecision => OperationError.Conflict(

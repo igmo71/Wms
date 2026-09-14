@@ -47,6 +47,10 @@ public static class DependencyInjection
         services.AddScoped<PickingQueryService>();
         services.AddScoped<PutawayCommandService>();
         services.AddScoped<PutawayQueryService>();
+        services.AddOptions<ReceivingOptions>()
+            .Bind(configuration.GetSection("Receiving"))
+            .Validate(x => Enum.IsDefined(x.ReceivingIntegrationMode), "Неизвестный режим приемки.")
+            .ValidateOnStart();
         services.AddScoped<ReceivingOrderCommandService>();
         services.AddScoped<ReceivingOrderSynchronizationService>();
         services.AddScoped<MobileReceivingOrderQueryService>();

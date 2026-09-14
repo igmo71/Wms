@@ -34,7 +34,7 @@ else
                     <span>
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Disabled="@(PutawayPending || _isStarting || (_pendingStart is null && (_receivingLocation is null || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
+                                   Disabled="@(PutawayPending || _isStarting || (_pendingStart is null && (_receivingLocation is null || (_synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized && !_order.CanStartWithSourceDifferences) || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
                                    StartIcon="@Icons.Material.Filled.PlayArrow"
                                    OnClick="SetInReceivingAsync">
                             @(_pendingStart is null ? "Взять в работу" : "Повторить начало приёмки")
@@ -91,7 +91,8 @@ else
             <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
         }
 
-        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
+        <ReceivingSourcePanel Order="_order" CompletedBy="@GetUserName(_order.CompletedBy)" />
+        <OrderSynchronizationPanel Receiving="true" Assessment="_synchronizationAssessment"
                                    IsAcknowledging="@(_isAcknowledgingSynchronization || PutawayPending)"
                                    OnAcknowledge="AcknowledgeSynchronizationAsync"
                                    AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"

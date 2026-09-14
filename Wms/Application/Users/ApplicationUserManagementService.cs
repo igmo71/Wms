@@ -28,7 +28,8 @@ public sealed class ApplicationUserManagementService(
                         join role in dbContext.Roles on userRole.RoleId equals role.Id
                         where userRole.UserId == user.Id
                             && (role.Name == ApplicationRoles.Administrator
-                                || role.Name == ApplicationRoles.Operator)
+                                || role.Name == ApplicationRoles.Operator
+                                || role.Name == ApplicationRoles.Manager)
                         select role.Name).FirstOrDefault() ?? string.Empty,
                 IsBlocked = user.LockoutEnd != null && user.LockoutEnd > DateTimeOffset.UtcNow
             });

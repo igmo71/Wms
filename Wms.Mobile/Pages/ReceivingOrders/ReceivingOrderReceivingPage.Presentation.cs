@@ -37,6 +37,19 @@ public partial class ReceivingOrderReceivingPage
             _synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
             _synchronization);
+        if (details.Order.RequiresManagerCompletion)
+        {
+            SynchronizationPanel.IsVisible = true;
+            SynchronizationTitleLabel.Text = "Требуется решение заведующего";
+            SynchronizationDetailsLabel.Text += Environment.NewLine
+                + "Количества отличаются от плана WMS или текущего плана 1С. Завершить приемку может заведующий в Web.";
+        }
+        else if (_synchronization.ChangedFields.Count > 0 && !OrderSynchronizationPresentation.HasIssue(_synchronization))
+        {
+            SynchronizationPanel.IsVisible = true;
+            SynchronizationTitleLabel.Text = "Изменения в 1С (информация)";
+            SynchronizationDetailsLabel.Text = string.Join(", ", _synchronization.ChangedFields);
+        }
         SynchronizeLineStates(details.Lines);
         RefreshActionAvailability();
     }
@@ -173,7 +186,8 @@ public partial class ReceivingOrderReceivingPage
 
         StartReceivingButton.IsEnabled = !_busy
             && !HasPendingCommand
-            && IsSynchronizationResolved;
+            && (IsSynchronizationResolved || (Details.Order.CanStartWithSourceDifferences
+                && _synchronization is { IsFresh: true } && string.IsNullOrWhiteSpace(_synchronization.VerificationError)));
         ConfirmLocationButton.IsEnabled = !_busy
             && (!HasPendingCommand || _process.IsStartPending);
         CancelLocationButton.IsEnabled = !_busy && !_process.IsStartPending;
@@ -184,6 +198,7 @@ public partial class ReceivingOrderReceivingPage
             && _mode == ReceivingPageMode.Scanning
             && IsSynchronizationResolved
             && (!HasPendingCommand || _process.IsCompletionPending)
+            && (_process.IsCompletionPending || !Details.Order.RequiresManagerCompletion)
             && Details.Lines.All(x => x.FactQuantity.HasValue);
         foreach (var line in LineStates)
         {

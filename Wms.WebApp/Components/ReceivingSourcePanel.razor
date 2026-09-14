@@ -1,0 +1,53 @@
+@using Wms.Common
+@using Wms.Domain
+
+@if (Order.SourceSnapshot is { } source)
+{
+    <MudExpansionPanels>
+        <MudExpansionPanel Text="Последние данные 1С">
+            <MudText>Статус: @source.Status.GetDisplayName(). Проведен: @(source.Posted ? "Да" : "Нет"). Пометка удаления: @(source.DeletionMark ? "Да" : "Нет").</MudText>
+            <MudTable T="ReceivingOrderItemImportSnapshot" Items="source.Items" Dense="true" Elevation="0">
+                <HeaderContent><MudTh>Строка</MudTh><MudTh>Номенклатура</MudTh><MudTh>План WMS</MudTh><MudTh>План 1С</MudTh><MudTh>Факт WMS</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.LineNumber</MudTd>
+                    <MudTd>@SkuName(context.StockKeepingUnitId)</MudTd>
+                    <MudTd>@Quantity(LocalLine(context)?.PlanQuantity)</MudTd>
+                    <MudTd>@Quantity(context.Quantity)</MudTd>
+                    <MudTd>@Quantity(LocalLine(context)?.FactQuantity)</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+@if (Order.CompletionDecision is { } decision)
+{
+    <MudPaper Class="pa-3" Outlined="true">
+        <MudText Typo="Typo.subtitle1">Завершено с расхождениями</MudText>
+        <MudText>@CompletedBy · @decision.CompletedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+        <MudText Style="white-space: pre-wrap">@decision.Reason</MudText>
+        <MudTable T="ReceivingCompletionDecisionLine" Items="decision.Lines" Dense="true" Elevation="0">
+            <HeaderContent><MudTh>Строка</MudTh><MudTh>Номенклатура</MudTh><MudTh>План WMS</MudTh><MudTh>План 1С при решении</MudTh><MudTh>Принято</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.LineNumber</MudTd><MudTd>@SkuName(context.StockKeepingUnitId)</MudTd>
+                <MudTd>@Quantity(context.PlanQuantity)</MudTd>
+                <MudTd>@Quantity(decision.Source.Items.FirstOrDefault(x => x.LineNumber == context.LineNumber && x.StockKeepingUnitId == context.StockKeepingUnitId)?.Quantity)</MudTd>
+                <MudTd>@Quantity(context.FactQuantity)</MudTd>
+            </RowTemplate>
+        </MudTable>
+        @if (decision.Differences.Count > 0)
+        {
+            <MudTable T="OrderSynchronizationDifference" Items="decision.Differences" Dense="true" Elevation="0">
+                <HeaderContent><MudTh>Поле при решении</MudTh><MudTh>WMS</MudTh><MudTh>1С</MudTh></HeaderContent>
+                <RowTemplate><MudTd>@context.FieldName</MudTd><MudTd>@context.WmsValue</MudTd><MudTd>@context.OneCValue</MudTd></RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter, EditorRequired] public ReceivingOrder Order { get; set; } = null!;
+    [Parameter] public string CompletedBy { get; set; } = "—";
+    private string SkuName(Guid id) => Order.Items.FirstOrDefault(x => x.StockKeepingUnitId == id)?.StockKeepingUnit?.Name ?? id.ToString();
+    private ReceivingOrderItem? LocalLine(ReceivingOrderItemImportSnapshot line) => Order.Items.FirstOrDefault(x => x.LineNumber == line.LineNumber && x.StockKeepingUnitId == line.StockKeepingUnitId);
+    private static string Quantity(decimal? value) => value?.ToString("0.###") ?? "—";
+}

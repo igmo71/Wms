@@ -224,6 +224,12 @@ public partial class ReceivingOrderReceivingPage
             return;
         }
 
+        if (!_process.IsCompletionPending && Details.Order.RequiresManagerCompletion)
+        {
+            ErrorLabel.Text = "Завершить приемку с расхождениями может заведующий в Web.";
+            return;
+        }
+
         if (Details.Lines.Any(x => x.FactQuantity is null))
         {
             ErrorLabel.Text = "Сначала проверьте фактическое количество каждой строки.";

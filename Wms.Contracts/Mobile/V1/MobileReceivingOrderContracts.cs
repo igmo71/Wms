@@ -50,7 +50,9 @@ public sealed record MobileReceivingOrderSummaryResponse(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     DateTimeOffset? PutawayStartedAtUtc,
-    DateTimeOffset? PutawayCompletedAtUtc);
+    DateTimeOffset? PutawayCompletedAtUtc,
+    bool RequiresManagerCompletion = false,
+    bool CanStartWithSourceDifferences = false);
 
 public sealed record MobileReceivingOrderLineResponse(
     int LineNumber,

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 using Wms.Common;
 using Wms.Domain.Enums;
 
@@ -13,6 +15,55 @@ public class ReceivingOrder
 
     public Guid Id { get; private set; }
     public long OperationalRevision { get; private set; }
+    public ReceivingIntegrationMode IntegrationMode { get; private set; }
+    public string? SourceSnapshotJson { get; private set; }
+    public string? CompletionDecisionJson { get; private set; }
+    [NotMapped]
+    public ReceivingOrderImportSnapshot? SourceSnapshot => SourceSnapshotJson is null
+        ? null : JsonSerializer.Deserialize<ReceivingOrderImportSnapshot>(SourceSnapshotJson);
+    [NotMapped]
+    public ReceivingCompletionDecision? CompletionDecision => CompletionDecisionJson is null
+        ? null : JsonSerializer.Deserialize<ReceivingCompletionDecision>(CompletionDecisionJson);
+    [NotMapped]
+    public bool RequiresManagerCompletion => HasPlanFactDifference
+        || SourceSnapshot is { } source && HasSourceQuantityDifference(source);
+
+    [NotMapped]
+    public bool CanStartWithSourceDifferences => IntegrationMode == ReceivingIntegrationMode.Autonomous
+        && SourceSnapshot is { } source
+        && AssessSynchronization(source, DateTimeOffset.UtcNow).Differences.All(x =>
+            x.Level == OrderSynchronizationLevel.Synchronized
+            || ReceivingOrderSynchronizationComparer.IsQuantityDifference(x));
+
+    public bool HasSourceQuantityDifference(ReceivingOrderImportSnapshot source) =>
+        _items.Any(item => source.Items?.FirstOrDefault(x => x.LineNumber == item.LineNumber
+            && x.StockKeepingUnitId == item.StockKeepingUnitId) is { } line
+            && (line.Quantity != item.PlanQuantity
+                || item.FactQuantity is decimal fact && line.Quantity != fact));
+
+    internal void RememberSource(ReceivingOrderImportSnapshot snapshot)
+    {
+        string json = JsonSerializer.Serialize(snapshot);
+        if (SourceSnapshotJson == json) return;
+        SourceSnapshotJson = json;
+        if (IntegrationMode == ReceivingIntegrationMode.Autonomous)
+        {
+            Posted = snapshot.Posted;
+            DeletionMark = snapshot.DeletionMark;
+        }
+        AdvanceOperationalRevision();
+    }
+
+    internal void RecordCompletionDecision(string reason, ReceivingOrderImportSnapshot source,
+        OrderSynchronizationAssessment assessment)
+    {
+        CompletionDecisionJson = JsonSerializer.Serialize(new ReceivingCompletionDecision(
+            reason.Trim(), CompletedBy!, CompletedAtUtc!.Value, source,
+            _items.Select(x => new ReceivingCompletionDecisionLine(x.LineNumber,
+                x.StockKeepingUnitId, x.PlanQuantity, x.FactQuantity!.Value)).ToList(),
+            assessment.Differences));
+        AdvanceOperationalRevision();
+    }
     public bool DeletionMark { get; private set; }
     public bool Posted { get; private set; }
     public string? Number { get; private set; }
@@ -58,7 +109,8 @@ public class ReceivingOrder
 
     public static OperationResult<ReceivingOrder> Create(
         ReceivingOrderImportSnapshot snapshot,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        ReceivingIntegrationMode integrationMode = ReceivingIntegrationMode.Connected)
     {
         var validationResult = ValidateInitialSourcePlan(snapshot, createdAtUtc);
         if (!validationResult.IsSuccess)
@@ -66,7 +118,8 @@ public class ReceivingOrder
             return validationResult.Error!;
         }
 
-        if (snapshot.Status != ReceivingOrderStatus.ReadyForReceiving)
+        if (integrationMode == ReceivingIntegrationMode.Connected
+            && snapshot.Status != ReceivingOrderStatus.ReadyForReceiving)
         {
             return OperationError.Invalid(
                 "Приходный ордер можно создать только в статусе готовности к приёмке.");
@@ -75,12 +128,16 @@ public class ReceivingOrder
         var order = new ReceivingOrder
         {
             Id = snapshot.Id,
+            IntegrationMode = integrationMode,
             CreatedAtUtc = createdAtUtc,
             PutawayStatus = PutawayStatus.Inactive,
             SynchronizationLevel = OrderSynchronizationLevel.Synchronized
         };
 
         order.ApplyImport(snapshot);
+        if (integrationMode == ReceivingIntegrationMode.Autonomous)
+            order.Status = ReceivingOrderStatus.ReadyForReceiving;
+        order.RememberSource(snapshot);
         foreach (var itemSnapshot in snapshot.Items)
         {
             var itemResult = ReceivingOrderItem.Create(order.Id, itemSnapshot);
@@ -92,8 +149,7 @@ public class ReceivingOrder
             order._items.Add(itemResult.Value!);
         }
 
-        order.SynchronizationFingerprint =
-            ReceivingOrderSynchronizationComparer.Compare(order, snapshot).Fingerprint;
+        order.ApplySynchronizationAssessment(order.AssessSynchronization(snapshot, createdAtUtc), createdAtUtc);
 
         return order;
     }
@@ -119,6 +175,8 @@ public class ReceivingOrder
                 "Время сверки приходного ордера не может предшествовать времени его создания.");
         }
 
+        long previousRevision = OperationalRevision;
+        RememberSource(snapshot);
         OrderSynchronizationAssessment assessment =
             AssessSynchronization(snapshot, updatedAtUtc);
 
@@ -155,7 +213,7 @@ public class ReceivingOrder
             return ReceivingOrderReconciliation.DifferencesDetected;
         }
 
-        return synchronizationStateChanged
+        return synchronizationStateChanged || previousRevision != OperationalRevision
             ? ReceivingOrderReconciliation.Updated
             : ReceivingOrderReconciliation.Unchanged;
     }
@@ -166,11 +224,6 @@ public class ReceivingOrder
     {
         OrderSynchronizationAssessment assessment =
             ReceivingOrderSynchronizationComparer.Compare(this, snapshot);
-
-        if (!CanApplyInitialSourceDocument(snapshot))
-        {
-            return assessment;
-        }
 
         OperationResult validationResult = ValidateInitialSourcePlan(snapshot, checkedAtUtc);
         return validationResult.IsSuccess
@@ -220,7 +273,8 @@ public class ReceivingOrder
             return auditResult;
         }
 
-        if (assessment.Level != OrderSynchronizationLevel.RequiresOperatorDecision)
+        if (IntegrationMode == ReceivingIntegrationMode.Autonomous
+            || assessment.Level != OrderSynchronizationLevel.RequiresOperatorDecision)
         {
             return OperationError.Conflict(
                 "Подтвердить можно только расхождения, требующие решения оператора.");
@@ -821,7 +875,8 @@ public class ReceivingOrder
     }
 
     private bool CanApplyInitialSourceDocument(ReceivingOrderImportSnapshot snapshot) =>
-        Status == ReceivingOrderStatus.ReadyForReceiving
+        IntegrationMode == ReceivingIntegrationMode.Connected
+        && Status == ReceivingOrderStatus.ReadyForReceiving
         && StartedAtUtc is null
         && snapshot.Status == ReceivingOrderStatus.ReadyForReceiving
         && !DeletionMark
@@ -831,9 +886,7 @@ public class ReceivingOrder
     private static OrderSynchronizationAssessment EnsureBlockingAssessment(
         OrderSynchronizationAssessment assessment,
         string reason) =>
-        assessment.Level == OrderSynchronizationLevel.Blocking
-            ? assessment
-            : new OrderSynchronizationAssessment(
+        new OrderSynchronizationAssessment(
                 assessment.Fingerprint,
                 [
                     .. assessment.Differences,
