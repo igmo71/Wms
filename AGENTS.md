@@ -7,6 +7,9 @@ Before reading specifications, consult [the specification registry](specs/README
 - Treat the context as the current architectural and business guide. The code remains the source of truth for implementation details.
 - This is an MVP: prefer explicit, straightforward changes that fit the existing structure. Do not introduce abstractions, layers, or infrastructure unless the task needs them.
 - Keep changes scoped to the request. Do not implement roadmap processes prematurely.
+- Add, change, or run automated tests only when there is a real, acute need
+  and the user has agreed to the necessity and scope in advance. Prefer
+  targeted review, relevant builds, and focused manual verification.
 - When a task changes a lasting business rule, integration boundary, workflow, or architectural convention, update `docs/PROJECT_CONTEXT.md` in the same change.
 - Read only the specification marked **Active**, explicitly named by the user,
   or directly required by the active specification. Do not scan frozen or

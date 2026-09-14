@@ -103,6 +103,22 @@ inventory concurrency failures become business conflicts.
 
 ## Warehouse workflows
 
+### Accepted receiving change (implementation pending)
+
+The active receiving specification introduces Autonomous receiving for this
+deployment alongside Connected integration. Autonomous preserves the imported
+WMS plan, reads 1C differences without outbound writes, and allows any known 1C
+status; deletion and unposting still block completion. In both modes, quantity
+differences between the retained plan, current 1C plan and warehouse fact require
+Manager or Administrator completion in Web with a mandatory reason, including
+an original plan of 10, revised 1C plan of 8 and fact of 8. Normal fact editing
+remains unchanged. Shipping is out of scope; old operational data migration
+is not required during development. These are accepted target rules, not yet
+implemented behavior; the
+sections below still describe the current implementation. Scope, unresolved
+details and the implementation plan are in
+[`the active specification`](../specs/2026-09-14-receiving-manager-completion/spec.md).
+
 ### Receiving and putaway
 
 Receiving imports never discard active local work. WMS owns the receiving
