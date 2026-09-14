@@ -6,7 +6,9 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-None.
+- [LPN development planning](2026-09-14-lpn-development-planning/spec.md)
+  — Implementation survey and unified development plan; draft for discussion.
+  No implementation stage is active yet.
 
 ## Frozen
 

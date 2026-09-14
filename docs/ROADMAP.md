@@ -7,8 +7,12 @@ This file contains unfinished accepted work. Current behavior belongs in
 
 ## Next delivery
 
-Define and rehearse operator recovery for partial WMS-to-1C failures as
-described below.
+Discuss the implementation survey and unified
+[LPN development plan](DEVELOPMENT_PLAN.md). Its implementation stages remain
+proposed until accepted; the active scope is planning only.
+The existing pilot prerequisites below remain outstanding. Receiving's proposed
+one-way integration may narrow operator recovery, but does not remove shipping's
+WMS-to-1C recovery requirement.
 
 ## Pilot prerequisites
 

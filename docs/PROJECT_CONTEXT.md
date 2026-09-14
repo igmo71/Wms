@@ -21,6 +21,12 @@ This file owns current product boundaries and lasting business rules.
 decision history. Code and migrations remain the implementation source of
 truth.
 
+The proposed LPN, receiving/putaway and addressing evolution is tracked in
+[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). It is a discussion draft, not
+implemented behavior. Existing databases may be recreated for this work;
+legacy data migration is outside its scope. Consult the specification registry
+for the currently active planning or implementation scope.
+
 ## Identity and access
 
 WebApp uses ASP.NET Core Identity with two roles: `Operator` may run warehouse
