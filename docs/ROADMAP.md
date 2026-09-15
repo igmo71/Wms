@@ -7,9 +7,18 @@ This file contains unfinished accepted work. Current behavior belongs in
 
 ## Next delivery
 
-Discuss the implementation survey and unified
-[LPN development plan](DEVELOPMENT_PLAN.md). Its implementation stages remain
-proposed until accepted; the active scope is planning only.
+Prioritize an end-to-end receiving and putaway demo through LPN, requested
+on 2026-09-15 for approximately September 17–18. See the scope and checkpoints
+in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md), section 6. Use existing topology;
+LPN tracks receiving and initial putaway, not stored inventory dimensions.
+Addressing, topology editing, advanced recommendations and replenishment follow later.
+Planning is complete; implement the active
+[receiving and putaway specification](../specs/2026-09-15-lpn-receiving-putaway/spec.md).
+It includes Manager reconciliation and simple location recommendations;
+SKU storage groups and capacity ranking remain later work. Quality and usability
+take priority over the requested demo date. Implementation has not started.
+The active specification splits delivery into I01–I08; begin with I01 label
+issuance and A4 printing, including its UI and checks.
 The existing pilot prerequisites below remain outstanding. Receiving's proposed
 one-way integration may narrow operator recovery, but does not remove shipping's
 WMS-to-1C recovery requirement.

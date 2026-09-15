@@ -19,3 +19,11 @@ Before reading specifications, consult [the specification registry](specs/README
 - When an issue is complete, distill lasting rules into current documentation,
   update the registry, and freeze the specification. Do not spread a new issue
   through completed specifications; create a new dated specification instead.
+- Treat one implementation increment as one task and leave a concise handoff.
+- Read only required file sections and keep command output bounded.
+- Build affected projects during implementation; build the full solution once
+  at the increment checkpoint. Stop after the required checks pass.
+- Leave UI, device, and print verification as developer instructions unless the
+  user explicitly requests automated UI control.
+- Add automated tests only for material regression risks such as concurrency,
+  replay/idempotency, atomic posting, data loss, and database constraints.

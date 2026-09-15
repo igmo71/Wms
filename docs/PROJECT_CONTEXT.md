@@ -21,11 +21,18 @@ This file owns current product boundaries and lasting business rules.
 decision history. Code and migrations remain the implementation source of
 truth.
 
-The proposed LPN, receiving/putaway and addressing evolution is tracked in
-[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). It is a discussion draft, not
-implemented behavior. Existing databases may be recreated for this work;
-legacy data migration is outside its scope. Consult the specification registry
-for the currently active planning or implementation scope.
+The accepted LPN, receiving/putaway and addressing development plan is tracked in
+[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). The active
+[receiving and putaway specification](../specs/2026-09-15-lpn-receiving-putaway/spec.md)
+defines the next implementation, not current behavior. Existing databases may
+be recreated; legacy data migration is outside its scope. The accepted target
+limits LPN to receiving and initial putaway, preserves location/SKU inventory,
+and uses existing topology. The target uses one sequential LPN code for display
+and barcode, and retained zero balances for historical-location suggestions.
+The specification defines eight increments. I01 label issuance and A4 printing
+are implemented; receiving association and I02–I08 remain future work.
+Broader addressing work follows later. Consult the
+specification registry for active scope; implemented rules remain below.
 
 ## Identity and access
 

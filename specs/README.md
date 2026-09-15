@@ -6,11 +6,17 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-- [LPN development planning](2026-09-14-lpn-development-planning/spec.md)
-  — Implementation survey and unified development plan; draft for discussion.
-  No implementation stage is active yet.
+- [LPN receiving and putaway](2026-09-15-lpn-receiving-putaway/spec.md)
+  — Agreed receiving, reconciliation and initial putaway workflow. Specification
+  prepared and split into eight increments on 2026-09-15. I01 label issuance
+  and A4 layout implemented with automatic SQL checks; developer print/scanner
+  checks remain. I02–I08 not started; handoff in section 12.
 
 ## Frozen
+
+- [LPN development planning](2026-09-14-lpn-development-planning/spec.md)
+  — Planning completed on 2026-09-15. Cross-stage plan lives in
+  `docs/DEVELOPMENT_PLAN.md`; implementation follows the active specification.
 
 - [Unified shipping rollback](2026-09-11-unified-shipping-rollback/spec.md)
   — Repeat-safe Web rollback implemented on 2026-09-11.
