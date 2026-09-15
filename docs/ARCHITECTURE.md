@@ -149,3 +149,30 @@ algorithms and aggregates intact.
 - Verification is proportional to change risk. Schema changes require a
   migration and migration-drift check; the task specification defines any
   additional checks.
+
+## Testing strategy
+
+`Wms.Tests` is the only automated test project and uses xUnit. Its suite is
+deliberately small: a test is justified by a critical business invariant, a
+dangerous inventory mutation, an important transaction boundary, a SQL-backed
+concurrency guarantee, or a serious regression that could corrupt persisted
+warehouse state. Coverage percentage is not a project objective.
+
+Prefer integration tests with disposable SQL Server LocalDB databases when the
+guarantee depends on EF Core, migrations, constraints, transactions, optimistic
+concurrency, `InventoryBalance`, `InventoryMovement`, `InventoryTurnover`, or
+`CommandReceipt`. Use a unit/domain test only when the complete invariant lives
+in memory. UI, device, printer, and live-1C checks remain explicit developer
+verification unless a task specifically automates them.
+
+Cross-cutting command guarantees are tested once around `CommandExecutor` and
+must not be repeated in every vertical slice. Feature tests protect only their
+own business invariant. Do not add tests for trivial CRUD, accessors,
+constructors, straightforward mapping, framework behavior, or multiple inputs
+that exercise the same rule. A feature may correctly ship without a new test
+when it introduces no critical invariant or material regression risk.
+
+During implementation, run only one or two tests directly relevant to the
+change. Do not run the full `dotnet test` suite automatically after routine
+edits; a full run requires an explicit user request. The task handoff must list
+the focused checks already run and the full command left for manual execution.

@@ -9,10 +9,15 @@ specifications unless a current task explicitly needs their rationale.
 - [LPN receiving and putaway](2026-09-15-lpn-receiving-putaway/spec.md)
   — Agreed receiving, reconciliation and initial putaway workflow. Specification
   prepared and split into eight increments on 2026-09-15. I01 label issuance
-  and A4 layout implemented with automatic SQL checks; developer print/scanner
-  checks remain. I02–I08 not started; handoff in section 12.
+  and its manual print/scanner path are accepted. I02 order participation and
+  shared receiving-location selection are implemented. I03–I08 are not started;
+  handoff in section 12.
 
 ## Frozen
+
+- [Minimal xUnit test strategy](2026-09-15-xunit-test-strategy/spec.md)
+  — Replaced the executable test harnesses with one risk-based xUnit suite and
+  documented the lasting test-selection rules.
 
 - [LPN development planning](2026-09-14-lpn-development-planning/spec.md)
   — Planning completed on 2026-09-15. Cross-stage plan lives in

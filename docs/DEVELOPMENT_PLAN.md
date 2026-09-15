@@ -75,7 +75,7 @@
 | Клиенты | `Wms.Mobile/Pages/MainPage.xaml`: «Приёмка и размещение»; Web Putaway лежит в ReceivingOrderPages; V1 contracts/client также общие | Выделить маршруты, DTO, страницы и процессы LPN/размещения в обоих клиентах. |
 | Роли | `Wms/Data/ApplicationRoles.cs`: Administrator, Operator, WmsUser; одна роль аккаунта | Добавить Manager в авторизацию, bootstrap, управление пользователями и тесты, а не только кнопку. |
 | Отчёты | `Reports/EmployeePerformance/EmployeePerformanceReportService.cs`: вся приёмка приписывается CompletedBy | Распределять вклад по LPN/составу, не дублировать весь ордер каждому участнику; длительность ордера не выдавать за рабочее время каждого. |
-| Проверки | `tests/ReceivingCommands`, `ReceivingFacts`, `ReceivingSynchronization`, `PutawayCommands`, `PickingCommands`, `ShippingCommands`, `ShippingRollback`, `TransferCommands`, `CountCommands` | Уже есть сценарные проверки и SQL LocalDB-тесты гонок/replay. Обновить изменившиеся ожидания и дополнить критические сценарии. |
+| Проверки | Единый xUnit-проект `Wms.Tests` | Минимальный риск-ориентированный набор использует LocalDB для SQL/транзакций/гонок. Добавлять только новые критические инварианты, не повторять общие гарантии `CommandExecutor` по slices. |
 
 Поиск в исходниках не обнаружил LicensePlate, Replenishment и AllowMultipleSkus.
 ZoneType сейчас содержит Storage, Transit, Receiving, Shipping, без Picking/Reserve.
@@ -225,9 +225,9 @@ E1 больше не является условием начала E3. Демо
 Текущий результат E2/E3/E4 имеет одну активную спецификацию; не создавать
 параллельные активные спецификации для отдельных слоёв этой реализации.
 Команды Web/API/Mobile обновлять согласованно. Новый смысл не должен скрываться
-под старым receipt/hash. Тестовый проект стандартного формата разрешён пользователем;
-использовать его для новых содержательных проверок, без массовой переделки всех
-старых тестов ради единого оформления.
+под старым receipt/hash. Единый xUnit-проект `Wms.Tests` содержит только
+минимальные содержательные проверки. Старые executable-проекты удалены; их
+сценарии не переносить обратно ради coverage или единого оформления.
 
 ## 7. Критические проверки
 

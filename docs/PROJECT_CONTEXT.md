@@ -387,3 +387,20 @@ shipping transitions and rollback, transfers and inventory counts. Mobile V1 ret
 `ClientRequestId` transport name. The receipt schema rename preserves existing
 keys, command types, hashes,
 and result ids, so previously completed Mobile attempts remain replayable.
+
+## Automated testing
+
+The project uses one xUnit project, `Wms.Tests`, with a minimal risk-based suite.
+It does not pursue coverage targets or automatically add a test for every new
+handler, command, or feature. New tests are reserved for critical business and
+inventory invariants, material transactional guarantees, SQL-backed concurrency,
+and serious regressions whose failure can damage persisted warehouse state.
+
+Persistence, stock, receipt, and concurrency guarantees use disposable SQL
+Server LocalDB integration tests. Generic `CommandExecutor` replay, hash,
+receipt, rollback, and race behavior is tested centrally and is not duplicated
+inside receiving, putaway, shipping, transfer, count, or LPN slices. Feature
+work may require no new automated test when it introduces none of these risks.
+Agents run at most one or two directly relevant tests while implementing a
+change. They do not launch the complete suite without an explicit request and
+instead leave the full manual verification command in the handoff.
