@@ -3,6 +3,7 @@
   <Project Path="Wms.Mobile/Wms.Mobile.csproj" Id="385ccb43-3e36-4711-9bbe-1f07597a1604">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="Wms.Tests/Wms.Tests.csproj" Id="8f380490-fcf0-4cd6-a7b6-f6e9293cfa20" />
   <Project Path="Wms.WebApi/Wms.WebApi.csproj" />
   <Project Path="Wms.WebApp/Wms.WebApp.csproj" />
   <Project Path="Wms/Wms.csproj" Id="1ad728c4-5535-4315-a7f8-96625fec8b7d" />
