@@ -30,6 +30,7 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="2">
+        <MudAlert Severity="Severity.Info">Размещение по ордеру отключено. Размещение через LPN появится в соответствующем инкременте.</MudAlert>
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Размещение приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />

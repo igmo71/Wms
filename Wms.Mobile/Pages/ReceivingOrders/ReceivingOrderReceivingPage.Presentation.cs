@@ -38,6 +38,7 @@ public partial class ReceivingOrderReceivingPage
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
             _synchronization);
         SynchronizeLineStates(details.Lines);
+        OnProductsTabClicked(null, EventArgs.Empty);
         RefreshActionAvailability();
     }
 
@@ -137,8 +138,8 @@ public partial class ReceivingOrderReceivingPage
                 "Итоговое количество",
                 "Введите абсолютное фактическое количество."),
             _ => (
-                "Приёмка товара",
-                "Отсканируйте товар. Каждый принятый скан добавляет одну единицу.")
+                "Ордер в работе",
+                "Состав пока доступен только для просмотра. Работа с LPN появится в следующем инкременте.")
         };
         RefreshActionAvailability();
     }

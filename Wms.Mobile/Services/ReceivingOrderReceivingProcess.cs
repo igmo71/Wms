@@ -36,7 +36,7 @@ public sealed class ReceivingOrderReceivingProcess
         _startRequestId ??= Guid.NewGuid();
         try
         {
-            var response = await _orderClient.StartAsync(
+            var response = await _orderClient.JoinAsync(
                 orderId,
                 receivingLocationBarcode,
                 _startRequestId.Value);

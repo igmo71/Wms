@@ -28,12 +28,13 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="2">
+        <MudAlert Severity="Severity.Info">Прямое редактирование факта и завершение отключены. Новый процесс выполняется через LPN.</MudAlert>
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Приёмка приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="@(_isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && (_receivingLocation is null || _order.UnconfirmedItemCount > 0 || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
+                       Disabled="true"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="SetReceivedAsync">
                 @(_pendingCompletion is null ? "Завершить" : "Повторить завершение")

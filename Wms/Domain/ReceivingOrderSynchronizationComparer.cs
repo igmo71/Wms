@@ -23,30 +23,18 @@ public static class ReceivingOrderSynchronizationComparer
         ArgumentNullException.ThrowIfNull(snapshot);
 
         var comparison = new OrderSynchronizationComparisonBuilder(CreateFingerprint(snapshot));
-        ReceivingOrderStatus expectedStatus = expectReceivedTarget
-            ? ReceivingOrderStatus.Received
-            : order.Status;
-        bool expectedPosted = expectReceivedTarget || order.Posted;
-
         comparison.AddIfDifferent("id", "Идентификатор ордера", order.Id, snapshot.Id, OrderSynchronizationLevel.Blocking);
-        comparison.AddIfDifferent("deletionMark", "Пометка удаления", order.DeletionMark, snapshot.DeletionMark, OrderSynchronizationLevel.Blocking);
-        comparison.AddIfDifferent("posted", "Проведение", expectedPosted, snapshot.Posted, OrderSynchronizationLevel.Blocking);
+        if (snapshot.DeletionMark)
+            comparison.Add("deletionMark", "Пометка удаления", false, true, OrderSynchronizationLevel.Blocking);
+        if (!snapshot.Posted)
+            comparison.Add("posted", "Проведение", true, false, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("number", "Номер", order.Number, snapshot.Number, OrderSynchronizationLevel.RequiresOperatorDecision);
         comparison.AddIfDifferent("date", "Дата", order.Date, snapshot.Date, OrderSynchronizationLevel.RequiresOperatorDecision);
         comparison.AddIfDifferent("warehouse", "Склад", order.WarehouseId, snapshot.WarehouseId, OrderSynchronizationLevel.Blocking);
         comparison.AddIfDifferent("comment", "Комментарий", order.Comment, snapshot.Comment, OrderSynchronizationLevel.RequiresOperatorDecision);
 
-        if (expectedStatus != snapshot.Status)
-        {
-            comparison.Add(
-                "status",
-                "Статус",
-                expectedStatus,
-                snapshot.Status,
-                !expectReceivedTarget && IsCompatibleStatusChange(expectedStatus, snapshot.Status)
-                    ? OrderSynchronizationLevel.RequiresOperatorDecision
-                    : OrderSynchronizationLevel.Blocking);
-        }
+        if (snapshot.Status == ReceivingOrderStatus.Unknown)
+            comparison.Add("status", "Статус", "Поддерживаемый статус 1С", snapshot.Status, OrderSynchronizationLevel.Blocking);
 
         comparison.AddIfDifferent("queue", "Очередь", order.Queue, snapshot.Queue, OrderSynchronizationLevel.RequiresOperatorDecision);
         comparison.AddIfDifferent("warehouseOperation", "Складская операция", order.WarehouseOperation, snapshot.WarehouseOperation, OrderSynchronizationLevel.Blocking);
@@ -70,6 +58,19 @@ public static class ReceivingOrderSynchronizationComparer
         {
             comparison.Add("items", "Строки", order.Items.Count, null, OrderSynchronizationLevel.Blocking);
             return;
+        }
+
+        var duplicateSku = externalItems
+            .GroupBy(x => x.StockKeepingUnitId)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicateSku is not null)
+        {
+            comparison.Add(
+                "items.duplicateSku",
+                "Повтор SKU",
+                "Одна строка на SKU",
+                duplicateSku.Key,
+                OrderSynchronizationLevel.Blocking);
         }
 
         var localByLine = order.Items.ToDictionary(x => x.LineNumber);
@@ -119,14 +120,6 @@ public static class ReceivingOrderSynchronizationComparer
             comparison.AddIfDifferent($"{prefix}.packageQuantity", $"Строка {lineNumber}: {quantityKind} количество упаковок", expectedQuantity.Value, externalItem.PlanQuantity, OrderSynchronizationLevel.Blocking);
         }
     }
-
-    private static bool IsCompatibleStatusChange(
-        ReceivingOrderStatus localStatus,
-        ReceivingOrderStatus externalStatus) =>
-        IsActiveReceivingStatus(localStatus) && IsActiveReceivingStatus(externalStatus);
-
-    private static bool IsActiveReceivingStatus(ReceivingOrderStatus status) =>
-        status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired;
 
     private static string CreateFingerprint(ReceivingOrderImportSnapshot snapshot)
     {

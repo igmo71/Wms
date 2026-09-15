@@ -86,7 +86,8 @@ public partial class Details
                 _order.CompletedBy,
                 _order.PutawayStartedBy,
                 _order.PutawayCompletedBy,
-                _order.SynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy,
+                .. _order.Participants.Select(x => x.UserId)]);
     }
 
     private async Task AcknowledgeSynchronizationAsync()

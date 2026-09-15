@@ -62,7 +62,13 @@
                 Clicked="OnReceivingOrdersClicked"
                 FontSize="18"
                 HeightRequest="64"
-                Text="Приёмка и размещение" />
+                Text="Приёмка" />
+
+            <Button
+                Clicked="OnPutawayClicked"
+                FontSize="18"
+                HeightRequest="64"
+                Text="Размещение" />
 
             <Button
                 Clicked="OnShippingOrdersClicked"

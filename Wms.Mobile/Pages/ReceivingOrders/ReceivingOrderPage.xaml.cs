@@ -15,6 +15,8 @@ public partial class ReceivingOrderPage : ContentPage
     private bool _scannerSubscribed;
     private bool _busy;
     private bool _showPutaway;
+    private Guid? _pendingJoinOrderId;
+    private Guid? _pendingJoinRequestId;
     private int _loadVersion;
 
     public ReceivingOrderPage(
@@ -203,12 +205,36 @@ public partial class ReceivingOrderPage : ContentPage
             return;
         }
 
-        if (details.Order.Status == MobileReceivingOrderStatus.Received)
+        if (!details.Order.IsParticipant)
         {
-            var page = _services.GetRequiredService<ReceivingOrderPutawayPage>();
-            page.Show(details);
-            await Navigation.PushAsync(page);
-            return;
+            if (!details.Order.CanJoin)
+            {
+                ErrorLabel.Text = details.Order.JoinBlockedReason
+                    ?? "Нельзя присоединиться к этому ордеру.";
+                return;
+            }
+
+            if (details.Order.Status == MobileReceivingOrderStatus.InReceiving)
+            {
+                _pendingJoinOrderId = details.Order.Id;
+                _pendingJoinRequestId ??= Guid.NewGuid();
+                try
+                {
+                    var response = await _orderClient.JoinAsync(
+                        details.Order.Id,
+                        null,
+                        _pendingJoinRequestId.Value);
+                    _pendingJoinOrderId = null;
+                    _pendingJoinRequestId = null;
+                    details = response.Details;
+                }
+                catch (MobileApiException)
+                {
+                    _pendingJoinOrderId = null;
+                    _pendingJoinRequestId = null;
+                    throw;
+                }
+            }
         }
 
         var receivingPage = _services.GetRequiredService<ReceivingOrderReceivingPage>();
@@ -236,14 +262,14 @@ public partial class ReceivingOrderPage : ContentPage
             }
 
             ApplyQueue(
-                queue.Receiving.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList(),
-                queue.Putaway.Select(ReceivingOrderQueueItemViewState.ForPutaway).ToList());
-            ReceivingStatusLabel.Text = queue.Receiving.Count == 0
-                ? "Ордера для приёмки отсутствуют."
-                : $"Ордеров: {queue.Receiving.Count}.";
-            PutawayStatusLabel.Text = queue.Putaway.Count == 0
-                ? "Ордера для размещения отсутствуют."
-                : $"Ордеров: {queue.Putaway.Count}.";
+                queue.Personal.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList(),
+                queue.Available.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList());
+            ReceivingStatusLabel.Text = queue.Personal.Count == 0
+                ? "Личных ордеров в работе нет."
+                : $"Личных ордеров: {queue.Personal.Count}.";
+            PutawayStatusLabel.Text = queue.Available.Count == 0
+                ? "Доступных ордеров нет."
+                : $"Доступных ордеров: {queue.Available.Count}.";
         }
         catch (MobileApiException exception)
         {

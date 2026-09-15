@@ -182,7 +182,12 @@
                 Loaded="OnNonScanControlLoaded"
                 Text="Завершить приёмку" />
 
-            <Label FontAttributes="Bold" FontSize="20" Text="Строки ордера" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" Text="Товары" />
+                <Button x:Name="LpnTabButton" Clicked="OnLpnTabClicked" Grid.Column="1" Opacity="0.65" Text="LPN" />
+            </Grid>
+            <VerticalStackLayout x:Name="ProductLinesPanel" Spacing="10">
+            <Label FontAttributes="Bold" FontSize="20" Text="Товары ордера" />
             <VerticalStackLayout
                 BindableLayout.ItemsSource="{Binding LineStates, Source={x:Reference Page}}"
                 Spacing="10">
@@ -265,6 +270,11 @@
                         </Border>
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            </VerticalStackLayout>
+            <VerticalStackLayout x:Name="LpnPanel" IsVisible="False" Spacing="10">
+                <Label FontAttributes="Bold" FontSize="20" Text="LPN ордера" />
+                <Label Text="LPN пока не созданы. Этот шаг будет доступен в следующем инкременте." />
             </VerticalStackLayout>
         </VerticalStackLayout>
     </ScrollView>

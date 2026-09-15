@@ -26,33 +26,14 @@ internal static class MobileReceivingOrderEndpoints
             .WithMobileResponses<MobileReceivingOrderDetailsResponse>();
         group.MapGet("/{orderId:guid}", GetDetailsAsync)
             .WithMobileResponses<MobileReceivingOrderDetailsResponse>();
-        group.MapPost("/{orderId:guid}/start-receiving", StartReceivingAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/lines/resolve-sku", ResolveSkuAsync)
-            .WithMobileResponses<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>>();
-        group.MapGet("/{orderId:guid}/lines/search", SearchLinesAsync)
-            .WithMobileResponses<MobileReceivingOrderLineSearchResponse>();
-        group.MapPost("/{orderId:guid}/lines/{lineNumber:int}/scan", IncrementLineAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/lines/{lineNumber:int}/quantity", SetLineQuantityAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/complete-receiving", CompleteReceivingAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/start-putaway", StartPutawayAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/putaway-movements", AddPutawayMovementAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost(
-            "/{orderId:guid}/putaway-movements/{movementId:guid}/delete",
-            DeletePutawayMovementAsync)
-            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
-        group.MapPost("/{orderId:guid}/complete-putaway", CompletePutawayAsync)
+        group.MapPost("/{orderId:guid}/join-receiving", JoinReceivingAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         return endpoints;
     }
 
     private static async Task<IResult> GetWorkQueueAsync(
         Guid warehouseId,
+        ClaimsPrincipal principal,
         MobileReceivingOrderQueryService queryService,
         CancellationToken ct)
     {
@@ -62,14 +43,19 @@ internal static class MobileReceivingOrderEndpoints
                 OperationError.Invalid("Выберите склад."));
         }
 
-        var queue = await queryService.GetWorkQueueAsync(warehouseId, ct);
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
+        var queue = await queryService.GetWorkQueueAsync(warehouseId, userId, ct);
         return TypedResults.Ok(new MobileReceivingOrderWorkQueueResponse(
-            queue.Receiving.Select(x => MapSummary(x)).ToList(),
-            queue.Putaway.Select(x => MapSummary(x)).ToList()));
+            queue.Personal.Select(x => MapSummary(x)).ToList(),
+            queue.Available.Select(x => MapSummary(x)).ToList()));
     }
 
     private static async Task<IResult> ResolveDocumentAsync(
         MobileResolveReceivingOrderDocumentRequest request,
+        ClaimsPrincipal principal,
         MobileReceivingOrderQueryService queryService,
         ReceivingOrderSynchronizationService synchronizationService,
         CancellationToken ct)
@@ -86,9 +72,14 @@ internal static class MobileReceivingOrderEndpoints
             return MobileEndpointResults.CommandProblem(decodeResult.Error!);
         }
 
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
         var result = await queryService.ResolveDocumentAsync(
             request.WarehouseId,
             decodeResult.Value,
+            userId,
             ct);
         if (!result.IsSuccess)
         {
@@ -111,7 +102,7 @@ internal static class MobileReceivingOrderEndpoints
                     ?? "Не удалось сверить приходный ордер с 1С."));
         }
 
-        var currentResult = await queryService.GetDetailsAsync(result.Value.Order.Id, ct);
+        var currentResult = await queryService.GetDetailsAsync(result.Value.Order.Id, userId, ct);
         return currentResult.IsSuccess
             ? TypedResults.Ok(MapDetails(currentResult.Value!, synchronizationResult.Value))
             : MobileEndpointResults.CommandProblem(currentResult.Error!);
@@ -119,11 +110,16 @@ internal static class MobileReceivingOrderEndpoints
 
     private static async Task<IResult> GetDetailsAsync(
         Guid orderId,
+        ClaimsPrincipal principal,
         MobileReceivingOrderQueryService queryService,
         ReceivingOrderSynchronizationService synchronizationService,
         CancellationToken ct)
     {
-        var result = await queryService.GetDetailsAsync(orderId, ct);
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
+        var result = await queryService.GetDetailsAsync(orderId, userId, ct);
         if (!result.IsSuccess)
         {
             return MobileEndpointResults.CommandProblem(result.Error!);
@@ -143,15 +139,15 @@ internal static class MobileReceivingOrderEndpoints
                     ?? "Не удалось сверить приходный ордер с 1С."));
         }
 
-        var currentResult = await queryService.GetDetailsAsync(orderId, ct);
+        var currentResult = await queryService.GetDetailsAsync(orderId, userId, ct);
         return currentResult.IsSuccess
             ? TypedResults.Ok(MapDetails(currentResult.Value!, synchronizationResult.Value))
             : MobileEndpointResults.CommandProblem(currentResult.Error!);
     }
 
-    private static async Task<IResult> StartReceivingAsync(
+    private static async Task<IResult> JoinReceivingAsync(
         Guid orderId,
-        MobileStartReceivingOrderRequest request,
+        MobileJoinReceivingOrderRequest request,
         ClaimsPrincipal principal,
         MobileReceivingOrderQueryService queryService,
         ReceivingOrderCommandService commandService,
@@ -163,19 +159,24 @@ internal static class MobileReceivingOrderEndpoints
             return TypedResults.Unauthorized();
         }
 
-        if (!StorageLocation.TryParseBarcode(
-            request.ReceivingLocationBarcode,
-            out var receivingLocationId))
+        Guid? receivingLocationId = null;
+        if (!string.IsNullOrWhiteSpace(request.ReceivingLocationBarcode))
         {
-            return MobileEndpointResults.CommandProblem(
-                OperationError.Invalid("Некорректный QR-код ячейки."));
+            if (!StorageLocation.TryParseBarcode(
+                request.ReceivingLocationBarcode,
+                out var parsedLocationId))
+            {
+                return MobileEndpointResults.CommandProblem(
+                    OperationError.Invalid("Некорректный QR-код ячейки."));
+            }
+            receivingLocationId = parsedLocationId;
         }
 
-        var result = await commandService.StartReceivingAsync(
-            new StartReceivingCommand(orderId, receivingLocationId),
+        var result = await commandService.JoinReceivingAsync(
+            new JoinReceivingOrderCommand(orderId, receivingLocationId),
             new CommandContext(request.ClientRequestId, userId),
             ct);
-        return await CommandResultAsync(result, orderId, queryService, ct);
+        return await CommandResultAsync(result, orderId, userId, queryService, ct);
     }
 
     private static async Task<IResult> ResolveSkuAsync(
@@ -396,6 +397,23 @@ internal static class MobileReceivingOrderEndpoints
     private static async Task<IResult> CommandResultAsync(
         OperationResult<Guid> result,
         Guid orderId,
+        string userId,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+
+        var detailsResult = await queryService.GetCommandResultDetailsAsync(orderId, userId, ct);
+        return detailsResult.IsSuccess
+            ? TypedResults.Ok(new MobileReceivingOrderCommandResponse(
+                MapDetails(detailsResult.Value!)))
+            : MobileEndpointResults.CommandProblem(detailsResult.Error!);
+    }
+
+    private static async Task<IResult> CommandResultAsync(
+        OperationResult<Guid> result,
+        Guid orderId,
         MobileReceivingOrderQueryService queryService,
         CancellationToken ct,
         int? changedLineNumber = null,
@@ -452,7 +470,15 @@ internal static class MobileReceivingOrderEndpoints
         order.StartedAtUtc,
         order.CompletedAtUtc,
         order.PutawayStartedAtUtc,
-        order.PutawayCompletedAtUtc);
+        order.PutawayCompletedAtUtc,
+        order.IsParticipant,
+        order.CanJoin
+            && string.IsNullOrWhiteSpace(verificationError)
+            && (assessment is null || assessment.Level == OrderSynchronizationLevel.Synchronized),
+        verificationError
+            ?? (assessment is { Level: not OrderSynchronizationLevel.Synchronized }
+                ? "Ордер заблокирован расхождениями с 1С."
+                : order.JoinBlockedReason));
 
     private static MobileOrderSynchronizationResponse MapSynchronization(
         OrderSynchronizationLevel persistedLevel,
@@ -530,6 +556,7 @@ internal static class MobileReceivingOrderEndpoints
     private static MobileReceivingOrderStatus MapStatus(ReceivingOrderStatus status) =>
         status switch
         {
+            ReceivingOrderStatus.Unknown => MobileReceivingOrderStatus.Unknown,
             ReceivingOrderStatus.ReadyForReceiving => MobileReceivingOrderStatus.ReadyForReceiving,
             ReceivingOrderStatus.InReceiving => MobileReceivingOrderStatus.InReceiving,
             ReceivingOrderStatus.ProcessingRequired => MobileReceivingOrderStatus.ProcessingRequired,

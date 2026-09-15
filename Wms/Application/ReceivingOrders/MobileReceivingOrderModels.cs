@@ -42,7 +42,10 @@ public sealed record MobileReceivingOrderSummary(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     DateTimeOffset? PutawayStartedAtUtc,
-    DateTimeOffset? PutawayCompletedAtUtc);
+    DateTimeOffset? PutawayCompletedAtUtc,
+    bool IsParticipant,
+    bool CanJoin,
+    string? JoinBlockedReason);
 
 public sealed record MobileReceivingOrderLine(
     int LineNumber,
@@ -72,8 +75,8 @@ public sealed record MobileReceivingOrderDetails(
     IReadOnlyList<MobileReceivingOrderMovement> Movements);
 
 public sealed record MobileReceivingOrderWorkQueue(
-    IReadOnlyList<MobileReceivingOrderSummary> Receiving,
-    IReadOnlyList<MobileReceivingOrderSummary> Putaway);
+    IReadOnlyList<MobileReceivingOrderSummary> Personal,
+    IReadOnlyList<MobileReceivingOrderSummary> Available);
 
 public sealed record MobileReceivingOrderLineCandidate(
     int LineNumber,

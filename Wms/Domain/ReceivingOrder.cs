@@ -6,6 +6,7 @@ namespace Wms.Domain;
 public class ReceivingOrder
 {
     private readonly List<ReceivingOrderItem> _items = [];
+    private readonly List<ReceivingOrderParticipant> _participants = [];
 
     private ReceivingOrder()
     {
@@ -48,6 +49,7 @@ public class ReceivingOrder
     public Guid BaseOrderId { get; private set; }
     public string? BaseOrderType { get; private set; }
     public IReadOnlyCollection<ReceivingOrderItem> Items => _items;
+    public IReadOnlyCollection<ReceivingOrderParticipant> Participants => _participants;
 
     public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
@@ -76,6 +78,7 @@ public class ReceivingOrder
         {
             Id = snapshot.Id,
             CreatedAtUtc = createdAtUtc,
+            Status = ReceivingOrderStatus.ReadyForReceiving,
             PutawayStatus = PutawayStatus.Inactive,
             SynchronizationLevel = OrderSynchronizationLevel.Synchronized
         };
@@ -121,6 +124,7 @@ public class ReceivingOrder
 
         OrderSynchronizationAssessment assessment =
             AssessSynchronization(snapshot, updatedAtUtc);
+        bool sourceStateChanged = ApplySourceState(snapshot);
 
         if (CanApplyInitialSourceDocument(snapshot))
         {
@@ -155,7 +159,7 @@ public class ReceivingOrder
             return ReceivingOrderReconciliation.DifferencesDetected;
         }
 
-        return synchronizationStateChanged
+        return synchronizationStateChanged || sourceStateChanged
             ? ReceivingOrderReconciliation.Updated
             : ReceivingOrderReconciliation.Unchanged;
     }
@@ -229,7 +233,6 @@ public class ReceivingOrder
         Number = snapshot.Number;
         Date = snapshot.Date;
         Comment = snapshot.Comment;
-        Status = snapshot.Status;
         Queue = snapshot.Queue;
         ShipperId = snapshot.ShipperId;
         ShipperType = snapshot.ShipperType;
@@ -251,8 +254,7 @@ public class ReceivingOrder
         }
 
         if (Status is not (ReceivingOrderStatus.ReadyForReceiving
-            or ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired))
+            or ReceivingOrderStatus.InReceiving))
         {
             return OperationError.Invalid(
                 "Позицию приёмки можно изменить только до завершения приёмки ордера.");
@@ -305,6 +307,42 @@ public class ReceivingOrder
         StartedBy = startedBy.Trim();
         AdvanceOperationalRevision();
         return OperationResult.Success();
+    }
+
+    public OperationResult JoinReceiving(DateTimeOffset joinedAtUtc, string userId)
+    {
+        if (Status != ReceivingOrderStatus.InReceiving)
+            return OperationError.Invalid("Присоединиться можно только к ордеру в работе.");
+
+        var eligibility = ValidateReceivingParticipationEligibility();
+        if (!eligibility.IsSuccess)
+            return eligibility;
+
+        if (_participants.Any(x => x.UserId == userId))
+            return OperationResult.Success();
+
+        var participantResult = ReceivingOrderParticipant.Create(Id, userId, joinedAtUtc);
+        if (!participantResult.IsSuccess)
+            return participantResult.Error!;
+
+        _participants.Add(participantResult.Value!);
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
+
+    public OperationResult ValidateReceivingParticipationEligibility()
+    {
+        if (DeletionMark)
+            return OperationError.Conflict("Приходный ордер помечен на удаление в 1С.");
+        if (!Posted)
+            return OperationError.Conflict("Приходный ордер не проведён в 1С.");
+        var duplicateSku = _items
+            .GroupBy(x => x.StockKeepingUnitId)
+            .FirstOrDefault(x => x.Count() > 1);
+        return duplicateSku is null
+            ? OperationResult.Success()
+            : OperationError.Conflict(
+                $"SKU указан в нескольких строках: {duplicateSku.Key}.");
     }
 
     public OperationResult UpdateItemFact(
@@ -403,15 +441,14 @@ public class ReceivingOrder
     }
 
     private OperationResult ValidateReceivingEditing() =>
-        Status is ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired
+        Status == ReceivingOrderStatus.InReceiving
             ? OperationResult.Success()
             : OperationError.Invalid(
                 "Строки приходного ордера можно изменять только во время приёмки или обработки ордера.");
 
     private OperationResult ValidateToSetReceived()
     {
-        if (Status is not (ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired))
+        if (Status != ReceivingOrderStatus.InReceiving)
         {
             return OperationError.Invalid(
                 "Завершить приёмку можно только для ордера в приёмке или обработке.");
@@ -823,10 +860,10 @@ public class ReceivingOrder
     private bool CanApplyInitialSourceDocument(ReceivingOrderImportSnapshot snapshot) =>
         Status == ReceivingOrderStatus.ReadyForReceiving
         && StartedAtUtc is null
-        && snapshot.Status == ReceivingOrderStatus.ReadyForReceiving
         && !DeletionMark
         && !snapshot.DeletionMark
-        && Posted == snapshot.Posted;
+        && snapshot.Posted
+        && snapshot.Status != ReceivingOrderStatus.Unknown;
 
     private static OrderSynchronizationAssessment EnsureBlockingAssessment(
         OrderSynchronizationAssessment assessment,
@@ -879,13 +916,11 @@ public class ReceivingOrder
 
     private void ApplyImport(ReceivingOrderImportSnapshot snapshot)
     {
-        DeletionMark = snapshot.DeletionMark;
-        Posted = snapshot.Posted;
+        ApplySourceState(snapshot);
         Number = snapshot.Number;
         Date = snapshot.Date;
         WarehouseId = snapshot.WarehouseId;
         Comment = snapshot.Comment;
-        Status = snapshot.Status;
         Queue = snapshot.Queue;
         WarehouseOperation = snapshot.WarehouseOperation;
         BusinessOperation = snapshot.BusinessOperation;
@@ -893,6 +928,15 @@ public class ReceivingOrder
         ShipperType = snapshot.ShipperType;
         BaseOrderId = snapshot.BaseOrderId;
         BaseOrderType = snapshot.BaseOrderType;
+    }
+
+    private bool ApplySourceState(ReceivingOrderImportSnapshot snapshot)
+    {
+        bool changed = DeletionMark != snapshot.DeletionMark
+            || Posted != snapshot.Posted;
+        DeletionMark = snapshot.DeletionMark;
+        Posted = snapshot.Posted;
+        return changed;
     }
 
     private static OperationResult ValidateAudit(

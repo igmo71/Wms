@@ -25,6 +25,7 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="2">
+        <MudAlert Severity="Severity.Info">Начало приёмки выполняется участником на ТСД. Прежние Web-действия приёмки и размещения отключены.</MudAlert>
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
@@ -34,7 +35,7 @@ else
                     <span>
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Disabled="@(PutawayPending || _isStarting || (_pendingStart is null && (_receivingLocation is null || _synchronizationAssessment?.Level != OrderSynchronizationLevel.Synchronized || !string.IsNullOrWhiteSpace(_synchronizationErrorMessage))))"
+                                   Disabled="true"
                                    StartIcon="@Icons.Material.Filled.PlayArrow"
                                    OnClick="SetInReceivingAsync">
                             @(_pendingStart is null ? "Взять в работу" : "Повторить начало приёмки")
@@ -46,7 +47,7 @@ else
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
-                           Disabled="@(PutawayPending || _isStarting || _pendingStart is not null || _isAcknowledgingSynchronization)"
+                           Disabled="true"
                            StartIcon="@Icons.Material.Filled.PlayArrow"
                            OnClick="StartPutawayAsync">
                     Начать размещение
@@ -119,7 +120,7 @@ else
                     @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
                     {
                         <MudAutocomplete T="Zone"
-                                         Disabled="@(PutawayPending || _isStarting || _pendingStart is not null)"
+                                         Disabled="true"
                                          Value="_receivingZone"
                                          ValueChanged="OnReceivingZoneChanged"
                                          SearchFunc="SearchReceivingZonesAsync"
@@ -143,7 +144,7 @@ else
                                          ValueChanged="OnReceivingLocationChanged"
                                          SearchFunc="SearchReceivingLocationsAsync"
                                          ToStringFunc="StorageLocationDisplay.Format"
-                                         Disabled="@(_receivingZone is null || _isStarting || _pendingStart is not null)"
+                                         Disabled="true"
                                          Variant="Variant.Text"
                                          Dense="true"
                                          Margin="Margin.Dense"
@@ -169,6 +170,25 @@ else
                 <DocumentOperationInfo Title="Начал размещение" UserName="@GetUserName(_order.PutawayStartedBy)" Timestamp="_order.PutawayStartedAtUtc" />
                 <DocumentOperationInfo Title="Разместил" UserName="@GetUserName(_order.PutawayCompletedBy)" Timestamp="_order.PutawayCompletedAtUtc" />
             </MudGrid>
+        </MudPaper>
+
+        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-2">Участники приёмки</MudText>
+            @if (_order.Participants.Count == 0)
+            {
+                <MudText>К ордеру ещё никто не присоединился.</MudText>
+            }
+            else
+            {
+                <MudDataGrid T="ReceivingOrderParticipant"
+                             Items="_order.Participants.OrderBy(x => x.JoinedAtUtc)"
+                             Dense="true">
+                    <Columns>
+                        <TemplateColumn Title="Сотрудник"><CellTemplate>@GetUserName(context.Item.UserId)</CellTemplate></TemplateColumn>
+                        <PropertyColumn Property="x => x.JoinedAtUtc" Title="Присоединился" Format="dd.MM.yyyy HH:mm" />
+                    </Columns>
+                </MudDataGrid>
+            }
         </MudPaper>
 
         @if (_order.Status == ReceivingOrderStatus.Received

@@ -19,75 +19,81 @@ public class ReceivingOrderCommandService(
     ILogger<ReceivingOrderCommandService> logger)
 {
     // Persisted protocol identifiers: do not derive these from CLR type names.
-    private const string StartReceivingCommandType = "receiving-order.start-receiving";
+    private const string JoinReceivingCommandType = "receiving-order.join-receiving";
     private const string CompleteReceivingCommandType = "receiving-order.complete-receiving";
 
     public Task<OperationResult<Guid>> StartReceivingAsync(
         StartReceivingCommand command,
         CommandContext context,
+        CancellationToken ct = default) => Task.FromResult<OperationResult<Guid>>(
+            OperationError.Invalid(
+                "Прежний запуск приёмки отключён. Используйте присоединение к ордеру."));
+
+    public Task<OperationResult<Guid>> JoinReceivingAsync(
+        JoinReceivingOrderCommand command,
+        CommandContext context,
         CancellationToken ct = default) =>
         commandExecutor.ExecuteAsync(
-            StartReceivingCommandType,
+            JoinReceivingCommandType,
             context.RequestId,
-            CommandExecutor.ComputeHash($"{command.OrderId:N}|{command.ReceivingLocationId:N}"),
+            CommandExecutor.ComputeHash(
+                command.ReceivingLocationId is Guid locationId
+                    ? $"{command.OrderId:N}|{locationId:N}"
+                    : command.OrderId.ToString("N")),
             context.UserId,
             async (dbContext, token) =>
             {
-                var result = await StartReceivingCoreAsync(dbContext, command, context.UserId, token);
-                return result.IsSuccess ? command.OrderId : result.Error!;
+                var order = await dbContext.ReceivingOrders
+                    .Include(x => x.Items)
+                    .Include(x => x.Participants)
+                    .FirstOrDefaultAsync(x => x.Id == command.OrderId, token);
+                if (order is null)
+                    return OperationError.NotFound(
+                        $"Приходный ордер '{command.OrderId}' не найден.");
+
+                OperationResult synchronizationResult = EnsureSynchronizationAllowsWork(order);
+                if (!synchronizationResult.IsSuccess)
+                    return synchronizationResult.Error!;
+
+                OperationResult eligibility = order.ValidateReceivingParticipationEligibility();
+                if (!eligibility.IsSuccess)
+                    return eligibility.Error!;
+
+                if (order.Status == ReceivingOrderStatus.ReadyForReceiving)
+                {
+                    if (command.ReceivingLocationId is not Guid receivingLocationId)
+                        return OperationError.Invalid(
+                            "Первый участник должен отсканировать ячейку приёмки.");
+
+                    OperationResult locationResult = await SetReceivingLocationAsync(
+                        dbContext, order, receivingLocationId, token);
+                    if (!locationResult.IsSuccess)
+                        return locationResult.Error!;
+
+                    OperationResult startResult = order.SetInReceiving(
+                        DateTimeOffset.UtcNow,
+                        context.UserId);
+                    if (!startResult.IsSuccess)
+                        return startResult.Error!;
+                }
+                else if (order.Status != ReceivingOrderStatus.InReceiving)
+                {
+                    return OperationError.Invalid(
+                        "Присоединиться можно только к готовому или находящемуся в работе ордеру.");
+                }
+
+                bool wasParticipant = order.Participants.Any(x => x.UserId == context.UserId);
+                OperationResult joinResult = order.JoinReceiving(
+                    DateTimeOffset.UtcNow,
+                    context.UserId);
+                if (joinResult.IsSuccess && !wasParticipant)
+                {
+                    dbContext.ReceivingOrderParticipants.Add(
+                        order.Participants.Single(x => x.UserId == context.UserId));
+                }
+                return joinResult.IsSuccess ? order.Id : joinResult.Error!;
             },
             ct);
-
-    private async Task<OperationResult> StartReceivingCoreAsync(
-        ApplicationDbContext dbContext,
-        StartReceivingCommand command,
-        string userId,
-        CancellationToken ct)
-    {
-        var (orderId, receivingLocationId) = command;
-        using var scope = logger.BeginScope("ReceivingOrder Start {OrderId}", orderId);
-        using var activity = AppTracing.StartActivity(
-            "ReceivingOrder.Start",
-            nameof(ReceivingOrderCommandService));
-
-        var order = await LoadOrderAsync(dbContext, orderId, ct);
-        if (order is null)
-        {
-            logger.LogError("Приходный ордер {OrderId} не найден", orderId);
-            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
-        }
-
-        OperationResult synchronizationResult = EnsureSynchronizationAllowsWork(order);
-        if (!synchronizationResult.IsSuccess)
-            return synchronizationResult;
-
-        var locationResult = await SetReceivingLocationAsync(
-            dbContext,
-            order,
-            receivingLocationId,
-            ct);
-        if (!locationResult.IsSuccess)
-        {
-            return locationResult;
-        }
-
-        var transitionResult = order.SetInReceiving(DateTimeOffset.UtcNow, userId);
-        if (!transitionResult.IsSuccess)
-        {
-            logger.LogError("Не удалось перевести приходный ордер в приемку: {ErrorMessage}", transitionResult.Error?.Message);
-            return transitionResult;
-        }
-
-        var externalResult = await executionSink.SetInReceivingAsync(order.Id, ct);
-
-        if (!externalResult.IsSuccess)
-        {
-            logger.LogError("Не удалось перевести документ 1С в приемку: {ErrorMessage}", externalResult.Error?.Message);
-            return externalResult;
-        }
-
-        return OperationResult.Success();
-    }
 
     public Task<OperationResult<Guid>> CompleteReceivingAsync(
         CompleteReceivingCommand command,
@@ -284,6 +290,7 @@ public class ReceivingOrderCommandService(
         CancellationToken ct) =>
         dbContext.ReceivingOrders
             .Include(x => x.Items)
+            .Include(x => x.Participants)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
     private static OperationResult<List<InventoryMovement>> CreateReceivingMovements(

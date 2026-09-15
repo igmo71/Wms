@@ -2,6 +2,7 @@ namespace Wms.Contracts.Mobile.V1;
 
 public enum MobileReceivingOrderStatus
 {
+    Unknown = 0,
     ReadyForReceiving = 1,
     InReceiving = 2,
     ProcessingRequired = 3,
@@ -50,7 +51,10 @@ public sealed record MobileReceivingOrderSummaryResponse(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     DateTimeOffset? PutawayStartedAtUtc,
-    DateTimeOffset? PutawayCompletedAtUtc);
+    DateTimeOffset? PutawayCompletedAtUtc,
+    bool IsParticipant,
+    bool CanJoin,
+    string? JoinBlockedReason);
 
 public sealed record MobileReceivingOrderLineResponse(
     int LineNumber,
@@ -81,8 +85,8 @@ public sealed record MobileReceivingOrderDetailsResponse(
     IReadOnlyList<MobileReceivingOrderMovementResponse> Movements);
 
 public sealed record MobileReceivingOrderWorkQueueResponse(
-    IReadOnlyList<MobileReceivingOrderSummaryResponse> Receiving,
-    IReadOnlyList<MobileReceivingOrderSummaryResponse> Putaway);
+    IReadOnlyList<MobileReceivingOrderSummaryResponse> Personal,
+    IReadOnlyList<MobileReceivingOrderSummaryResponse> Available);
 
 public sealed record MobileReceivingOrderLineCandidateResponse(
     int LineNumber,
@@ -106,9 +110,9 @@ public sealed record MobileResolveReceivingOrderDocumentRequest(
 
 public sealed record MobileResolveReceivingOrderSkuRequest(string Barcode);
 
-public sealed record MobileStartReceivingOrderRequest(
+public sealed record MobileJoinReceivingOrderRequest(
     Guid ClientRequestId,
-    string ReceivingLocationBarcode);
+    string? ReceivingLocationBarcode);
 
 public sealed record MobileReceivingOrderCommandRequest(Guid ClientRequestId);
 

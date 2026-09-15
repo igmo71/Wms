@@ -21,6 +21,7 @@ public class ReceivingOrderQueryService(
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
+            .Include(x => x.Participants)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (order is null)

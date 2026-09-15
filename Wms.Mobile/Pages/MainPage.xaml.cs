@@ -94,6 +94,12 @@ public partial class MainPage : ContentPage
     private async void OnReceivingOrdersClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ReceivingOrderPage>());
 
+    private async void OnPutawayClicked(object? sender, EventArgs e) =>
+        await DisplayAlertAsync(
+            "Размещение",
+            "Размещение через LPN будет доступно после завершения соответствующего этапа.",
+            "ОК");
+
     private async void OnShippingOrdersClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ShippingOrderPage>());
 

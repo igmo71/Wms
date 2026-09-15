@@ -33,12 +33,12 @@ public partial class Putaway
     private bool _isLoading = true;
     private bool _isExecuting;
     private PendingPutawayOperation? _pendingOperation;
-    private bool InputsLocked => _isExecuting || _pendingOperation is not null;
+    private bool InputsLocked => true;
     private bool _operationFailed;
     private string? _errorMessage;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
-    private bool IsEditable => _order?.PutawayStatus == PutawayStatus.InProgress;
+    private bool IsEditable => false;
     private List<InventoryMovement> SelectedLineMovements => _selectedLine is null
         ? []
         : _movements.Where(x => x.RecorderLineNumber == _selectedLine.LineNumber).ToList();

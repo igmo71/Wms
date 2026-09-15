@@ -40,8 +40,7 @@ public partial class InProcess
     private PendingReceivingCommand<CompleteReceivingCommand>? _pendingCompletion;
     private PendingItemOperation? _pendingItem;
     private bool _isSavingItem;
-    private bool InputsLocked => _isSavingItem || _pendingItem is not null || _isCompleting
-        || _pendingCompletion is not null || _isAcknowledgingSynchronization;
+    private bool InputsLocked => true;
     private ReceivingOrder? _order;
     private Zone? _receivingZone;
     private StorageLocation? _receivingLocation;

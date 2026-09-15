@@ -45,14 +45,14 @@ public sealed class MobileReceivingOrderClient
                 "Сервер вернул некорректный приходный ордер.");
     }
 
-    public Task<MobileReceivingOrderCommandResponse> StartAsync(
+    public Task<MobileReceivingOrderCommandResponse> JoinAsync(
         Guid orderId,
-        string receivingLocationBarcode,
+        string? receivingLocationBarcode,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/start-receiving",
-            new MobileStartReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/join-receiving",
+            new MobileJoinReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
             ct);
 
     public async Task<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>> ResolveSkuAsync(

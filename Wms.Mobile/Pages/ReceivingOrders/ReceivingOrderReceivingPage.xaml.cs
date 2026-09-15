@@ -44,9 +44,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private MobileReceivingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Приходный ордер не загружен.");
 
-    private bool IsActiveReceiving => Details.Order.Status is
-        MobileReceivingOrderStatus.InReceiving or
-        MobileReceivingOrderStatus.ProcessingRequired;
+    private bool IsActiveReceiving => false;
 
     private bool IsSynchronizationResolved =>
         _synchronization is not null
@@ -59,10 +57,23 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         && _mode == ReceivingPageMode.Scanning
         && !HasPendingCommand;
 
-    private bool IsScanExpected => !_busy
-        && (_mode == ReceivingPageMode.LocationScanning
-            || (_mode == ReceivingPageMode.Scanning
-                && (!HasPendingCommand || _process.IsScanPending)));
+    private bool IsScanExpected => !_busy && _mode == ReceivingPageMode.LocationScanning;
+
+    private void OnProductsTabClicked(object? sender, EventArgs e)
+    {
+        ProductLinesPanel.IsVisible = true;
+        LpnPanel.IsVisible = false;
+        ProductsTabButton.Opacity = 1;
+        LpnTabButton.Opacity = 0.65;
+    }
+
+    private void OnLpnTabClicked(object? sender, EventArgs e)
+    {
+        ProductLinesPanel.IsVisible = false;
+        LpnPanel.IsVisible = true;
+        ProductsTabButton.Opacity = 0.65;
+        LpnTabButton.Opacity = 1;
+    }
 
     public void Show(MobileReceivingOrderDetailsResponse details)
     {

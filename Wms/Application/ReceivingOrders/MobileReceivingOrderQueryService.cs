@@ -13,19 +13,15 @@ public sealed class MobileReceivingOrderQueryService(
 {
     public async Task<MobileReceivingOrderWorkQueue> GetWorkQueueAsync(
         Guid warehouseId,
+        string userId,
         CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
         var orders = await QueueOrderQuery(dbContext)
             .Where(x => x.WarehouseId == warehouseId
-                && !x.DeletionMark
                 && (x.Status == ReceivingOrderStatus.ReadyForReceiving
-                    || x.Status == ReceivingOrderStatus.InReceiving
-                    || x.Status == ReceivingOrderStatus.ProcessingRequired
-                    || (x.Status == ReceivingOrderStatus.Received
-                        && (x.PutawayStatus == PutawayStatus.Pending
-                            || x.PutawayStatus == PutawayStatus.InProgress))))
+                    || x.Status == ReceivingOrderStatus.InReceiving))
             .AsSplitQuery()
             .ToListAsync(ct);
 
@@ -35,27 +31,39 @@ public sealed class MobileReceivingOrderQueryService(
             ct);
         var shippers = await LoadShippersAsync(orders, ct);
         var summaries = orders
-            .Select(order => MapSummary(order, movements, shippers))
+            .Select(order => MapSummary(order, movements, shippers, userId))
             .ToList();
 
         return new MobileReceivingOrderWorkQueue(
-            OrderQueue(summaries.Where(x => IsReceivingWork(x.Status))),
-            OrderQueue(summaries.Where(x => IsPutawayWork(x.Status, x.PutawayStatus))));
+            OrderQueue(summaries.Where(x => x.IsParticipant)),
+            OrderQueue(summaries.Where(x => !x.IsParticipant)));
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(
         Guid orderId,
+        string userId,
         CancellationToken ct = default) =>
-        await GetDetailsAsync(orderId, requireMobileWork: true, ct);
+        await GetDetailsAsync(orderId, userId, requireMobileWork: true, ct);
+
+    public Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(
+        Guid orderId,
+        CancellationToken ct = default) => GetDetailsAsync(orderId, string.Empty, ct);
 
     public async Task<OperationResult<MobileReceivingOrderDetails>>
         GetCommandResultDetailsAsync(
             Guid orderId,
+            string userId,
             CancellationToken ct = default) =>
-        await GetDetailsAsync(orderId, requireMobileWork: false, ct);
+        await GetDetailsAsync(orderId, userId, requireMobileWork: false, ct);
+
+    public Task<OperationResult<MobileReceivingOrderDetails>> GetCommandResultDetailsAsync(
+        Guid orderId,
+        CancellationToken ct = default) =>
+        GetCommandResultDetailsAsync(orderId, string.Empty, ct);
 
     private async Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(
         Guid orderId,
+        string userId,
         bool requireMobileWork,
         CancellationToken ct)
     {
@@ -77,12 +85,13 @@ public sealed class MobileReceivingOrderQueryService(
 
         var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
         var shippers = await LoadShippersAsync([order], ct);
-        return MapDetails(order, movements, shippers);
+        return MapDetails(order, movements, shippers, userId);
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> ResolveDocumentAsync(
         Guid warehouseId,
         Guid orderId,
+        string userId,
         CancellationToken ct = default)
     {
         if (warehouseId == Guid.Empty)
@@ -90,7 +99,7 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.Invalid("Перед сканированием документа необходимо выбрать склад.");
         }
 
-        var detailsResult = await GetDetailsAsync(orderId, ct);
+        var detailsResult = await GetDetailsAsync(orderId, userId, ct);
         if (!detailsResult.IsSuccess)
         {
             return detailsResult.Error!;
@@ -197,7 +206,7 @@ public sealed class MobileReceivingOrderQueryService(
 
         var context = order.Status switch
         {
-            ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.ProcessingRequired =>
+            ReceivingOrderStatus.InReceiving =>
                 ReceivingOrderLineContext.Receiving,
             ReceivingOrderStatus.Received when order.PutawayStatus == PutawayStatus.InProgress =>
                 ReceivingOrderLineContext.Putaway,
@@ -227,7 +236,8 @@ public sealed class MobileReceivingOrderQueryService(
                     .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
-                    .ThenInclude(x => x!.Barcodes);
+                    .ThenInclude(x => x!.Barcodes)
+            .Include(x => x.Participants);
 
     private static IQueryable<ReceivingOrder> QueueOrderQuery(
         ApplicationDbContext dbContext) =>
@@ -236,7 +246,8 @@ public sealed class MobileReceivingOrderQueryService(
             .Include(x => x.Warehouse)
             .Include(x => x.ReceivingLocation)
                 .ThenInclude(x => x!.Zone)
-            .Include(x => x.Items);
+            .Include(x => x.Items)
+            .Include(x => x.Participants);
 
     private static Task<List<InventoryMovement>> LoadDraftMovementsAsync(
         ApplicationDbContext dbContext,
@@ -272,7 +283,8 @@ public sealed class MobileReceivingOrderQueryService(
     private static MobileReceivingOrderDetails MapDetails(
         ReceivingOrder order,
         IReadOnlyCollection<InventoryMovement> movements,
-        IReadOnlyDictionary<PartyReference, PartyInfo> shippers)
+        IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
+        string userId)
     {
         var orderMovements = movements
             .Where(x => x.RecorderId == order.Id)
@@ -287,7 +299,7 @@ public sealed class MobileReceivingOrderQueryService(
             .ToList();
 
         return new MobileReceivingOrderDetails(
-            MapSummary(order, orderMovements, shippers),
+            MapSummary(order, orderMovements, shippers, userId),
             lines,
             mappedMovements);
     }
@@ -295,7 +307,8 @@ public sealed class MobileReceivingOrderQueryService(
     private static MobileReceivingOrderSummary MapSummary(
         ReceivingOrder order,
         IReadOnlyCollection<InventoryMovement> movements,
-        IReadOnlyDictionary<PartyReference, PartyInfo> shippers)
+        IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
+        string userId)
     {
         var orderMovements = movements
             .Where(x => x.RecorderId == order.Id)
@@ -303,6 +316,8 @@ public sealed class MobileReceivingOrderQueryService(
         var allocatedByLine = BuildAllocatedByLine(orderMovements);
         var shipperReference = new PartyReference(order.ShipperId, order.ShipperType);
         shippers.TryGetValue(shipperReference, out var shipper);
+        OperationResult eligibility = order.ValidateReceivingParticipationEligibility();
+        bool isParticipant = order.Participants.Any(x => x.UserId == userId);
 
         return new MobileReceivingOrderSummary(
             order.Id,
@@ -332,7 +347,15 @@ public sealed class MobileReceivingOrderQueryService(
             order.StartedAtUtc,
             order.CompletedAtUtc,
             order.PutawayStartedAtUtc,
-            order.PutawayCompletedAtUtc);
+            order.PutawayCompletedAtUtc,
+            isParticipant,
+            !isParticipant
+                && order.Status is ReceivingOrderStatus.ReadyForReceiving or ReceivingOrderStatus.InReceiving
+                && eligibility.IsSuccess
+                && order.SynchronizationLevel == OrderSynchronizationLevel.Synchronized,
+            eligibility.IsSuccess && order.SynchronizationLevel == OrderSynchronizationLevel.Synchronized
+                ? null
+                : eligibility.Error?.Message ?? "Ордер заблокирован расхождениями с 1С.");
     }
 
     private static MobileReceivingOrderLine MapLine(
@@ -432,11 +455,10 @@ public sealed class MobileReceivingOrderQueryService(
             .ToList();
 
     private static bool IsMobileWork(ReceivingOrder order) =>
-        !order.DeletionMark
-        && (IsReceivingWork(order) || IsPutawayWork(order));
+        IsReceivingWork(order) || IsPutawayWork(order);
 
     private static bool IsReceivingWork(ReceivingOrder order) =>
-        IsReceivingWork(order.Status);
+        order.Status is ReceivingOrderStatus.ReadyForReceiving or ReceivingOrderStatus.InReceiving;
 
     private static bool IsReceivingWork(ReceivingOrderStatus status) =>
         status is ReceivingOrderStatus.ReadyForReceiving
@@ -448,7 +470,8 @@ public sealed class MobileReceivingOrderQueryService(
             or ReceivingOrderStatus.ProcessingRequired;
 
     private static bool IsPutawayWork(ReceivingOrder order) =>
-        IsPutawayWork(order.Status, order.PutawayStatus);
+        order.Status == ReceivingOrderStatus.Received
+        && order.PutawayStatus is PutawayStatus.Pending or PutawayStatus.InProgress;
 
     private static bool IsPutawayWork(
         ReceivingOrderStatus status,

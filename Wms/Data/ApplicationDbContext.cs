@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Partner> Partners => Set<Partner>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();
     public DbSet<ReceivingOrderItem> ReceivingOrderItems => Set<ReceivingOrderItem>();
+    public DbSet<ReceivingOrderParticipant> ReceivingOrderParticipants => Set<ReceivingOrderParticipant>();
     public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();
     public DbSet<ShippingOrderBaseItem> ShippingOrderBaseItems => Set<ShippingOrderBaseItem>();
     public DbSet<ShippingOrderItem> ShippingOrderItems => Set<ShippingOrderItem>();

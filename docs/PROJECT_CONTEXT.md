@@ -30,7 +30,8 @@ limits LPN to receiving and initial putaway, preserves location/SKU inventory,
 and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
 The specification defines eight increments. I01 label issuance and A4 printing
-are implemented; receiving association and I02–I08 remain future work.
+and I02 receiving-order participation are implemented; LPN association and
+I03–I08 remain future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
@@ -146,6 +147,31 @@ printer output and target-scanner reading still require developer verification.
 I01 does not associate numbers with orders or change receiving, putaway or stock.
 
 ### Receiving and putaway
+
+The local `ReceivingOrder.Status` is the WMS lifecycle: ready for receiving, in
+receiving, or received. The source document status is consumed only from the
+integration snapshot during import and reconciliation; it is not persisted as a
+second aggregate status. A later outbound integration must map local transitions
+at its adapter boundary rather than add a provider status to the aggregate. If
+several consumers require acknowledgements, retries, or conflict tracking, that
+per-consumer delivery state belongs to integration storage outside the aggregate.
+
+Receiving participation is stored in `ReceivingOrderParticipant`, unique by
+order and Identity user. Mobile receiving separates the current user's active
+orders from joinable orders for the selected warehouse. Opening or scanning an
+already joined order reads it; opening or scanning an available in-progress
+order joins the user. The first participant must scan an active unlocked
+Receiving location for the order warehouse. Starting the local lifecycle,
+assigning that shared location, adding the participant, and the command receipt
+commit together. Later participants reuse the location. Concurrent first entry
+uses the order operational revision; a losing caller reloads and joins the
+winning location on explicit retry.
+
+Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
+duplicate-SKU source documents remain visible with a blocking reason and cannot
+be joined. The I02 order view shows the source plan read-only and an empty LPN
+screen. Direct facts, receiving completion, and order-based putaway are removed
+from the Mobile API and disabled in Web until their LPN increments are available.
 
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
