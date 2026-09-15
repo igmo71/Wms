@@ -15,6 +15,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
+    public DbSet<LicensePlateNumber> LicensePlateNumbers => Set<LicensePlateNumber>();
+    public DbSet<LicensePlateNumberBatch> LicensePlateNumberBatches => Set<LicensePlateNumberBatch>();
     public DbSet<OrganizationalUnit> OrganizationalUnits => Set<OrganizationalUnit>();
     public DbSet<Partner> Partners => Set<Partner>();
     public DbSet<ReceivingOrder> ReceivingOrders => Set<ReceivingOrder>();
@@ -34,6 +36,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasSequence<long>("LicensePlateNumberSequence").StartsAt(1).IncrementsBy(1)
+            .HasMin(1).HasMax(999999999999).IsCyclic(false);
 
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }

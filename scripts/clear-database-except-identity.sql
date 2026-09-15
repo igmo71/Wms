@@ -1,12 +1,15 @@
 /*
     Очистка прикладных данных WMS для текущей схемы базы данных.
     Включает справочники и топологию склада.
-    Схема: 20260904151251_CreateInitialWmsSchema.
+    Схема: AddLicensePlateNumbers.
     Запускать при остановленных WebApp, WebApi и обработчиках интеграции.
 
     Не очищаются:
       - таблицы ASP.NET Core Identity (dbo.AspNet*);
-      - dbo.__EFMigrationsHistory.
+      - dbo.__EFMigrationsHistory;
+      - последовательность LicensePlateNumberSequence (старые коды не переиспользуются).
+
+    Распечатанные до очистки этикетки LPN больше не действуют.
 
     Порядок DELETE соответствует внешним ключам текущей EF Core модели:
     сначала зависимые таблицы, затем родительские.
@@ -20,6 +23,9 @@ BEGIN TRY
 
     -- Квитанции повторных команд относятся к удаляемым операциям.
     DELETE FROM [dbo].[CommandReceipts];
+
+    DELETE FROM [dbo].[LicensePlateNumbers];
+    DELETE FROM [dbo].[LicensePlateNumberBatches];
 
     -- Все блокировки удаляются вместе с топологией склада.
     DELETE FROM [dbo].[StorageLocationLocks];

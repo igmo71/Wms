@@ -79,6 +79,14 @@ public class Program
         app.UseAntiforgery();
 
         app.MapStaticAssets();
+        app.MapGet("/lpn-labels/print/{id:guid}", async (Guid id, bool? batch,
+            Wms.Application.LicensePlateNumbers.LicensePlateNumberService labels, HttpContext context, CancellationToken ct) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var items = await labels.GetForPrintAsync(id, batch == true, ct);
+            return items.Count == 0 ? Results.NotFound("Этикетки не найдены.")
+                : Results.Content(Printing.LicensePlateNumberPrintDocument.Render(items), "text/html; charset=utf-8");
+        }).RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Operator, ApplicationRoles.Administrator));
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
 

@@ -1,0 +1,40 @@
+@page "/lpn-labels"
+@using Wms.Domain
+
+<PageTitle>Этикетки LPN</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Этикетки LPN</MudText>
+<MudText Class="mb-4">Выпустите пакет заранее, откройте макет A4 и распечатайте. Привязка к ордеру пока недоступна.</MudText>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudNumericField T="int" Label="Количество этикеток" @bind-Value="_quantity" Min="1" Max="LicensePlateNumberBatch.MaximumQuantity" Disabled="InputsLocked" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="InputsLocked" OnClick="IssueAsync">Выпустить пакет</MudButton>
+    @if (_pending is not null && !_busy)
+    {
+        <MudButton Color="Color.Warning" OnClick="ExecuteAsync">Повторить выпуск</MudButton>
+    }
+</MudStack>
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+@if (_issuedBatch is Guid batchId)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">
+        Пакет выпущен.
+        <a href="@($"lpn-labels/print/{batchId}?batch=true")" target="_blank" rel="noopener">Предпросмотр и печать A4</a>
+    </MudAlert>
+}
+<MudTextField T="string" Label="Поиск по коду" ValueChanged="SearchAsync" Immediate="false" Class="mb-4" />
+<MudDataGrid T="LicensePlateNumber" @ref="_grid" ServerData="LoadAsync" SortMode="SortMode.None" RowsPerPage="25" Dense="true" Hover="true">
+    <Columns>
+        <PropertyColumn Property="x => x.Code" Title="Код LPN" />
+        <TemplateColumn Title="Выпущена"><CellTemplate>@context.Item.Batch.IssuedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</CellTemplate></TemplateColumn>
+        <TemplateColumn Title="Сотрудник"><CellTemplate>@UserName(context.Item.Batch.IssuedBy)</CellTemplate></TemplateColumn>
+        <TemplateColumn Title="Печать"><CellTemplate>
+            <a href="@($"lpn-labels/print/{context.Item.Id}")" target="_blank" rel="noopener">Этикетка</a>
+            <span> · </span>
+            <a href="@($"lpn-labels/print/{context.Item.BatchId}?batch=true")" target="_blank" rel="noopener">Весь пакет</a>
+        </CellTemplate></TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>Этикетки не найдены.</MudText></NoRecordsContent>
+    <PagerContent><MudDataGridPager T="LicensePlateNumber" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>
+</MudDataGrid>

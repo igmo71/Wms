@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryMovementQueryService>();
         services.AddScoped<InventoryTurnoverQueryService>();
         services.AddScoped<CommandExecutor>();
+        services.AddScoped<Wms.Application.LicensePlateNumbers.LicensePlateNumberService>();
         services.AddScoped<OrganizationalUnitService>();
         services.AddScoped<PickingCommandService>();
         services.AddScoped<PartyQueryService>();

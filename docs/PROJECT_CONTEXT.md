@@ -56,7 +56,9 @@ stopped. `scripts/clear-wms-operational-data.sql` clears warehouse documents,
 inventory, command receipts, and inventory-count locks while preserving
 Identity, catalogs, warehouse topology, and manual locks.
 `scripts/clear-database-except-identity.sql` also clears catalogs, topology, and
-all locks. Both preserve EF migration history and execute in a transaction.
+all locks. Both clear issued LPN and their batches, preserve the LPN sequence
+(old codes are never reissued), preserve EF migration history, and execute in
+a transaction. Labels printed before such cleanup are no longer valid.
 
 A warehouse contains storage, transit, receiving, and shipping zones. Locations
 form an arbitrary-depth tree within one active warehouse zone.
@@ -108,6 +110,33 @@ balance concurrency tokens plus named database constraints. Only recognized
 inventory concurrency failures become business conflicts.
 
 ## Warehouse workflows
+
+### LPN issuance (I01)
+
+The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an
+acceptable local abbreviation. One stored `Code` is used for display, barcode
+payload and the text printed below the barcode: `LPN` followed by exactly twelve
+digits (`LPN000000000001` through `LPN999999999999`). It is an internal WMS code,
+encoded in ordinary Code 128, with no GS1/SSCC claim.
+
+SQL Server allocates codes on insert from the global, non-cycling
+`LicensePlateNumberSequence`. A unique index guards codes; gaps are allowed.
+There is no independently stored barcode value or second business number.
+`LicensePlateNumberBatch` retains issuance time and Identity user id.
+
+Operator and Administrator can issue 1–500 labels through Web `/lpn-labels`,
+search the issued list, and preview/reprint one label or its entire batch.
+Issuance uses `LicensePlateNumberService` and `CommandExecutor`: all numbers,
+the batch and `lpn-label.issue-batch` receipt commit in one save. Replay returns
+the original batch. Web retains quantity, request and user during an uncertain
+attempt and blocks another issuance until explicit retry resolves it. This
+recovery lasts only for the live component.
+
+Authenticated print requests only read persisted codes. The standalone A4
+portrait layout contains two columns by five rows, with SVG Code 128 and the
+same human-readable code. Printing does not create new numbers. Physical
+printer output and target-scanner reading still require developer verification.
+I01 does not associate numbers with orders or change receiving, putaway or stock.
 
 ### Receiving and putaway
 
