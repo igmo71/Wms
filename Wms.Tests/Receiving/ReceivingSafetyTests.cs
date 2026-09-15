@@ -121,6 +121,93 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Assert.All(order.Participants, participant => Assert.Equal(order.Id, participant.ReceivingOrderId));
     }
 
+    [Fact]
+    public async Task Receiving_lpn_assignment_is_single_owner_and_cancelled_code_is_never_free_again()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN assignment" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "LPN SKU" };
+        var zone = Zone(warehouse.Id, "LA", ZoneType.Receiving);
+        var location = Location(warehouse.Id, zone, 1);
+        var firstOrder = StartedOrder(warehouse.Id, sku.Id, location.Id, "owner-a");
+        var secondOrder = StartedOrder(warehouse.Id, sku.Id, location.Id, "owner-b");
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, firstOrder, secondOrder);
+            await seed.SaveChangesAsync();
+        }
+
+        var lpnService = LpnService(database);
+        var batchId = Value(await lpnService.IssueAsync(3, Command("issuer")));
+        string[] codes;
+        await using (var read = database.CreateDbContext())
+        {
+            codes = await read.LicensePlateNumbers
+                .Where(x => x.BatchId == batchId)
+                .OrderBy(x => x.Code)
+                .Select(x => x.Code)
+                .ToArrayAsync();
+        }
+
+        var sameLabelRaceService = LpnService(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var sameLabelRace = await Task.WhenAll(
+            sameLabelRaceService.OpenForReceivingAsync(new(firstOrder.Id, codes[0]), Command("owner-a")),
+            sameLabelRaceService.OpenForReceivingAsync(new(secondOrder.Id, codes[0]), Command("owner-b")));
+        Assert.Single(sameLabelRace, x => x.IsSuccess);
+        Error(sameLabelRace.Single(x => !x.IsSuccess), OperationErrorType.Conflict);
+
+        var targetOrder = sameLabelRace[0].IsSuccess ? firstOrder : secondOrder;
+        var targetOwner = sameLabelRace[0].IsSuccess ? "owner-a" : "owner-b";
+        var assignedId = Value(sameLabelRace.Single(x => x.IsSuccess));
+        Success(await lpnService.CancelEmptyReceivingAsync(
+            new(targetOrder.Id, assignedId), Command(targetOwner)));
+
+        var oneOpenRaceService = LpnService(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var oneOpenRace = await Task.WhenAll(
+            oneOpenRaceService.OpenForReceivingAsync(new(targetOrder.Id, codes[1]), Command(targetOwner)),
+            oneOpenRaceService.OpenForReceivingAsync(new(targetOrder.Id, codes[2]), Command(targetOwner)));
+        Assert.Single(oneOpenRace, x => x.IsSuccess);
+        Error(oneOpenRace.Single(x => !x.IsSuccess), OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        var assigned = await verify.LicensePlateNumbers.SingleAsync(x => x.Code == codes[0]);
+        Assert.Equal(targetOrder.Id, assigned.ReceivingOrderId);
+        Assert.Equal(LicensePlateNumberStatus.Cancelled, assigned.Status);
+
+        var openId = Value(oneOpenRace.Single(x => x.IsSuccess));
+        Success(await lpnService.CancelEmptyReceivingAsync(
+            new(targetOrder.Id, openId), Command(targetOwner)));
+        var nextCode = oneOpenRace[0].IsSuccess ? codes[2] : codes[1];
+        var next = await lpnService.OpenForReceivingAsync(
+            new(targetOrder.Id, nextCode), Command(targetOwner));
+        Success(next);
+        var reopenCancelled = await lpnService.OpenForReceivingAsync(
+            new(targetOrder.Id, codes[0]), Command(targetOwner));
+        Assert.Equal(assigned.Id, Value(reopenCancelled));
+
+        Assert.Equal(LicensePlateNumberStatus.Cancelled, assigned.Status);
+        Assert.Equal(targetOrder.Id, assigned.ReceivingOrderId);
+    }
+
+    private static ReceivingOrder StartedOrder(
+        Guid warehouseId,
+        Guid skuId,
+        Guid locationId,
+        string userId)
+    {
+        var snapshot = new ReceivingOrderImportSnapshot(
+            Guid.NewGuid(), false, true, Guid.NewGuid().ToString("N"), DateTime.UtcNow,
+            warehouseId, null, ReceivingOrderStatus.ReadyForReceiving, default,
+            WarehouseOperation.VendorReceipt, BusinessOperation.VendorPurchase,
+            Guid.NewGuid(), default, Guid.NewGuid(), null,
+            [new(1, skuId, 1m, 1m, null)]);
+        var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
+        Success(order.SetReceivingLocation(locationId));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, userId));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, userId));
+        return order;
+    }
+
     private static LicensePlateNumberService LpnService(IDbContextFactory<ApplicationDbContext> factory) =>
         new(new CommandExecutor(factory), factory);
 

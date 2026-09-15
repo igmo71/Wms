@@ -24,6 +24,9 @@ internal static class PersistenceConflictClassifier
     private static readonly OperationError ReceivingOrderConflict = OperationError.Conflict(
         "Приходный ордер изменился. Обновите данные и повторите операцию.");
 
+    private static readonly OperationError LicensePlateNumberConflict = OperationError.Conflict(
+        "LPN изменился. Обновите данные и повторите операцию.");
+
     private static readonly OperationError ShippingOrderConflict = OperationError.Conflict(
         "Расходный ордер изменился. Обновите данные и повторите операцию.");
 
@@ -58,6 +61,12 @@ internal static class PersistenceConflictClassifier
             if (concurrencyException.Entries.Any(x => x.Entity is ReceivingOrder))
             {
                 error = ReceivingOrderConflict;
+                return true;
+            }
+
+            if (concurrencyException.Entries.Any(x => x.Entity is LicensePlateNumber))
+            {
+                error = LicensePlateNumberConflict;
                 return true;
             }
 
@@ -136,6 +145,15 @@ internal static class PersistenceConflictClassifier
                     StringComparison.Ordinal))
             {
                 error = StorageLocationConflict;
+                return true;
+            }
+
+            if (sqlException.Message.Contains(
+                    DatabaseObjectNames.LicensePlateNumbersOpenOwnerIndex,
+                    StringComparison.Ordinal))
+            {
+                error = OperationError.Conflict(
+                    "У сотрудника уже есть открытый LPN в этом приходном ордере.");
                 return true;
             }
         }

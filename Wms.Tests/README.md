@@ -8,10 +8,11 @@ not be run automatically without an explicit request:
 dotnet test Wms.Tests/Wms.Tests.csproj
 ```
 
-The 14-test suite is intentionally small. It protects migration drift; central
+The 15-test suite is intentionally small. It protects migration drift; central
 command replay, payload conflict, receipt races, and transaction rollback; LPN
 uniqueness and non-reuse after maintenance; one receiving location under a
-first-participant race; receiving synchronization quantity protection; complete
+first-participant race; single LPN assignment/open-owner concurrency and
+cancelled-code retention; receiving synchronization quantity protection; complete
 and atomic putaway; competing stock withdrawal; inventory-count correction and
 stock-drift rejection; once-only picking/shipping; and atomic compensating
 shipping rollback.

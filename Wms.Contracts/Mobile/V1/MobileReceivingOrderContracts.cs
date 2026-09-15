@@ -16,6 +16,14 @@ public enum MobilePutawayStatus
     InProgress = 2,
     Completed = 3
 }
+
+public enum MobileLicensePlateNumberStatus
+{
+    Available = 0,
+    Open = 1,
+    Closed = 2,
+    Cancelled = 3
+}
 public sealed record MobileReceivingOrderLocationResponse(
     Guid Id,
     string Name,
@@ -79,10 +87,23 @@ public sealed record MobileReceivingOrderMovementResponse(
     DateTimeOffset? UpdatedAtUtc,
     DateTimeOffset? PostedAtUtc);
 
+public sealed record MobileReceivingOrderLicensePlateNumberResponse(
+    Guid Id,
+    string Code,
+    MobileLicensePlateNumberStatus Status,
+    string StatusName,
+    string ResponsibleUserName,
+    string CreatedByName,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? CancelledAtUtc,
+    bool IsOwnedByCurrentUser,
+    bool CanCancel);
+
 public sealed record MobileReceivingOrderDetailsResponse(
     MobileReceivingOrderSummaryResponse Order,
     IReadOnlyList<MobileReceivingOrderLineResponse> Lines,
-    IReadOnlyList<MobileReceivingOrderMovementResponse> Movements);
+    IReadOnlyList<MobileReceivingOrderMovementResponse> Movements,
+    IReadOnlyList<MobileReceivingOrderLicensePlateNumberResponse> LicensePlateNumbers);
 
 public sealed record MobileReceivingOrderWorkQueueResponse(
     IReadOnlyList<MobileReceivingOrderSummaryResponse> Personal,
@@ -114,6 +135,10 @@ public sealed record MobileJoinReceivingOrderRequest(
     Guid ClientRequestId,
     string? ReceivingLocationBarcode);
 
+public sealed record MobileOpenReceivingLicensePlateNumberRequest(
+    Guid ClientRequestId,
+    string Code);
+
 public sealed record MobileReceivingOrderCommandRequest(Guid ClientRequestId);
 
 public sealed record MobileSetReceivingOrderLineQuantityRequest(
@@ -129,5 +154,6 @@ public sealed record MobileAddReceivingOrderPutawayMovementRequest(
 public sealed record MobileReceivingOrderCommandResponse(
     MobileReceivingOrderDetailsResponse Details,
     int? ChangedLineNumber = null,
-    Guid? ChangedMovementId = null);
+    Guid? ChangedMovementId = null,
+    Guid? SelectedLicensePlateNumberId = null);
 

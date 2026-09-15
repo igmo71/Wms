@@ -10,6 +10,8 @@ public partial class ReceivingOrderReceivingPage
     {
         if (!IsScanExpected)
         {
+            if (_lpnTabActive && CanUseLicensePlateNumbers)
+                await OpenLicensePlateNumberAsync(barcode);
             return;
         }
 
@@ -20,6 +22,96 @@ public partial class ReceivingOrderReceivingPage
         else
         {
             await ResolveOrIncrementSkuAsync(barcode);
+        }
+    }
+
+    private async Task OpenLicensePlateNumberAsync(string code)
+    {
+        if (_busy || (HasPendingCommand && !_process.IsOpenLpnPending))
+            return;
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var response = await _process.OpenLicensePlateNumberAsync(Details.Order.Id, code);
+            ApplyDetails(response.Details);
+            SelectedLicensePlateNumber = response.SelectedLicensePlateNumberId is Guid id
+                ? LicensePlateNumbers.SingleOrDefault(x => x.Id == id)
+                : null;
+            OnPropertyChanged(nameof(SelectedLicensePlateNumber));
+            SelectedLpnPanel.IsVisible = SelectedLicensePlateNumber is not null;
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Ответ сервера не получен. Повторно отсканируйте тот же LPN.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
+    private void OnLicensePlateNumberTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is not MobileReceivingOrderLicensePlateNumberResponse lpn)
+            return;
+        SelectedLicensePlateNumber = lpn;
+        OnPropertyChanged(nameof(SelectedLicensePlateNumber));
+        SelectedLpnPanel.IsVisible = true;
+    }
+
+    private async void OnCancelLicensePlateNumberClicked(object? sender, EventArgs e)
+    {
+        if (_busy
+            || sender is not Button { CommandParameter: MobileReceivingOrderLicensePlateNumberResponse lpn }
+            || !lpn.CanCancel
+            || (HasPendingCommand && !_process.IsCancelLpnPending))
+            return;
+
+        if (!_process.IsCancelLpnPending
+            && !await DisplayAlertAsync(
+                "Отменить LPN",
+                $"Отменить пустой LPN {lpn.Code}? Код больше нельзя будет использовать.",
+                "Отменить LPN",
+                "Назад"))
+            return;
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var response = await _process.CancelLicensePlateNumberAsync(Details.Order.Id, lpn.Id);
+            ApplyDetails(response.Details);
+            SelectedLicensePlateNumber = LicensePlateNumbers.SingleOrDefault(x => x.Id == lpn.Id);
+            OnPropertyChanged(nameof(SelectedLicensePlateNumber));
+            SelectedLpnPanel.IsVisible = SelectedLicensePlateNumber is not null;
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите отмену этого же LPN.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
         }
     }
 

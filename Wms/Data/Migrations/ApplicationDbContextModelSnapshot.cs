@@ -677,6 +677,13 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("BatchId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CancelledBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -685,12 +692,40 @@ namespace Wms.Data.Migrations
                         .HasColumnType("varchar(15)")
                         .HasDefaultValueSql("'LPN' + RIGHT('000000000000' + CONVERT(varchar(12), NEXT VALUE FOR [LicensePlateNumberSequence]), 12)");
 
+                    b.Property<DateTimeOffset?>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("ReceivingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResponsibleUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BatchId");
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("ReceivingOrderId");
+
+                    b.HasIndex("ReceivingOrderId", "ResponsibleUserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LicensePlateNumbers_OpenOwner")
+                        .HasFilter("[Status] = 1");
 
                     b.ToTable("LicensePlateNumbers");
                 });
@@ -1603,7 +1638,14 @@ namespace Wms.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
+                        .WithMany("LicensePlateNumbers")
+                        .HasForeignKey("ReceivingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Batch");
+
+                    b.Navigation("ReceivingOrder");
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
@@ -1858,6 +1900,8 @@ namespace Wms.Data.Migrations
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("LicensePlateNumbers");
 
                     b.Navigation("Participants");
                 });

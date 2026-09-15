@@ -9,9 +9,13 @@ public sealed class ReceivingOrderReceivingProcess
     private Guid? _scanRequestId;
     private Guid? _quantityRequestId;
     private Guid? _completionRequestId;
+    private Guid? _openLpnRequestId;
+    private Guid? _cancelLpnRequestId;
     private string? _scanBarcode;
     private int? _scanLineNumber;
     private int? _quantityLineNumber;
+    private string? _openLpnCode;
+    private Guid? _cancelLpnId;
 
     internal ReceivingOrderReceivingProcess(MobileReceivingOrderClient orderClient)
     {
@@ -21,12 +25,16 @@ public sealed class ReceivingOrderReceivingProcess
     public bool HasPendingCommand => IsStartPending
         || IsScanPending
         || IsQuantityPending
-        || IsCompletionPending;
+        || IsCompletionPending
+        || IsOpenLpnPending
+        || IsCancelLpnPending;
 
     public bool IsStartPending => _startRequestId is not null;
     public bool IsScanPending => _scanRequestId is not null;
     public bool IsQuantityPending => _quantityRequestId is not null;
     public bool IsCompletionPending => _completionRequestId is not null;
+    public bool IsOpenLpnPending => _openLpnRequestId is not null;
+    public bool IsCancelLpnPending => _cancelLpnRequestId is not null;
     public int? PendingQuantityLineNumber => _quantityLineNumber;
 
     public async Task<MobileReceivingOrderCommandResponse> StartAsync(
@@ -132,6 +140,56 @@ public sealed class ReceivingOrderReceivingProcess
         catch (MobileApiException)
         {
             _completionRequestId = null;
+            throw;
+        }
+    }
+
+    public async Task<MobileReceivingOrderCommandResponse> OpenLicensePlateNumberAsync(
+        Guid orderId,
+        string code)
+    {
+        if (_openLpnCode is not null && !string.Equals(_openLpnCode, code, StringComparison.Ordinal))
+            throw new InvalidOperationException("Повторите предыдущий штрихкод LPN.");
+
+        _openLpnCode ??= code;
+        _openLpnRequestId ??= Guid.NewGuid();
+        try
+        {
+            var response = await _orderClient.OpenLicensePlateNumberAsync(
+                orderId, _openLpnCode, _openLpnRequestId.Value);
+            _openLpnCode = null;
+            _openLpnRequestId = null;
+            return response;
+        }
+        catch (MobileApiException)
+        {
+            _openLpnCode = null;
+            _openLpnRequestId = null;
+            throw;
+        }
+    }
+
+    public async Task<MobileReceivingOrderCommandResponse> CancelLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId)
+    {
+        if (_cancelLpnId is Guid pendingId && pendingId != lpnId)
+            throw new InvalidOperationException("Сначала повторите отмену предыдущего LPN.");
+
+        _cancelLpnId ??= lpnId;
+        _cancelLpnRequestId ??= Guid.NewGuid();
+        try
+        {
+            var response = await _orderClient.CancelLicensePlateNumberAsync(
+                orderId, _cancelLpnId.Value, _cancelLpnRequestId.Value);
+            _cancelLpnId = null;
+            _cancelLpnRequestId = null;
+            return response;
+        }
+        catch (MobileApiException)
+        {
+            _cancelLpnId = null;
+            _cancelLpnRequestId = null;
             throw;
         }
     }

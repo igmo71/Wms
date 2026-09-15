@@ -55,6 +55,26 @@ public sealed class MobileReceivingOrderClient
             new MobileJoinReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
             ct);
 
+    public Task<MobileReceivingOrderCommandResponse> OpenLicensePlateNumberAsync(
+        Guid orderId,
+        string code,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/open",
+            new MobileOpenReceivingLicensePlateNumberRequest(clientRequestId, code),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> CancelLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/cancel",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
     public async Task<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>> ResolveSkuAsync(
         Guid orderId,
         string barcode,

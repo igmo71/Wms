@@ -29,9 +29,9 @@ be recreated; legacy data migration is outside its scope. The accepted target
 limits LPN to receiving and initial putaway, preserves location/SKU inventory,
 and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
-The specification defines eight increments. I01 label issuance and A4 printing
-and I02 receiving-order participation are implemented; LPN association and
-I03–I08 remain future work.
+The specification defines eight increments. I01 label issuance and A4 printing,
+I02 receiving-order participation, and I03 LPN association are implemented;
+quantity entry and I04–I08 remain future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
@@ -144,7 +144,24 @@ Authenticated print requests only read persisted codes. The standalone A4
 portrait layout contains two columns by five rows, with SVG Code 128 and the
 same human-readable code. Printing does not create new numbers. Physical
 printer output and target-scanner reading still require developer verification.
-I01 does not associate numbers with orders or change receiving, putaway or stock.
+I01 issuance does not itself change receiving, putaway or stock.
+
+### Receiving LPN association (I03)
+
+An issued `LicensePlateNumber` starts as `Available`. A participant scans its
+code inside an in-progress receiving order to bind it permanently to that order,
+the creating Identity user, the responsible user, and the creation time. The
+same code cannot move to another order. `Open`, `Closed`, and `Cancelled` are
+persisted LPN states; I03 creates and cancels empty LPNs but leaves contents and
+closing to I04.
+
+One employee may have only one open LPN in an order. The aggregate operational
+revision coordinates parallel creation, and SQL constraints independently guard
+both a label race and the open-owner rule. Scanning an existing LPN of the same
+order opens its server state, including another employee's read-only LPN.
+Only the responsible employee can cancel their empty open LPN. Cancellation
+allows another LPN to be opened but never makes the cancelled code available.
+Every mutation and its command receipt commit together.
 
 ### Receiving and putaway
 
@@ -169,8 +186,8 @@ winning location on explicit retry.
 
 Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
-be joined. The I02 order view shows the source plan read-only and an empty LPN
-screen. Direct facts, receiving completion, and order-based putaway are removed
+be joined. The order view shows the source plan read-only and its LPN list.
+Direct facts, receiving completion, and order-based putaway are removed
 from the Mobile API and disabled in Web until their LPN increments are available.
 
 Receiving imports never discard active local work. WMS owns the receiving

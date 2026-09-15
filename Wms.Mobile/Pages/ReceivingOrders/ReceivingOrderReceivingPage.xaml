@@ -274,7 +274,40 @@
             </VerticalStackLayout>
             <VerticalStackLayout x:Name="LpnPanel" IsVisible="False" Spacing="10">
                 <Label FontAttributes="Bold" FontSize="20" Text="LPN ордера" />
-                <Label Text="LPN пока не созданы. Этот шаг будет доступен в следующем инкременте." />
+                <Label x:Name="LpnScanInstructionLabel" />
+                <Border x:Name="SelectedLpnPanel" IsVisible="False" Padding="14" Stroke="Gray">
+                    <VerticalStackLayout Spacing="4" BindingContext="{Binding SelectedLicensePlateNumber, Source={x:Reference Page}}">
+                        <Label FontAttributes="Bold" FontSize="20" Text="{Binding Code}" />
+                        <Label Text="{Binding StatusName, StringFormat='Состояние: {0}'}" />
+                        <Label Text="{Binding ResponsibleUserName, StringFormat='Ответственный: {0}'}" />
+                        <Label Text="Состав LPN пока пуст. Количества будут доступны в следующем инкременте." />
+                    </VerticalStackLayout>
+                </Border>
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" Spacing="8">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="contracts:MobileReceivingOrderLicensePlateNumberResponse">
+                            <Border Padding="12" Stroke="Gray">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLicensePlateNumberTapped" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label FontAttributes="Bold" FontSize="18" Text="{Binding Code}" />
+                                        <Label Text="{Binding StatusName}" />
+                                        <Label Text="{Binding ResponsibleUserName, StringFormat='Ответственный: {0}'}" />
+                                    </VerticalStackLayout>
+                                    <Button
+                                        Grid.Column="1"
+                                        Clicked="OnCancelLicensePlateNumberClicked"
+                                        CommandParameter="{Binding .}"
+                                        IsVisible="{Binding CanCancel}"
+                                        Loaded="OnNonScanControlLoaded"
+                                        Text="Отменить" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </VerticalStackLayout>
     </ScrollView>

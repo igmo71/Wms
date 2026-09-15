@@ -12,4 +12,6 @@ internal static class DatabaseObjectNames
         "IX_InventoryTransfers_TransitStorageLocationId";
     public const string StorageLocationLocksPrimaryKey =
         "PK_StorageLocationLocks";
+    public const string LicensePlateNumbersOpenOwnerIndex =
+        "UX_LicensePlateNumbers_OpenOwner";
 }

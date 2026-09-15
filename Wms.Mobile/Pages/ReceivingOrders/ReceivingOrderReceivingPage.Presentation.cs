@@ -38,7 +38,22 @@ public partial class ReceivingOrderReceivingPage
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
             _synchronization);
         SynchronizeLineStates(details.Lines);
-        OnProductsTabClicked(null, EventArgs.Empty);
+        LicensePlateNumbers = details.LicensePlateNumbers;
+        OnPropertyChanged(nameof(LicensePlateNumbers));
+        if (SelectedLicensePlateNumber is not null)
+        {
+            SelectedLicensePlateNumber = LicensePlateNumbers
+                .SingleOrDefault(x => x.Id == SelectedLicensePlateNumber.Id);
+            OnPropertyChanged(nameof(SelectedLicensePlateNumber));
+        }
+        SelectedLpnPanel.IsVisible = SelectedLicensePlateNumber is not null;
+        LpnScanInstructionLabel.Text = CanUseLicensePlateNumbers
+            ? "Отсканируйте свободную этикетку или существующий LPN этого ордера."
+            : "Для создания LPN сначала присоединитесь к ордеру.";
+        if (_lpnTabActive)
+            OnLpnTabClicked(null, EventArgs.Empty);
+        else
+            OnProductsTabClicked(null, EventArgs.Empty);
         RefreshActionAvailability();
     }
 
@@ -148,7 +163,7 @@ public partial class ReceivingOrderReceivingPage
     {
         if (_isVisible
             && _scanner.ActiveSource == BarcodeScanSource.Camera
-            && IsScanExpected)
+            && (IsScanExpected || (_lpnTabActive && CanUseLicensePlateNumbers)))
         {
             await CameraScannerView.StartAsync();
         }

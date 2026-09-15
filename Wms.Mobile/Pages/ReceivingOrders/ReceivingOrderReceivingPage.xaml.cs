@@ -22,6 +22,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
+    private bool _lpnTabActive;
 
     public ReceivingOrderReceivingPage(
         ReceivingOrderReceivingProcess process,
@@ -40,6 +41,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     public ObservableCollection<ReceivingOrderLineViewState> LineStates { get; } = [];
     public IReadOnlyList<MobileReceivingOrderLineCandidateResponse> ScanCandidates { get; private set; } = [];
     public IReadOnlyList<MobileReceivingOrderLineCandidateResponse> SearchCandidates { get; private set; } = [];
+    public IReadOnlyList<MobileReceivingOrderLicensePlateNumberResponse> LicensePlateNumbers { get; private set; } = [];
+    public MobileReceivingOrderLicensePlateNumberResponse? SelectedLicensePlateNumber { get; private set; }
 
     private MobileReceivingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Приходный ордер не загружен.");
@@ -58,21 +61,27 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         && !HasPendingCommand;
 
     private bool IsScanExpected => !_busy && _mode == ReceivingPageMode.LocationScanning;
+    private bool CanUseLicensePlateNumbers =>
+        _details?.Order is { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true };
 
     private void OnProductsTabClicked(object? sender, EventArgs e)
     {
+        _lpnTabActive = false;
         ProductLinesPanel.IsVisible = true;
         LpnPanel.IsVisible = false;
         ProductsTabButton.Opacity = 1;
         LpnTabButton.Opacity = 0.65;
+        _ = UpdateCameraAsync();
     }
 
     private void OnLpnTabClicked(object? sender, EventArgs e)
     {
+        _lpnTabActive = true;
         ProductLinesPanel.IsVisible = false;
         LpnPanel.IsVisible = true;
         ProductsTabButton.Opacity = 0.65;
         LpnTabButton.Opacity = 1;
+        _ = UpdateCameraAsync();
     }
 
     public void Show(MobileReceivingOrderDetailsResponse details)

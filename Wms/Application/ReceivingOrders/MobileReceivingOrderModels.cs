@@ -69,10 +69,23 @@ public sealed record MobileReceivingOrderMovement(
     DateTimeOffset? UpdatedAtUtc,
     DateTimeOffset? PostedAtUtc);
 
+public sealed record MobileReceivingOrderLicensePlateNumber(
+    Guid Id,
+    string Code,
+    LicensePlateNumberStatus Status,
+    string ResponsibleUserId,
+    string ResponsibleUserName,
+    string CreatedByName,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? CancelledAtUtc,
+    bool IsOwnedByCurrentUser,
+    bool CanCancel);
+
 public sealed record MobileReceivingOrderDetails(
     MobileReceivingOrderSummary Order,
     IReadOnlyList<MobileReceivingOrderLine> Lines,
-    IReadOnlyList<MobileReceivingOrderMovement> Movements);
+    IReadOnlyList<MobileReceivingOrderMovement> Movements,
+    IReadOnlyList<MobileReceivingOrderLicensePlateNumber> LicensePlateNumbers);
 
 public sealed record MobileReceivingOrderWorkQueue(
     IReadOnlyList<MobileReceivingOrderSummary> Personal,

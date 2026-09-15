@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Wms.Application.Commands;
 using Wms.Application.ReceivingOrders;
+using Wms.Application.LicensePlateNumbers;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
 using Wms.Domain;
@@ -27,6 +28,10 @@ internal static class MobileReceivingOrderEndpoints
         group.MapGet("/{orderId:guid}", GetDetailsAsync)
             .WithMobileResponses<MobileReceivingOrderDetailsResponse>();
         group.MapPost("/{orderId:guid}/join-receiving", JoinReceivingAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lpns/open", OpenLicensePlateNumberAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/cancel", CancelLicensePlateNumberAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         return endpoints;
     }
@@ -177,6 +182,65 @@ internal static class MobileReceivingOrderEndpoints
             new CommandContext(request.ClientRequestId, userId),
             ct);
         return await CommandResultAsync(result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> OpenLicensePlateNumberAsync(
+        Guid orderId,
+        MobileOpenReceivingLicensePlateNumberRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
+        var result = await service.OpenForReceivingAsync(
+            new OpenReceivingLicensePlateNumberCommand(orderId, request.Code),
+            new CommandContext(request.ClientRequestId, userId),
+            ct);
+        return await LicensePlateNumberCommandResultAsync(
+            result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> CancelLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        MobileReceivingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
+        var result = await service.CancelEmptyReceivingAsync(
+            new CancelReceivingLicensePlateNumberCommand(orderId, lpnId),
+            new CommandContext(request.ClientRequestId, userId),
+            ct);
+        return await LicensePlateNumberCommandResultAsync(
+            result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> LicensePlateNumberCommandResultAsync(
+        OperationResult<Guid> result,
+        Guid orderId,
+        string userId,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+
+        var details = await queryService.GetCommandResultDetailsAsync(orderId, userId, ct);
+        return details.IsSuccess
+            ? TypedResults.Ok(new MobileReceivingOrderCommandResponse(
+                MapDetails(details.Value!),
+                SelectedLicensePlateNumberId: result.Value))
+            : MobileEndpointResults.CommandProblem(details.Error!);
     }
 
     private static async Task<IResult> ResolveSkuAsync(
@@ -439,7 +503,28 @@ internal static class MobileReceivingOrderEndpoints
         string? verificationError = null) => new(
         MapSummary(details.Order, assessment, verificationError),
         details.Lines.Select(MapLine).ToList(),
-        details.Movements.Select(MapMovement).ToList());
+        details.Movements.Select(MapMovement).ToList(),
+        details.LicensePlateNumbers.Select(MapLicensePlateNumber).ToList());
+
+    private static MobileReceivingOrderLicensePlateNumberResponse MapLicensePlateNumber(
+        MobileReceivingOrderLicensePlateNumber lpn) => new(
+        lpn.Id,
+        lpn.Code,
+        lpn.Status switch
+        {
+            LicensePlateNumberStatus.Available => MobileLicensePlateNumberStatus.Available,
+            LicensePlateNumberStatus.Open => MobileLicensePlateNumberStatus.Open,
+            LicensePlateNumberStatus.Closed => MobileLicensePlateNumberStatus.Closed,
+            LicensePlateNumberStatus.Cancelled => MobileLicensePlateNumberStatus.Cancelled,
+            _ => throw new InvalidOperationException($"Неизвестный статус LPN: {lpn.Status}.")
+        },
+        lpn.Status.GetDisplayName(),
+        lpn.ResponsibleUserName,
+        lpn.CreatedByName,
+        lpn.CreatedAtUtc,
+        lpn.CancelledAtUtc,
+        lpn.IsOwnedByCurrentUser,
+        lpn.CanCancel);
 
     private static MobileReceivingOrderSummaryResponse MapSummary(
         MobileReceivingOrderSummary order,

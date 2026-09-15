@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Data.Configurations;
 
@@ -12,7 +13,18 @@ public sealed class LicensePlateNumberConfiguration : IEntityTypeConfiguration<L
         builder.Property(x => x.Code).HasMaxLength(15).IsUnicode(false).IsRequired()
             .HasDefaultValueSql("'LPN' + RIGHT('000000000000' + CONVERT(varchar(12), NEXT VALUE FOR [LicensePlateNumberSequence]), 12)");
         builder.HasIndex(x => x.Code).IsUnique();
+        builder.Property(x => x.CreatedBy).HasMaxLength(450);
+        builder.Property(x => x.ResponsibleUserId).HasMaxLength(450);
+        builder.Property(x => x.CancelledBy).HasMaxLength(450);
+        builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
+        builder.HasIndex(x => x.ReceivingOrderId);
+        builder.HasIndex(x => new { x.ReceivingOrderId, x.ResponsibleUserId })
+            .HasDatabaseName(DatabaseObjectNames.LicensePlateNumbersOpenOwnerIndex)
+            .HasFilter($"[Status] = {(int)LicensePlateNumberStatus.Open}")
+            .IsUnique();
         builder.HasOne(x => x.Batch).WithMany(x => x.Labels).HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.LicensePlateNumbers)
+            .HasForeignKey(x => x.ReceivingOrderId).OnDelete(DeleteBehavior.Restrict);
     }
 
     public void Configure(EntityTypeBuilder<LicensePlateNumberBatch> builder)

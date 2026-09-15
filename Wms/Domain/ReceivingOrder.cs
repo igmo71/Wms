@@ -7,6 +7,7 @@ public class ReceivingOrder
 {
     private readonly List<ReceivingOrderItem> _items = [];
     private readonly List<ReceivingOrderParticipant> _participants = [];
+    private readonly List<LicensePlateNumber> _licensePlateNumbers = [];
 
     private ReceivingOrder()
     {
@@ -50,6 +51,7 @@ public class ReceivingOrder
     public string? BaseOrderType { get; private set; }
     public IReadOnlyCollection<ReceivingOrderItem> Items => _items;
     public IReadOnlyCollection<ReceivingOrderParticipant> Participants => _participants;
+    public IReadOnlyCollection<LicensePlateNumber> LicensePlateNumbers => _licensePlateNumbers;
 
     public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
     public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
@@ -343,6 +345,58 @@ public class ReceivingOrder
             ? OperationResult.Success()
             : OperationError.Conflict(
                 $"SKU указан в нескольких строках: {duplicateSku.Key}.");
+    }
+
+    public OperationResult<Guid> OpenOrCreateLicensePlateNumber(
+        LicensePlateNumber lpn,
+        DateTimeOffset createdAtUtc,
+        string userId)
+    {
+        if (Status != ReceivingOrderStatus.InReceiving)
+            return OperationError.Invalid("LPN можно создать только для ордера в работе.");
+        if (!_participants.Any(x => x.UserId == userId))
+            return OperationError.Conflict("Сначала присоединитесь к приходному ордеру.");
+
+        if (lpn.Status != LicensePlateNumberStatus.Available)
+        {
+            return lpn.ReceivingOrderId == Id
+                ? lpn.Id
+                : OperationError.Conflict(
+                    $"LPN {lpn.Code} относится к другому приходному ордеру.");
+        }
+
+        if (_licensePlateNumbers.Any(x =>
+                x.Status == LicensePlateNumberStatus.Open
+                && x.ResponsibleUserId == userId))
+        {
+            return OperationError.Conflict(
+                "У вас уже есть открытый LPN в этом ордере. Закройте или отмените его перед созданием следующего.");
+        }
+
+        var assignResult = lpn.Assign(Id, userId, createdAtUtc);
+        if (!assignResult.IsSuccess)
+            return assignResult.Error!;
+
+        if (!_licensePlateNumbers.Contains(lpn))
+            _licensePlateNumbers.Add(lpn);
+        AdvanceOperationalRevision();
+        return lpn.Id;
+    }
+
+    public OperationResult CancelEmptyLicensePlateNumber(
+        LicensePlateNumber lpn,
+        DateTimeOffset cancelledAtUtc,
+        string userId)
+    {
+        if (lpn.ReceivingOrderId != Id)
+            return OperationError.NotFound("LPN не найден в приходном ордере.");
+        if (Status != ReceivingOrderStatus.InReceiving)
+            return OperationError.Invalid("LPN нельзя отменить после завершения приёмки.");
+
+        var result = lpn.CancelEmpty(userId, cancelledAtUtc);
+        if (result.IsSuccess)
+            AdvanceOperationalRevision();
+        return result;
     }
 
     public OperationResult UpdateItemFact(

@@ -191,6 +191,29 @@ else
             }
         </MudPaper>
 
+        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-2">LPN ордера</MudText>
+            @if (_order.LicensePlateNumbers.Count == 0)
+            {
+                <MudText>LPN ещё не созданы.</MudText>
+            }
+            else
+            {
+                <MudDataGrid T="LicensePlateNumber"
+                             Items="_order.LicensePlateNumbers.OrderByDescending(x => x.CreatedAtUtc)"
+                             Dense="true">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Code" Title="LPN" />
+                        <TemplateColumn Title="Состояние"><CellTemplate>@context.Item.Status.GetDisplayName()</CellTemplate></TemplateColumn>
+                        <TemplateColumn Title="Ответственный"><CellTemplate>@GetUserName(context.Item.ResponsibleUserId)</CellTemplate></TemplateColumn>
+                        <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
+                        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создан" Format="dd.MM.yyyy HH:mm" />
+                        <PropertyColumn Property="x => x.CancelledAtUtc" Title="Отменён" Format="dd.MM.yyyy HH:mm" />
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudPaper>
+
         @if (_order.Status == ReceivingOrderStatus.Received
             && _order.PutawayStatus == PutawayStatus.Inactive
             && !_order.Items.Any(x => x.FactQuantity > 0))

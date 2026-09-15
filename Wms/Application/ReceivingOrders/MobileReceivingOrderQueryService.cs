@@ -85,7 +85,18 @@ public sealed class MobileReceivingOrderQueryService(
 
         var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
         var shippers = await LoadShippersAsync([order], ct);
-        return MapDetails(order, movements, shippers, userId);
+        var lpnUserIds = order.LicensePlateNumbers
+            .SelectMany(x => new[] { x.ResponsibleUserId, x.CreatedBy })
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToArray();
+        var lpnUserNames = await dbContext.Users
+            .Where(x => lpnUserIds.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => string.IsNullOrWhiteSpace(x.DisplayName) ? x.UserName ?? x.Id : x.DisplayName,
+                ct);
+        return MapDetails(order, movements, shippers, userId, lpnUserNames);
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> ResolveDocumentAsync(
@@ -237,7 +248,9 @@ public sealed class MobileReceivingOrderQueryService(
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
                     .ThenInclude(x => x!.Barcodes)
-            .Include(x => x.Participants);
+            .Include(x => x.Participants)
+            .Include(x => x.LicensePlateNumbers);
+
 
     private static IQueryable<ReceivingOrder> QueueOrderQuery(
         ApplicationDbContext dbContext) =>
@@ -284,7 +297,8 @@ public sealed class MobileReceivingOrderQueryService(
         ReceivingOrder order,
         IReadOnlyCollection<InventoryMovement> movements,
         IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
-        string userId)
+        string userId,
+        IReadOnlyDictionary<string, string> userNames)
     {
         var orderMovements = movements
             .Where(x => x.RecorderId == order.Id)
@@ -297,12 +311,37 @@ public sealed class MobileReceivingOrderQueryService(
         var mappedMovements = orderMovements
             .Select(MapMovement)
             .ToList();
+        var lpns = order.LicensePlateNumbers
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.Code)
+            .Select(x => new MobileReceivingOrderLicensePlateNumber(
+                x.Id,
+                x.Code,
+                x.Status,
+                x.ResponsibleUserId ?? string.Empty,
+                UserName(x.ResponsibleUserId, userNames),
+                UserName(x.CreatedBy, userNames),
+                x.CreatedAtUtc ?? DateTimeOffset.MinValue,
+                x.CancelledAtUtc,
+                x.ResponsibleUserId == userId,
+                x.Status == LicensePlateNumberStatus.Open
+                    && x.ResponsibleUserId == userId
+                    && order.Status == ReceivingOrderStatus.InReceiving))
+            .ToList();
 
         return new MobileReceivingOrderDetails(
             MapSummary(order, orderMovements, shippers, userId),
             lines,
-            mappedMovements);
+            mappedMovements,
+            lpns);
     }
+
+    private static string UserName(
+        string? userId,
+        IReadOnlyDictionary<string, string> userNames) =>
+        !string.IsNullOrWhiteSpace(userId) && userNames.TryGetValue(userId, out var name)
+            ? name
+            : "Пользователь не найден";
 
     private static MobileReceivingOrderSummary MapSummary(
         ReceivingOrder order,
