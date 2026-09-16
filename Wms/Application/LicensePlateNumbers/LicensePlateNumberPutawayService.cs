@@ -43,7 +43,7 @@ public sealed class LicensePlateNumberPutawayService(
             : Map(lpn);
     }
 
-    public async Task<OperationResult<LicensePlateNumberPutawayItem>> ResolveSkuAsync(
+    public async Task<OperationResult<LicensePlateNumberPutawaySelection>> ResolveSkuAsync(
         Guid lpnId,
         string barcode,
         CancellationToken ct = default)
@@ -65,12 +65,30 @@ public sealed class LicensePlateNumberPutawayService(
         var matches = details.Items
             .Where(x => x.RemainingQuantity > 0 && matchedSkuIds.Contains(x.StockKeepingUnitId))
             .ToList();
-        return matches.Count switch
+        if (matches.Count != 1)
         {
-            0 => OperationError.NotFound("В выбранном LPN нет этого товара с остатком к размещению."),
-            1 => matches[0],
-            _ => OperationError.Conflict("Штрихкод соответствует нескольким товарам LPN.")
-        };
+            return matches.Count == 0
+                ? OperationError.NotFound("В выбранном LPN нет этого товара с остатком к размещению.")
+                : OperationError.Conflict("Штрихкод соответствует нескольким товарам LPN.");
+        }
+
+        return await BuildSelectionAsync(dbContext, lpn, matches[0], ct);
+    }
+
+    public async Task<OperationResult<LicensePlateNumberPutawaySelection>> GetSelectionAsync(
+        Guid lpnId,
+        Guid lpnItemId,
+        CancellationToken ct = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var lpn = await LoadAsync(dbContext, x => x.Id == lpnId, true, ct);
+        if (lpn is null)
+            return OperationError.NotFound("LPN не найден.");
+
+        var item = Map(lpn).Items.SingleOrDefault(x => x.Id == lpnItemId && x.RemainingQuantity > 0);
+        return item is null
+            ? OperationError.NotFound("В выбранном LPN нет этой строки с остатком к размещению.")
+            : await BuildSelectionAsync(dbContext, lpn, item, ct);
     }
 
     public Task<OperationResult<Guid>> PutawayAsync(
@@ -164,6 +182,72 @@ public sealed class LicensePlateNumberPutawayService(
         if (noTracking)
             query = query.AsNoTracking();
         return query.SingleOrDefaultAsync(predicate, ct);
+    }
+
+    private static async Task<OperationResult<LicensePlateNumberPutawaySelection>> BuildSelectionAsync(
+        ApplicationDbContext dbContext,
+        LicensePlateNumber lpn,
+        LicensePlateNumberPutawayItem item,
+        CancellationToken ct)
+    {
+        if (lpn.Status != LicensePlateNumberStatus.Closed)
+            return OperationError.Invalid("Размещать можно только закрытый LPN.");
+        if (lpn.ReceivingOrder is not { Status: ReceivingOrderStatus.Received } order)
+            return OperationError.Invalid("Размещение запрещено до завершения приходного ордера.");
+
+        var recommendations = await dbContext.StorageLocations
+            .AsNoTracking()
+            .Where(location =>
+                location.WarehouseId == order.WarehouseId
+                && location.Warehouse != null && !location.Warehouse.DeletionMark
+                && location.Zone != null && !location.Zone.DeletionMark
+                && location.Zone.Type == ZoneType.Storage
+                && !location.IsFolder
+                && !location.DeletionMark
+                && location.ActiveLock == null)
+            .Select(location => new
+            {
+                location.Id,
+                Address = location.Zone!.Code + "-" + location.Code,
+                location.Name,
+                location.PickSequence,
+                HasSelectedSkuStock = dbContext.InventoryBalances.Any(balance =>
+                    balance.StorageLocationId == location.Id
+                    && balance.StockKeepingUnitId == item.StockKeepingUnitId
+                    && balance.Quantity > 0),
+                HasSelectedSkuBalance = dbContext.InventoryBalances.Any(balance =>
+                    balance.StorageLocationId == location.Id
+                    && balance.StockKeepingUnitId == item.StockKeepingUnitId),
+                HasAnyStock = dbContext.InventoryBalances.Any(balance =>
+                    balance.StorageLocationId == location.Id
+                    && balance.Quantity > 0)
+            })
+            .Where(location => location.HasSelectedSkuStock || !location.HasAnyStock)
+            .Select(location => new
+            {
+                location.Id,
+                location.Address,
+                location.Name,
+                location.PickSequence,
+                Category = location.HasSelectedSkuStock
+                    ? LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock
+                    : location.HasSelectedSkuBalance
+                        ? LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory
+                        : LicensePlateNumberPutawayRecommendationCategory.Empty
+            })
+            .OrderBy(location => location.Category)
+            .ThenBy(location => location.PickSequence.HasValue ? 0 : 1)
+            .ThenBy(location => location.PickSequence)
+            .ThenBy(location => location.Address)
+            .ThenBy(location => location.Id)
+            .Select(location => new LicensePlateNumberPutawayRecommendation(
+                location.Id,
+                location.Address,
+                location.Name,
+                location.Category))
+            .ToListAsync(ct);
+
+        return new LicensePlateNumberPutawaySelection(item, recommendations);
     }
 
     private static LicensePlateNumberPutawayDetails Map(LicensePlateNumber lpn)

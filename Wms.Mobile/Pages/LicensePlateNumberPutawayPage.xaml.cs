@@ -11,6 +11,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     private readonly IOperationalBarcodeScanner _scanner;
     private MobileLicensePlateNumberPutawayDetailsResponse? _details;
     private MobileLicensePlateNumberPutawayItemResponse? _selectedItem;
+    private IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> _recommendations = [];
     private PutawayStep _step = PutawayStep.Lpn;
     private bool _busy;
     private bool _isVisible;
@@ -32,6 +33,12 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     public IReadOnlyList<MobileLicensePlateNumberPutawayItemResponse> Items => _details?.Items ?? [];
     public IReadOnlyList<MobileLicensePlateNumberPutawayHistoryResponse> History => _details?.History ?? [];
+    public IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> CurrentSkuStockRecommendations =>
+        Recommendations(MobileLicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock);
+    public IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> EmptyWithSkuHistoryRecommendations =>
+        Recommendations(MobileLicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory);
+    public IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> EmptyRecommendations =>
+        Recommendations(MobileLicensePlateNumberPutawayRecommendationCategory.Empty);
 
     protected override async void OnAppearing()
     {
@@ -115,13 +122,25 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         if (_busy || _step != PutawayStep.Sku
             || e.Parameter is not MobileLicensePlateNumberPutawayItemResponse { RemainingQuantity: > 0 } item)
             return;
-        SelectItem(item);
-        await UpdateCameraAsync();
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            SelectItem(await _client.GetSelectionAsync(_details!.Id, item.Id));
+        }
+        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите выбор товара."; }
+        finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private void SelectItem(MobileLicensePlateNumberPutawayItemResponse item)
+    private void SelectItem(MobileLicensePlateNumberPutawaySelectionResponse selection)
     {
+        var item = selection.Item;
         _selectedItem = item;
+        _recommendations = selection.Recommendations;
+        OnPropertyChanged(nameof(CurrentSkuStockRecommendations));
+        OnPropertyChanged(nameof(EmptyWithSkuHistoryRecommendations));
+        OnPropertyChanged(nameof(EmptyRecommendations));
         SelectedSkuLabel.Text = item.SkuName;
         RemainingLabel.Text = $"Осталось {item.RemainingQuantity:0.###} {item.UnitOfMeasure}";
         QuantityEntry.Text = item.RemainingQuantity.ToString("0.###", CultureInfo.InvariantCulture);
@@ -177,6 +196,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             _pendingDestinationBarcode = null;
             RetryButton.IsVisible = false;
             _selectedItem = null;
+            ClearRecommendations();
             ApplyDetails(response.Details);
         }
         catch (MobileApiException exception)
@@ -231,6 +251,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         if (_busy || _pendingRequestId is not null) return;
         _details = null;
         _selectedItem = null;
+        ClearRecommendations();
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(History));
         ErrorLabel.Text = string.Empty;
@@ -283,6 +304,18 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     {
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
+    }
+
+    private IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> Recommendations(
+        MobileLicensePlateNumberPutawayRecommendationCategory category) =>
+        _recommendations.Where(x => x.Category == category).ToList();
+
+    private void ClearRecommendations()
+    {
+        _recommendations = [];
+        OnPropertyChanged(nameof(CurrentSkuStockRecommendations));
+        OnPropertyChanged(nameof(EmptyWithSkuHistoryRecommendations));
+        OnPropertyChanged(nameof(EmptyRecommendations));
     }
 
     private enum PutawayStep { Lpn, Sku, Quantity, Destination, Status }

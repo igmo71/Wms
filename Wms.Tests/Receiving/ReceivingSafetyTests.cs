@@ -468,6 +468,119 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
                 && x.StockKeepingUnitId == sku.Id)).Quantity);
     }
 
+    [Fact]
+    public async Task Lpn_putaway_recommendations_classify_order_and_revalidate_a_changed_location()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN recommendations" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Recommended SKU", Code = "REC-1" };
+        var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Other SKU", Code = "REC-2" };
+        var receivingZone = Zone(warehouse.Id, "RR", ZoneType.Receiving);
+        var storageZone = Zone(warehouse.Id, "RS", ZoneType.Storage);
+        var sourceLocation = Location(warehouse.Id, receivingZone, 1);
+        var currentAddressFirst = RecommendationLocation(warehouse.Id, storageZone, 10, "10", 10);
+        var currentAddressSecond = RecommendationLocation(warehouse.Id, storageZone, 11, "11", 10);
+        var currentWithoutSequence = RecommendationLocation(warehouse.Id, storageZone, 12, "12", null);
+        var historical = RecommendationLocation(warehouse.Id, storageZone, 21, "21", 5);
+        var emptyWithOtherHistory = RecommendationLocation(warehouse.Id, storageZone, 31, "31", null);
+        var pristine = RecommendationLocation(warehouse.Id, storageZone, 32, "32", null);
+        var occupiedByOtherSku = RecommendationLocation(warehouse.Id, storageZone, 40, "40", 1);
+        var snapshot = new ReceivingOrderImportSnapshot(
+            Guid.NewGuid(), false, true, "LPN recommendations", DateTime.UtcNow, warehouse.Id, null,
+            ReceivingOrderStatus.ReadyForReceiving, default, WarehouseOperation.VendorReceipt,
+            BusinessOperation.VendorPurchase, Guid.NewGuid(), default, Guid.NewGuid(), null,
+            [new(1, sku.Id, 2m, 2m, null)]);
+        var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
+        Success(order.SetReceivingLocation(sourceLocation.Id));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "worker"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "worker"));
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(
+                warehouse, sku, otherSku, receivingZone, storageZone, sourceLocation,
+                currentAddressFirst, currentAddressSecond, currentWithoutSequence,
+                historical, emptyWithOtherHistory, pristine,
+                occupiedByOtherSku, order,
+                Balance(warehouse.Id, currentAddressFirst.Id, sku.Id, 3m),
+                Balance(warehouse.Id, currentAddressSecond.Id, sku.Id, 2m),
+                Balance(warehouse.Id, currentWithoutSequence.Id, sku.Id, 1m),
+                Balance(warehouse.Id, historical.Id, sku.Id, 0m),
+                Balance(warehouse.Id, emptyWithOtherHistory.Id, otherSku.Id, 0m),
+                Balance(warehouse.Id, occupiedByOtherSku.Id, sku.Id, 0m),
+                Balance(warehouse.Id, occupiedByOtherSku.Id, otherSku.Id, 1m));
+            await seed.SaveChangesAsync();
+        }
+
+        var lpnService = LpnService(database);
+        var batchId = Value(await lpnService.IssueAsync(1, Command("issuer")));
+        string code;
+        await using (var read = database.CreateDbContext())
+            code = await read.LicensePlateNumbers
+                .Where(x => x.BatchId == batchId)
+                .Select(x => x.Code)
+                .SingleAsync();
+        var lpnId = Value(await lpnService.OpenForReceivingAsync(
+            new(order.Id, code), Command("worker")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, lpnId, sku.Id, 2m), Command("worker"), false));
+        Success(await lpnService.CloseReceivingAsync(
+            new(order.Id, lpnId), Command("worker"), false));
+
+        var source = new FixedSource(snapshot);
+        var synchronization = new ReceivingOrderSynchronizationService(
+            database, source, NullLogger<ReceivingOrderSynchronizationService>.Instance);
+        var preview = Value(await synchronization.CheckCompletionAsync(order.Id));
+        Value(await ReceivingService(database, source).CompleteReceivingAsync(
+            new(order.Id, null, preview.Assessment.Fingerprint, null),
+            Command("worker"),
+            false));
+
+        Guid itemId;
+        await using (var read = database.CreateDbContext())
+            itemId = await read.LicensePlateNumberItems
+                .Where(x => x.LicensePlateNumberId == lpnId && x.StockKeepingUnitId == sku.Id)
+                .Select(x => x.Id)
+                .SingleAsync();
+
+        var recommendations = Value(await PutawayService(database).GetSelectionAsync(lpnId, itemId))
+            .Recommendations;
+        Assert.Equal(
+            new[]
+            {
+                currentAddressFirst.Id,
+                currentAddressSecond.Id,
+                currentWithoutSequence.Id,
+                historical.Id,
+                emptyWithOtherHistory.Id,
+                pristine.Id
+            },
+            recommendations.Select(x => x.StorageLocationId));
+        Assert.Equal(
+            new[]
+            {
+                LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
+                LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
+                LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
+                LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory,
+                LicensePlateNumberPutawayRecommendationCategory.Empty,
+                LicensePlateNumberPutawayRecommendationCategory.Empty
+            },
+            recommendations.Select(x => x.Category));
+        Assert.Equal(recommendations.Count, recommendations.Select(x => x.StorageLocationId).Distinct().Count());
+        Assert.DoesNotContain(recommendations, x => x.StorageLocationId == occupiedByOtherSku.Id);
+
+        await using (var lockContext = database.CreateDbContext())
+        {
+            lockContext.StorageLocationLocks.Add(Value(StorageLocationLock.CreateManual(
+                currentAddressFirst.Id, "Changed after recommendations", DateTimeOffset.UtcNow, "manager")));
+            await lockContext.SaveChangesAsync();
+        }
+
+        Error(await PutawayService(database).PutawayAsync(
+            new(lpnId, itemId, currentAddressFirst.Id, 1m), Command("worker")),
+            OperationErrorType.Conflict);
+    }
+
     private static ReceivingOrder StartedOrder(
         Guid warehouseId,
         Guid skuId,
@@ -486,6 +599,17 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Success(order.JoinReceiving(DateTimeOffset.UtcNow, userId));
         return order;
     }
+
+    private static StorageLocation RecommendationLocation(
+        Guid warehouseId,
+        Zone zone,
+        int number,
+        string code,
+        long? pickSequence) =>
+        Value(StorageLocation.Create(
+            Guid.NewGuid(), warehouseId, zone.Id, null, number, code,
+            Value(StorageLocationDetails.Create(
+                $"Location {code}", false, LocationDimensions.Empty, LocationCoordinates.Empty, pickSequence))));
 
     private static LicensePlateNumberService LpnService(IDbContextFactory<ApplicationDbContext> factory) =>
         new(new CommandExecutor(factory), factory);

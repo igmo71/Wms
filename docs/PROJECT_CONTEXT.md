@@ -31,8 +31,8 @@ and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
 The specification defines eight increments. I01 label issuance and A4 printing,
 I02 receiving-order participation, I03 LPN association, I04 LPN counting, and
-I05 receiving completion and I06 independent LPN putaway are implemented;
-I07–I08 remain future work.
+I05 receiving completion, I06 independent LPN putaway, and I07 destination
+recommendations are implemented; I08 remains future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
@@ -248,8 +248,20 @@ item. The LPN operational revision coordinates concurrent employees, while
 balance row versions independently protect shared physical stock. Movement,
 balances, turnover, LPN history and command receipt commit atomically. The old
 order-level draft/start/complete putaway UI and API are unavailable. I06 does
-not provide destination recommendations; any scanned destination is validated
-at posting time.
+not restrict the destination to a recommendation; any scanned destination is
+validated at posting time.
+
+The LPN quantity screen recommends active unlocked Storage locations in the
+order warehouse. Locations with positive current stock of the selected SKU come
+first, followed by empty locations retaining a zero balance row for that SKU,
+then other empty locations. Empty means no positive balance of any SKU, and a
+zero row for another SKU does not make the location historical for the selected
+SKU. Each location appears in only its first matching category. Within each
+category, locations with `PickSequence` sort first by that value, followed by
+locations without it, then by full address and location id. Recommendations are
+only a snapshot hint; posting revalidates the warehouse, active Storage topology,
+folder status and lock. Capacity and storage groups are not considered, no zero
+balances are pre-created, and movement history is not queried for recommendations.
 
 Starting and completing receiving use shared application commands. Command
 receipt lookup precedes mutable validation and 1C access;

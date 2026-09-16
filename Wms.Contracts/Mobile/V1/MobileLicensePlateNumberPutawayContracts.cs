@@ -20,6 +20,23 @@ public sealed record MobileLicensePlateNumberPutawayItemResponse(
     decimal PlacedQuantity,
     decimal RemainingQuantity);
 
+public enum MobileLicensePlateNumberPutawayRecommendationCategory
+{
+    CurrentSkuStock = 1,
+    EmptyWithSkuBalanceHistory = 2,
+    Empty = 3
+}
+
+public sealed record MobileLicensePlateNumberPutawayRecommendationResponse(
+    Guid StorageLocationId,
+    string Address,
+    string Name,
+    MobileLicensePlateNumberPutawayRecommendationCategory Category);
+
+public sealed record MobileLicensePlateNumberPutawaySelectionResponse(
+    MobileLicensePlateNumberPutawayItemResponse Item,
+    IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> Recommendations);
+
 public sealed record MobileLicensePlateNumberPutawayHistoryResponse(
     Guid Id,
     Guid LicensePlateNumberItemId,

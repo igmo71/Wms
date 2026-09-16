@@ -21,6 +21,23 @@ public sealed record LicensePlateNumberPutawayItem(
     decimal PlacedQuantity,
     decimal RemainingQuantity);
 
+public enum LicensePlateNumberPutawayRecommendationCategory
+{
+    CurrentSkuStock = 1,
+    EmptyWithSkuBalanceHistory = 2,
+    Empty = 3
+}
+
+public sealed record LicensePlateNumberPutawayRecommendation(
+    Guid StorageLocationId,
+    string Address,
+    string Name,
+    LicensePlateNumberPutawayRecommendationCategory Category);
+
+public sealed record LicensePlateNumberPutawaySelection(
+    LicensePlateNumberPutawayItem Item,
+    IReadOnlyList<LicensePlateNumberPutawayRecommendation> Recommendations);
+
 public sealed record LicensePlateNumberPutawayHistoryItem(
     Guid Id,
     Guid LicensePlateNumberItemId,

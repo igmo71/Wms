@@ -20,7 +20,9 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
         group.MapGet("/{lpnId:guid}", GetAsync)
             .WithMobileResponses<MobileLicensePlateNumberPutawayDetailsResponse>();
         group.MapPost("/{lpnId:guid}/resolve-sku", ResolveSkuAsync)
-            .WithMobileResponses<MobileLicensePlateNumberPutawayItemResponse>();
+            .WithMobileResponses<MobileLicensePlateNumberPutawaySelectionResponse>();
+        group.MapGet("/{lpnId:guid}/items/{lpnItemId:guid}/selection", GetSelectionAsync)
+            .WithMobileResponses<MobileLicensePlateNumberPutawaySelectionResponse>();
         group.MapPost("/{lpnId:guid}/putaway", PutawayAsync)
             .WithMobileResponses<MobileLicensePlateNumberPutawayCommandResponse>();
         return endpoints;
@@ -46,7 +48,19 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
     {
         var result = await service.ResolveSkuAsync(lpnId, request.Barcode, ct);
         return result.IsSuccess
-            ? TypedResults.Ok(MapItem(result.Value!))
+            ? TypedResults.Ok(MapSelection(result.Value!))
+            : MobileEndpointResults.CommandProblem(result.Error!);
+    }
+
+    private static async Task<IResult> GetSelectionAsync(
+        Guid lpnId,
+        Guid lpnItemId,
+        LicensePlateNumberPutawayService service,
+        CancellationToken ct)
+    {
+        var result = await service.GetSelectionAsync(lpnId, lpnItemId, ct);
+        return result.IsSuccess
+            ? TypedResults.Ok(MapSelection(result.Value!))
             : MobileEndpointResults.CommandProblem(result.Error!);
     }
 
@@ -115,4 +129,13 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
             item.AcceptedQuantity,
             item.PlacedQuantity,
             item.RemainingQuantity);
+
+    private static MobileLicensePlateNumberPutawaySelectionResponse MapSelection(
+        LicensePlateNumberPutawaySelection selection) => new(
+            MapItem(selection.Item),
+            selection.Recommendations.Select(x => new MobileLicensePlateNumberPutawayRecommendationResponse(
+                x.StorageLocationId,
+                x.Address,
+                x.Name,
+                (MobileLicensePlateNumberPutawayRecommendationCategory)x.Category)).ToList());
 }
