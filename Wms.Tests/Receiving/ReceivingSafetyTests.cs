@@ -189,6 +189,81 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Assert.Equal(targetOrder.Id, assigned.ReceivingOrderId);
     }
 
+    [Fact]
+    public async Task Concurrent_lpn_counts_preserve_explicit_zero_aggregate_and_manager_reopen()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN count" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Counted SKU" };
+        var zone = Zone(warehouse.Id, "LC", ZoneType.Receiving);
+        var location = Location(warehouse.Id, zone, 1);
+        var order = StartedOrder(warehouse.Id, sku.Id, location.Id, "counter-a");
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "counter-b"));
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, order);
+            await seed.SaveChangesAsync();
+        }
+
+        var service = LpnService(database);
+        var batchId = Value(await service.IssueAsync(2, Command("issuer")));
+        string[] codes;
+        await using (var read = database.CreateDbContext())
+        {
+            codes = await read.LicensePlateNumbers
+                .Where(x => x.BatchId == batchId)
+                .OrderBy(x => x.Code)
+                .Select(x => x.Code)
+                .ToArrayAsync();
+        }
+        var firstLpn = Value(await service.OpenForReceivingAsync(
+            new(order.Id, codes[0]), Command("counter-a")));
+        var secondLpn = Value(await service.OpenForReceivingAsync(
+            new(order.Id, codes[1]), Command("counter-b")));
+
+        var racingService = LpnService(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var commands = new[]
+        {
+            new SetReceivingLicensePlateNumberItemQuantityCommand(order.Id, firstLpn, sku.Id, 2m),
+            new SetReceivingLicensePlateNumberItemQuantityCommand(order.Id, secondLpn, sku.Id, 0m)
+        };
+        var contexts = new[] { Command("counter-a"), Command("counter-b") };
+        var race = await Task.WhenAll(
+            racingService.SetReceivingItemQuantityAsync(commands[0], contexts[0], false),
+            racingService.SetReceivingItemQuantityAsync(commands[1], contexts[1], false));
+        Assert.Contains(race, x => !x.IsSuccess);
+        for (var index = 0; index < race.Length; index++)
+        {
+            if (race[index].IsSuccess)
+                continue;
+            Error(race[index], OperationErrorType.Conflict);
+            Success(await service.SetReceivingItemQuantityAsync(
+                commands[index], Command(contexts[index].UserId), false));
+        }
+        Success(await service.CloseReceivingAsync(
+            new(order.Id, firstLpn), Command("counter-a"), false));
+        Success(await service.CloseReceivingAsync(
+            new(order.Id, secondLpn), Command("counter-b"), false));
+        Success(await service.ReopenReceivingAsync(
+            new(order.Id, firstLpn), Command("manager"), true));
+        Success(await service.SetReceivingItemQuantityAsync(
+            new(order.Id, firstLpn, sku.Id, 3m), Command("manager"), true));
+
+        await using var verify = database.CreateDbContext();
+        var savedOrder = await verify.ReceivingOrders
+            .Include(x => x.Items)
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items)
+            .SingleAsync(x => x.Id == order.Id);
+        Assert.Equal(3m, savedOrder.Items.Single().FactQuantity);
+        Assert.Equal(2, savedOrder.LicensePlateNumbers.SelectMany(x => x.Items).Count());
+        Assert.Contains(savedOrder.LicensePlateNumbers.SelectMany(x => x.Items), x => x.Quantity == 0m);
+        Assert.Equal(LicensePlateNumberStatus.Open,
+            savedOrder.LicensePlateNumbers.Single(x => x.Id == firstLpn).Status);
+        Assert.Equal("manager",
+            savedOrder.LicensePlateNumbers.Single(x => x.Id == firstLpn).ReopenedBy);
+    }
+
     private static ReceivingOrder StartedOrder(
         Guid warehouseId,
         Guid skuId,

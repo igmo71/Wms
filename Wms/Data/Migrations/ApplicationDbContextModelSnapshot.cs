@@ -684,6 +684,13 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateTimeOffset?>("ClosedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ClosedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -705,6 +712,13 @@ namespace Wms.Data.Migrations
 
                     b.Property<Guid?>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ReopenedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReopenedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ResponsibleUserId")
                         .HasMaxLength(450)
@@ -728,6 +742,56 @@ namespace Wms.Data.Migrations
                         .HasFilter("[Status] = 1");
 
                     b.ToTable("LicensePlateNumbers");
+                });
+
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("LicensePlateNumberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.HasIndex("LicensePlateNumberId", "StockKeepingUnitId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_LicensePlateNumberItems_ActiveSku")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.ToTable("LicensePlateNumberItems");
                 });
 
             modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
@@ -1648,6 +1712,25 @@ namespace Wms.Data.Migrations
                     b.Navigation("ReceivingOrder");
                 });
 
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberItem", b =>
+                {
+                    b.HasOne("Wms.Domain.LicensePlateNumber", "LicensePlateNumber")
+                        .WithMany("Items")
+                        .HasForeignKey("LicensePlateNumberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("LicensePlateNumber");
+
+                    b.Navigation("StockKeepingUnit");
+                });
+
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
                 {
                     b.HasOne("Wms.Domain.StorageLocation", "ReceivingLocation")
@@ -1895,6 +1978,11 @@ namespace Wms.Data.Migrations
             modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
                 {
                     b.Navigation("Labels");
+                });
+
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumber", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>

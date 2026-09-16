@@ -30,16 +30,17 @@ limits LPN to receiving and initial putaway, preserves location/SKU inventory,
 and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
 The specification defines eight increments. I01 label issuance and A4 printing,
-I02 receiving-order participation, and I03 LPN association are implemented;
-quantity entry and I04–I08 remain future work.
+I02 receiving-order participation, I03 LPN association, and I04 LPN counting
+are implemented; I05–I08 remain future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
 ## Identity and access
 
-WebApp uses ASP.NET Core Identity with two roles: `Operator` may run warehouse
-operations and reports; `Administrator` additionally manages configuration and
-users. Public self-registration is not offered. Administrator-created accounts
+WebApp uses ASP.NET Core Identity with three roles: `Operator` may run warehouse
+operations and reports; `Manager` additionally corrects and reopens receiving
+LPNs; `Administrator` also has Manager operational rights and manages configuration
+and users. Public self-registration is not offered. Administrator-created accounts
 are confirmed local accounts with one WMS role. An administrator cannot block
 or demote themselves, and the last active administrator cannot be blocked or
 demoted.
@@ -162,6 +163,23 @@ order opens its server state, including another employee's read-only LPN.
 Only the responsible employee can cancel their empty open LPN. Cancellation
 allows another LPN to be opened but never makes the cancelled code available.
 Every mutation and its command receipt commit together.
+
+### Receiving LPN counting (I04)
+
+An open LPN contains at most one retained row per order SKU. Quantity entry sets
+an absolute nonnegative canonical-unit quantity; zero is an explicit counted
+value, while removal marks the row deleted for audit and excludes it from the
+composition. Receiving-order fact is the aggregate of non-deleted rows across
+its non-cancelled LPNs. If a SKU has no such row its fact remains unchecked;
+concurrent LPN changes are coordinated by the receiving-order revision.
+
+The responsible employee may edit and close their open LPN, including an empty
+one. A Manager or Administrator may correct any open LPN and may reopen a closed
+LPN when its responsible employee has no other open LPN in the order. Creation,
+last update/removal, closing and reopening retain user and UTC time audit.
+Closing and reopening do not post inventory or complete the receiving order.
+Mobile uses one SKU → absolute quantity confirmation cycle and repeat-safe
+commands; Web displays per-LPN composition and employee contribution.
 
 ### Receiving and putaway
 
@@ -321,9 +339,11 @@ return to scanning or search without losing the source location or transit
 cart. Selection cannot be changed while posting or awaiting a repeat-safe
 retry. A SKU with no available source stock does not advance to quantity entry.
 
-Employee-performance reporting attributes receiving to `CompletedBy` and
-picking to `ReadyForShipmentBy`; picking duration ends at ready-for-shipment.
-Weight totals use current SKU data and identify incomplete results.
+Employee-performance reporting temporarily excludes receiving while LPN
+completion is unfinished; per-employee receiving contribution is available in
+the receiving-order LPN audit. Picking remains attributed to
+`ReadyForShipmentBy`, and its duration ends at ready-for-shipment. Weight totals
+use current SKU data and identify incomplete results.
 
 ## 1C synchronization
 

@@ -23,6 +23,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private bool _scannerSubscribed;
     private bool _busy;
     private bool _lpnTabActive;
+    private Guid? _selectedLpnSkuId;
+    private bool _lpnQuantityEditing;
 
     public ReceivingOrderReceivingPage(
         ReceivingOrderReceivingProcess process,

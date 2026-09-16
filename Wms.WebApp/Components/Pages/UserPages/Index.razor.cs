@@ -69,6 +69,7 @@ public partial class Index
     private static string GetRoleName(string role) => role switch
     {
         ApplicationRoles.Administrator => "Администратор",
+        ApplicationRoles.Manager => "Менеджер",
         ApplicationRoles.Operator => "Оператор",
         _ => role
     };

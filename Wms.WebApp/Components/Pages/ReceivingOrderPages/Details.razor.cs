@@ -88,7 +88,10 @@ public partial class Details
                 _order.PutawayCompletedBy,
                 _order.SynchronizationAcknowledgedBy,
                 .. _order.Participants.Select(x => x.UserId),
-                .. _order.LicensePlateNumbers.SelectMany(x => new[] { x.ResponsibleUserId, x.CreatedBy })]);
+                .. _order.LicensePlateNumbers.SelectMany(x =>
+                    new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy, x.CancelledBy }
+                        .Concat(x.Items.SelectMany(item =>
+                            new[] { item.CreatedBy, item.UpdatedBy, item.DeletedBy }))) ]);
     }
 
     private async Task AcknowledgeSynchronizationAsync()

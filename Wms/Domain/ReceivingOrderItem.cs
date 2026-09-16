@@ -97,6 +97,8 @@ public class ReceivingOrderItem
         Comment = comment;
     }
 
+    internal void SetAggregatedLpnFact(decimal? factQuantity) => FactQuantity = factQuantity;
+
     internal static OperationResult ValidateImport(
         Guid receivingOrderId,
         ReceivingOrderItemImportSnapshot snapshot)

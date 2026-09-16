@@ -86,7 +86,8 @@ public sealed class MobileReceivingOrderQueryService(
         var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
         var shippers = await LoadShippersAsync([order], ct);
         var lpnUserIds = order.LicensePlateNumbers
-            .SelectMany(x => new[] { x.ResponsibleUserId, x.CreatedBy })
+            .SelectMany(x => new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy }
+                .Concat(x.Items.SelectMany(item => new[] { item.CreatedBy, item.UpdatedBy })))
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct()
             .ToArray();
@@ -96,7 +97,14 @@ public sealed class MobileReceivingOrderQueryService(
                 x => x.Id,
                 x => string.IsNullOrWhiteSpace(x.DisplayName) ? x.UserName ?? x.Id : x.DisplayName,
                 ct);
-        return MapDetails(order, movements, shippers, userId, lpnUserNames);
+        var canManage = !string.IsNullOrWhiteSpace(userId)
+            && await (from userRole in dbContext.UserRoles
+                      join role in dbContext.Roles on userRole.RoleId equals role.Id
+                      where userRole.UserId == userId
+                          && (role.Name == ApplicationRoles.Manager
+                              || role.Name == ApplicationRoles.Administrator)
+                      select role.Id).AnyAsync(ct);
+        return MapDetails(order, movements, shippers, userId, canManage, lpnUserNames);
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> ResolveDocumentAsync(
@@ -249,7 +257,10 @@ public sealed class MobileReceivingOrderQueryService(
                 .ThenInclude(x => x.StockKeepingUnit)
                     .ThenInclude(x => x!.Barcodes)
             .Include(x => x.Participants)
-            .Include(x => x.LicensePlateNumbers);
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items)
+                    .ThenInclude(x => x.StockKeepingUnit)
+                        .ThenInclude(x => x.BaseUnitOfMeasure);
 
 
     private static IQueryable<ReceivingOrder> QueueOrderQuery(
@@ -298,6 +309,7 @@ public sealed class MobileReceivingOrderQueryService(
         IReadOnlyCollection<InventoryMovement> movements,
         IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
         string userId,
+        bool canManage,
         IReadOnlyDictionary<string, string> userNames)
     {
         var orderMovements = movements
@@ -322,11 +334,39 @@ public sealed class MobileReceivingOrderQueryService(
                 UserName(x.ResponsibleUserId, userNames),
                 UserName(x.CreatedBy, userNames),
                 x.CreatedAtUtc ?? DateTimeOffset.MinValue,
+                x.ClosedBy is null ? null : UserName(x.ClosedBy, userNames),
+                x.ClosedAtUtc,
+                x.ReopenedBy is null ? null : UserName(x.ReopenedBy, userNames),
+                x.ReopenedAtUtc,
                 x.CancelledAtUtc,
                 x.ResponsibleUserId == userId,
                 x.Status == LicensePlateNumberStatus.Open
+                    && (x.ResponsibleUserId == userId || canManage)
+                    && order.Status == ReceivingOrderStatus.InReceiving,
+                x.Status == LicensePlateNumberStatus.Open
                     && x.ResponsibleUserId == userId
-                    && order.Status == ReceivingOrderStatus.InReceiving))
+                    && x.Items.All(item => item.IsDeleted)
+                    && order.Status == ReceivingOrderStatus.InReceiving,
+                x.Status == LicensePlateNumberStatus.Open
+                    && (x.ResponsibleUserId == userId || canManage)
+                    && order.Status == ReceivingOrderStatus.InReceiving,
+                x.Status == LicensePlateNumberStatus.Closed
+                    && canManage
+                    && order.Status == ReceivingOrderStatus.InReceiving,
+                x.Items
+                    .Where(item => !item.IsDeleted)
+                    .OrderBy(item => item.StockKeepingUnit.Name)
+                    .Select(item => new MobileReceivingOrderLicensePlateNumberItem(
+                        item.StockKeepingUnitId,
+                        item.StockKeepingUnit.Code ?? string.Empty,
+                        item.StockKeepingUnit.Name ?? string.Empty,
+                        GetUnitOfMeasure(item.StockKeepingUnit),
+                        item.Quantity,
+                        UserName(item.CreatedBy, userNames),
+                        item.CreatedAtUtc,
+                        item.UpdatedBy is null ? null : UserName(item.UpdatedBy, userNames),
+                        item.UpdatedAtUtc))
+                    .ToList()))
             .ToList();
 
         return new MobileReceivingOrderDetails(

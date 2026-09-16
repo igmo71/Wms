@@ -11,6 +11,10 @@ public sealed class LicensePlateNumberService(CommandExecutor executor, IDbConte
 {
     private const string OpenCommandType = "receiving-lpn.open";
     private const string CancelCommandType = "receiving-lpn.cancel-empty";
+    private const string SetQuantityCommandType = "receiving-lpn.set-quantity";
+    private const string RemoveItemCommandType = "receiving-lpn.remove-item";
+    private const string CloseCommandType = "receiving-lpn.close";
+    private const string ReopenCommandType = "receiving-lpn.reopen";
 
     public Task<OperationResult<Guid>> IssueAsync(int quantity, CommandContext context, CancellationToken ct = default) =>
         executor.ExecuteAsync("lpn-label.issue-batch", context.RequestId,
@@ -97,6 +101,7 @@ public sealed class LicensePlateNumberService(CommandExecutor executor, IDbConte
             {
                 var order = await db.ReceivingOrders
                     .Include(x => x.LicensePlateNumbers)
+                        .ThenInclude(x => x.Items)
                     .SingleOrDefaultAsync(x => x.Id == command.ReceivingOrderId, token);
                 if (order is null)
                     return OperationError.NotFound("Приходный ордер не найден.");
@@ -110,6 +115,107 @@ public sealed class LicensePlateNumberService(CommandExecutor executor, IDbConte
                     lpn,
                     DateTimeOffset.UtcNow,
                     context.UserId);
+                return result.IsSuccess ? lpn.Id : result.Error!;
+            },
+            ct);
+
+    public Task<OperationResult<Guid>> SetReceivingItemQuantityAsync(
+        SetReceivingLicensePlateNumberItemQuantityCommand command,
+        CommandContext context,
+        bool canManage,
+        CancellationToken ct = default) =>
+        ExecuteMutationAsync(
+            SetQuantityCommandType,
+            $"{command.ReceivingOrderId:N}|{command.LicensePlateNumberId:N}|{command.StockKeepingUnitId:N}|{command.Quantity.ToString(CultureInfo.InvariantCulture)}",
+            command.ReceivingOrderId,
+            command.LicensePlateNumberId,
+            context,
+            (order, lpn, now) => order.SetLicensePlateNumberItemQuantity(
+                lpn, command.StockKeepingUnitId, command.Quantity, now, context.UserId, canManage),
+            ct);
+
+    public Task<OperationResult<Guid>> RemoveReceivingItemAsync(
+        RemoveReceivingLicensePlateNumberItemCommand command,
+        CommandContext context,
+        bool canManage,
+        CancellationToken ct = default) =>
+        ExecuteMutationAsync(
+            RemoveItemCommandType,
+            $"{command.ReceivingOrderId:N}|{command.LicensePlateNumberId:N}|{command.StockKeepingUnitId:N}",
+            command.ReceivingOrderId,
+            command.LicensePlateNumberId,
+            context,
+            (order, lpn, now) => order.RemoveLicensePlateNumberItem(
+                lpn, command.StockKeepingUnitId, now, context.UserId, canManage),
+            ct);
+
+    public Task<OperationResult<Guid>> CloseReceivingAsync(
+        CloseReceivingLicensePlateNumberCommand command,
+        CommandContext context,
+        bool canManage,
+        CancellationToken ct = default) =>
+        ExecuteMutationAsync(
+            CloseCommandType,
+            $"{command.ReceivingOrderId:N}|{command.LicensePlateNumberId:N}",
+            command.ReceivingOrderId,
+            command.LicensePlateNumberId,
+            context,
+            (order, lpn, now) => order.CloseLicensePlateNumber(
+                lpn, now, context.UserId, canManage),
+            ct);
+
+    public Task<OperationResult<Guid>> ReopenReceivingAsync(
+        ReopenReceivingLicensePlateNumberCommand command,
+        CommandContext context,
+        bool canManage,
+        CancellationToken ct = default) =>
+        ExecuteMutationAsync(
+            ReopenCommandType,
+            $"{command.ReceivingOrderId:N}|{command.LicensePlateNumberId:N}",
+            command.ReceivingOrderId,
+            command.LicensePlateNumberId,
+            context,
+            (order, lpn, now) => order.ReopenLicensePlateNumber(
+                lpn, now, context.UserId, canManage),
+            ct);
+
+    private Task<OperationResult<Guid>> ExecuteMutationAsync(
+        string commandType,
+        string input,
+        Guid orderId,
+        Guid lpnId,
+        CommandContext context,
+        Func<ReceivingOrder, LicensePlateNumber, DateTimeOffset, OperationResult> mutate,
+        CancellationToken ct) =>
+        executor.ExecuteAsync(
+            commandType,
+            context.RequestId,
+            CommandExecutor.ComputeHash(input),
+            context.UserId,
+            async (db, token) =>
+            {
+                var order = await db.ReceivingOrders
+                    .Include(x => x.Items)
+                    .Include(x => x.LicensePlateNumbers)
+                        .ThenInclude(x => x.Items)
+                    .SingleOrDefaultAsync(x => x.Id == orderId, token);
+                if (order is null)
+                    return OperationError.NotFound("Приходный ордер не найден.");
+
+                var lpn = order.LicensePlateNumbers.SingleOrDefault(x => x.Id == lpnId);
+                if (lpn is null)
+                    return OperationError.NotFound("LPN не найден в приходном ордере.");
+
+                var persistedItemIds = order.LicensePlateNumbers
+                    .SelectMany(x => x.Items)
+                    .Select(x => x.Id)
+                    .ToHashSet();
+                var result = mutate(order, lpn, DateTimeOffset.UtcNow);
+                if (result.IsSuccess)
+                {
+                    db.LicensePlateNumberItems.AddRange(
+                        lpn.Items.Where(x => !persistedItemIds.Contains(x.Id)));
+                }
                 return result.IsSuccess ? lpn.Id : result.Error!;
             },
             ct);

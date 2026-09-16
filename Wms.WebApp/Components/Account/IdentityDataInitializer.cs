@@ -47,9 +47,20 @@ internal static class IdentityDataInitializer
                 "Не удалось обновить сессию первоначального администратора");
         }
 
+        if (administrator is not null && await userManager.IsInRoleAsync(administrator, ApplicationRoles.Manager))
+        {
+            EnsureSucceeded(
+                await userManager.RemoveFromRoleAsync(administrator, ApplicationRoles.Manager),
+                "Не удалось снять роль Manager с первоначального администратора");
+            EnsureSucceeded(
+                await userManager.UpdateSecurityStampAsync(administrator),
+                "Не удалось обновить сессию первоначального администратора");
+        }
+
         foreach (var user in await userManager.Users.ToListAsync())
         {
             if (await userManager.IsInRoleAsync(user, ApplicationRoles.Administrator)
+                || await userManager.IsInRoleAsync(user, ApplicationRoles.Manager)
                 || await userManager.IsInRoleAsync(user, ApplicationRoles.Operator))
             {
                 continue;

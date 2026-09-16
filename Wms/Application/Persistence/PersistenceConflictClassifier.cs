@@ -64,7 +64,8 @@ internal static class PersistenceConflictClassifier
                 return true;
             }
 
-            if (concurrencyException.Entries.Any(x => x.Entity is LicensePlateNumber))
+            if (concurrencyException.Entries.Any(x =>
+                    x.Entity is LicensePlateNumber or LicensePlateNumberItem))
             {
                 error = LicensePlateNumberConflict;
                 return true;
@@ -154,6 +155,14 @@ internal static class PersistenceConflictClassifier
             {
                 error = OperationError.Conflict(
                     "У сотрудника уже есть открытый LPN в этом приходном ордере.");
+                return true;
+            }
+
+            if (sqlException.Message.Contains(
+                    DatabaseObjectNames.LicensePlateNumberItemsActiveSkuIndex,
+                    StringComparison.Ordinal))
+            {
+                error = LicensePlateNumberConflict;
                 return true;
             }
         }

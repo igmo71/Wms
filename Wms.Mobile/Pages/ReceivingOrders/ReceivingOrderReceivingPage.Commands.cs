@@ -11,7 +11,14 @@ public partial class ReceivingOrderReceivingPage
         if (!IsScanExpected)
         {
             if (_lpnTabActive && CanUseLicensePlateNumbers)
-                await OpenLicensePlateNumberAsync(barcode);
+            {
+                if (_lpnQuantityEditing)
+                    return;
+                if (SelectedLicensePlateNumber?.CanEdit == true)
+                    await ResolveLpnSkuAsync(barcode);
+                else
+                    await OpenLicensePlateNumberAsync(barcode);
+            }
             return;
         }
 
@@ -68,6 +75,193 @@ public partial class ReceivingOrderReceivingPage
         SelectedLicensePlateNumber = lpn;
         OnPropertyChanged(nameof(SelectedLicensePlateNumber));
         SelectedLpnPanel.IsVisible = true;
+        CloseLpnQuantityEditor();
+        LpnScanInstructionLabel.Text = lpn.CanEdit
+            ? "Отсканируйте товар для ввода абсолютного количества."
+            : "LPN доступен только для просмотра.";
+        _ = UpdateCameraAsync();
+    }
+
+    private async Task ResolveLpnSkuAsync(string barcode)
+    {
+        if (_busy || SelectedLicensePlateNumber?.CanEdit != true || HasPendingCommand)
+            return;
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var candidates = await _orderClient.ResolveSkuAsync(Details.Order.Id, barcode);
+            if (candidates.Count != 1)
+            {
+                ErrorLabel.Text = candidates.Count == 0
+                    ? "Товар отсутствует в плане приходного ордера."
+                    : "Штрихкод соответствует нескольким строкам плана.";
+                return;
+            }
+            OpenLpnQuantityEditor(candidates[0]);
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Не удалось определить товар. Повторите сканирование.";
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
+    private void OpenLpnQuantityEditor(MobileReceivingOrderLineCandidateResponse candidate)
+    {
+        _selectedLpnSkuId = candidate.StockKeepingUnitId;
+        _lpnQuantityEditing = true;
+        LpnQuantitySkuLabel.Text = candidate.SkuName;
+        LpnQuantityUnitLabel.Text = string.IsNullOrWhiteSpace(candidate.UnitOfMeasure)
+            ? candidate.SkuCode
+            : $"{candidate.SkuCode} · {candidate.UnitOfMeasure}";
+        var existing = SelectedLicensePlateNumber?.Items
+            .SingleOrDefault(x => x.StockKeepingUnitId == candidate.StockKeepingUnitId);
+        LpnQuantityEntry.Text = existing?.Quantity.ToString("0.###") ?? string.Empty;
+        RemoveLpnItemButton.IsVisible = existing is not null;
+        LpnQuantityEditor.IsVisible = true;
+        LpnScanInstructionLabel.Text = "Введите абсолютное количество, включая ноль, и подтвердите.";
+    }
+
+    private void OnLpnItemTapped(object? sender, TappedEventArgs e)
+    {
+        if (SelectedLicensePlateNumber?.CanEdit != true
+            || e.Parameter is not MobileReceivingOrderLicensePlateNumberItemResponse item)
+            return;
+        var line = Details.Lines.Single(x => x.StockKeepingUnitId == item.StockKeepingUnitId);
+        OpenLpnQuantityEditor(new MobileReceivingOrderLineCandidateResponse(
+            line.LineNumber, line.StockKeepingUnitId, line.SkuCode, line.SkuName,
+            line.UnitOfMeasure, line.PlanQuantity, line.FactQuantity,
+            line.AllocatedQuantity, line.RemainingPutawayQuantity, true));
+        _ = UpdateCameraAsync();
+    }
+
+    private async void OnSaveLpnQuantityClicked(object? sender, EventArgs e)
+    {
+        if (_busy || SelectedLicensePlateNumber?.CanEdit != true
+            || _selectedLpnSkuId is not Guid skuId
+            || (HasPendingCommand && !_process.IsLpnMutationPending))
+            return;
+        var text = LpnQuantityEntry.Text?.Trim().Replace(',', '.');
+        if (!decimal.TryParse(text, System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture, out var quantity)
+            || !WarehouseQuantityInput.IsSupported(quantity)
+            || quantity < 0)
+        {
+            ErrorLabel.Text = "Введите неотрицательное количество не более трёх знаков после запятой.";
+            return;
+        }
+
+        await ExecuteLpnMutationAsync(
+            () => _process.SetLicensePlateNumberItemQuantityAsync(
+                Details.Order.Id, SelectedLicensePlateNumber.Id, skuId, quantity),
+            "Ответ сервера не получен. Повторите сохранение того же количества.");
+    }
+
+    private async void OnRemoveLpnItemClicked(object? sender, EventArgs e)
+    {
+        if (_busy || SelectedLicensePlateNumber?.CanEdit != true
+            || _selectedLpnSkuId is not Guid skuId
+            || (HasPendingCommand && !_process.IsLpnMutationPending))
+            return;
+        if (!_process.IsLpnMutationPending
+            && !await DisplayAlertAsync("Удалить строку", "Удалить товар из состава LPN?", "Удалить", "Назад"))
+            return;
+        await ExecuteLpnMutationAsync(
+            () => _process.RemoveLicensePlateNumberItemAsync(
+                Details.Order.Id, SelectedLicensePlateNumber.Id, skuId),
+            "Ответ сервера не получен. Повторите удаление этой же строки.");
+    }
+
+    private async void OnCloseLicensePlateNumberClicked(object? sender, EventArgs e)
+    {
+        if (_busy || SelectedLicensePlateNumber?.CanClose != true
+            || (HasPendingCommand && !_process.IsLpnMutationPending))
+            return;
+        if (!_process.IsLpnMutationPending
+            && !await DisplayAlertAsync("Закрыть LPN", "Закрыть пересчёт этого LPN?", "Закрыть", "Назад"))
+            return;
+        await ExecuteLpnMutationAsync(
+            () => _process.CloseLicensePlateNumberAsync(
+                Details.Order.Id, SelectedLicensePlateNumber.Id),
+            "Ответ сервера не получен. Повторите закрытие этого же LPN.");
+    }
+
+    private async void OnReopenLicensePlateNumberClicked(object? sender, EventArgs e)
+    {
+        if (_busy || SelectedLicensePlateNumber?.CanReopen != true
+            || (HasPendingCommand && !_process.IsLpnMutationPending))
+            return;
+        await ExecuteLpnMutationAsync(
+            () => _process.ReopenLicensePlateNumberAsync(
+                Details.Order.Id, SelectedLicensePlateNumber.Id),
+            "Ответ сервера не получен. Повторите возобновление этого же LPN.");
+    }
+
+    private async Task ExecuteLpnMutationAsync(
+        Func<Task<MobileReceivingOrderCommandResponse>> execute,
+        string uncertainMessage)
+    {
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        try
+        {
+            var response = await execute();
+            ApplyDetails(response.Details);
+            if (response.SelectedLicensePlateNumberId is Guid id)
+            {
+                SelectedLicensePlateNumber = LicensePlateNumbers.SingleOrDefault(x => x.Id == id);
+                OnPropertyChanged(nameof(SelectedLicensePlateNumber));
+            }
+            CloseLpnQuantityEditor();
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = uncertainMessage;
+        }
+        catch (InvalidOperationException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+    }
+
+    private async void OnCancelLpnQuantityClicked(object? sender, EventArgs e)
+    {
+        if (_process.IsLpnMutationPending)
+        {
+            ErrorLabel.Text = "Сначала повторите предыдущее изменение LPN.";
+            return;
+        }
+        CloseLpnQuantityEditor();
+        await UpdateCameraAsync();
+    }
+
+    private void CloseLpnQuantityEditor()
+    {
+        _selectedLpnSkuId = null;
+        _lpnQuantityEditing = false;
+        LpnQuantityEditor.IsVisible = false;
+        LpnQuantityEntry.Text = string.Empty;
+        if (SelectedLicensePlateNumber?.CanEdit == true)
+            LpnScanInstructionLabel.Text = "Отсканируйте товар для ввода абсолютного количества.";
     }
 
     private async void OnCancelLicensePlateNumberClicked(object? sender, EventArgs e)

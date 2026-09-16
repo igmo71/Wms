@@ -4,6 +4,7 @@ using Wms.Application.ReceivingOrders;
 using Wms.Application.LicensePlateNumbers;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 using Wms.Integration.OneS;
@@ -32,6 +33,16 @@ internal static class MobileReceivingOrderEndpoints
         group.MapPost("/{orderId:guid}/lpns/open", OpenLicensePlateNumberAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/cancel", CancelLicensePlateNumberAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lines/resolve-sku", ResolveSkuAsync)
+            .WithMobileResponses<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/items/{skuId:guid}/quantity", SetLicensePlateNumberItemQuantityAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/items/{skuId:guid}/remove", RemoveLicensePlateNumberItemAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/close", CloseLicensePlateNumberAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/reopen", ReopenLicensePlateNumberAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         return endpoints;
     }
@@ -241,6 +252,82 @@ internal static class MobileReceivingOrderEndpoints
                 MapDetails(details.Value!),
                 SelectedLicensePlateNumberId: result.Value))
             : MobileEndpointResults.CommandProblem(details.Error!);
+    }
+
+    private static async Task<IResult> SetLicensePlateNumberItemQuantityAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid skuId,
+        MobileSetReceivingLicensePlateNumberItemQuantityRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        var result = await service.SetReceivingItemQuantityAsync(
+            new(orderId, lpnId, skuId, request.Quantity),
+            new(request.ClientRequestId, userId),
+            CanManageLpn(principal),
+            ct);
+        return await LicensePlateNumberCommandResultAsync(result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> RemoveLicensePlateNumberItemAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid skuId,
+        MobileReceivingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        var result = await service.RemoveReceivingItemAsync(
+            new(orderId, lpnId, skuId),
+            new(request.ClientRequestId, userId),
+            CanManageLpn(principal),
+            ct);
+        return await LicensePlateNumberCommandResultAsync(result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> CloseLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        MobileReceivingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        var result = await service.CloseReceivingAsync(
+            new(orderId, lpnId), new(request.ClientRequestId, userId), CanManageLpn(principal), ct);
+        return await LicensePlateNumberCommandResultAsync(result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<IResult> ReopenLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        MobileReceivingOrderCommandRequest request,
+        ClaimsPrincipal principal,
+        LicensePlateNumberService service,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        var result = await service.ReopenReceivingAsync(
+            new(orderId, lpnId), new(request.ClientRequestId, userId), CanManageLpn(principal), ct);
+        return await LicensePlateNumberCommandResultAsync(result, orderId, userId, queryService, ct);
     }
 
     private static async Task<IResult> ResolveSkuAsync(
@@ -522,9 +609,26 @@ internal static class MobileReceivingOrderEndpoints
         lpn.ResponsibleUserName,
         lpn.CreatedByName,
         lpn.CreatedAtUtc,
+        lpn.ClosedByName,
+        lpn.ClosedAtUtc,
+        lpn.ReopenedByName,
+        lpn.ReopenedAtUtc,
         lpn.CancelledAtUtc,
         lpn.IsOwnedByCurrentUser,
-        lpn.CanCancel);
+        lpn.CanEdit,
+        lpn.CanCancel,
+        lpn.CanClose,
+        lpn.CanReopen,
+        lpn.Items.Select(x => new MobileReceivingOrderLicensePlateNumberItemResponse(
+            x.StockKeepingUnitId,
+            x.SkuCode,
+            x.SkuName,
+            x.UnitOfMeasure,
+            x.Quantity,
+            x.CreatedByName,
+            x.CreatedAtUtc,
+            x.UpdatedByName,
+            x.UpdatedAtUtc)).ToList());
 
     private static MobileReceivingOrderSummaryResponse MapSummary(
         MobileReceivingOrderSummary order,
@@ -661,5 +765,9 @@ internal static class MobileReceivingOrderEndpoints
 
     private static string? GetUserId(ClaimsPrincipal principal) =>
         principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    private static bool CanManageLpn(ClaimsPrincipal principal) =>
+        principal.IsInRole(ApplicationRoles.Manager)
+        || principal.IsInRole(ApplicationRoles.Administrator);
 
 }

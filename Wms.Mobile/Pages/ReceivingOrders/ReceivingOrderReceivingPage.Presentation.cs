@@ -47,7 +47,9 @@ public partial class ReceivingOrderReceivingPage
             OnPropertyChanged(nameof(SelectedLicensePlateNumber));
         }
         SelectedLpnPanel.IsVisible = SelectedLicensePlateNumber is not null;
-        LpnScanInstructionLabel.Text = CanUseLicensePlateNumbers
+        LpnScanInstructionLabel.Text = SelectedLicensePlateNumber?.CanEdit == true
+            ? "Отсканируйте товар для ввода абсолютного количества."
+            : CanUseLicensePlateNumbers
             ? "Отсканируйте свободную этикетку или существующий LPN этого ордера."
             : "Для создания LPN сначала присоединитесь к ордеру.";
         if (_lpnTabActive)
@@ -163,7 +165,7 @@ public partial class ReceivingOrderReceivingPage
     {
         if (_isVisible
             && _scanner.ActiveSource == BarcodeScanSource.Camera
-            && (IsScanExpected || (_lpnTabActive && CanUseLicensePlateNumbers)))
+            && (IsScanExpected || (_lpnTabActive && CanUseLicensePlateNumbers && !_lpnQuantityEditing)))
         {
             await CameraScannerView.StartAsync();
         }

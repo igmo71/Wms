@@ -14,4 +14,6 @@ internal static class DatabaseObjectNames
         "PK_StorageLocationLocks";
     public const string LicensePlateNumbersOpenOwnerIndex =
         "UX_LicensePlateNumbers_OpenOwner";
+    public const string LicensePlateNumberItemsActiveSkuIndex =
+        "UX_LicensePlateNumberItems_ActiveSku";
 }

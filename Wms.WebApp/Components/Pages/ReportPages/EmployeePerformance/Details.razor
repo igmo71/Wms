@@ -10,6 +10,7 @@
     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="@GetSummaryHref()" />
     <MudText Typo="Typo.h5">Производительность: @_userName</MudText>
 </MudStack>
+<MudAlert Severity="Severity.Info" Class="mb-4">Статистика приёмки временно недоступна до завершения LPN-процесса в I05.</MudAlert>
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudGrid Spacing="2">
@@ -51,13 +52,10 @@
                        Value="_documentType"
                        ValueChanged="OnDocumentTypeChangedAsync"
                        Clearable="true">
-                @foreach (var documentType in Enum.GetValues<EmployeePerformanceDocumentType>())
-                {
-                    <MudSelectItem T="EmployeePerformanceDocumentType?"
-                                   Value="@((EmployeePerformanceDocumentType?)documentType)">
-                        @GetDocumentTypeName(documentType)
-                    </MudSelectItem>
-                }
+                <MudSelectItem T="EmployeePerformanceDocumentType?"
+                               Value="@((EmployeePerformanceDocumentType?)EmployeePerformanceDocumentType.Picking)">
+                    @GetDocumentTypeName(EmployeePerformanceDocumentType.Picking)
+                </MudSelectItem>
             </MudSelect>
         </MudItem>
     </MudGrid>

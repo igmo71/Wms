@@ -77,9 +77,28 @@ public sealed record MobileReceivingOrderLicensePlateNumber(
     string ResponsibleUserName,
     string CreatedByName,
     DateTimeOffset CreatedAtUtc,
+    string? ClosedByName,
+    DateTimeOffset? ClosedAtUtc,
+    string? ReopenedByName,
+    DateTimeOffset? ReopenedAtUtc,
     DateTimeOffset? CancelledAtUtc,
     bool IsOwnedByCurrentUser,
-    bool CanCancel);
+    bool CanEdit,
+    bool CanCancel,
+    bool CanClose,
+    bool CanReopen,
+    IReadOnlyList<MobileReceivingOrderLicensePlateNumberItem> Items);
+
+public sealed record MobileReceivingOrderLicensePlateNumberItem(
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    decimal Quantity,
+    string CreatedByName,
+    DateTimeOffset CreatedAtUtc,
+    string? UpdatedByName,
+    DateTimeOffset? UpdatedAtUtc);
 
 public sealed record MobileReceivingOrderDetails(
     MobileReceivingOrderSummary Order,

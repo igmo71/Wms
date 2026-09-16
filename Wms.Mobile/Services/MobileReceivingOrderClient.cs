@@ -75,6 +75,49 @@ public sealed class MobileReceivingOrderClient
             new MobileReceivingOrderCommandRequest(clientRequestId),
             ct);
 
+    public Task<MobileReceivingOrderCommandResponse> SetLicensePlateNumberItemQuantityAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid skuId,
+        decimal quantity,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/items/{skuId:D}/quantity",
+            new MobileSetReceivingLicensePlateNumberItemQuantityRequest(clientRequestId, quantity),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> RemoveLicensePlateNumberItemAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid skuId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/items/{skuId:D}/remove",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> CloseLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/close",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
+    public Task<MobileReceivingOrderCommandResponse> ReopenLicensePlateNumberAsync(
+        Guid orderId,
+        Guid lpnId,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/reopen",
+            new MobileReceivingOrderCommandRequest(clientRequestId),
+            ct);
+
     public async Task<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>> ResolveSkuAsync(
         Guid orderId,
         string barcode,

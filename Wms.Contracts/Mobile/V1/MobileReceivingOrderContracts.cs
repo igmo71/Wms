@@ -95,9 +95,28 @@ public sealed record MobileReceivingOrderLicensePlateNumberResponse(
     string ResponsibleUserName,
     string CreatedByName,
     DateTimeOffset CreatedAtUtc,
+    string? ClosedByName,
+    DateTimeOffset? ClosedAtUtc,
+    string? ReopenedByName,
+    DateTimeOffset? ReopenedAtUtc,
     DateTimeOffset? CancelledAtUtc,
     bool IsOwnedByCurrentUser,
-    bool CanCancel);
+    bool CanEdit,
+    bool CanCancel,
+    bool CanClose,
+    bool CanReopen,
+    IReadOnlyList<MobileReceivingOrderLicensePlateNumberItemResponse> Items);
+
+public sealed record MobileReceivingOrderLicensePlateNumberItemResponse(
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    decimal Quantity,
+    string CreatedByName,
+    DateTimeOffset CreatedAtUtc,
+    string? UpdatedByName,
+    DateTimeOffset? UpdatedAtUtc);
 
 public sealed record MobileReceivingOrderDetailsResponse(
     MobileReceivingOrderSummaryResponse Order,
@@ -140,6 +159,10 @@ public sealed record MobileOpenReceivingLicensePlateNumberRequest(
     string Code);
 
 public sealed record MobileReceivingOrderCommandRequest(Guid ClientRequestId);
+
+public sealed record MobileSetReceivingLicensePlateNumberItemQuantityRequest(
+    Guid ClientRequestId,
+    decimal Quantity);
 
 public sealed record MobileSetReceivingOrderLineQuantityRequest(
     Guid ClientRequestId,

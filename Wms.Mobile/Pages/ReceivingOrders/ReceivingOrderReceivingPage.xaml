@@ -280,7 +280,45 @@
                         <Label FontAttributes="Bold" FontSize="20" Text="{Binding Code}" />
                         <Label Text="{Binding StatusName, StringFormat='Состояние: {0}'}" />
                         <Label Text="{Binding ResponsibleUserName, StringFormat='Ответственный: {0}'}" />
-                        <Label Text="Состав LPN пока пуст. Количества будут доступны в следующем инкременте." />
+                        <Label Text="{Binding ClosedAtUtc, StringFormat='Закрыт: {0:dd.MM.yyyy HH:mm}'}" />
+                        <Label Text="{Binding ReopenedAtUtc, StringFormat='Возобновлён: {0:dd.MM.yyyy HH:mm}'}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6">
+                            <BindableLayout.EmptyView>
+                                <Label Text="Состав LPN пуст." />
+                            </BindableLayout.EmptyView>
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="contracts:MobileReceivingOrderLicensePlateNumberItemResponse">
+                                    <Border Padding="10" Stroke="LightGray">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLpnItemTapped" />
+                                        </Border.GestureRecognizers>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <VerticalStackLayout>
+                                                <Label FontAttributes="Bold" Text="{Binding SkuName}" />
+                                                <Label Text="{Binding SkuCode}" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" FontAttributes="Bold" Text="{Binding Quantity, StringFormat='{0:0.###}'}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <HorizontalStackLayout Spacing="8">
+                            <Button Clicked="OnCloseLicensePlateNumberClicked" IsVisible="{Binding CanClose}" Text="Закрыть" />
+                            <Button Clicked="OnReopenLicensePlateNumberClicked" IsVisible="{Binding CanReopen}" Text="Возобновить" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+                <Border x:Name="LpnQuantityEditor" IsVisible="False" Padding="14" Stroke="{StaticResource Primary}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label x:Name="LpnQuantitySkuLabel" FontAttributes="Bold" FontSize="18" />
+                        <Label x:Name="LpnQuantityUnitLabel" />
+                        <Entry x:Name="LpnQuantityEntry" Keyboard="Numeric" Placeholder="Абсолютное количество" />
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <Button Clicked="OnSaveLpnQuantityClicked" Text="Подтвердить" />
+                            <Button x:Name="RemoveLpnItemButton" Grid.Column="1" Clicked="OnRemoveLpnItemClicked" Text="Удалить" />
+                            <Button Grid.Column="2" Clicked="OnCancelLpnQuantityClicked" Text="Отмена" />
+                        </Grid>
                     </VerticalStackLayout>
                 </Border>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" Spacing="8">

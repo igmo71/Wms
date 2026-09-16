@@ -5,6 +5,7 @@ namespace Wms.Domain;
 
 public sealed class LicensePlateNumber
 {
+    private readonly List<LicensePlateNumberItem> _items = [];
     private LicensePlateNumber() { }
     internal LicensePlateNumber(Guid batchId) { Id = Guid.NewGuid(); BatchId = batchId; }
     public Guid Id { get; private set; }
@@ -20,7 +21,12 @@ public sealed class LicensePlateNumber
     public DateTimeOffset? CreatedAtUtc { get; private set; }
     public string? CancelledBy { get; private set; }
     public DateTimeOffset? CancelledAtUtc { get; private set; }
+    public string? ClosedBy { get; private set; }
+    public DateTimeOffset? ClosedAtUtc { get; private set; }
+    public string? ReopenedBy { get; private set; }
+    public DateTimeOffset? ReopenedAtUtc { get; private set; }
     public long OperationalRevision { get; private set; }
+    public IReadOnlyCollection<LicensePlateNumberItem> Items => _items;
 
     internal OperationResult Assign(Guid receivingOrderId, string userId, DateTimeOffset createdAtUtc)
     {
@@ -48,6 +54,8 @@ public sealed class LicensePlateNumber
             return OperationError.Invalid("Отменить можно только открытый LPN.");
         if (!string.Equals(ResponsibleUserId, userId, StringComparison.Ordinal))
             return OperationError.Conflict("Отменить LPN может только ответственный сотрудник.");
+        if (_items.Any(x => !x.IsDeleted))
+            return OperationError.Invalid("Отменить можно только пустой LPN.");
         if (cancelledAtUtc == default)
             return OperationError.Invalid("Время отмены LPN обязательно.");
 
@@ -56,5 +64,101 @@ public sealed class LicensePlateNumber
         CancelledAtUtc = cancelledAtUtc;
         OperationalRevision++;
         return OperationResult.Success();
+    }
+
+    internal OperationResult SetItemQuantity(
+        Guid stockKeepingUnitId,
+        decimal quantity,
+        string userId,
+        DateTimeOffset occurredAtUtc,
+        bool canManage)
+    {
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (stockKeepingUnitId == Guid.Empty)
+            return OperationError.Invalid("SKU для строки LPN обязателен.");
+        var validation = LicensePlateNumberItem.Validate(quantity, occurredAtUtc, userId);
+        if (!validation.IsSuccess)
+            return validation;
+
+        var item = _items.SingleOrDefault(x =>
+            x.StockKeepingUnitId == stockKeepingUnitId && !x.IsDeleted);
+        if (item is null)
+        {
+            _items.Add(new LicensePlateNumberItem(
+                Id, stockKeepingUnitId, quantity, occurredAtUtc, userId.Trim()));
+        }
+        else
+        {
+            var update = item.SetQuantity(quantity, occurredAtUtc, userId);
+            if (!update.IsSuccess)
+                return update;
+        }
+
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    internal OperationResult RemoveItem(
+        Guid stockKeepingUnitId,
+        string userId,
+        DateTimeOffset occurredAtUtc,
+        bool canManage)
+    {
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        var item = _items.SingleOrDefault(x =>
+            x.StockKeepingUnitId == stockKeepingUnitId && !x.IsDeleted);
+        if (item is null)
+            return OperationError.NotFound("Строка состава LPN не найдена.");
+
+        var result = item.Delete(occurredAtUtc, userId);
+        if (result.IsSuccess)
+            OperationalRevision++;
+        return result;
+    }
+
+    internal OperationResult Close(string userId, DateTimeOffset closedAtUtc, bool canManage)
+    {
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (closedAtUtc == default)
+            return OperationError.Invalid("Время закрытия LPN обязательно.");
+
+        Status = LicensePlateNumberStatus.Closed;
+        ClosedBy = userId.Trim();
+        ClosedAtUtc = closedAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    internal OperationResult Reopen(string userId, DateTimeOffset reopenedAtUtc, bool canManage)
+    {
+        if (!canManage)
+            return OperationError.Conflict("Возобновить закрытый LPN может только менеджер.");
+        if (Status != LicensePlateNumberStatus.Closed)
+            return OperationError.Invalid("Возобновить можно только закрытый LPN.");
+        if (reopenedAtUtc == default || string.IsNullOrWhiteSpace(userId))
+            return OperationError.Invalid("Для возобновления LPN обязателен пользователь и время.");
+
+        Status = LicensePlateNumberStatus.Open;
+        ReopenedBy = userId.Trim();
+        ReopenedAtUtc = reopenedAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    private OperationResult ValidateEditing(string userId, bool canManage)
+    {
+        if (Status != LicensePlateNumberStatus.Open)
+            return OperationError.Invalid("Изменять можно только открытый LPN.");
+        if (string.IsNullOrWhiteSpace(userId))
+            return OperationError.Invalid("Пользователь изменения LPN не определён.");
+        return canManage || string.Equals(ResponsibleUserId, userId, StringComparison.Ordinal)
+            ? OperationResult.Success()
+            : OperationError.Conflict("Изменять LPN может ответственный сотрудник или менеджер.");
     }
 }

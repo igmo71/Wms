@@ -171,13 +171,7 @@ public sealed class EmployeePerformanceReportService(
     {
         var receiving =
             from order in dbContext.ReceivingOrders.AsNoTracking()
-            where order.CompletedBy != null
-                && order.StartedAtUtc != null
-                && order.CompletedAtUtc != null
-                && order.CompletedAtUtc >= order.StartedAtUtc
-            from user in dbContext.Users
-                .Where(x => x.Id == order.CompletedBy)
-                .DefaultIfEmpty()
+            where false
             select new EmployeePerformanceDocumentProjection
             {
                 DocumentType = EmployeePerformanceDocumentType.Receiving,
@@ -186,20 +180,13 @@ public sealed class EmployeePerformanceReportService(
                 DocumentDate = order.Date,
                 WarehouseId = order.WarehouseId,
                 WarehouseName = order.Warehouse!.Name ?? string.Empty,
-                UserId = order.CompletedBy!,
-                UserName = user != null && !string.IsNullOrWhiteSpace(user.DisplayName)
-                    ? user.DisplayName
-                    : user != null && user.UserName != null
-                    ? user.UserName
-                    : "Удаленный пользователь (" + order.CompletedBy + ")",
-                PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),
-                KnownFactWeightKg = order.Items
-                    .Where(x => x.FactQuantity > 0 && x.StockKeepingUnit!.WeightKg != null)
-                    .Sum(x => (double?)((double)x.FactQuantity!.Value * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
-                IsFactWeightComplete = !order.Items.Any(x => x.FactQuantity > 0
-                    && x.StockKeepingUnit!.WeightKg == null),
-                StartedAtUtc = order.StartedAtUtc!.Value,
-                CompletedAtUtc = order.CompletedAtUtc!.Value
+                UserId = string.Empty,
+                UserName = string.Empty,
+                PositiveLineCount = 0,
+                KnownFactWeightKg = 0,
+                IsFactWeightComplete = true,
+                StartedAtUtc = DateTimeOffset.MinValue,
+                CompletedAtUtc = DateTimeOffset.MinValue
             };
 
         var picking =

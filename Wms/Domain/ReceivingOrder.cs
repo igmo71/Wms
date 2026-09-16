@@ -399,6 +399,124 @@ public class ReceivingOrder
         return result;
     }
 
+    public OperationResult SetLicensePlateNumberItemQuantity(
+        LicensePlateNumber lpn,
+        Guid stockKeepingUnitId,
+        decimal quantity,
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        bool canManage)
+    {
+        var validation = ValidateLicensePlateNumberMutation(lpn, stockKeepingUnitId);
+        if (!validation.IsSuccess)
+            return validation;
+        var result = lpn.SetItemQuantity(
+            stockKeepingUnitId, quantity, userId, occurredAtUtc, canManage);
+        if (!result.IsSuccess)
+            return result;
+
+        var aggregateResult = RecalculateLpnFacts();
+        if (!aggregateResult.IsSuccess)
+            return aggregateResult;
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
+
+    public OperationResult RemoveLicensePlateNumberItem(
+        LicensePlateNumber lpn,
+        Guid stockKeepingUnitId,
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        bool canManage)
+    {
+        var validation = ValidateLicensePlateNumberMutation(lpn, stockKeepingUnitId);
+        if (!validation.IsSuccess)
+            return validation;
+        var result = lpn.RemoveItem(stockKeepingUnitId, userId, occurredAtUtc, canManage);
+        if (!result.IsSuccess)
+            return result;
+
+        var aggregateResult = RecalculateLpnFacts();
+        if (!aggregateResult.IsSuccess)
+            return aggregateResult;
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
+
+    public OperationResult CloseLicensePlateNumber(
+        LicensePlateNumber lpn,
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        bool canManage)
+    {
+        var validation = ValidateLicensePlateNumberMutation(lpn);
+        if (!validation.IsSuccess)
+            return validation;
+        var result = lpn.Close(userId, occurredAtUtc, canManage);
+        if (result.IsSuccess)
+            AdvanceOperationalRevision();
+        return result;
+    }
+
+    public OperationResult ReopenLicensePlateNumber(
+        LicensePlateNumber lpn,
+        DateTimeOffset occurredAtUtc,
+        string userId,
+        bool canManage)
+    {
+        var validation = ValidateLicensePlateNumberMutation(lpn);
+        if (!validation.IsSuccess)
+            return validation;
+        if (_licensePlateNumbers.Any(x =>
+                x.Id != lpn.Id
+                && x.Status == LicensePlateNumberStatus.Open
+                && x.ResponsibleUserId == lpn.ResponsibleUserId))
+        {
+            return OperationError.Conflict(
+                "У ответственного сотрудника уже есть открытый LPN в этом ордере.");
+        }
+
+        var result = lpn.Reopen(userId, occurredAtUtc, canManage);
+        if (result.IsSuccess)
+            AdvanceOperationalRevision();
+        return result;
+    }
+
+    private OperationResult ValidateLicensePlateNumberMutation(
+        LicensePlateNumber lpn,
+        Guid? stockKeepingUnitId = null)
+    {
+        if (Status != ReceivingOrderStatus.InReceiving)
+            return OperationError.Invalid("Изменять LPN можно только во время приёмки.");
+        if (lpn.ReceivingOrderId != Id || !_licensePlateNumbers.Contains(lpn))
+            return OperationError.NotFound("LPN не найден в приходном ордере.");
+        if (stockKeepingUnitId is Guid skuId
+            && _items.All(x => x.StockKeepingUnitId != skuId))
+        {
+            return OperationError.NotFound("SKU отсутствует в плане приходного ордера.");
+        }
+        return OperationResult.Success();
+    }
+
+    private OperationResult RecalculateLpnFacts()
+    {
+        var activeItems = _licensePlateNumbers
+            .Where(x => x.Status != LicensePlateNumberStatus.Cancelled)
+            .SelectMany(x => x.Items)
+            .Where(x => !x.IsDeleted)
+            .ToLookup(x => x.StockKeepingUnitId);
+
+        foreach (var orderItem in _items)
+        {
+            var lpnItems = activeItems[orderItem.StockKeepingUnitId];
+            decimal? aggregate = lpnItems.Any() ? lpnItems.Sum(x => x.Quantity) : null;
+            if (aggregate is decimal quantity && !WarehouseQuantity.IsNonNegative(quantity))
+                return OperationError.Invalid("Суммарное количество SKU в LPN выходит за допустимый диапазон.");
+            orderItem.SetAggregatedLpnFact(aggregate);
+        }
+        return OperationResult.Success();
+    }
+
     public OperationResult UpdateItemFact(
         int lineNumber,
         decimal factQuantity,

@@ -208,9 +208,33 @@ else
                         <TemplateColumn Title="Ответственный"><CellTemplate>@GetUserName(context.Item.ResponsibleUserId)</CellTemplate></TemplateColumn>
                         <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
                         <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создан" Format="dd.MM.yyyy HH:mm" />
+                        <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Items.Where(x => !x.IsDeleted).Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
+                        <PropertyColumn Property="x => x.ClosedAtUtc" Title="Закрыт" Format="dd.MM.yyyy HH:mm" />
+                        <TemplateColumn Title="Закрыл"><CellTemplate>@GetUserName(context.Item.ClosedBy)</CellTemplate></TemplateColumn>
+                        <PropertyColumn Property="x => x.ReopenedAtUtc" Title="Возобновлён" Format="dd.MM.yyyy HH:mm" />
+                        <TemplateColumn Title="Возобновил"><CellTemplate>@GetUserName(context.Item.ReopenedBy)</CellTemplate></TemplateColumn>
                         <PropertyColumn Property="x => x.CancelledAtUtc" Title="Отменён" Format="dd.MM.yyyy HH:mm" />
                     </Columns>
                 </MudDataGrid>
+                @if (_order.LicensePlateNumbers.Any(x => x.Items.Count > 0))
+                {
+                    <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">Состав и аудит пересчёта</MudText>
+                    <MudDataGrid T="LicensePlateNumberItem"
+                                 Items="_order.LicensePlateNumbers.SelectMany(x => x.Items).OrderByDescending(x => x.UpdatedAtUtc ?? x.CreatedAtUtc)"
+                                 Dense="true">
+                        <Columns>
+                            <TemplateColumn Title="LPN"><CellTemplate>@context.Item.LicensePlateNumber.Code</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="SKU"><CellTemplate>@context.Item.StockKeepingUnit?.Name</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Единица"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation ?? "—")</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Состояние"><CellTemplate>@(context.Item.IsDeleted ? "Удалено" : "В составе")</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Изменил"><CellTemplate>@GetUserName(context.Item.UpdatedBy)</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Удалил"><CellTemplate>@GetUserName(context.Item.DeletedBy)</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Последнее действие"><CellTemplate>@((context.Item.UpdatedAtUtc ?? context.Item.CreatedAtUtc).ToString("dd.MM.yyyy HH:mm"))</CellTemplate></TemplateColumn>
+                        </Columns>
+                    </MudDataGrid>
+                }
             }
         </MudPaper>
 
