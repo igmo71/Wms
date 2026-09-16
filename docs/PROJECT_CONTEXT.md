@@ -30,8 +30,8 @@ limits LPN to receiving and initial putaway, preserves location/SKU inventory,
 and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
 The specification defines eight increments. I01 label issuance and A4 printing,
-I02 receiving-order participation, I03 LPN association, and I04 LPN counting
-are implemented; I05–I08 remain future work.
+I02 receiving-order participation, I03 LPN association, I04 LPN counting, and
+I05 receiving completion are implemented; I06–I08 remain future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
@@ -205,8 +205,8 @@ winning location on explicit retry.
 Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
 be joined. The order view shows the source plan read-only and its LPN list.
-Direct facts, receiving completion, and order-based putaway are removed
-from the Mobile API and disabled in Web until their LPN increments are available.
+Direct facts and order-based putaway are removed from the Mobile API. Receiving
+completion is available in Web; Mobile completion remains unavailable.
 
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
@@ -215,15 +215,31 @@ line, while manual input sets an absolute nonnegative fact without overwriting
 a Web comment. Every line requires a fact before completion.
 
 Starting receiving and selecting its scanned receiving location form one save.
-Completion first persists a fresh 1C synchronization checkpoint, then applies
-the selected location, transition, and positive inventory receipt for the final
-save. Putaway supports split draft movements from receiving to ordinary storage
+Completion is available to an order participant only after every active LPN is
+closed and every source SKU has an explicit aggregate LPN fact, including zero.
+It first persists a fresh 1C synchronization checkpoint. Source deletion,
+unposting, unsupported quantity semantics, duplicate SKU, or a changed/ambiguous
+line-to-SKU composition blocks completion. A quantity-only plan/fact difference
+requires a reasoned server-side decision by the `Manager` role specifically;
+`Administrator` does not receive that permission implicitly.
+
+The completion decision fingerprint covers both the fresh source snapshot and
+the complete local LPN composition. A source or LPN change after display rejects
+the command and requires a new decision. The original plan, current 1C plan,
+fact, differences, source check, and optional Manager decision are retained on
+the order as its immutable completion audit. Final transition, positive receipt
+movements, balances, turnover, audit, and command receipt save atomically. A
+successful replay reads the receipt before 1C and cannot receive stock twice.
+Completion makes no outbound change to 1C; later notifications do not replace
+the accepted facts or completion audit.
+
+Putaway supports split draft movements from receiving to ordinary storage
 and posts them together on completion. `ReceivingOrder.OperationalRevision`
 protects reconciliation, facts, transitions, and draft movements from stale
 saves.
 
-Starting and completing receiving share the same application commands in WebApp
-and Mobile. Command receipt lookup precedes mutable validation and 1C access;
+Starting and completing receiving use shared application commands. Command
+receipt lookup precedes mutable validation and 1C access;
 successful replay returns the recorded resource id without executing the command
 again. The synchronization checkpoint remains independently persisted, while the
 final WMS effects and receipt commit atomically. An explicit completion location
@@ -339,9 +355,8 @@ return to scanning or search without losing the source location or transit
 cart. Selection cannot be changed while posting or awaiting a repeat-safe
 retry. A SKU with no available source stock does not advance to quantity entry.
 
-Employee-performance reporting temporarily excludes receiving while LPN
-completion is unfinished; per-employee receiving contribution is available in
-the receiving-order LPN audit. Picking remains attributed to
+Employee-performance reporting exposes receiving contribution in the
+receiving-order LPN audit rather than the aggregate report. Picking remains attributed to
 `ReadyForShipmentBy`, and its duration ends at ready-for-shipment. Weight totals
 use current SKU data and identify incomplete results.
 

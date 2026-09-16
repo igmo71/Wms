@@ -264,6 +264,92 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
             savedOrder.LicensePlateNumbers.Single(x => x.Id == firstLpn).ReopenedBy);
     }
 
+    [Fact]
+    public async Task Completion_racing_lpn_change_rolls_back_and_repeat_does_not_receive_twice()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN completion" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Completion SKU" };
+        var zone = Zone(warehouse.Id, "LF", ZoneType.Receiving);
+        var location = Location(warehouse.Id, zone, 1);
+        var snapshot = new ReceivingOrderImportSnapshot(
+            Guid.NewGuid(), false, true, "Completion", DateTime.UtcNow, warehouse.Id, null,
+            ReceivingOrderStatus.ReadyForReceiving, default, WarehouseOperation.VendorReceipt,
+            BusinessOperation.VendorPurchase, Guid.NewGuid(), default, Guid.NewGuid(), null,
+            [new(1, sku.Id, 5m, 5m, null)]);
+        var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
+        Success(order.SetReceivingLocation(location.Id));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "manager"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "manager"));
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, order);
+            await seed.SaveChangesAsync();
+        }
+
+        var lpnService = LpnService(database);
+        Guid batchId = Value(await lpnService.IssueAsync(1, Command("issuer")));
+        string code;
+        await using (var read = database.CreateDbContext())
+            code = await read.LicensePlateNumbers.Where(x => x.BatchId == batchId).Select(x => x.Code).SingleAsync();
+        Guid lpnId = Value(await lpnService.OpenForReceivingAsync(new(order.Id, code), Command("manager")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, lpnId, sku.Id, 4m), Command("manager"), true));
+        Success(await lpnService.CloseReceivingAsync(new(order.Id, lpnId), Command("manager"), true));
+
+        var source = new FixedSource(snapshot);
+        var synchronization = new ReceivingOrderSynchronizationService(
+            database, source, NullLogger<ReceivingOrderSynchronizationService>.Instance);
+        var preview = Value(await synchronization.CheckCompletionAsync(order.Id));
+        Assert.True(preview.RequiresManager);
+
+        var barrier = new CompletionReceiptBarrier();
+        var racingService = ReceivingService(database.WithInterceptor(barrier), source);
+        var racingContext = Command("manager");
+        var racingCommand = new CompleteReceivingCommand(
+            order.Id, null, preview.Assessment.Fingerprint, "Недостача при приёмке");
+        Task<OperationResult<Guid>> racingCompletion = racingService.CompleteReceivingAsync(
+            racingCommand, racingContext, true);
+        await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        Success(await lpnService.ReopenReceivingAsync(new(order.Id, lpnId), Command("manager"), true));
+        barrier.Release.TrySetResult();
+        Error(await racingCompletion, OperationErrorType.Conflict);
+
+        await using (var failed = database.CreateDbContext())
+        {
+            Assert.Equal(ReceivingOrderStatus.InReceiving,
+                (await failed.ReceivingOrders.SingleAsync(x => x.Id == order.Id)).Status);
+            Assert.False(await failed.InventoryMovements.AnyAsync(x => x.RecorderId == order.Id));
+            Assert.False(await failed.InventoryBalances.AnyAsync(x => x.StorageLocationId == location.Id && x.StockKeepingUnitId == sku.Id));
+            Assert.False(await failed.CommandReceipts.AnyAsync(x => x.RequestId == racingContext.RequestId));
+        }
+
+        Success(await lpnService.CloseReceivingAsync(new(order.Id, lpnId), Command("manager"), true));
+        var fresh = Value(await synchronization.CheckCompletionAsync(order.Id));
+        var successContext = Command("manager");
+        var successCommand = new CompleteReceivingCommand(
+            order.Id, null, fresh.Assessment.Fingerprint, "Недостача при приёмке");
+        var service = ReceivingService(database, source);
+        Value(await service.CompleteReceivingAsync(successCommand, successContext, true));
+        int callsAfterSuccess = source.CallCount;
+        Value(await service.CompleteReceivingAsync(successCommand, successContext, true));
+        Assert.Equal(callsAfterSuccess, source.CallCount);
+
+        await using var verify = database.CreateDbContext();
+        var completed = await verify.ReceivingOrders.SingleAsync(x => x.Id == order.Id);
+        Assert.Equal(ReceivingOrderStatus.Received, completed.Status);
+        Assert.Equal("manager", completed.CompletionApprovedBy);
+        Assert.Equal("Недостача при приёмке", completed.CompletionApprovalReason);
+        Assert.False(string.IsNullOrWhiteSpace(completed.CompletionOriginalPlanJson));
+        Assert.False(string.IsNullOrWhiteSpace(completed.CompletionCurrentPlanJson));
+        Assert.Equal(1, await verify.InventoryMovements.CountAsync(x => x.RecorderId == order.Id));
+        Assert.Equal(1, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == order.Id));
+        Assert.Equal(4m, (await verify.InventoryBalances.SingleAsync(
+            x => x.StorageLocationId == location.Id && x.StockKeepingUnitId == sku.Id)).Quantity);
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x => x.RequestId == successContext.RequestId));
+    }
+
     private static ReceivingOrder StartedOrder(
         Guid warehouseId,
         Guid skuId,
@@ -286,12 +372,13 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
     private static LicensePlateNumberService LpnService(IDbContextFactory<ApplicationDbContext> factory) =>
         new(new CommandExecutor(factory), factory);
 
-    private static ReceivingOrderCommandService ReceivingService(IDbContextFactory<ApplicationDbContext> factory) =>
+    private static ReceivingOrderCommandService ReceivingService(
+        IDbContextFactory<ApplicationDbContext> factory,
+        IReceivingOrderSource? source = null) =>
         new(
             new CommandExecutor(factory),
             new InventoryPostingService(NullLogger<InventoryPostingService>.Instance),
-            new ReceivingOrderSynchronizationService(factory, new RejectingSource(), NullLogger<ReceivingOrderSynchronizationService>.Instance),
-            new RejectingSink(),
+            new ReceivingOrderSynchronizationService(factory, source ?? new RejectingSource(), NullLogger<ReceivingOrderSynchronizationService>.Instance),
             NullLogger<ReceivingOrderCommandService>.Instance);
 
     private sealed class ParticipantSaveBarrier : SaveChangesInterceptor
@@ -318,11 +405,40 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
             throw new InvalidOperationException("Joining receiving must not call 1C.");
     }
 
-    private sealed class RejectingSink : IReceivingOrderExecutionSink
+    private sealed class FixedSource(ReceivingOrderImportSnapshot snapshot) : IReceivingOrderSource
     {
-        public Task<OperationResult> SetInReceivingAsync(Guid orderId, CancellationToken ct) => Reject();
-        public Task<OperationResult> UpdateItemsAsync(Guid orderId, IReadOnlyCollection<ReceivingOrderItem> items, CancellationToken ct) => Reject();
-        public Task<OperationResult> SetReceivedAsync(Guid orderId, CancellationToken ct) => Reject();
-        private static Task<OperationResult> Reject() => throw new InvalidOperationException("Joining receiving must not call 1C.");
+        private int _callCount;
+        public int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<OperationResult<ReceivingOrderImportSnapshot>> GetSnapshotAsync(
+            Guid orderId,
+            CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _callCount);
+            return Task.FromResult<OperationResult<ReceivingOrderImportSnapshot>>(
+                orderId == snapshot.Id
+                    ? snapshot
+                    : OperationError.NotFound("Snapshot not found."));
+        }
     }
+
+    private sealed class CompletionReceiptBarrier : SaveChangesInterceptor
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context!.ChangeTracker.Entries<CommandReceipt>().Any(x => x.State == EntityState.Added))
+            {
+                Entered.TrySetResult();
+                await Release.Task.WaitAsync(TimeSpan.FromSeconds(20), cancellationToken);
+            }
+            return result;
+        }
+    }
+
 }

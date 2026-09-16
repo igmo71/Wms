@@ -121,7 +121,7 @@ public static class ReceivingOrderSynchronizationComparer
         }
     }
 
-    private static string CreateFingerprint(ReceivingOrderImportSnapshot snapshot)
+    internal static string CreateFingerprint(ReceivingOrderImportSnapshot snapshot)
     {
         var fingerprint = new OrderSynchronizationFingerprintBuilder();
         fingerprint.Add("id", snapshot.Id);

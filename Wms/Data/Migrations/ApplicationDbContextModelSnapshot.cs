@@ -892,6 +892,36 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<DateTimeOffset?>("CompletionApprovedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CompletionApprovedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("CompletionApprovalReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("CompletionCurrentPlanJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompletionDifferencesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompletionFactJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompletionFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("CompletionOriginalPlanJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("CompletionSourceCheckedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 

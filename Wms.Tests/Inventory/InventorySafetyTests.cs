@@ -179,8 +179,18 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
         Success(order.SetReceivingLocation(source.Id));
         Success(order.SetInReceiving(DateTimeOffset.UtcNow, "putaway"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "putaway"));
         Success(order.UpdateItemFactQuantity(1, 10m));
-        Success(order.SetReceived(DateTimeOffset.UtcNow, "putaway"));
+        var completion = new ReceivingCompletionReconciliation(
+            DateTimeOffset.UtcNow,
+            new OrderSynchronizationAssessment(new string('A', 64), []),
+            [new(1, sku.Id, 10m)],
+            [new(1, sku.Id, 10m)],
+            [new(1, sku.Id, 10m)],
+            false);
+        Success(order.SetReceived(
+            completion, "[]", "[]", "[]", "[]",
+            DateTimeOffset.UtcNow, "putaway", false, null));
 
         await using var seed = database.CreateDbContext();
         seed.AddRange(warehouse, sku, receivingZone, storageZone, source, first, second, balance, order);

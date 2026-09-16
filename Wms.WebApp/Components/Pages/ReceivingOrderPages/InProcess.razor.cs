@@ -7,6 +7,7 @@ using Wms.Application.StorageLocations;
 using Wms.Application.Users;
 using Wms.Application.Zones;
 using Wms.Common;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -41,6 +42,16 @@ public partial class InProcess
     private PendingItemOperation? _pendingItem;
     private bool _isSavingItem;
     private bool InputsLocked => true;
+    private bool CompletionLocked => _isSavingItem
+        || _pendingItem is not null
+        || _isCompleting
+        || _order is not { Status: ReceivingOrderStatus.InReceiving }
+        || !_isParticipant
+        || _order.LicensePlateNumbers.Any(x => x.Status == LicensePlateNumberStatus.Open)
+        || _completionReconciliation is null
+        || _completionReconciliation.IsBlocking
+        || (_completionReconciliation.RequiresManager
+            && (!_canApproveQuantityDifference || string.IsNullOrWhiteSpace(_managerReason)));
     private ReceivingOrder? _order;
     private Zone? _receivingZone;
     private StorageLocation? _receivingLocation;
@@ -51,6 +62,10 @@ public partial class InProcess
     private string? _errorMessage;
     private string? _synchronizationErrorMessage;
     private OrderSynchronizationAssessment? _synchronizationAssessment;
+    private ReceivingCompletionReconciliation? _completionReconciliation;
+    private bool _canApproveQuantityDifference;
+    private bool _isParticipant;
+    private string? _managerReason;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     protected override async Task OnParametersSetAsync()
@@ -60,14 +75,20 @@ public partial class InProcess
         if (_pendingItem is { } itemPending && itemPending.OrderId != Id)
             _pendingItem = null;
         _isLoading = true;
-        OperationResult<OrderSynchronizationAssessment> synchronizationResult =
-            await SynchronizationService.CheckAsync(Id);
-        _synchronizationAssessment = synchronizationResult.Value;
+        AuthenticationState authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _canApproveQuantityDifference = authenticationState.User.IsInRole(ApplicationRoles.Manager);
+        OperationResult<ReceivingCompletionReconciliation> synchronizationResult =
+            await SynchronizationService.CheckCompletionAsync(Id);
+        _completionReconciliation = synchronizationResult.Value;
+        _synchronizationAssessment = synchronizationResult.Value?.Assessment;
         _synchronizationErrorMessage = synchronizationResult.IsSuccess
             ? null
             : synchronizationResult.Error?.Message
                 ?? "Не удалось сверить приходный ордер с 1С.";
         _order = await OrderQueryService.GetOrderAsync(Id);
+        string? currentUserId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        _isParticipant = currentUserId is not null
+            && _order?.Participants.Any(x => x.UserId == currentUserId) == true;
         _userNames = _order is null
             ? new Dictionary<string, string>()
             : await ApplicationUserQueryService.GetUserNamesAsync([
@@ -276,7 +297,9 @@ public partial class InProcess
 
     private async Task SetReceivedAsync()
     {
-        if (_isSavingItem || _pendingItem is not null || _isAcknowledgingSynchronization || _isCompleting || (_pendingCompletion is null && _receivingLocation is null))
+        if ((_pendingCompletion is null && CompletionLocked)
+            || _isCompleting
+            || (_pendingCompletion is null && _receivingLocation is null))
             return;
 
         var orderId = Id;
@@ -303,10 +326,19 @@ public partial class InProcess
                 _errorMessage = "Повторите операцию под пользователем, который её начал.";
                 return;
             }
-            _pendingCompletion ??= new(new CompleteReceivingCommand(orderId, locationId),
+            if (_completionReconciliation is null)
+                return;
+            _pendingCompletion ??= new(new CompleteReceivingCommand(
+                    orderId,
+                    locationId,
+                    _completionReconciliation.Assessment.Fingerprint,
+                    _completionReconciliation.RequiresManager ? _managerReason?.Trim() : null),
                 new CommandContext(Guid.NewGuid(), userId));
             var pending = _pendingCompletion;
-            var result = await OrderCommandService.CompleteReceivingAsync(pending.Command, pending.Context);
+            var result = await OrderCommandService.CompleteReceivingAsync(
+                pending.Command,
+                pending.Context,
+                _canApproveQuantityDifference);
             if (_pendingCompletion != pending)
                 return;
             if (result.IsSuccess || result.Error?.Type != OperationErrorType.Failure)
@@ -317,14 +349,14 @@ public partial class InProcess
             {
                 if (result.Error?.Type == OperationErrorType.Conflict)
                 {
-                    OperationResult<OrderSynchronizationAssessment> latest =
-                        await SynchronizationService.CheckAsync(Id);
+                    OperationResult<ReceivingCompletionReconciliation> latest =
+                        await SynchronizationService.CheckCompletionAsync(Id);
                     if (latest.IsSuccess)
                     {
-                        _synchronizationAssessment = latest.Value;
+                        _completionReconciliation = latest.Value;
+                        _synchronizationAssessment = latest.Value!.Assessment;
                         _synchronizationErrorMessage = null;
-                        if (_synchronizationAssessment is { Level: not OrderSynchronizationLevel.Synchronized })
-                            return;
+                        _order = await OrderQueryService.GetOrderAsync(Id);
                     }
                     else
                     {
@@ -346,6 +378,12 @@ public partial class InProcess
             _isCompleting = false;
         }
     }
+
+    private decimal? CurrentPlanQuantity(ReceivingOrderItem item) =>
+        _completionReconciliation?.CurrentPlan
+            .SingleOrDefault(x => x.LineNumber == item.LineNumber
+                && x.StockKeepingUnitId == item.StockKeepingUnitId)
+            ?.Quantity;
 
     private async Task<string?> GetCurrentUserIdAsync()
     {

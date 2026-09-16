@@ -15,7 +15,6 @@ public class ReceivingOrderCommandService(
     CommandExecutor commandExecutor,
     InventoryPostingService inventoryPostingService,
     ReceivingOrderSynchronizationService synchronizationService,
-    IReceivingOrderExecutionSink executionSink,
     ILogger<ReceivingOrderCommandService> logger)
 {
     // Persisted protocol identifiers: do not derive these from CLR type names.
@@ -98,19 +97,17 @@ public class ReceivingOrderCommandService(
     public Task<OperationResult<Guid>> CompleteReceivingAsync(
         CompleteReceivingCommand command,
         CommandContext context,
+        bool canApproveQuantityDifference = false,
         CancellationToken ct = default) =>
         commandExecutor.ExecuteAsync(
             CompleteReceivingCommandType,
             context.RequestId,
-            // Null keeps the original Mobile completion hash, independent of DB state.
-            CommandExecutor.ComputeHash(command.ReceivingLocationId is Guid locationId
-                ? $"{command.OrderId:N}|{locationId:N}"
-                : command.OrderId.ToString("N")),
+            CommandExecutor.ComputeHash(JsonSerializer.Serialize(command)),
             context.UserId,
             async (dbContext, token) =>
             {
                 var result = await CompleteReceivingWithCheckpointAsync(
-                    dbContext, command, context.UserId, token);
+                    dbContext, command, context.UserId, canApproveQuantityDifference, token);
                 return result.IsSuccess ? command.OrderId : result.Error!;
             },
             ct);
@@ -119,9 +116,11 @@ public class ReceivingOrderCommandService(
         ApplicationDbContext dbContext,
         CompleteReceivingCommand command,
         string userId,
+        bool canApproveQuantityDifference,
         CancellationToken ct)
     {
-        var (orderId, receivingLocationId) = command;
+        Guid orderId = command.OrderId;
+        Guid? receivingLocationId = command.ReceivingLocationId;
         using var scope = logger.BeginScope("ReceivingOrder SetReceived {OrderId}", orderId);
         using var activity = AppTracing.StartActivity(
             "ReceivingOrder.SetReceived",
@@ -135,21 +134,44 @@ public class ReceivingOrderCommandService(
         }
 
         // Explicit independent checkpoint, after receipt lookup and before final effects.
-        OperationResult synchronizationResult = await synchronizationService.PersistCompletionCheckpointAsync(
+        OperationResult<ReceivingCompletionReconciliation> synchronizationResult = await synchronizationService.PersistCompletionCheckpointAsync(
             dbContext,
             order,
             ct);
         if (!synchronizationResult.IsSuccess)
-            return synchronizationResult;
+            return synchronizationResult.Error!;
 
-        return await CompleteReceivingCoreAsync(dbContext, order, receivingLocationId, userId, ct);
+        ReceivingCompletionReconciliation reconciliation = synchronizationResult.Value!;
+        if (!string.Equals(
+                reconciliation.Assessment.Fingerprint,
+                command.ExpectedFingerprint,
+                StringComparison.Ordinal))
+        {
+            return OperationError.Conflict(
+                "План 1С или состав LPN изменился. Просмотрите свежую сверку и подтвердите завершение заново.");
+        }
+        if (reconciliation.IsBlocking)
+            return OperationError.Conflict("Завершение заблокировано свежей сверкой с 1С.");
+
+        return await CompleteReceivingCoreAsync(
+            dbContext,
+            order,
+            reconciliation,
+            receivingLocationId,
+            userId,
+            canApproveQuantityDifference,
+            command.ManagerReason,
+            ct);
     }
 
     private async Task<OperationResult> CompleteReceivingCoreAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
+        ReceivingCompletionReconciliation reconciliation,
         Guid? receivingLocationId,
         string userId,
+        bool canApproveQuantityDifference,
+        string? managerReason,
         CancellationToken ct)
     {
         if (receivingLocationId is Guid selectedLocationId)
@@ -172,7 +194,16 @@ public class ReceivingOrderCommandService(
             return locationResult;
 
         var now = DateTimeOffset.UtcNow;
-        var transitionResult = order.SetReceived(now, userId);
+        var transitionResult = order.SetReceived(
+            reconciliation,
+            JsonSerializer.Serialize(reconciliation.OriginalPlan),
+            JsonSerializer.Serialize(reconciliation.CurrentPlan),
+            JsonSerializer.Serialize(reconciliation.Fact),
+            JsonSerializer.Serialize(reconciliation.Assessment.Differences),
+            now,
+            userId,
+            canApproveQuantityDifference,
+            managerReason);
         if (!transitionResult.IsSuccess)
         {
             logger.LogError("Не удалось завершить приемку приходного ордера: {ErrorMessage}", transitionResult.Error?.Message);
@@ -193,28 +224,6 @@ public class ReceivingOrderCommandService(
 
         if (!balanceAndTurnoverResult.IsSuccess)
             return balanceAndTurnoverResult;
-
-        if (order.HasPlanFactDifference)
-        {
-            var externalItemsUpdateResult = await executionSink.UpdateItemsAsync(
-                order.Id,
-                order.Items,
-                ct);
-
-            if (!externalItemsUpdateResult.IsSuccess)
-            {
-                logger.LogError("Не удалось обновить строки приходного ордера в 1С: {ErrorMessage}", externalItemsUpdateResult.Error?.Message);
-                return externalItemsUpdateResult;
-            }
-        }
-
-        var externalResult = await executionSink.SetReceivedAsync(order.Id, ct);
-
-        if (!externalResult.IsSuccess)
-        {
-            logger.LogError("Не удалось завершить приемку документа в 1С: {ErrorMessage}", externalResult.Error?.Message);
-            return externalResult;
-        }
 
         return OperationResult.Success();
     }
@@ -291,6 +300,8 @@ public class ReceivingOrderCommandService(
         dbContext.ReceivingOrders
             .Include(x => x.Items)
             .Include(x => x.Participants)
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
     private static OperationResult<List<InventoryMovement>> CreateReceivingMovements(

@@ -24,6 +24,29 @@ public sealed class ReceivingOrderSynchronizationService(
             : snapshotResult.Error!;
     }
 
+    public async Task<OperationResult<ReceivingCompletionReconciliation>> CheckCompletionAsync(
+        Guid orderId,
+        CancellationToken ct = default)
+    {
+        OperationResult<ReceivingOrderImportSnapshot> snapshotResult =
+            await orderSource.GetSnapshotAsync(orderId, ct);
+        if (!snapshotResult.IsSuccess)
+            return snapshotResult.Error!;
+
+        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        ReceivingOrder? order = await LoadCompletionOrderAsync(dbContext, orderId, ct);
+        if (order is null)
+            return OperationError.NotFound($"Приходный ордер '{orderId}' не найден в WMS.");
+
+        ReceivingCompletionReconciliation reconciliation = ReceivingCompletionComparer.Compare(
+            order,
+            snapshotResult.Value!,
+            DateTimeOffset.UtcNow);
+        order.ApplySynchronizationAssessment(reconciliation.Assessment, reconciliation.CheckedAtUtc);
+        OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return saveResult.IsSuccess ? reconciliation : saveResult.Error!;
+    }
+
     public async Task<OperationResult<OrderSynchronizationAssessment>> ImportNotificationAsync(
         Guid orderId,
         CancellationToken ct = default)
@@ -78,7 +101,7 @@ public sealed class ReceivingOrderSynchronizationService(
             : acknowledgeResult;
     }
 
-    internal async Task<OperationResult> PersistCompletionCheckpointAsync(
+    internal async Task<OperationResult<ReceivingCompletionReconciliation>> PersistCompletionCheckpointAsync(
         ApplicationDbContext dbContext,
         ReceivingOrder order,
         CancellationToken ct)
@@ -88,21 +111,25 @@ public sealed class ReceivingOrderSynchronizationService(
         if (!snapshotResult.IsSuccess)
             return snapshotResult.Error!;
 
-        ReceivingOrderImportSnapshot snapshot = snapshotResult.Value!;
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        OrderSynchronizationAssessment sourceAssessment = order.AssessSynchronization(snapshot, now);
-        OrderSynchronizationAssessment targetAssessment =
-            ReceivingOrderSynchronizationComparer.CompareReceivedTarget(order, snapshot);
-        OrderSynchronizationAssessment assessment = sourceAssessment.Level == OrderSynchronizationLevel.Synchronized
-            ? sourceAssessment
-            : targetAssessment.Level == OrderSynchronizationLevel.Synchronized
-                ? targetAssessment
-                : sourceAssessment;
-
-        order.ApplySynchronizationAssessment(assessment, now);
+        ReceivingCompletionReconciliation reconciliation = ReceivingCompletionComparer.Compare(
+            order,
+            snapshotResult.Value!,
+            DateTimeOffset.UtcNow);
+        order.ApplySynchronizationAssessment(reconciliation.Assessment, reconciliation.CheckedAtUtc);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
-        return saveResult.IsSuccess ? EnsureAllowsWork(order) : saveResult;
+        return saveResult.IsSuccess ? reconciliation : saveResult.Error!;
     }
+
+    private static Task<ReceivingOrder?> LoadCompletionOrderAsync(
+        ApplicationDbContext dbContext,
+        Guid orderId,
+        CancellationToken ct) =>
+        dbContext.ReceivingOrders
+            .Include(x => x.Items)
+            .Include(x => x.Participants)
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == orderId, ct);
 
     private async Task<OperationResult<OrderSynchronizationAssessment>> ApplySnapshotAsync(
         ReceivingOrderImportSnapshot snapshot,

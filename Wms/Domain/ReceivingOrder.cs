@@ -44,6 +44,15 @@ public class ReceivingOrder
     public string? SynchronizationFingerprint { get; private set; }
     public DateTimeOffset? SynchronizationAcknowledgedAtUtc { get; private set; }
     public string? SynchronizationAcknowledgedBy { get; private set; }
+    public DateTimeOffset? CompletionSourceCheckedAtUtc { get; private set; }
+    public string? CompletionFingerprint { get; private set; }
+    public string? CompletionOriginalPlanJson { get; private set; }
+    public string? CompletionCurrentPlanJson { get; private set; }
+    public string? CompletionFactJson { get; private set; }
+    public string? CompletionDifferencesJson { get; private set; }
+    public DateTimeOffset? CompletionApprovedAtUtc { get; private set; }
+    public string? CompletionApprovedBy { get; private set; }
+    public string? CompletionApprovalReason { get; private set; }
     public Guid ShipperId { get; private set; }
     public PartyType ShipperType { get; private set; }
     public PartyInfo? Shipper { get; private set; }
@@ -618,7 +627,7 @@ public class ReceivingOrder
             : OperationError.Invalid(
                 "Строки приходного ордера можно изменять только во время приёмки или обработки ордера.");
 
-    private OperationResult ValidateToSetReceived()
+    private OperationResult ValidateToSetReceived(string userId)
     {
         if (Status != ReceivingOrderStatus.InReceiving)
         {
@@ -632,6 +641,22 @@ public class ReceivingOrder
                 "Перед завершением приёмки необходимо указать позицию приёмки.");
         }
 
+        if (!_participants.Any(x => x.UserId == userId))
+        {
+            return OperationError.Conflict(
+                "Завершить приёмку может только участник приходного ордера.");
+        }
+
+        var openLpns = _licensePlateNumbers
+            .Where(x => x.Status == LicensePlateNumberStatus.Open)
+            .Select(x => string.IsNullOrWhiteSpace(x.Code) ? x.Id.ToString("D") : x.Code)
+            .ToList();
+        if (openLpns.Count > 0)
+        {
+            return OperationError.Conflict(
+                $"Перед завершением закройте LPN: {string.Join(", ", openLpns)}.");
+        }
+
         if (_items.Any(x => !x.IsFactConfirmed))
         {
             return OperationError.Invalid(
@@ -641,9 +666,18 @@ public class ReceivingOrder
         return OperationResult.Success();
     }
 
-    public OperationResult SetReceived(DateTimeOffset completedAtUtc, string completedBy)
+    public OperationResult SetReceived(
+        ReceivingCompletionReconciliation reconciliation,
+        string originalPlanJson,
+        string currentPlanJson,
+        string factJson,
+        string differencesJson,
+        DateTimeOffset completedAtUtc,
+        string completedBy,
+        bool canApproveQuantityDifference,
+        string? approvalReason)
     {
-        var validationResult = ValidateToSetReceived();
+        var validationResult = ValidateToSetReceived(completedBy);
         if (!validationResult.IsSuccess)
         {
             return validationResult;
@@ -661,9 +695,40 @@ public class ReceivingOrder
                 "Время завершения приёмки не может предшествовать предыдущим операциям ордера.");
         }
 
+        if (reconciliation.IsBlocking)
+            return OperationError.Conflict("Завершение заблокировано свежей сверкой с 1С.");
+        if (string.IsNullOrWhiteSpace(reconciliation.Assessment.Fingerprint)
+            || string.IsNullOrWhiteSpace(originalPlanJson)
+            || string.IsNullOrWhiteSpace(currentPlanJson)
+            || string.IsNullOrWhiteSpace(factJson)
+            || string.IsNullOrWhiteSpace(differencesJson))
+        {
+            return OperationError.Invalid("Снимок завершения приходного ордера обязателен.");
+        }
+        if (reconciliation.RequiresManager
+            && (!canApproveQuantityDifference || string.IsNullOrWhiteSpace(approvalReason)))
+        {
+            return OperationError.Conflict(
+                "Количественное расхождение должен подтвердить Manager с указанием причины.");
+        }
+        if (reconciliation.RequiresManager && approvalReason!.Trim().Length > 1000)
+            return OperationError.Invalid("Причина решения Manager не должна превышать 1000 символов.");
+
         Status = ReceivingOrderStatus.Received;
         CompletedAtUtc = completedAtUtc;
         CompletedBy = completedBy.Trim();
+        CompletionSourceCheckedAtUtc = reconciliation.CheckedAtUtc;
+        CompletionFingerprint = reconciliation.Assessment.Fingerprint;
+        CompletionOriginalPlanJson = originalPlanJson;
+        CompletionCurrentPlanJson = currentPlanJson;
+        CompletionFactJson = factJson;
+        CompletionDifferencesJson = differencesJson;
+        CompletionApprovedAtUtc = reconciliation.RequiresManager ? completedAtUtc : null;
+        CompletionApprovedBy = reconciliation.RequiresManager ? completedBy.Trim() : null;
+        CompletionApprovalReason = reconciliation.RequiresManager ? approvalReason!.Trim() : null;
+        SynchronizationLevel = OrderSynchronizationLevel.Synchronized;
+        SynchronizationDetectedAtUtc = null;
+        SynchronizationFingerprint = reconciliation.Assessment.Fingerprint;
         PutawayStatus = _items.Any(x => x.FactQuantity > 0)
             ? PutawayStatus.Pending
             : PutawayStatus.Inactive;

@@ -28,13 +28,13 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="2">
-        <MudAlert Severity="Severity.Info">Прямое редактирование факта и завершение отключены. Новый процесс выполняется через LPN.</MudAlert>
+        <MudAlert Severity="Severity.Info">Факт формируется только из состава LPN. Завершение не изменяет документ 1С.</MudAlert>
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Приёмка приходного ордера @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
             <MudButton Color="Color.Primary"
                        Variant="Variant.Filled"
-                       Disabled="true"
+                       Disabled="@(_pendingCompletion is null && CompletionLocked)"
                        StartIcon="@Icons.Material.Filled.Check"
                        OnClick="SetReceivedAsync">
                 @(_pendingCompletion is null ? "Завершить" : "Повторить завершение")
@@ -47,7 +47,7 @@ else
         @if (_isCompleting)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
+            <MudText Typo="Typo.caption">Выполняется свежая сверка и атомарный приход…</MudText>
         }
 
 
@@ -57,10 +57,38 @@ else
         }
 
         <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
-                                   IsAcknowledging="InputsLocked"
-                                   OnAcknowledge="AcknowledgeSynchronizationAsync"
+                                   IsAcknowledging="true"
+                                   ShowAcknowledgeButton="false"
+                                   RequiresDecisionMessage="Факт отличается от актуального плана 1С. Для завершения требуется отдельное решение Manager с причиной."
                                    AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
                                    AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
+
+        @if (_order.LicensePlateNumbers.Any(x => x.Status == LicensePlateNumberStatus.Open))
+        {
+            <MudAlert Severity="Severity.Warning">
+                Открытые LPN: @string.Join(", ", _order.LicensePlateNumbers
+                    .Where(x => x.Status == LicensePlateNumberStatus.Open)
+                    .Select(x => $"{x.Code} ({GetUserName(x.ResponsibleUserId)})"))
+            </MudAlert>
+        }
+
+        @if (_completionReconciliation?.RequiresManager == true)
+        {
+            @if (_canApproveQuantityDifference)
+            {
+                <MudTextField T="string"
+                              Label="Причина подтверждения количественного расхождения"
+                              @bind-Value="_managerReason"
+                              Disabled="@(_isCompleting || _pendingCompletion is not null)"
+                              Required="true"
+                              Lines="2"
+                              Variant="Variant.Outlined" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">Количественное расхождение может подтвердить только Manager.</MudAlert>
+            }
+        }
 
         @if (_order.UnconfirmedItemCount > 0)
         {
@@ -135,7 +163,10 @@ else
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
+                <PropertyColumn Property="x => x.PlanQuantity" Title="Исходный план" />
+                <TemplateColumn Title="Актуальный план 1С">
+                    <CellTemplate>@FormatQuantity(CurrentPlanQuantity(context.Item))</CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Факт">
                     <CellTemplate>
                         <MudNumericField T="decimal?"

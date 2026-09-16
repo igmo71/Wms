@@ -12,7 +12,7 @@
             <MudText Typo="Typo.body2">
                 @(assessment.Level == OrderSynchronizationLevel.Blocking
                     ? "Расхождения затрагивают складские данные. Продолжение операции недопустимо до исправления источника."
-                    : "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.")
+                    : RequiresDecisionMessage)
             </MudText>
 
             <MudTable T="OrderSynchronizationDifference"
@@ -34,14 +34,14 @@
                 </RowTemplate>
             </MudTable>
 
-            @if (assessment.Level == OrderSynchronizationLevel.RequiresOperatorDecision)
+            @if (assessment.Level == OrderSynchronizationLevel.RequiresOperatorDecision && ShowAcknowledgeButton)
             {
                 <MudButton Color="Color.Warning"
                            Variant="Variant.Filled"
                            Disabled="IsAcknowledging"
                            StartIcon="@Icons.Material.Filled.DoneAll"
                            OnClick="OnAcknowledge">
-                    Принять изменения из 1С
+                    @AcknowledgeButtonText
                 </MudButton>
             }
         </MudStack>
@@ -64,6 +64,16 @@
 
     [Parameter]
     public EventCallback OnAcknowledge { get; set; }
+
+    [Parameter]
+    public bool ShowAcknowledgeButton { get; set; } = true;
+
+    [Parameter]
+    public string RequiresDecisionMessage { get; set; } =
+        "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.";
+
+    [Parameter]
+    public string AcknowledgeButtonText { get; set; } = "Принять изменения из 1С";
 
     [Parameter]
     public string AcknowledgedBy { get; set; } = "—";

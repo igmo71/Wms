@@ -93,7 +93,11 @@ else
         }
 
         <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
-                                   IsAcknowledging="@(_isAcknowledgingSynchronization || PutawayPending)"
+                                   IsAcknowledging="@(_isAcknowledgingSynchronization || PutawayPending || _order.Status == ReceivingOrderStatus.Received)"
+                                   ShowAcknowledgeButton="@(_order.Status != ReceivingOrderStatus.Received)"
+                                   RequiresDecisionMessage="@(_order.Status == ReceivingOrderStatus.Received
+                                       ? "Сохранённые расхождения, по которым было завершено принятие. Принятый состав неизменяем."
+                                       : "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.")"
                                    OnAcknowledge="AcknowledgeSynchronizationAsync"
                                    AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
                                    AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
@@ -167,10 +171,21 @@ else
             <MudGrid Spacing="2">
                 <DocumentOperationInfo Title="Взял в работу" UserName="@GetUserName(_order.StartedBy)" Timestamp="_order.StartedAtUtc" />
                 <DocumentOperationInfo Title="Принял" UserName="@GetUserName(_order.CompletedBy)" Timestamp="_order.CompletedAtUtc" />
+                @if (_order.CompletionApprovedAtUtc is not null)
+                {
+                    <DocumentOperationInfo Title="Подтвердил расхождение" UserName="@GetUserName(_order.CompletionApprovedBy)" Timestamp="_order.CompletionApprovedAtUtc" />
+                }
                 <DocumentOperationInfo Title="Начал размещение" UserName="@GetUserName(_order.PutawayStartedBy)" Timestamp="_order.PutawayStartedAtUtc" />
                 <DocumentOperationInfo Title="Разместил" UserName="@GetUserName(_order.PutawayCompletedBy)" Timestamp="_order.PutawayCompletedAtUtc" />
             </MudGrid>
         </MudPaper>
+
+        @if (_order.CompletionApprovedAtUtc is not null)
+        {
+            <MudAlert Severity="Severity.Info">
+                Причина решения Manager: @_order.CompletionApprovalReason
+            </MudAlert>
+        }
 
         <MudPaper Class="pa-3" Elevation="0" Outlined="true">
             <MudText Typo="Typo.h6" Class="mb-2">Участники приёмки</MudText>
@@ -253,7 +268,13 @@ else
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
+                <PropertyColumn Property="x => x.PlanQuantity" Title="Исходный план" />
+                @if (_order.Status == ReceivingOrderStatus.Received)
+                {
+                    <TemplateColumn Title="Актуальный план при завершении">
+                        <CellTemplate>@FormatQuantity(CompletionCurrentPlanQuantity(context.Item))</CellTemplate>
+                    </TemplateColumn>
+                }
                 <TemplateColumn Title="Факт">
                     <CellTemplate>@FormatQuantity(context.Item.FactQuantity, "Не проверено")</CellTemplate>
                 </TemplateColumn>

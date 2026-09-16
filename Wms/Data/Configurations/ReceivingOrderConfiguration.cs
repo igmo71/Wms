@@ -22,6 +22,12 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
             .HasMaxLength(DefaultConfiguration.Fingerprint);
         builder.Property(x => x.SynchronizationAcknowledgedBy)
             .HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.CompletionFingerprint)
+            .HasMaxLength(DefaultConfiguration.Fingerprint);
+        builder.Property(x => x.CompletionApprovedBy)
+            .HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.CompletionApprovalReason)
+            .HasMaxLength(DefaultConfiguration.Description);
         builder.Ignore(x => x.Shipper);
 
         builder.HasOne(X => X.Warehouse).WithMany()

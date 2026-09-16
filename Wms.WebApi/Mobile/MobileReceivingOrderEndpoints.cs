@@ -430,9 +430,9 @@ internal static class MobileReceivingOrderEndpoints
             request.ClientRequestId,
             principal,
             (id, requestId, userId, token) => commandService.CompleteReceivingAsync(
-                new CompleteReceivingCommand(id, null),
+                new CompleteReceivingCommand(id, null, string.Empty, null),
                 new CommandContext(requestId, userId),
-                token),
+                ct: token),
             queryService,
             ct);
 

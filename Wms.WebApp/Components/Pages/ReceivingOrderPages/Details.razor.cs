@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
+using System.Text.Json;
 using Wms.Application.Commands;
 using Wms.Application.ReceivingOrders;
 using Wms.Application.StorageLocations;
@@ -53,6 +54,7 @@ public partial class Details
     private string? _errorMessage;
     private string? _synchronizationErrorMessage;
     private OrderSynchronizationAssessment? _synchronizationAssessment;
+    private IReadOnlyList<ReceivingCompletionPlanLine> _completionCurrentPlan = [];
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     protected override async Task OnParametersSetAsync()
@@ -63,14 +65,28 @@ public partial class Details
             _pendingPutaway = null;
         _isLoading = true;
 
-        OperationResult<OrderSynchronizationAssessment> synchronizationResult =
-            await SynchronizationService.CheckAsync(Id);
-        _synchronizationAssessment = synchronizationResult.Value;
-        _synchronizationErrorMessage = synchronizationResult.IsSuccess
-            ? null
-            : synchronizationResult.Error?.Message
-                ?? "Не удалось сверить приходный ордер с 1С.";
         _order = await OrderQueryService.GetOrderAsync(Id);
+        if (_order?.Status == ReceivingOrderStatus.Received)
+        {
+            _completionCurrentPlan = Deserialize<IReadOnlyList<ReceivingCompletionPlanLine>>(
+                _order.CompletionCurrentPlanJson) ?? [];
+            var differences = Deserialize<IReadOnlyList<OrderSynchronizationDifference>>(
+                _order.CompletionDifferencesJson) ?? [];
+            _synchronizationAssessment = string.IsNullOrWhiteSpace(_order.CompletionFingerprint)
+                ? null
+                : new OrderSynchronizationAssessment(_order.CompletionFingerprint, differences);
+            _synchronizationErrorMessage = null;
+        }
+        else
+        {
+            OperationResult<OrderSynchronizationAssessment> synchronizationResult =
+                await SynchronizationService.CheckAsync(Id);
+            _synchronizationAssessment = synchronizationResult.Value;
+            _synchronizationErrorMessage = synchronizationResult.IsSuccess
+                ? null
+                : synchronizationResult.Error?.Message
+                    ?? "Не удалось сверить приходный ордер с 1С.";
+        }
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;
         await LoadUserNamesAsync();
@@ -87,6 +103,7 @@ public partial class Details
                 _order.PutawayStartedBy,
                 _order.PutawayCompletedBy,
                 _order.SynchronizationAcknowledgedBy,
+                _order.CompletionApprovedBy,
                 .. _order.Participants.Select(x => x.UserId),
                 .. _order.LicensePlateNumbers.SelectMany(x =>
                     new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy, x.CancelledBy }
@@ -96,7 +113,9 @@ public partial class Details
 
     private async Task AcknowledgeSynchronizationAsync()
     {
-        if (PutawayPending || _synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
+        if (PutawayPending
+            || _order?.Status == ReceivingOrderStatus.Received
+            || _synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
             return;
 
         _isAcknowledgingSynchronization = true;
@@ -146,6 +165,20 @@ public partial class Details
         : _userNames.TryGetValue(userId, out var userName)
             ? userName
             : "Пользователь не найден";
+
+    private decimal? CompletionCurrentPlanQuantity(ReceivingOrderItem item) =>
+        _completionCurrentPlan
+            .SingleOrDefault(x => x.LineNumber == item.LineNumber
+                && x.StockKeepingUnitId == item.StockKeepingUnitId)
+            ?.Quantity;
+
+    private static T? Deserialize<T>(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return default;
+        try { return JsonSerializer.Deserialize<T>(json); }
+        catch (JsonException) { return default; }
+    }
 
     private async Task<IEnumerable<Zone>> SearchReceivingZonesAsync(string? searchText, CancellationToken ct)
     {
