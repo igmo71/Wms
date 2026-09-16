@@ -1,0 +1,91 @@
+<ContentPage
+    x:Class="Wms.Mobile.LicensePlateNumberPutawayPage"
+    x:Name="Page"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Размещение LPN">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="25" />
+            <Label x:Name="InstructionLabel" FontSize="18" />
+            <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+
+            <Border x:Name="LpnPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="LpnCodeLabel" FontAttributes="Bold" FontSize="22" />
+                    <Label x:Name="OrderLabel" />
+                    <Label x:Name="LpnStatusLabel" />
+                    <VerticalStackLayout
+                        BindableLayout.ItemsSource="{Binding Items, Source={x:Reference Page}}"
+                        Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayItemResponse">
+                                <Border Padding="12">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnItemTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label FontAttributes="Bold" Text="{Binding SkuName}" />
+                                        <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
+                                        <Label Text="{Binding AcceptedQuantity, StringFormat='Принято: {0:g}'}" />
+                                        <Label Text="{Binding PlacedQuantity, StringFormat='Размещено: {0:g}'}" />
+                                        <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border x:Name="QuantityPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="10">
+                    <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
+                    <Label x:Name="RemainingLabel" />
+                    <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="Количество" />
+                    <Button Clicked="OnQuantityConfirmed" Text="К скану позиции" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border x:Name="DestinationPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="DestinationSkuLabel" FontAttributes="Bold" FontSize="20" />
+                    <Label x:Name="DestinationQuantityLabel" />
+                    <Label Text="Скан позиции сразу проводит движение." />
+                    <Button x:Name="RetryButton" Clicked="OnRetryClicked" IsVisible="False" Text="Повторить то же размещение" />
+                    <Button Clicked="OnChangeQuantityClicked" Text="Изменить количество" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border x:Name="HistoryPanel" IsVisible="False" Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontAttributes="Bold" Text="История размещения" />
+                    <VerticalStackLayout
+                        BindableLayout.ItemsSource="{Binding History, Source={x:Reference Page}}"
+                        Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayHistoryResponse">
+                                <Border Padding="10">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label FontAttributes="Bold" Text="{Binding SkuName}" />
+                                        <Label Text="{Binding Quantity, StringFormat='Количество: {0:g}'}" />
+                                        <Label Text="{Binding DestinationAddress, StringFormat='Назначение: {0}'}" />
+                                        <Label Text="{Binding CreatedBy, StringFormat='Исполнитель: {0}'}" />
+                                        <Label Text="{Binding CreatedAtUtc, StringFormat='Проведено: {0:dd.MM.yyyy HH:mm}'}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Button x:Name="NextLpnButton" Clicked="OnNextLpnClicked" IsVisible="False" Text="Следующий LPN" />
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
+            <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

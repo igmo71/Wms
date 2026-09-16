@@ -1,0 +1,40 @@
+namespace Wms.Application.LicensePlateNumbers;
+
+public sealed record LicensePlateNumberPutawayDetails(
+    Guid Id,
+    string Code,
+    string OrderNumber,
+    Guid WarehouseId,
+    bool CanPutaway,
+    string? BlockedReason,
+    bool IsCompleted,
+    IReadOnlyList<LicensePlateNumberPutawayItem> Items,
+    IReadOnlyList<LicensePlateNumberPutawayHistoryItem> History);
+
+public sealed record LicensePlateNumberPutawayItem(
+    Guid Id,
+    Guid StockKeepingUnitId,
+    string SkuCode,
+    string SkuName,
+    string? UnitOfMeasure,
+    decimal AcceptedQuantity,
+    decimal PlacedQuantity,
+    decimal RemainingQuantity);
+
+public sealed record LicensePlateNumberPutawayHistoryItem(
+    Guid Id,
+    Guid LicensePlateNumberItemId,
+    Guid StockKeepingUnitId,
+    string SkuName,
+    decimal Quantity,
+    string DestinationAddress,
+    string DestinationName,
+    string CreatedBy,
+    DateTimeOffset CreatedAtUtc,
+    Guid InventoryMovementId);
+
+public sealed record PutawayLicensePlateNumberCommand(
+    Guid LicensePlateNumberId,
+    Guid LicensePlateNumberItemId,
+    Guid DestinationStorageLocationId,
+    decimal Quantity);

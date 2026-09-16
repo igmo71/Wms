@@ -17,6 +17,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
     public DbSet<LicensePlateNumber> LicensePlateNumbers => Set<LicensePlateNumber>();
     public DbSet<LicensePlateNumberItem> LicensePlateNumberItems => Set<LicensePlateNumberItem>();
+    public DbSet<LicensePlateNumberPutaway> LicensePlateNumberPutaways => Set<LicensePlateNumberPutaway>();
     public DbSet<LicensePlateNumberBatch> LicensePlateNumberBatches => Set<LicensePlateNumberBatch>();
     public DbSet<OrganizationalUnit> OrganizationalUnits => Set<OrganizationalUnit>();
     public DbSet<Partner> Partners => Set<Partner>();

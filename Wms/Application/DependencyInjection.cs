@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryTurnoverQueryService>();
         services.AddScoped<CommandExecutor>();
         services.AddScoped<Wms.Application.LicensePlateNumbers.LicensePlateNumberService>();
+        services.AddScoped<Wms.Application.LicensePlateNumbers.LicensePlateNumberPutawayService>();
         services.AddScoped<OrganizationalUnitService>();
         services.AddScoped<PickingCommandService>();
         services.AddScoped<PartyQueryService>();

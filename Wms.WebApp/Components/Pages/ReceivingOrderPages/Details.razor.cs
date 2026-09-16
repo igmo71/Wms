@@ -30,8 +30,6 @@ public partial class Details
     [Inject]
     private ReceivingOrderCommandService OrderCommandService { get; set; } = null!;
     [Inject]
-    private PutawayCommandService PutawayCommandService { get; set; } = null!;
-    [Inject]
     private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject]
     private ZoneQueryService ZoneQueryService { get; set; } = null!;
@@ -41,14 +39,11 @@ public partial class Details
     private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private PendingReceivingCommand<StartReceivingCommand>? _pendingStart;
-    private (Guid OrderId, CommandContext Context)? _pendingPutaway;
-    private bool PutawayPending => _isStartingPutaway || _pendingPutaway is not null;
     private ReceivingOrder? _order;
     private Zone? _receivingZone;
     private StorageLocation? _receivingLocation;
     private bool _isLoading = true;
     private bool _isStarting;
-    private bool _isStartingPutaway;
     private bool _isAcknowledgingSynchronization;
     private bool _startOrderFailed;
     private string? _errorMessage;
@@ -61,8 +56,6 @@ public partial class Details
     {
         if (_pendingStart is { } pending && pending.Command.OrderId != Id)
             _pendingStart = null;
-        if (_pendingPutaway is { } putaway && putaway.OrderId != Id)
-            _pendingPutaway = null;
         _isLoading = true;
 
         _order = await OrderQueryService.GetOrderAsync(Id);
@@ -100,21 +93,19 @@ public partial class Details
             : await ApplicationUserQueryService.GetUserNamesAsync([
                 _order.StartedBy,
                 _order.CompletedBy,
-                _order.PutawayStartedBy,
-                _order.PutawayCompletedBy,
                 _order.SynchronizationAcknowledgedBy,
                 _order.CompletionApprovedBy,
                 .. _order.Participants.Select(x => x.UserId),
                 .. _order.LicensePlateNumbers.SelectMany(x =>
                     new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy, x.CancelledBy }
                         .Concat(x.Items.SelectMany(item =>
-                            new[] { item.CreatedBy, item.UpdatedBy, item.DeletedBy }))) ]);
+                            new[] { item.CreatedBy, item.UpdatedBy, item.DeletedBy }))
+                        .Concat(x.Putaways.Select(putaway => putaway.CreatedBy))) ]);
     }
 
     private async Task AcknowledgeSynchronizationAsync()
     {
-        if (PutawayPending
-            || _order?.Status == ReceivingOrderStatus.Received
+        if (_order?.Status == ReceivingOrderStatus.Received
             || _synchronizationAssessment is not { Level: OrderSynchronizationLevel.RequiresOperatorDecision } assessment)
             return;
 
@@ -231,7 +222,7 @@ public partial class Details
 
     private async Task SetInReceivingAsync()
     {
-        if (PutawayPending || _isAcknowledgingSynchronization || _isStarting || (_pendingStart is null && _receivingLocation is null))
+        if (_isAcknowledgingSynchronization || _isStarting || (_pendingStart is null && _receivingLocation is null))
             return;
 
         _isStarting = true;
@@ -273,50 +264,6 @@ public partial class Details
         {
             _isStarting = false;
         }
-    }
-
-    private async Task StartPutawayAsync()
-    {
-        if (_isStartingPutaway || _isStarting || _pendingStart is not null || _isAcknowledgingSynchronization)
-            return;
-        var orderId = Id;
-        _isStartingPutaway = true;
-        _startOrderFailed = false;
-        try
-        {
-            var userId = await GetCurrentUserIdAsync();
-            if (userId is null)
-            {
-                _startOrderFailed = true;
-                _errorMessage = "Не удалось определить текущего пользователя.";
-                return;
-            }
-            if (Id != orderId) return;
-            if (_pendingPutaway is { } previous && previous.Context.UserId != userId)
-            {
-                _startOrderFailed = true;
-                _errorMessage = "Повторите операцию под пользователем, который её начал.";
-                return;
-            }
-            _pendingPutaway ??= (orderId, new(Guid.NewGuid(), userId));
-            var pending = _pendingPutaway.Value;
-            var result = await PutawayCommandService.StartAsync(pending.OrderId, pending.Context);
-            if (_pendingPutaway != pending) return;
-            if (result.IsSuccess || result.Error?.Type != OperationErrorType.Failure) _pendingPutaway = null;
-            if (!result.IsSuccess)
-            {
-                _startOrderFailed = true;
-                _errorMessage = result.Error?.Message ?? "Не удалось начать размещение.";
-                return;
-            }
-            NavigationManager.NavigateTo($"receiving-orders/{result.Value}/putaway");
-        }
-        catch
-        {
-            _startOrderFailed = true;
-            _errorMessage = "Не удалось начать размещение.";
-        }
-        finally { _isStartingPutaway = false; }
     }
 
     private async Task<string?> GetCurrentUserIdAsync()

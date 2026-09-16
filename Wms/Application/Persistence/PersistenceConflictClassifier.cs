@@ -65,22 +65,23 @@ internal static class PersistenceConflictClassifier
             }
 
             if (concurrencyException.Entries.Any(x =>
-                    x.Entity is LicensePlateNumber or LicensePlateNumberItem))
+                    x.Entity is LicensePlateNumber
+                        or LicensePlateNumberItem
+                        or LicensePlateNumberPutaway))
             {
                 error = LicensePlateNumberConflict;
                 return true;
             }
 
-            // A concurrent delete may be reported against the draft movement before
-            // SQL reaches the owning receiving order's operational revision check.
+            // SQL may report a receiving movement before reaching the owning order
+            // or LPN operational revision check in the same command batch.
             if (concurrencyException.Entries.Any(x =>
                     x.Entity is InventoryMovement
                     {
                         RecorderType: RecorderType.ReceivingOrder,
                         SourceStorageLocationId: not null,
                         DestinationStorageLocationId: not null
-                    }
-                    && x.OriginalValues.GetValue<DateTimeOffset?>(nameof(InventoryMovement.PostedAtUtc)) is null))
+                    }))
             {
                 error = ReceivingOrderConflict;
                 return true;

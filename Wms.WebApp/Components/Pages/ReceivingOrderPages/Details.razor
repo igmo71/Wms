@@ -5,15 +5,6 @@
 
 <PageTitle>Детали приходного ордера</PageTitle>
 
-@if (_pendingPutaway is not null)
-{
-    <MudAlert Severity="Severity.Info" Class="mb-3">
-        Начало размещения ожидает подтверждения результата.
-        <MudButton OnClick="StartPutawayAsync" Disabled="@_isStartingPutaway" Color="Color.Primary">Повторить</MudButton>
-    </MudAlert>
-}
-
-
 @if (_isLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
@@ -25,7 +16,7 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="2">
-        <MudAlert Severity="Severity.Info">Начало приёмки выполняется участником на ТСД. Прежние Web-действия приёмки и размещения отключены.</MudAlert>
+        <MudAlert Severity="Severity.Info">Приёмка и независимое размещение LPN выполняются на ТСД. Web показывает происхождение и историю операций.</MudAlert>
         <MudStack Row="true" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
             <MudSpacer />
@@ -43,43 +34,15 @@ else
                     </span>
                 </MudTooltip>
             }
-            @if (_order.PutawayStatus == PutawayStatus.Pending)
-            {
-                <MudButton Color="Color.Primary"
-                           Variant="Variant.Filled"
-                           Disabled="true"
-                           StartIcon="@Icons.Material.Filled.PlayArrow"
-                           OnClick="StartPutawayAsync">
-                    Начать размещение
-                </MudButton>
-            }
-            else if (_order.PutawayStatus == PutawayStatus.InProgress)
-            {
-                <MudButton Href="@($"receiving-orders/{Id}/putaway")"
-                           Color="Color.Primary"
-                           Variant="Variant.Filled"
-                           StartIcon="@Icons.Material.Filled.Inventory">
-                    Открыть размещение
-                </MudButton>
-            }
-            else if (_order.PutawayStatus == PutawayStatus.Completed)
-            {
-                <MudButton Href="@($"receiving-orders/{Id}/putaway")"
-                           Color="Color.Primary"
-                           Variant="Variant.Outlined"
-                           StartIcon="@Icons.Material.Filled.Visibility">
-                    Посмотреть размещение
-                </MudButton>
-            }
             <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
                 К списку
             </MudButton>
         </MudStack>
 
-        @if (_isStarting || _isStartingPutaway)
+        @if (_isStarting)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">@(_isStartingPutaway ? "Начинается размещение…" : "Отправляется запрос в 1С…")</MudText>
+            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
         }
 
         @if (_startOrderFailed)
@@ -93,7 +56,7 @@ else
         }
 
         <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
-                                   IsAcknowledging="@(_isAcknowledgingSynchronization || PutawayPending || _order.Status == ReceivingOrderStatus.Received)"
+                                   IsAcknowledging="@(_isAcknowledgingSynchronization || _order.Status == ReceivingOrderStatus.Received)"
                                    ShowAcknowledgeButton="@(_order.Status != ReceivingOrderStatus.Received)"
                                    RequiresDecisionMessage="@(_order.Status == ReceivingOrderStatus.Received
                                        ? "Сохранённые расхождения, по которым было завершено принятие. Принятый состав неизменяем."
@@ -115,7 +78,6 @@ else
                         <MudText>@_order.Queue.GetDisplayName()</MudText>
                     </MudStack>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус размещения</MudText><MudChip T="string" Size="Size.Small" Color="@_order.PutawayStatus.GetChipColor()">@_order.PutawayStatus.GetDisplayName()</MudChip></MudItem>
             </MudGrid>
             <MudDivider Class="my-1" />
             <MudGrid Spacing="2">
@@ -175,8 +137,6 @@ else
                 {
                     <DocumentOperationInfo Title="Подтвердил расхождение" UserName="@GetUserName(_order.CompletionApprovedBy)" Timestamp="_order.CompletionApprovedAtUtc" />
                 }
-                <DocumentOperationInfo Title="Начал размещение" UserName="@GetUserName(_order.PutawayStartedBy)" Timestamp="_order.PutawayStartedAtUtc" />
-                <DocumentOperationInfo Title="Разместил" UserName="@GetUserName(_order.PutawayCompletedBy)" Timestamp="_order.PutawayCompletedAtUtc" />
             </MudGrid>
         </MudPaper>
 
@@ -229,6 +189,8 @@ else
                         <PropertyColumn Property="x => x.ReopenedAtUtc" Title="Возобновлён" Format="dd.MM.yyyy HH:mm" />
                         <TemplateColumn Title="Возобновил"><CellTemplate>@GetUserName(context.Item.ReopenedBy)</CellTemplate></TemplateColumn>
                         <PropertyColumn Property="x => x.CancelledAtUtc" Title="Отменён" Format="dd.MM.yyyy HH:mm" />
+                        <TemplateColumn Title="Размещено"><CellTemplate>@FormatQuantity(context.Item.Putaways.Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
+                        <TemplateColumn Title="Осталось"><CellTemplate>@FormatQuantity(context.Item.Items.Where(x => !x.IsDeleted).Sum(x => x.Quantity) - context.Item.Putaways.Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
                     </Columns>
                 </MudDataGrid>
                 @if (_order.LicensePlateNumbers.Any(x => x.Items.Count > 0))
@@ -250,12 +212,28 @@ else
                         </Columns>
                     </MudDataGrid>
                 }
+                @if (_order.LicensePlateNumbers.Any(x => x.Putaways.Count > 0))
+                {
+                    <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">История размещения LPN</MudText>
+                    <MudDataGrid T="LicensePlateNumberPutaway"
+                                 Items="_order.LicensePlateNumbers.SelectMany(x => x.Putaways).OrderByDescending(x => x.CreatedAtUtc)"
+                                 Dense="true">
+                        <Columns>
+                            <TemplateColumn Title="LPN"><CellTemplate>@context.Item.LicensePlateNumber.Code</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="SKU"><CellTemplate>@context.Item.StockKeepingUnit.Name</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Назначение"><CellTemplate>@($"{context.Item.DestinationStorageLocation.Zone.Code}-{context.Item.DestinationStorageLocation.Code}")</CellTemplate></TemplateColumn>
+                            <TemplateColumn Title="Исполнитель"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
+                            <PropertyColumn Property="x => x.CreatedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" />
+                            <TemplateColumn Title="Движение"><CellTemplate><MudLink Href="@($"inventory-movements?search={context.Item.InventoryMovementId}")">@context.Item.InventoryMovementId</MudLink></CellTemplate></TemplateColumn>
+                        </Columns>
+                    </MudDataGrid>
+                }
             }
         </MudPaper>
 
         @if (_order.Status == ReceivingOrderStatus.Received
-            && _order.PutawayStatus == PutawayStatus.Inactive
-            && !_order.Items.Any(x => x.FactQuantity > 0))
+            && !_order.LicensePlateNumbers.SelectMany(x => x.Items).Any(x => !x.IsDeleted && x.Quantity > 0))
         {
             <MudAlert Severity="Severity.Warning">Размещение недоступно: в ордере отсутствует фактически принятое количество.</MudAlert>
         }

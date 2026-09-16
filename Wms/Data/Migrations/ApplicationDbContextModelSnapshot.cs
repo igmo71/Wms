@@ -744,6 +744,27 @@ namespace Wms.Data.Migrations
                     b.ToTable("LicensePlateNumbers");
                 });
 
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("IssuedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("IssuedBy")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IssuedAtUtc");
+
+                    b.ToTable("LicensePlateNumberBatches");
+                });
+
             modelBuilder.Entity("Wms.Domain.LicensePlateNumberItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -794,25 +815,53 @@ namespace Wms.Data.Migrations
                     b.ToTable("LicensePlateNumberItems");
                 });
 
-            modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberPutaway", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset>("IssuedAtUtc")
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("IssuedBy")
+                    b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<Guid>("DestinationStorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InventoryMovementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LicensePlateNumberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LicensePlateNumberItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("IssuedAtUtc");
+                    b.HasIndex("DestinationStorageLocationId");
 
-                    b.ToTable("LicensePlateNumberBatches");
+                    b.HasIndex("InventoryMovementId")
+                        .IsUnique();
+
+                    b.HasIndex("LicensePlateNumberId");
+
+                    b.HasIndex("LicensePlateNumberItemId");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.ToTable("LicensePlateNumberPutaways");
                 });
 
             modelBuilder.Entity("Wms.Domain.OrganizationalUnit", b =>
@@ -892,16 +941,16 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<string>("CompletionApprovalReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<DateTimeOffset?>("CompletionApprovedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("CompletionApprovedBy")
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
-
-                    b.Property<string>("CompletionApprovalReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("CompletionCurrentPlanJson")
                         .HasColumnType("nvarchar(max)");
@@ -1761,6 +1810,49 @@ namespace Wms.Data.Migrations
                     b.Navigation("StockKeepingUnit");
                 });
 
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberPutaway", b =>
+                {
+                    b.HasOne("Wms.Domain.StorageLocation", "DestinationStorageLocation")
+                        .WithMany()
+                        .HasForeignKey("DestinationStorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.InventoryMovement", "InventoryMovement")
+                        .WithOne()
+                        .HasForeignKey("Wms.Domain.LicensePlateNumberPutaway", "InventoryMovementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.LicensePlateNumber", "LicensePlateNumber")
+                        .WithMany("Putaways")
+                        .HasForeignKey("LicensePlateNumberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.LicensePlateNumberItem", "LicensePlateNumberItem")
+                        .WithMany()
+                        .HasForeignKey("LicensePlateNumberItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinationStorageLocation");
+
+                    b.Navigation("InventoryMovement");
+
+                    b.Navigation("LicensePlateNumber");
+
+                    b.Navigation("LicensePlateNumberItem");
+
+                    b.Navigation("StockKeepingUnit");
+                });
+
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
                 {
                     b.HasOne("Wms.Domain.StorageLocation", "ReceivingLocation")
@@ -2005,14 +2097,16 @@ namespace Wms.Data.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
-                {
-                    b.Navigation("Labels");
-                });
-
             modelBuilder.Entity("Wms.Domain.LicensePlateNumber", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("Putaways");
+                });
+
+            modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
+                {
+                    b.Navigation("Labels");
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>

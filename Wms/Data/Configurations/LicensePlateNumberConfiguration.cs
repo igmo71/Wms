@@ -30,6 +30,9 @@ public sealed class LicensePlateNumberConfiguration : IEntityTypeConfiguration<L
         builder.Navigation(x => x.Items)
             .HasField("_items")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(x => x.Putaways)
+            .HasField("_putaways")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 
     public void Configure(EntityTypeBuilder<LicensePlateNumberBatch> builder)

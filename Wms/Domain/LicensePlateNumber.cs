@@ -6,6 +6,7 @@ namespace Wms.Domain;
 public sealed class LicensePlateNumber
 {
     private readonly List<LicensePlateNumberItem> _items = [];
+    private readonly List<LicensePlateNumberPutaway> _putaways = [];
     private LicensePlateNumber() { }
     internal LicensePlateNumber(Guid batchId) { Id = Guid.NewGuid(); BatchId = batchId; }
     public Guid Id { get; private set; }
@@ -27,6 +28,7 @@ public sealed class LicensePlateNumber
     public DateTimeOffset? ReopenedAtUtc { get; private set; }
     public long OperationalRevision { get; private set; }
     public IReadOnlyCollection<LicensePlateNumberItem> Items => _items;
+    public IReadOnlyCollection<LicensePlateNumberPutaway> Putaways => _putaways;
 
     internal OperationResult Assign(Guid receivingOrderId, string userId, DateTimeOffset createdAtUtc)
     {
@@ -149,6 +151,41 @@ public sealed class LicensePlateNumber
         ReopenedAtUtc = reopenedAtUtc;
         OperationalRevision++;
         return OperationResult.Success();
+    }
+
+    internal OperationResult<LicensePlateNumberPutaway> CreatePutaway(
+        Guid itemId,
+        Guid destinationStorageLocationId,
+        decimal quantity,
+        Guid inventoryMovementId,
+        string userId,
+        DateTimeOffset createdAtUtc)
+    {
+        if (Status != LicensePlateNumberStatus.Closed)
+            return OperationError.Invalid("Размещать можно только закрытый LPN.");
+
+        var item = _items.SingleOrDefault(x => x.Id == itemId && !x.IsDeleted);
+        if (item is null)
+            return OperationError.NotFound("Строка состава LPN не найдена.");
+        if (!WarehouseQuantity.IsPositive(quantity))
+            return OperationError.Invalid("Количество размещения должно быть больше нуля.");
+
+        var placedQuantity = _putaways
+            .Where(x => x.LicensePlateNumberItemId == itemId)
+            .Sum(x => x.Quantity);
+        if (placedQuantity + quantity > item.Quantity)
+            return OperationError.Conflict("Количество размещения превышает остаток выбранного LPN.");
+
+        var putawayResult = LicensePlateNumberPutaway.Create(
+            Guid.NewGuid(), Id, item.Id, item.StockKeepingUnitId,
+            destinationStorageLocationId, quantity, inventoryMovementId,
+            userId, createdAtUtc);
+        if (!putawayResult.IsSuccess)
+            return putawayResult.Error!;
+
+        _putaways.Add(putawayResult.Value!);
+        OperationalRevision++;
+        return putawayResult.Value!;
     }
 
     private OperationResult ValidateEditing(string userId, bool canManage)

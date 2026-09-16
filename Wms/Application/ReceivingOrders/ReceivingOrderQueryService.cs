@@ -26,6 +26,13 @@ public class ReceivingOrderQueryService(
                 .ThenInclude(x => x.Items)
                     .ThenInclude(x => x.StockKeepingUnit)
                         .ThenInclude(x => x.BaseUnitOfMeasure)
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Putaways)
+                    .ThenInclude(x => x.StockKeepingUnit)
+            .Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Putaways)
+                    .ThenInclude(x => x.DestinationStorageLocation)
+                        .ThenInclude(x => x.Zone)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
         if (order is null)

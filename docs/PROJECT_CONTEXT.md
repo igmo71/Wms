@@ -31,7 +31,8 @@ and uses existing topology. The target uses one sequential LPN code for display
 and barcode, and retained zero balances for historical-location suggestions.
 The specification defines eight increments. I01 label issuance and A4 printing,
 I02 receiving-order participation, I03 LPN association, I04 LPN counting, and
-I05 receiving completion are implemented; I06–I08 remain future work.
+I05 receiving completion and I06 independent LPN putaway are implemented;
+I07–I08 remain future work.
 Broader addressing work follows later. Consult the
 specification registry for active scope; implemented rules remain below.
 
@@ -233,10 +234,22 @@ successful replay reads the receipt before 1C and cannot receive stock twice.
 Completion makes no outbound change to 1C; later notifications do not replace
 the accepted facts or completion audit.
 
-Putaway supports split draft movements from receiving to ordinary storage
-and posts them together on completion. `ReceivingOrder.OperationalRevision`
-protects reconciliation, facts, transitions, and draft movements from stale
-saves.
+Independent putaway starts from a closed LPN rather than an order. Mobile uses
+LPN → SKU → quantity → destination scan; scanning the destination immediately
+posts one movement from the order's Receiving location to an active unlocked
+Storage location in the same warehouse. Partial putaway is allowed. The
+remaining quantity is the immutable accepted LPN-item quantity minus its posted
+LPN putaway history, so later picking or other consumption from a destination
+does not change receiving history or make quantity pending again.
+
+Putaway is blocked until the receiving order is completed. Each command checks
+both the physical source balance and the separate remaining limit of its LPN
+item. The LPN operational revision coordinates concurrent employees, while
+balance row versions independently protect shared physical stock. Movement,
+balances, turnover, LPN history and command receipt commit atomically. The old
+order-level draft/start/complete putaway UI and API are unavailable. I06 does
+not provide destination recommendations; any scanned destination is validated
+at posting time.
 
 Starting and completing receiving use shared application commands. Command
 receipt lookup precedes mutable validation and 1C access;
@@ -258,16 +271,11 @@ Original Mobile fact hashes remain compatible. Web snapshots each line edit for
 explicit retry and blocks other edits, completion, location selection and
 synchronization acknowledgement while an attempt is active or pending.
 
-Putaway start, draft add/update/delete and completion use the same
-PutawayCommandService and CommandExecutor in Web and Mobile. Receipt lookup
-precedes mutable checks; draft changes and order revision save with the receipt.
-Completion validates full allocation, routes, locks and current source stock,
-then confirms/posts all drafts and completes the order atomically with its receipt.
-No 1C call or synchronization checkpoint is involved. Web retains original
-movement inputs and request/user ids for explicit retries, disabling other
-mutations and editor selections while pending. Update/delete carry the expected
-order id. A draft edit racing its deletion is a business conflict even when SQL
-reports the missing movement before the order revision check.
+LPN putaway uses `LicensePlateNumberPutawayService` and `CommandExecutor`.
+Receipt lookup precedes mutable checks, and an uncertain Mobile response retains
+the original LPN item, quantity, destination and request id for explicit retry.
+Definitive rejection keeps the selected quantity and allows another destination
+scan. No 1C call or synchronization checkpoint participates in putaway.
 
 ### Picking and shipping
 
@@ -434,7 +442,7 @@ business/client `4xx` releases it. Stable Mobile error codes are
 `command_failed`.
 
 Receipts are shared application persistence (`CommandReceipts`), also used by
-Web receiving start/completion and line edits, putaway, picking movements,
+Web receiving start/completion and line edits, LPN putaway, picking movements,
 shipping transitions and rollback, transfers and inventory counts. Mobile V1 retains the
 `ClientRequestId` transport name. The receipt schema rename preserves existing
 keys, command types, hashes,

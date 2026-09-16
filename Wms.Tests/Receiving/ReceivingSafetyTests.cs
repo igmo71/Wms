@@ -350,6 +350,124 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Assert.Equal(1, await verify.CommandReceipts.CountAsync(x => x.RequestId == successContext.RequestId));
     }
 
+    [Fact]
+    public async Task Lpn_putaway_requires_completion_and_concurrent_overspend_posts_only_once()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN putaway" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Putaway SKU", Code = "PUT-1" };
+        var receivingZone = Zone(warehouse.Id, "LR", ZoneType.Receiving);
+        var storageZone = Zone(warehouse.Id, "LS", ZoneType.Storage);
+        var sourceLocation = Location(warehouse.Id, receivingZone, 1);
+        var firstDestination = Location(warehouse.Id, storageZone, 1);
+        var secondDestination = Location(warehouse.Id, storageZone, 2);
+        var snapshot = new ReceivingOrderImportSnapshot(
+            Guid.NewGuid(), false, true, "LPN putaway", DateTime.UtcNow, warehouse.Id, null,
+            ReceivingOrderStatus.ReadyForReceiving, default, WarehouseOperation.VendorReceipt,
+            BusinessOperation.VendorPurchase, Guid.NewGuid(), default, Guid.NewGuid(), null,
+            [new(1, sku.Id, 10m, 10m, null)]);
+        var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
+        Success(order.SetReceivingLocation(sourceLocation.Id));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "worker-a"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "worker-a"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "worker-b"));
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(
+                warehouse, sku, receivingZone, storageZone,
+                sourceLocation, firstDestination, secondDestination, order);
+            await seed.SaveChangesAsync();
+        }
+
+        var lpnService = LpnService(database);
+        var batchId = Value(await lpnService.IssueAsync(2, Command("issuer")));
+        string[] codes;
+        await using (var read = database.CreateDbContext())
+            codes = await read.LicensePlateNumbers
+                .Where(x => x.BatchId == batchId)
+                .OrderBy(x => x.Code)
+                .Select(x => x.Code)
+                .ToArrayAsync();
+
+        var firstLpnId = Value(await lpnService.OpenForReceivingAsync(
+            new(order.Id, codes[0]), Command("worker-a")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, firstLpnId, sku.Id, 5m), Command("worker-a"), false));
+        Success(await lpnService.CloseReceivingAsync(
+            new(order.Id, firstLpnId), Command("worker-a"), false));
+        var secondLpnId = Value(await lpnService.OpenForReceivingAsync(
+            new(order.Id, codes[1]), Command("worker-b")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, secondLpnId, sku.Id, 5m), Command("worker-b"), false));
+        Success(await lpnService.CloseReceivingAsync(
+            new(order.Id, secondLpnId), Command("worker-b"), false));
+
+        Guid firstItemId;
+        await using (var read = database.CreateDbContext())
+            firstItemId = await read.LicensePlateNumberItems
+                .Where(x => x.LicensePlateNumberId == firstLpnId && x.StockKeepingUnitId == sku.Id)
+                .Select(x => x.Id)
+                .SingleAsync();
+
+        var beforeCompletion = Command("worker-a");
+        Error(await PutawayService(database).PutawayAsync(
+            new(firstLpnId, firstItemId, firstDestination.Id, 1m), beforeCompletion),
+            OperationErrorType.Invalid);
+
+        var source = new FixedSource(snapshot);
+        var synchronization = new ReceivingOrderSynchronizationService(
+            database, source, NullLogger<ReceivingOrderSynchronizationService>.Instance);
+        var preview = Value(await synchronization.CheckCompletionAsync(order.Id));
+        Value(await ReceivingService(database, source).CompleteReceivingAsync(
+            new(order.Id, null, preview.Assessment.Fingerprint, null),
+            Command("worker-a"),
+            false));
+
+        var barrier = new ReceiptSaveBarrier();
+        var racingService = PutawayService(database.WithInterceptor(barrier));
+        var firstContext = Command("worker-a");
+        var secondContext = Command("worker-b");
+        var firstCommand = new PutawayLicensePlateNumberCommand(
+            firstLpnId, firstItemId, firstDestination.Id, 3m);
+        var secondCommand = new PutawayLicensePlateNumberCommand(
+            firstLpnId, firstItemId, secondDestination.Id, 3m);
+        var results = await Task.WhenAll(
+            racingService.PutawayAsync(firstCommand, firstContext),
+            racingService.PutawayAsync(secondCommand, secondContext));
+
+        var resultSummary = string.Join(" | ", results.Select(x =>
+            x.IsSuccess ? "success" : $"{x.Error?.Type}: {x.Error?.Message}"));
+        Assert.True(results.Count(x => x.IsSuccess) == 1, resultSummary);
+        Assert.True(
+            results.Count(x => x.Error?.Type == OperationErrorType.Conflict) == 1,
+            resultSummary);
+
+        await using (var verify = database.CreateDbContext())
+        {
+            Assert.Equal(1, await verify.LicensePlateNumberPutaways.CountAsync(
+                x => x.LicensePlateNumberId == firstLpnId));
+            Assert.Equal(1, await verify.InventoryMovements.CountAsync(
+                x => x.PostedAtUtc != null && x.RecorderId == order.Id
+                    && x.SourceStorageLocationId == sourceLocation.Id));
+            Assert.Equal(7m, (await verify.InventoryBalances.SingleAsync(
+                x => x.StorageLocationId == sourceLocation.Id
+                    && x.StockKeepingUnitId == sku.Id)).Quantity);
+            Assert.Equal(1, await verify.CommandReceipts.CountAsync(
+                x => x.RequestId == firstContext.RequestId || x.RequestId == secondContext.RequestId));
+        }
+
+        var winningCommand = results[0].IsSuccess ? firstCommand : secondCommand;
+        var winningContext = results[0].IsSuccess ? firstContext : secondContext;
+        Value(await PutawayService(database).PutawayAsync(winningCommand, winningContext));
+
+        await using var replayVerify = database.CreateDbContext();
+        Assert.Equal(1, await replayVerify.LicensePlateNumberPutaways.CountAsync(
+            x => x.LicensePlateNumberId == firstLpnId));
+        Assert.Equal(7m, (await replayVerify.InventoryBalances.SingleAsync(
+            x => x.StorageLocationId == sourceLocation.Id
+                && x.StockKeepingUnitId == sku.Id)).Quantity);
+    }
+
     private static ReceivingOrder StartedOrder(
         Guid warehouseId,
         Guid skuId,
@@ -380,6 +498,13 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
             new InventoryPostingService(NullLogger<InventoryPostingService>.Instance),
             new ReceivingOrderSynchronizationService(factory, source ?? new RejectingSource(), NullLogger<ReceivingOrderSynchronizationService>.Instance),
             NullLogger<ReceivingOrderCommandService>.Instance);
+
+    private static LicensePlateNumberPutawayService PutawayService(
+        IDbContextFactory<ApplicationDbContext> factory) =>
+        new(
+            new CommandExecutor(factory),
+            factory,
+            new InventoryPostingService(NullLogger<InventoryPostingService>.Instance));
 
     private sealed class ParticipantSaveBarrier : SaveChangesInterceptor
     {

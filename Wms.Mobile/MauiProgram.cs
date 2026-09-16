@@ -45,6 +45,7 @@ public static class MauiProgram
             serviceProvider.GetRequiredService<MobileReceivingOrderClient>()));
         builder.Services.AddTransient<ReceivingOrderPutawayPage>();
         builder.Services.AddTransient<ReceivingOrderPutawayMovementPage>();
+        builder.Services.AddTransient<LicensePlateNumberPutawayPage>();
         builder.Services.AddTransient<ShippingOrderPage>();
         builder.Services.AddTransient<ShippingOrderPickingPage>();
         builder.Services.AddTransient<ShippingOrderPickingMovementPage>();
@@ -77,6 +78,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(serviceProvider => new MobileReferenceDataClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
         builder.Services.AddSingleton(serviceProvider => new MobileReceivingOrderClient(
+            serviceProvider.GetRequiredService<MobileApiTransport>()));
+        builder.Services.AddSingleton(serviceProvider => new MobileLicensePlateNumberPutawayClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
         builder.Services.AddSingleton(serviceProvider => new MobileShippingOrderClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));

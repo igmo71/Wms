@@ -55,6 +55,7 @@
                         x:Name="PutawayTabButton"
                         Clicked="OnPutawayTabClicked"
                         Grid.Column="1"
+                        IsVisible="False"
                         Loaded="OnNonScanControlLoaded"
                         Text="Добавить ордер" />
                 </Grid>
