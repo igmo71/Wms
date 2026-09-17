@@ -21,20 +21,13 @@ This file owns current product boundaries and lasting business rules.
 decision history. Code and migrations remain the implementation source of
 truth.
 
-The accepted LPN, receiving/putaway and addressing development plan is tracked in
-[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). The active
-[receiving and putaway specification](../specs/2026-09-15-lpn-receiving-putaway/spec.md)
-defines the next implementation, not current behavior. Existing databases may
-be recreated; legacy data migration is outside its scope. The accepted target
-limits LPN to receiving and initial putaway, preserves location/SKU inventory,
-and uses existing topology. The target uses one sequential LPN code for display
-and barcode, and retained zero balances for historical-location suggestions.
-The specification defines eight increments. I01 label issuance and A4 printing,
-I02 receiving-order participation, I03 LPN association, I04 LPN counting, and
-I05 receiving completion, I06 independent LPN putaway, and I07 destination
-recommendations are implemented; I08 remains future work.
-Broader addressing work follows later. Consult the
-specification registry for active scope; implemented rules remain below.
+LPN receiving and initial putaway (I01–I08) were accepted on 2026-09-17.
+The specification is frozen; status and future E1/E5/E6/E7 boundaries are in
+[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md), and the next task is in ROADMAP.
+LPN tracks receiving provenance and initial putaway, not stored inventory.
+
+Shared command, replay and client-recovery rules are defined once in
+[`ARCHITECTURE.md`](ARCHITECTURE.md#persistence-and-integration).
 
 ## Identity and access
 
@@ -109,8 +102,9 @@ match 1:1. Package keys and characteristics do not participate in SKU identity.
 
 `InventoryBalance` is current quantity at a location. Posted
 `InventoryMovement` records warehouse movement, and `InventoryTurnover` is its
-immutable before/delta/after history. Draft picking and putaway movements do not
-change inventory.
+immutable before/delta/after history. Draft picking movements do not change
+inventory; LPN putaway posts each confirmed movement immediately. Zero balance
+rows are retained and support historical-location suggestions.
 
 Posting validates active topology, folder status, locks, the workflow-specific
 zone route, and physical balance in the caller's save. Posting and
@@ -134,19 +128,13 @@ SQL Server allocates codes on insert from the global, non-cycling
 There is no independently stored barcode value or second business number.
 `LicensePlateNumberBatch` retains issuance time and Identity user id.
 
-Operator and Administrator can issue 1–500 labels through Web `/lpn-labels`,
+Operator, Manager and Administrator can issue 1–500 labels through Web `/lpn-labels`,
 search the issued list, and preview/reprint one label or its entire batch.
-Issuance uses `LicensePlateNumberService` and `CommandExecutor`: all numbers,
-the batch and `lpn-label.issue-batch` receipt commit in one save. Replay returns
-the original batch. Web retains quantity, request and user during an uncertain
-attempt and blocks another issuance until explicit retry resolves it. This
-recovery lasts only for the live component.
-
-Authenticated print requests only read persisted codes. The standalone A4
-portrait layout contains two columns by five rows, with SVG Code 128 and the
-same human-readable code. Printing does not create new numbers. Physical
-printer output and target-scanner reading still require developer verification.
-I01 issuance does not itself change receiving, putaway or stock.
+Issuance saves the batch, codes and receipt atomically; replay returns the
+original batch. Authenticated printing reads persisted codes without allocating
+numbers or changing stock. A4 portrait contains two columns by five rows of
+SVG Code 128 with the same human-readable code. Physical printing and target
+scanner reading were accepted with I01; changed equipment requires verification.
 
 ### Receiving LPN association (I03)
 
@@ -154,8 +142,8 @@ An issued `LicensePlateNumber` starts as `Available`. A participant scans its
 code inside an in-progress receiving order to bind it permanently to that order,
 the creating Identity user, the responsible user, and the creation time. The
 same code cannot move to another order. `Open`, `Closed`, and `Cancelled` are
-persisted LPN states; I03 creates and cancels empty LPNs but leaves contents and
-closing to I04.
+persisted LPN states; association and cancellation retain their audit separately
+from counting and closing.
 
 One employee may have several open LPNs in an order. The aggregate operational
 revision coordinates parallel creation, and SQL constraints independently guard
@@ -175,8 +163,9 @@ its non-cancelled LPNs. If a SKU has no such row its fact remains unchecked;
 concurrent LPN changes are coordinated by the receiving-order revision.
 
 The responsible employee may edit and close their open LPN, including an empty
-one. A Manager or Administrator may correct any open LPN and may reopen a closed
-LPN without closing the employee's other LPNs. Creation,
+one. A Manager or Administrator may edit or close any open LPN and may reopen a
+closed LPN without closing the employee's other LPNs. An Operator cannot reopen
+a closed LPN, including their own. Creation,
 last update/removal, closing and reopening retain user and UTC time audit.
 Closing and reopening do not post inventory or complete the receiving order.
 Mobile uses one SKU → absolute quantity confirmation cycle and repeat-safe
@@ -233,7 +222,6 @@ means unchecked; zero is an explicit result. Mobile changes facts only through
 absolute quantities of LPN items; the aggregate fact is read-only. Every line
 requires a fact before completion.
 
-Starting receiving and selecting its scanned receiving location form one save.
 Completion is available to an order participant only after every active LPN is
 closed and every source SKU has an explicit aggregate LPN fact, including zero.
 It first persists a fresh 1C synchronization checkpoint. Source deletion,
@@ -281,31 +269,13 @@ only a snapshot hint; posting revalidates the warehouse, active Storage topology
 folder status and lock. Capacity and storage groups are not considered, no zero
 balances are pre-created, and movement history is not queried for recommendations.
 
-Starting and completing receiving use shared application commands. Command
-receipt lookup precedes mutable validation and 1C access;
-successful replay returns the recorded resource id without executing the command
-again. The synchronization checkpoint remains independently persisted, while the
-final WMS effects and receipt commit atomically. An explicit completion location
-selects that location; an omitted location uses the order's assigned location
-after receipt lookup. Hashes describe the original input, never resolved DB state.
-
-Web retains the request id and original receiving command together during the
-Interactive Server component lifetime. Uncertain failures retain the attempt;
-success and definitive rejection release it. Pending attempts do not survive
-page reload or component recreation. Shared execution for receiving start and
-completion is accepted. Fact increment, absolute quantity and line comment edits
-also use the shared executor. Quantity changes in both clients preserve the
-persisted comment; comment edits preserve the nullable fact. Facts/comments and
-order revision commit with the receipt without 1C calls or inventory posting.
-Original Mobile fact hashes remain compatible. Web snapshots each line edit for
-explicit retry and blocks other edits, completion, location selection and
-synchronization acknowledgement while an attempt is active or pending.
-
-LPN putaway uses `LicensePlateNumberPutawayService` and `CommandExecutor`.
-Receipt lookup precedes mutable checks, and an uncertain Mobile response retains
-the original LPN item, quantity, destination and request id for explicit retry.
-Definitive rejection keeps the selected quantity and allows another destination
-scan. No 1C call or synchronization checkpoint participates in putaway.
+Completion uses an explicitly supplied receiving location or the order's assigned
+location after receipt lookup. Supported UI/API paths change facts only through
+LPN items; legacy direct-fact methods and order-level putaway code remain in the
+repository but are not exposed as supported workflows. LPN mutations save audit,
+aggregate fact and revisions without posting inventory or calling 1C.
+Putaway has no 1C checkpoint. After a definitive destination rejection, Mobile
+keeps the selected quantity and allows another destination scan.
 
 ### Picking and shipping
 
@@ -315,31 +285,14 @@ still requires the physical source scan. Completing picking reconciles the
 fresh 1C plan, updates its item table, and posts drafts. Final shipping posts the
 issue from the location already assigned to the order.
 
-Starting picking, completing picking, and final shipping use the same public
-application commands and CommandExecutor in WebApp and Mobile. Existing Mobile
-receipt types and hashes are preserved. Receipt lookup precedes order/location
-validation and external access; picking completion and shipment each persist
-their synchronization checkpoint before final effects and receipt are saved
-atomically. Successful replay does not repeat synchronization or target calls.
-Web retains each pending transition's original input and request id for the
-component lifetime, including uncertain retries. Local movement editing and
-rollback are unavailable while a transition is in flight or pending recovery.
-Picking draft add/update/delete use PickingCommandService and CommandExecutor
-in both clients. API parses the source-location barcode before the command;
-original Mobile hashes remain compatible. Movement, recalculated line fact and
-order revision commit with the receipt without posting stock or calling 1C.
-Web retains original source, quantity, expected order/movement and request/user
-for explicit uncertain retry during component lifetime. Other edits, completion,
-acknowledgement and rollback are blocked while pending. Concurrent deletion of an
-originally unposted picking movement is a shipping conflict, including when SQL
-reports the disappeared movement before the owning order's revision check.
-Web rollback also uses ShippingOrderCommandService and CommandExecutor. The
-original order/reason and request/user ids are retained for explicit retry without
-reopening the reason dialog. Other mutations are blocked while choosing a reason
-or awaiting a result. Receipt lookup precedes state validation; draft deletion,
-current-cycle compensation, audit reset and the receipt commit together without
-1C access or a synchronization checkpoint. Replay leaves later picking cycles
-untouched. The hash preserves the original reason; the audit stores it trimmed.
+Picking draft edits save the movement, recalculated line fact and order revision
+without posting stock or calling 1C. Concurrent deletion of an originally
+unposted movement is a shipping conflict, even when SQL detects the missing
+movement before the order revision. Shipping rollback saves draft deletion,
+current-cycle compensation, audit reset and receipt together without 1C;
+replay leaves later cycles untouched. Its hash retains the original reason,
+while audit stores it trimmed. Web retains the chosen reason for uncertain retry
+and blocks mutations while choosing it or awaiting the outcome.
 
 A shortage requires explicit operator acknowledgement. An unfinished cycle may
 be rolled back in WebApp: drafts are removed, posted work is offset by reverse
@@ -350,16 +303,9 @@ draft movements, and rollback from stale saves.
 
 ### Inventory count
 
-WebApp and Mobile share InventoryCountCommandService and CommandExecutor for
-start/resume, barcode increment, absolute quantity by item or SKU, unexpected
-item removal, posting and draft deletion. Start returns an existing draft for
-the requested location and warehouse; otherwise it creates one. Barcode resolution
-and mutable checks run after receipt lookup. The original barcode and invariant
-quantity hashes remain compatible with Mobile receipts. Changes, lock, inventory
-effects and receipt commit atomically, without intermediate saves.
-Web retains original inputs and request/user ids for explicit uncertain retries
-within the component lifetime, disabling inputs and other mutations until the
-attempt resolves. Page reload/component recreation does not retain attempts.
+Start/resume returns an existing draft for the location and warehouse, or creates
+one. Barcode resolution and mutable checks follow receipt lookup; count changes,
+lock, inventory effects and receipt save together without intermediate saves.
 
 A count covers one ordinary storage location. Draft creation atomically locks
 the location and snapshots positive balances as expected rows. Nullable counted
@@ -370,14 +316,9 @@ screen retains the draft; explicit deletion removes it and releases the lock.
 
 ### Intra-warehouse transfer
 
-WebApp and Mobile call the same InventoryTransferCommandService methods through
-CommandExecutor for creation, direct movement, pick, put and completion. Web
-draft deletion also uses this boundary. All state, movements, balances, turnover
-and the receipt commit together; these commands need no intermediate save.
-Existing Mobile command identifiers and invariant input hashes remain compatible.
-Web retains immutable inputs and the request id for an explicit retry after an
-uncertain result, with other mutations and inputs disabled until resolution. This
-recovery is limited to the current component lifetime.
+Transfer creation, movements, completion and Web draft deletion share application
+commands. State, movements, balances, turnover and receipt save together without
+intermediate saves or 1C calls.
 
 Direct, pick-to-transit, and put-from-transit movements post immediately. One
 transit location belongs exclusively to one active transfer and must be empty
@@ -424,9 +365,10 @@ does not acknowledge source changes or replay pending commands.
 
 Starting work rejects a known unresolved assessment. Receiving completion,
 picking completion, and final shipping fetch and persist a fresh checkpoint
-before local effects or outbound mutation. An exact source state, or the exact
-repeat-safe target of the requested command, may continue. Technical failure,
-an unacknowledged decision, or a blocking assessment stops the transition.
+before final effects. Receiving applies the LPN plan/fact and Manager-decision
+rules above and never writes to 1C. Shipping may continue on an exact source
+state or the exact repeat-safe outbound target; an unacknowledged decision
+stops that transition. Technical failure or a blocking assessment stops both.
 Repeated identical assessments do not advance the order revision.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
@@ -435,8 +377,8 @@ operation therefore requires the recovery procedure tracked in the roadmap.
 Shipping completion treats an already-applied exact 1C item-table target as
 success, and its target status and posting calls are repeatable.
 
-Receiving line comments are WMS-owned annotations, not warehouse facts. They
-are sent to 1C with receiving item updates, but differences in these comments
+Receiving line comments are WMS-owned annotations, not warehouse facts.
+Receiving does not send item updates or comments to 1C. Comment differences
 do not affect synchronization assessments or fingerprints and never block work.
 
 ## Mobile boundary
@@ -471,40 +413,15 @@ confirm/cancel actions) dismisses the keyboard.
 Android fields suppress automatic keyboard display on native focus changes;
 an explicit field click requests the keyboard separately.
 
-Mobile clients and V1 contracts are grouped by business feature over one
-authenticated transport. A feature-specific process may own a multi-call
-sequence and retry ids, while pages retain UI state, scanning, navigation,
-dialogs, and rendering.
-
-Every changing Mobile command has a persisted receipt keyed by user, command
-type, and client request id. Its deterministic request hash and result resource
-id are saved atomically with the WMS change. Reusing an id with different input
-is a conflict. After transport failure, `408`, `5xx`, or an unreadable successful
-response, the client retains the same id and semantic retry target; a definitive
-business/client `4xx` releases it. Stable Mobile error codes are
-`invalid_command`, `resource_not_found`, `request_conflict`, and
-`command_failed`.
-
-Receipts are shared application persistence (`CommandReceipts`), also used by
-Web receiving start/completion and line edits, LPN putaway, picking movements,
-shipping transitions and rollback, transfers and inventory counts. Mobile V1 retains the
-`ClientRequestId` transport name. The receipt schema rename preserves existing
-keys, command types, hashes,
-and result ids, so previously completed Mobile attempts remain replayable.
+Client organization, receipt compatibility, error codes and retry rules belong
+in [ARCHITECTURE.md](ARCHITECTURE.md#client-organization).
 
 ## Automated testing
 
-The project uses one xUnit project, `Wms.Tests`, with a minimal risk-based suite.
-It does not pursue coverage targets or automatically add a test for every new
-handler, command, or feature. New tests are reserved for critical business and
-inventory invariants, material transactional guarantees, SQL-backed concurrency,
-and serious regressions whose failure can damage persisted warehouse state.
-
-Persistence, stock, receipt, and concurrency guarantees use disposable SQL
-Server LocalDB integration tests. Generic `CommandExecutor` replay, hash,
-receipt, rollback, and race behavior is tested centrally and is not duplicated
-inside receiving, putaway, shipping, transfer, count, or LPN slices. Feature
-work may require no new automated test when it introduces none of these risks.
-Agents run at most one or two directly relevant tests while implementing a
-change. They do not launch the complete suite without an explicit request and
-instead leave the full manual verification command in the handoff.
+The project uses one xUnit project, `Wms.Tests`, with only the minimum tests
+needed to protect critical warehouse state. Routine changes default to no new
+test; a new test requires a concrete material risk not already protected.
+The developer runs builds and tests; agents run them only on explicit request.
+[`ARCHITECTURE.md`](ARCHITECTURE.md#testing-strategy) owns the testing policy,
+including selection and stopping rules. [`Wms.Tests/README.md`](../Wms.Tests/README.md)
+contains local setup and execution commands.

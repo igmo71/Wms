@@ -66,15 +66,23 @@ application ports use WMS terminology.
 Application services use `ApplicationDbContext` directly, and one operation
 normally has one explicit save boundary.
 
-Receiving start/completion and fact/comment edits, all putaway commands,
-picking draft add/update/delete, shipping start-picking/complete-picking/ship/rollback,
-transfer creation/movements/completion/draft deletion, and all inventory-count
-mutations enter the shared `CommandExecutor` from their public application methods. The executor
-owns receipt lookup/replay, winning receipt recovery after final-save races,
-and the atomic final save of business
-state plus receipt. Callers supply `CommandContext` with request and user ids.
+Warehouse mutations in Web/Mobile enter shared application commands through
+`CommandExecutor`: LPN issuance/counting/putaway, receiving participation and
+completion, picking, shipping/rollback, transfers and inventory counts.
+The executor owns receipt lookup before mutable validation and external access,
+replay, winning receipt recovery after final-save races, and atomic final save
+of business state plus receipt. Callers supply `CommandContext` with request
+and user ids. A successful replay returns the recorded resource id without
+repeating business effects, synchronization or outbound calls.
 Persisted command types are stable strings, not CLR type names. Hashes use only
 deterministic semantic input; Mobile V1 hash compatibility is preserved.
+
+`CommandReceipts` is keyed by user, command type and request id and stores the
+request hash and result resource id. An id reused with different input conflicts.
+Hashes describe original input, never resolved database state. Mobile V1 retains
+the `ClientRequestId` name; schema renames preserve existing receipt keys,
+types, hashes and results. Location barcode parsing may precede the application
+command at the API boundary; inventory-count barcode resolution follows receipt lookup.
 
 Receiving completion calls `PersistCompletionCheckpointAsync`; shipping uses
 `PersistReadyForShipmentCheckpointAsync` and `PersistShippedCheckpointAsync`.
@@ -135,6 +143,15 @@ A page retains controls, modes, scanner lifecycle, navigation, dialogs, and
 rendering. A concrete feature process may own retry-aware API sequences and
 stable request ids when that materially clarifies the page.
 
+Web and Mobile retain the original command inputs, request id and user for
+explicit retry after transport failure, `408`, `5xx` or an unreadable successful
+response. Success or definitive business/client rejection releases the attempt;
+conflicting inputs and actions remain disabled while it is active or uncertain.
+Recovery lasts only for the live page/process or Interactive Server component:
+reload/recreation reads current server state and does not recover or replay the
+old intent automatically. Mobile error codes remain `invalid_command`,
+`resource_not_found`, `request_conflict` and `command_failed`.
+
 Treat roughly 300 lines as a review signal, not a limit. Extract a
 business-named or clearly technical cohesive responsibility only when it
 reduces the context required to follow the primary path. Keep cohesive
@@ -152,11 +169,16 @@ algorithms and aggregates intact.
 
 ## Testing strategy
 
-`Wms.Tests` is the only automated test project and uses xUnit. Its suite is
-deliberately small: a test is justified by a critical business invariant, a
-dangerous inventory mutation, an important transaction boundary, a SQL-backed
-concurrency guarantee, or a serious regression that could corrupt persisted
-warehouse state. Coverage percentage is not a project objective.
+This section owns the project's testing policy. `Wms.Tests` is the only
+automated test project and uses xUnit. Keep only the minimum tests needed to
+protect critical warehouse state. Coverage percentage, test count and a test
+for every feature are not objectives. Routine changes default to no new test.
+
+Before adding a test, identify the concrete failure it prevents, its material
+consequence, and why existing tests do not already protect it. Justified risks
+include lost or duplicated stock, data loss, non-atomic posting, unsafe replay,
+and database constraint or concurrency failures. A changed file, new handler,
+or conceivable edge case alone is not a reason to add a test.
 
 Prefer integration tests with disposable SQL Server LocalDB databases when the
 guarantee depends on EF Core, migrations, constraints, transactions, optimistic
@@ -169,10 +191,19 @@ Cross-cutting command guarantees are tested once around `CommandExecutor` and
 must not be repeated in every vertical slice. Feature tests protect only their
 own business invariant. Do not add tests for trivial CRUD, accessors,
 constructors, straightforward mapping, framework behavior, or multiple inputs
-that exercise the same rule. A feature may correctly ship without a new test
-when it introduces no critical invariant or material regression risk.
+that exercise the same rule. Prefer extending a relevant existing scenario
+over creating another suite, provided it keeps one clear purpose. Use the
+smallest test that demonstrates the distinct risk; a feature may ship without
+a new test when existing protection is sufficient. Do not expand test helpers
+or infrastructure unless the necessary test requires it.
 
-During implementation, run only one or two tests directly relevant to the
-change. Do not run the full `dotnet test` suite automatically after routine
-edits; a full run requires an explicit user request. The task handoff must list
-the focused checks already run and the full command left for manual execution.
+The developer runs builds and automated tests. Codex runs neither without an
+explicit user request. At a verification checkpoint, provide the exact minimal
+build command and, when relevant, commands for one or two focused existing or
+necessary new tests, then wait for the reported result. This is not a quota:
+documentation and routine low-risk changes may need no test command.
+Do not prescribe the complete suite after every task; reserve it for an agreed
+broader checkpoint. Once sufficient checks pass, stop unless a new change or
+failure justifies another check. Report what was actually verified and any
+remaining uncertainty. Local setup and execution commands belong in
+[`Wms.Tests/README.md`](../Wms.Tests/README.md).

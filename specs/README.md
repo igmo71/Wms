@@ -6,14 +6,14 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-- [LPN receiving and putaway](2026-09-15-lpn-receiving-putaway/spec.md)
-  — Agreed receiving, reconciliation and initial putaway workflow. Specification
-  prepared and split into eight increments on 2026-09-15. I01 label issuance
-  and its manual print/scanner path are accepted. I02 order participation and
-  shared receiving-location selection are implemented. I03–I08 are not started;
-  handoff in section 12.
+No active specification.
 
 ## Frozen
+
+- [LPN receiving and putaway](2026-09-15-lpn-receiving-putaway/spec.md)
+  — I01–I08 accepted on 2026-09-17: LPN issuance, participation and counting,
+  exact/Manager completion, independent putaway, destination recommendations,
+  corrected Mobile workflow and unified read-only Web order contents.
 
 - [Minimal xUnit test strategy](2026-09-15-xunit-test-strategy/spec.md)
   — Replaced the executable test harnesses with one risk-based xUnit suite and
@@ -21,7 +21,8 @@ specifications unless a current task explicitly needs their rationale.
 
 - [LPN development planning](2026-09-14-lpn-development-planning/spec.md)
   — Planning completed on 2026-09-15. Cross-stage plan lives in
-  `docs/DEVELOPMENT_PLAN.md`; implementation follows the active specification.
+  `docs/DEVELOPMENT_PLAN.md`; its I01–I08 receiving/putaway scope was accepted
+  on 2026-09-17. Future stages require a separate specification.
 
 - [Unified shipping rollback](2026-09-11-unified-shipping-rollback/spec.md)
   — Repeat-safe Web rollback implemented on 2026-09-11.

@@ -3,25 +3,26 @@
 This file contains unfinished accepted work. Current behavior belongs in
 [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md); engineering conventions belong in
 [`ARCHITECTURE.md`](ARCHITECTURE.md); detailed decision history belongs in
-`specs/`. Only **Next delivery** is recommended immediate work.
+`specs/`. **Next task** identifies the agreed immediate work; future delivery
+areas are not authorization to begin implementation.
 
-## Next delivery
+## Next task
 
-Prioritize an end-to-end receiving and putaway demo through LPN, requested
-on 2026-09-15 for approximately September 17–18. See the scope and checkpoints
-in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md), section 6. Use existing topology;
-LPN tracks receiving and initial putaway, not stored inventory dimensions.
-Addressing, topology editing, advanced recommendations and replenishment follow later.
-Planning is complete; implement the active
-[receiving and putaway specification](../specs/2026-09-15-lpn-receiving-putaway/spec.md).
-It includes Manager reconciliation and simple location recommendations;
-SKU storage groups and capacity ranking remain later work. Quality and usability
-take priority over the requested demo date. Implementation has not started.
-The active specification splits delivery into I01–I08; begin with I01 label
-issuance and A4 printing, including its UI and checks.
-The existing pilot prerequisites below remain outstanding. Receiving's proposed
-one-way integration may narrow operator recovery, but does not remove shipping's
-WMS-to-1C recovery requirement.
+After documentation reconciliation, perform a separate risk-based review of
+the accepted I01–I08 implementation at `9ea6620`. Review does not start new
+functional stages. Acceptance status is recorded in
+[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md); active scope is selected through
+the [specification registry](../specs/README.md).
+
+## Future delivery areas
+
+E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
+rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,
+dependencies and boundaries belong in DEVELOPMENT_PLAN; order and implementation
+scope require a separate task. The pilot prerequisites below govern E7.
+
+Receiving already uses inbound-only 1C integration. Shipping still requires
+the WMS-to-1C recovery procedure below.
 
 ## Pilot prerequisites
 
@@ -32,8 +33,10 @@ Authentication of 1C callers is deferred. Until it is implemented, unverified
 
 ### Operational confidence
 
-- Manually validate WebApp and Mobile flows against a representative database:
+- For the release rehearsal, manually validate WebApp and Mobile flows against a representative database:
   receiving, putaway, picking, shipping, count, and both transfer routes.
+  The accepted I01–I08 Web/Mobile checks are completed; this is the broader
+  release-environment checkpoint.
 - Confirm backup/restore and migration application on the staging topology.
 - Resolve the operator-recovery procedure described below.
 
