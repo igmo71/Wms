@@ -104,7 +104,7 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         if (_busy || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
             return;
         if (!_process.IsLpnMutationPending && !await DisplayAlertAsync(
-                "Удалить товар", "Удалить товар из состава паллеты?", "Удалить", "Назад"))
+                "Удалить товар", "Удалить товар из состава палеты?", "Удалить", "Назад"))
             return;
         await ExecuteAsync(
             () => _process.RemoveLicensePlateNumberItemAsync(_orderId, _lpnId, _skuId),

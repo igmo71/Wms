@@ -28,7 +28,7 @@ public sealed class ReceivingOrderQueueItemViewState
             MobileReceivingOrderStatus.ProcessingRequired => "Требуется обработка",
             _ => "Приёмка"
         },
-        DetailsText = BuildReceivingDetails(order),
+        DetailsText = string.Empty,
         HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         HasJoinBlock = !order.IsParticipant && !order.CanJoin,
@@ -56,15 +56,4 @@ public sealed class ReceivingOrderQueueItemViewState
         ProgressText = $"Размещено: {order.Progress.AllocatedQuantity:g} из {order.Progress.FactQuantity:g} · "
             + $"Строк: {order.Progress.FullyAllocatedLineCount} из {order.Progress.PositiveLineCount}"
     };
-
-    private static string BuildReceivingDetails(MobileReceivingOrderSummaryResponse order)
-    {
-        var priority = string.IsNullOrWhiteSpace(order.Queue)
-            ? string.Empty
-            : $" · {order.Queue}";
-        var location = order.ReceivingLocation is null
-            ? string.Empty
-            : $"\nПозиция: {order.ReceivingLocation.Address}";
-        return $"{order.ShipperName}{priority}{location}";
-    }
 }

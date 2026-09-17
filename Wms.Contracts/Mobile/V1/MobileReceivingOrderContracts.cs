@@ -150,6 +150,10 @@ public sealed record MobileJoinReceivingOrderRequest(
     Guid ClientRequestId,
     string? ReceivingLocationBarcode);
 
+public sealed record MobileCompleteReceivingOrderRequest(
+    Guid ClientRequestId,
+    string ExpectedFingerprint);
+
 public sealed record MobileOpenReceivingLicensePlateNumberRequest(
     Guid ClientRequestId,
     string Code);

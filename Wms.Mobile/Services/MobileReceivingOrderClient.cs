@@ -55,6 +55,16 @@ public sealed class MobileReceivingOrderClient
             new MobileJoinReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
             ct);
 
+    public Task<MobileReceivingOrderCommandResponse> CompleteAsync(
+        Guid orderId,
+        string expectedFingerprint,
+        Guid clientRequestId,
+        CancellationToken ct = default) =>
+        PostCommandAsync(
+            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/complete-receiving",
+            new MobileCompleteReceivingOrderRequest(clientRequestId, expectedFingerprint),
+            ct);
+
     public Task<MobileReceivingOrderCommandResponse> OpenLicensePlateNumberAsync(
         Guid orderId,
         string code,

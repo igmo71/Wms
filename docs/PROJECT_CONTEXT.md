@@ -207,15 +207,24 @@ Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
 be joined. The order view shows the source plan read-only and its LPN list.
 Direct facts and order-based putaway are removed from the Mobile API. Receiving
-completion is available in Web; Mobile completion remains unavailable.
+completion with a fresh exact plan/fact match is available to a participant in
+Mobile. Quantity-difference approval and its reason remain a Manager-only Web
+action. The Mobile completion action remains visible while the order is in
+receiving and explains why it is unavailable: an open pallet, an unchecked
+line, a quantity difference, or a failed/blocking fresh 1C check.
 
 The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
 accepted from either tab and opens its separate pallet page; an SKU scan is
 accepted only on that pallet page and opens a separate absolute-quantity page.
 No quantity field is focused by navigation or scanning. The order SKU table is
 read-only: unchecked fact is a red question mark, a mismatch is highlighted
-yellow, and an exact match green. Pallet actions remain visible below the
-scrolling composition; an empty pallet uses a compact cancel action.
+yellow, and an exact match green. Tapping an order SKU opens its aggregate plan
+and fact plus only the LPNs that contain that SKU, with quantity per LPN. An LPN
+page lists only its retained item rows, not every planned order SKU. Pallet
+actions remain visible below the scrolling composition; closing returns to the
+order, and an empty pallet uses a compact cancel action. Cancelled LPNs are
+hidden from operational Mobile lists but remain permanently used and auditable.
+Mobile SKU names wrap and are never ellipsized.
 
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact

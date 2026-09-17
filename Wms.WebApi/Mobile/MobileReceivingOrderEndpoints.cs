@@ -28,6 +28,8 @@ internal static class MobileReceivingOrderEndpoints
             .WithMobileResponses<MobileReceivingOrderDetailsResponse>();
         group.MapPost("/{orderId:guid}/join-receiving", JoinReceivingAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
+        group.MapPost("/{orderId:guid}/complete-receiving", CompleteReceivingAsync)
+            .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lpns/open", OpenLicensePlateNumberAsync)
             .WithMobileResponses<MobileReceivingOrderCommandResponse>();
         group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/cancel", CancelLicensePlateNumberAsync)
@@ -105,8 +107,10 @@ internal static class MobileReceivingOrderEndpoints
             return TypedResults.Ok(MapDetails(result.Value));
         }
 
-        var synchronizationResult = await synchronizationService.CheckAsync(
+        var synchronizationResult = await CheckForMobileAsync(
             result.Value!.Order.Id,
+            result.Value.Order.Status,
+            synchronizationService,
             ct);
         if (!synchronizationResult.IsSuccess)
         {
@@ -118,7 +122,10 @@ internal static class MobileReceivingOrderEndpoints
 
         var currentResult = await queryService.GetDetailsAsync(result.Value.Order.Id, userId, ct);
         return currentResult.IsSuccess
-            ? TypedResults.Ok(MapDetails(currentResult.Value!, synchronizationResult.Value))
+            ? TypedResults.Ok(MapDetails(
+                currentResult.Value!,
+                synchronizationResult.Value.Assessment,
+                requiresManager: synchronizationResult.Value.RequiresManager))
             : MobileEndpointResults.CommandProblem(currentResult.Error!);
     }
 
@@ -144,7 +151,11 @@ internal static class MobileReceivingOrderEndpoints
             return TypedResults.Ok(MapDetails(result.Value));
         }
 
-        var synchronizationResult = await synchronizationService.CheckAsync(orderId, ct);
+        var synchronizationResult = await CheckForMobileAsync(
+            result.Value.Order.Id,
+            result.Value.Order.Status,
+            synchronizationService,
+            ct);
         if (!synchronizationResult.IsSuccess)
         {
             return TypedResults.Ok(MapDetails(
@@ -155,7 +166,10 @@ internal static class MobileReceivingOrderEndpoints
 
         var currentResult = await queryService.GetDetailsAsync(orderId, userId, ct);
         return currentResult.IsSuccess
-            ? TypedResults.Ok(MapDetails(currentResult.Value!, synchronizationResult.Value))
+            ? TypedResults.Ok(MapDetails(
+                currentResult.Value!,
+                synchronizationResult.Value.Assessment,
+                requiresManager: synchronizationResult.Value.RequiresManager))
             : MobileEndpointResults.CommandProblem(currentResult.Error!);
     }
 
@@ -190,6 +204,48 @@ internal static class MobileReceivingOrderEndpoints
             new JoinReceivingOrderCommand(orderId, receivingLocationId),
             new CommandContext(request.ClientRequestId, userId),
             ct);
+        return await CommandResultAsync(result, orderId, userId, queryService, ct);
+    }
+
+    private static async Task<OperationResult<MobileReceivingSynchronization>> CheckForMobileAsync(
+        Guid orderId,
+        ReceivingOrderStatus status,
+        ReceivingOrderSynchronizationService synchronizationService,
+        CancellationToken ct)
+    {
+        if (status != ReceivingOrderStatus.InReceiving)
+        {
+            var synchronization = await synchronizationService.CheckAsync(orderId, ct);
+            return synchronization.IsSuccess
+                ? new MobileReceivingSynchronization(synchronization.Value!, false)
+                : synchronization.Error!;
+        }
+
+        var completion = await synchronizationService.CheckCompletionAsync(orderId, ct);
+        return completion.IsSuccess
+            ? new MobileReceivingSynchronization(
+                completion.Value!.Assessment,
+                completion.Value.RequiresManager)
+            : completion.Error!;
+    }
+
+    private static async Task<IResult> CompleteReceivingAsync(
+        Guid orderId,
+        MobileCompleteReceivingOrderRequest request,
+        ClaimsPrincipal principal,
+        ReceivingOrderCommandService commandService,
+        MobileReceivingOrderQueryService queryService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(principal);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+
+        var result = await commandService.CompleteReceivingAsync(
+            new CompleteReceivingCommand(orderId, null, request.ExpectedFingerprint, null),
+            new CommandContext(request.ClientRequestId, userId),
+            canApproveQuantityDifference: false,
+            ct: ct);
         return await CommandResultAsync(result, orderId, userId, queryService, ct);
     }
 
@@ -364,8 +420,9 @@ internal static class MobileReceivingOrderEndpoints
     private static MobileReceivingOrderDetailsResponse MapDetails(
         MobileReceivingOrderDetails details,
         OrderSynchronizationAssessment? assessment = null,
-        string? verificationError = null) => new(
-        MapSummary(details.Order, assessment, verificationError),
+        string? verificationError = null,
+        bool requiresManager = false) => new(
+        MapSummary(details.Order, assessment, verificationError, requiresManager),
         details.Lines.Select(MapLine).ToList(),
         details.Movements.Select(MapMovement).ToList(),
         details.LicensePlateNumbers.Select(MapLicensePlateNumber).ToList());
@@ -410,7 +467,8 @@ internal static class MobileReceivingOrderEndpoints
     private static MobileReceivingOrderSummaryResponse MapSummary(
         MobileReceivingOrderSummary order,
         OrderSynchronizationAssessment? assessment = null,
-        string? verificationError = null) => new(
+        string? verificationError = null,
+        bool requiresManager = false) => new(
         order.Id,
         order.Number,
         order.Date,
@@ -422,7 +480,7 @@ internal static class MobileReceivingOrderEndpoints
         order.BusinessOperation.GetDisplayName(),
         MapStatus(order.Status),
         MapPutawayStatus(order.PutawayStatus),
-        MapSynchronization(order.SynchronizationLevel, assessment, verificationError),
+        MapSynchronization(order.SynchronizationLevel, assessment, verificationError, requiresManager),
         order.Comment,
         order.ReceivingLocation is null ? null : MapLocation(order.ReceivingLocation),
         new MobileReceivingOrderProgressResponse(
@@ -449,7 +507,8 @@ internal static class MobileReceivingOrderEndpoints
     private static MobileOrderSynchronizationResponse MapSynchronization(
         OrderSynchronizationLevel persistedLevel,
         OrderSynchronizationAssessment? assessment,
-        string? verificationError = null)
+        string? verificationError = null,
+        bool requiresManager = false)
     {
         var commentDifference = assessment?.Differences
             .LastOrDefault(x => x.FieldCode == "comment");
@@ -459,8 +518,14 @@ internal static class MobileReceivingOrderEndpoints
             assessment?.Differences.Select(x => x.FieldName).Distinct().ToList() ?? [],
             commentDifference is not null,
             commentDifference?.OneCValue,
-            verificationError);
+            verificationError,
+            assessment?.Fingerprint,
+            requiresManager);
     }
+
+    private sealed record MobileReceivingSynchronization(
+        OrderSynchronizationAssessment Assessment,
+        bool RequiresManager);
 
     private static MobileOrderSynchronizationLevel MapSynchronizationLevel(
         OrderSynchronizationLevel level) => level switch

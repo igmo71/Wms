@@ -96,7 +96,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             return;
         if (!IsLicensePlateNumberCode(barcode))
         {
-            ErrorLabel.Text = "Товар сканируется на экране выбранной паллеты.";
+            ErrorLabel.Text = "Товар сканируется на экране выбранной палеты.";
             return;
         }
         await OpenLicensePlateNumberAsync(barcode.Trim());
@@ -198,6 +198,15 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         await Navigation.PushAsync(page);
     }
 
+    private async void OnSkuTapped(object? sender, TappedEventArgs e)
+    {
+        if (_busy || e.Parameter is not Guid skuId)
+            return;
+        var page = _services.GetRequiredService<ReceivingOrderSkuDistributionPage>();
+        page.Show(Details.Order.Id, skuId);
+        await Navigation.PushAsync(page);
+    }
+
     private async void OnCancelLicensePlateNumberClicked(object? sender, EventArgs e)
     {
         if (_busy || sender is not Button { CommandParameter: Guid id })
@@ -206,7 +215,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         if (lpn?.CanCancel != true || (_process.HasPendingCommand && !_process.IsCancelLpnPending))
             return;
         if (!_process.IsCancelLpnPending && !await DisplayAlertAsync(
-                "Отменить паллету", $"Отменить пустую паллету {lpn.Code}?", "Отменить", "Назад"))
+                "Отменить палету", $"Отменить пустую палету {lpn.Code}?", "Отменить", "Назад"))
             return;
 
         SetBusy(true);
@@ -214,6 +223,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         try
         {
             var response = await _process.CancelLicensePlateNumberAsync(Details.Order.Id, id);
+            _synchronization = null;
             ApplyDetails(response.Details);
         }
         catch (MobileApiException exception)
@@ -222,7 +232,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         }
         catch (HttpRequestException)
         {
-            ErrorLabel.Text = "Ответ сервера не получен. Повторите отмену этой же паллеты.";
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите отмену этой же палеты.";
         }
         catch (InvalidOperationException exception)
         {
@@ -234,12 +244,52 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         }
     }
 
+    private async void OnCompleteReceivingClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _synchronization?.Fingerprint is not { Length: > 0 } fingerprint
+            || (_process.HasPendingCommand && !_process.IsCompletionPending))
+            return;
+        if (!_process.IsCompletionPending && !await DisplayAlertAsync(
+                "Завершить приёмку", "Завершить ордер и оприходовать принятый товар?", "Завершить", "Назад"))
+            return;
+
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        var refreshAfterFailure = false;
+        try
+        {
+            var response = await _process.CompleteAsync(Details.Order.Id, fingerprint);
+            ApplyDetails(response.Details);
+            await DisplayAlertAsync("Приёмка завершена", "Ордер успешно завершён.", "Готово");
+            await Navigation.PopAsync();
+        }
+        catch (MobileApiException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+            refreshAfterFailure = true;
+        }
+        catch (HttpRequestException)
+        {
+            ErrorLabel.Text = "Ответ сервера не получен. Повторите завершение приёмки.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            ErrorLabel.Text = exception.Message;
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+        if (refreshAfterFailure)
+            await RefreshAsync(showErrors: false);
+    }
+
     private void OnProductsTabClicked(object? sender, EventArgs e) => SetLpnTab(false);
     private void OnLpnTabClicked(object? sender, EventArgs e) => SetLpnTab(true);
 
     private void SetLpnTab(bool active)
     {
-        if (active && Details.LicensePlateNumbers.Count == 0)
+        if (active && LicensePlateNumbers.Count == 0)
             return;
         _lpnTabActive = active;
         ProductLinesPanel.IsVisible = !active;
@@ -293,20 +343,20 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             MobileReceivingOrderStatus.ProcessingRequired => "Обработка",
             _ => "Завершён"
         };
-        ShipperLabel.Text = details.Order.ShipperName;
         FactLabel.Text = $"Факт: {details.Order.Progress.FactQuantity:g} из {details.Order.Progress.PlanQuantity:g}";
         CheckedLabel.Text = $"Проверено: {details.Order.Progress.ConfirmedLineCount} из {details.Order.Progress.TotalLineCount}";
         SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(_synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(_synchronization);
         LineRows = details.Lines.Select(ReceivingOrderLineRow.From).ToArray();
         LicensePlateNumbers = details.LicensePlateNumbers
+            .Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
             .Select(x => new ReceivingOrderLpnRow(
-                x.Id, x.Code, $"{x.StatusName} · {x.ResponsibleUserName}", x.CanCancel))
+                x.Id, x.Code, x.StatusName, x.ResponsibleUserName, x.CanCancel))
             .ToArray();
         OnPropertyChanged(nameof(LineRows));
         OnPropertyChanged(nameof(LicensePlateNumbers));
-        LpnTabButton.IsEnabled = details.LicensePlateNumbers.Count > 0;
-        if (_lpnTabActive && details.LicensePlateNumbers.Count == 0)
+        LpnTabButton.IsEnabled = LicensePlateNumbers.Count > 0;
+        if (_lpnTabActive && LicensePlateNumbers.Count == 0)
             _lpnTabActive = false;
         SetLpnTab(_lpnTabActive);
         StartReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
@@ -314,8 +364,13 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         StartReceivingButton.IsEnabled = !_busy
             && !_process.HasPendingCommand
             && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
-        InstructionLabel.Text = CanUseLicensePlateNumbers
-            ? "Сканируйте LPN на любой вкладке. Товар — внутри паллеты."
+        CompleteReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.InReceiving
+            && details.Order.IsParticipant;
+        CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
+        InstructionLabel.Text = CompleteReceivingButton.IsVisible
+            ? GetCompletionHint()
+            : CanUseLicensePlateNumbers
+                ? "Сканируйте LPN на любой вкладке. Товар — внутри палеты."
             : details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
                 ? "Начните приёмку."
                 : string.Empty;
@@ -329,6 +384,43 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             && !_process.HasPendingCommand
             && _synchronization is not null
             && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
+        CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
+    }
+
+    private bool CanCompleteReceiving()
+    {
+        if (_busy
+            || _details is not
+            {
+                Order: { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true },
+                LicensePlateNumbers: var licensePlateNumbers,
+                Lines: var lines
+            }
+            || _synchronization is not { Fingerprint.Length: > 0 } synchronization)
+        {
+            return false;
+        }
+
+        return (_process.IsCompletionPending || !_process.HasPendingCommand)
+            && licensePlateNumbers.All(x => x.Status != MobileLicensePlateNumberStatus.Open)
+            && lines.All(x => x.FactQuantity.HasValue)
+            && !synchronization.RequiresManager
+            && OrderSynchronizationPresentation.CanPerformCriticalTransition(synchronization);
+    }
+
+    private string GetCompletionHint()
+    {
+        if (_details is null || _synchronization is null)
+            return "Проверяем возможность завершения приёмки…";
+        if (_details.LicensePlateNumbers.Any(x => x.Status == MobileLicensePlateNumberStatus.Open))
+            return "Для завершения закройте все палеты.";
+        if (_details.Lines.Any(x => !x.FactQuantity.HasValue))
+            return "Для завершения пересчитайте всю номенклатуру.";
+        if (_synchronization.RequiresManager)
+            return "Есть расхождение количества — требуется решение Manager в Web.";
+        if (!OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization))
+            return "Завершение недоступно: проверьте сообщение сверки с 1С.";
+        return "Все палеты закрыты, план и факт совпадают.";
     }
 
     private async Task UpdateCameraAsync()
@@ -349,10 +441,16 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     }
 }
 
-public sealed record ReceivingOrderLpnRow(Guid Id, string Code, string Details, bool CanCancel);
+public sealed record ReceivingOrderLpnRow(
+    Guid Id,
+    string Code,
+    string StatusName,
+    string ResponsibleUserName,
+    bool CanCancel);
 
 public sealed record ReceivingOrderLineRow(
     int LineNumber,
+    Guid StockKeepingUnitId,
     string SkuCode,
     string SkuName,
     string PlanText,
@@ -370,6 +468,7 @@ public sealed record ReceivingOrderLineRow(
                 : Color.FromArgb("#FFF4CC");
         return new ReceivingOrderLineRow(
             line.LineNumber,
+            line.StockKeepingUnitId,
             line.SkuCode,
             line.SkuName,
             $"План {line.PlanQuantity:g}{unit}",

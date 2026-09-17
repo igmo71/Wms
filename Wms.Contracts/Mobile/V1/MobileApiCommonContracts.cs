@@ -36,5 +36,7 @@ public sealed record MobileOrderSynchronizationResponse(
     IReadOnlyList<string> ChangedFields,
     bool CommentChanged,
     string? OneCComment,
-    string? VerificationError);
+    string? VerificationError,
+    string? Fingerprint = null,
+    bool RequiresManager = false);
 

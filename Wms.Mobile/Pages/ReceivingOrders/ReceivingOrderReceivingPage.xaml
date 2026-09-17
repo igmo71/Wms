@@ -6,19 +6,18 @@
     xmlns:local="clr-namespace:Wms.Mobile"
     Title="Приёмка">
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
             <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="22" />
             <Label x:Name="StatusLabel" Grid.Column="1" FontAttributes="Bold" VerticalTextAlignment="Center" />
-            <Label x:Name="ShipperLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="13" />
-            <Label x:Name="FactLabel" Grid.Row="2" FontSize="13" />
-            <Label x:Name="CheckedLabel" Grid.Row="2" Grid.Column="1" FontSize="13" HorizontalTextAlignment="End" />
+            <Label x:Name="FactLabel" Grid.Row="1" FontSize="13" />
+            <Label x:Name="CheckedLabel" Grid.Row="1" Grid.Column="1" FontSize="13" HorizontalTextAlignment="End" />
         </Grid>
         <Border x:Name="SynchronizationPanel" Grid.Row="1" IsVisible="False" Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
             <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
         </Border>
         <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="6">
             <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
-            <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Паллеты" />
+            <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />
         </Grid>
         <RefreshView x:Name="OrderRefreshView" Grid.Row="3" Refreshing="OnOrderRefreshing">
             <ScrollView>
@@ -28,9 +27,12 @@
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingOrderLineRow">
                                 <Border Padding="7,5" BackgroundColor="{Binding BackgroundColor}" Stroke="#D4D4D4" StrokeThickness="1">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding StockKeepingUnitId}" Tapped="OnSkuTapped" />
+                                    </Border.GestureRecognizers>
                                     <Grid ColumnDefinitions="28,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
                                         <Label Grid.RowSpan="2" FontSize="12" Text="{Binding LineNumber}" VerticalTextAlignment="Center" />
-                                        <Label Grid.Column="1" FontAttributes="Bold" FontSize="14" LineBreakMode="TailTruncation" Text="{Binding SkuName}" />
+                                        <Label Grid.Column="1" FontAttributes="Bold" FontSize="12" LineBreakMode="WordWrap" Text="{Binding SkuName}" />
                                         <Label Grid.Row="1" Grid.Column="1" FontSize="11" Text="{Binding SkuCode}" />
                                         <VerticalStackLayout Grid.Column="2" Grid.RowSpan="2" Spacing="0" MinimumWidthRequest="70">
                                             <Label FontSize="12" HorizontalTextAlignment="End" Text="{Binding PlanText}" />
@@ -43,7 +45,7 @@
                     </VerticalStackLayout>
                     <VerticalStackLayout x:Name="LpnPanel" BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" IsVisible="False" Spacing="4">
                         <BindableLayout.EmptyView>
-                            <Label Padding="8" Text="Паллет пока нет. Отсканируйте свободную этикетку LPN." />
+                            <Label Padding="8" Text="Палет пока нет. Отсканируйте свободную этикетку LPN." />
                         </BindableLayout.EmptyView>
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingOrderLpnRow">
@@ -52,8 +54,11 @@
                                         <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnLicensePlateNumberTapped" />
                                     </Border.GestureRecognizers>
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                                        <Label FontAttributes="Bold" FontSize="16" Text="{Binding Code}" />
-                                        <Label Grid.Row="1" FontSize="12" Text="{Binding Details}" />
+                                        <HorizontalStackLayout Spacing="7">
+                                            <Label FontAttributes="Bold" FontSize="16" Text="{Binding Code}" />
+                                            <Label FontSize="12" Text="{Binding StatusName}" VerticalTextAlignment="Center" />
+                                        </HorizontalStackLayout>
+                                        <Label Grid.Row="1" FontSize="12" Text="{Binding ResponsibleUserName}" />
                                         <Button Grid.Column="1" Grid.RowSpan="2" Clicked="OnCancelLicensePlateNumberClicked" CommandParameter="{Binding Id}" FontSize="20" HeightRequest="36" IsVisible="{Binding CanCancel}" Padding="0" Text="×" WidthRequest="36" />
                                     </Grid>
                                 </Border>
@@ -68,6 +73,7 @@
             <Label x:Name="InstructionLabel" FontSize="12" HorizontalTextAlignment="Center" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
             <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
+            <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

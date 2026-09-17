@@ -9,9 +9,11 @@ public sealed class ReceivingOrderReceivingProcess
     private Guid? _openLpnRequestId;
     private Guid? _cancelLpnRequestId;
     private Guid? _lpnMutationRequestId;
+    private Guid? _completionRequestId;
     private string? _openLpnCode;
     private Guid? _cancelLpnId;
     private string? _lpnMutationKey;
+    private string? _completionFingerprint;
 
     internal ReceivingOrderReceivingProcess(MobileReceivingOrderClient orderClient)
     {
@@ -21,12 +23,43 @@ public sealed class ReceivingOrderReceivingProcess
     public bool HasPendingCommand => IsStartPending
         || IsOpenLpnPending
         || IsCancelLpnPending
-        || IsLpnMutationPending;
+        || IsLpnMutationPending
+        || IsCompletionPending;
 
     public bool IsStartPending => _startRequestId is not null;
     public bool IsOpenLpnPending => _openLpnRequestId is not null;
     public bool IsCancelLpnPending => _cancelLpnRequestId is not null;
     public bool IsLpnMutationPending => _lpnMutationRequestId is not null;
+    public bool IsCompletionPending => _completionRequestId is not null;
+
+    public async Task<MobileReceivingOrderCommandResponse> CompleteAsync(
+        Guid orderId,
+        string expectedFingerprint)
+    {
+        if (_completionFingerprint is not null
+            && !string.Equals(_completionFingerprint, expectedFingerprint, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Сначала повторите предыдущее завершение приёмки.");
+        }
+
+        _completionFingerprint ??= expectedFingerprint;
+        _completionRequestId ??= Guid.NewGuid();
+        try
+        {
+            var response = await _orderClient.CompleteAsync(
+                orderId, _completionFingerprint, _completionRequestId.Value);
+            _completionFingerprint = null;
+            _completionRequestId = null;
+            return response;
+        }
+        catch (MobileApiException)
+        {
+            _completionFingerprint = null;
+            _completionRequestId = null;
+            throw;
+        }
+    }
+
     public async Task<MobileReceivingOrderCommandResponse> StartAsync(
         Guid orderId,
         string receivingLocationBarcode)

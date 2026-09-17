@@ -102,7 +102,6 @@
                                             IsVisible="{Binding HasJoinBlock}"
                                             Text="{Binding JoinBlockText}"
                                             TextColor="Red" />
-                                        <Label Text="{Binding DetailsText}" />
                                         <Label
                                             FontSize="16"
                                             Text="{Binding ProgressText}" />

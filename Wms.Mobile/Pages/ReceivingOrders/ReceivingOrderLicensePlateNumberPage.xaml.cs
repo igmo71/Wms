@@ -36,7 +36,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private MobileReceivingOrderLicensePlateNumberResponse LicensePlateNumber =>
         _details?.LicensePlateNumbers.SingleOrDefault(x => x.Id == _lpnId)
-        ?? throw new InvalidOperationException("Паллета не найдена в приходном ордере.");
+        ?? throw new InvalidOperationException("Палета не найдена в приходном ордере.");
 
     public void Show(Guid orderId, Guid lpnId)
     {
@@ -83,7 +83,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         if (!LicensePlateNumber.CanEdit)
         {
-            ErrorLabel.Text = "Закрытая паллета доступна только для просмотра.";
+            ErrorLabel.Text = "Закрытая палета доступна только для просмотра.";
             return;
         }
         await ResolveSkuAsync(barcode);
@@ -153,11 +153,12 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
             return;
         if (!_process.IsLpnMutationPending && !await DisplayAlertAsync(
-                "Закрыть паллету", "Завершить пересчёт этой паллеты?", "Закрыть", "Назад"))
+                "Закрыть палету", "Завершить пересчёт этой палеты?", "Закрыть", "Назад"))
             return;
         await MutateAsync(
             () => _process.CloseLicensePlateNumberAsync(_orderId, _lpnId),
-            "Ответ сервера не получен. Повторите закрытие этой же паллеты.");
+            "Ответ сервера не получен. Повторите закрытие этой же палеты.",
+            returnToOrder: true);
     }
 
     private async void OnReopenClicked(object? sender, EventArgs e)
@@ -167,7 +168,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             return;
         await MutateAsync(
             () => _process.ReopenLicensePlateNumberAsync(_orderId, _lpnId),
-            "Ответ сервера не получен. Повторите возобновление этой же паллеты.");
+            "Ответ сервера не получен. Повторите возобновление этой же палеты.");
     }
 
     private async void OnCancelClicked(object? sender, EventArgs e)
@@ -176,24 +177,27 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             || (_process.HasPendingCommand && !_process.IsCancelLpnPending))
             return;
         if (!_process.IsCancelLpnPending && !await DisplayAlertAsync(
-                "Отменить паллету", $"Отменить пустую паллету {LicensePlateNumber.Code}?", "Отменить", "Назад"))
+                "Отменить палету", $"Отменить пустую палету {LicensePlateNumber.Code}?", "Отменить", "Назад"))
             return;
         await ExecuteAsync(async () =>
         {
             await _process.CancelLicensePlateNumberAsync(_orderId, _lpnId);
             await Navigation.PopAsync();
-        }, "Ответ сервера не получен. Повторите отмену этой же паллеты.");
+        }, "Ответ сервера не получен. Повторите отмену этой же палеты.");
     }
 
     private async Task MutateAsync(
         Func<Task<MobileReceivingOrderCommandResponse>> mutation,
-        string uncertainMessage)
+        string uncertainMessage,
+        bool returnToOrder = false)
     {
         await ExecuteAsync(async () =>
         {
             var response = await mutation();
             _details = response.Details;
             ApplyDetails();
+            if (returnToOrder)
+                await Navigation.PopAsync();
         }, uncertainMessage);
     }
 
@@ -259,26 +263,27 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private void ApplyDetails()
     {
         var lpn = LicensePlateNumber;
-        CodeLabel.Text = lpn.Code;
+        Title = lpn.Code;
         StatusLabel.Text = $"{lpn.StatusName} · {lpn.ResponsibleUserName}";
         InstructionLabel.Text = lpn.CanEdit
             ? "Выберите или отсканируйте товар. LPN переключается сканированием."
-            : "Паллета доступна только для просмотра.";
+            : "Палета доступна только для просмотра.";
         CancelButton.IsVisible = lpn.CanCancel;
         CloseButton.IsVisible = lpn.CanClose;
         ReopenButton.IsVisible = lpn.CanReopen;
-        Rows = _details!.Lines
-            .GroupBy(x => new { x.StockKeepingUnitId, x.SkuCode, x.SkuName, x.UnitOfMeasure })
-            .Select(group =>
+        Rows = lpn.Items
+            .Select(item =>
             {
-                var item = lpn.Items.SingleOrDefault(x => x.StockKeepingUnitId == group.Key.StockKeepingUnitId);
-                var unit = string.IsNullOrWhiteSpace(group.Key.UnitOfMeasure) ? string.Empty : $" {group.Key.UnitOfMeasure}";
+                var plan = _details!.Lines
+                    .Where(x => x.StockKeepingUnitId == item.StockKeepingUnitId)
+                    .Sum(x => x.PlanQuantity);
+                var unit = string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? string.Empty : $" {item.UnitOfMeasure}";
                 return new ReceivingOrderLpnSkuRow(
-                    group.Key.StockKeepingUnitId,
-                    group.Key.SkuCode,
-                    group.Key.SkuName,
-                    $"План {group.Sum(x => x.PlanQuantity):g}{unit}",
-                    item is null ? $"В паллете —{unit}" : $"В паллете {item.Quantity:g}{unit}");
+                    item.StockKeepingUnitId,
+                    item.SkuCode,
+                    item.SkuName,
+                    $"План {plan:g}{unit}",
+                    $"В палете {item.Quantity:g}{unit}");
             })
             .ToArray();
         OnPropertyChanged(nameof(Rows));
