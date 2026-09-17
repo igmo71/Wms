@@ -52,6 +52,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         ApplyDetails(details);
     }
 
+    public void ShowMain(MobileReceivingOrderDetailsResponse details)
+    {
+        _lpnTabActive = false;
+        Show(details);
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -471,8 +477,8 @@ public sealed record ReceivingOrderLineRow(
             line.StockKeepingUnitId,
             line.SkuCode,
             line.SkuName,
-            $"План {line.PlanQuantity:g}{unit}",
-            line.FactQuantity.HasValue ? $"Факт {line.FactQuantity:g}{unit}" : "?",
+            $"{line.PlanQuantity:g}{unit}",
+            line.FactQuantity.HasValue ? $"{line.FactQuantity:g}{unit}" : "?",
             background,
             line.FactQuantity.HasValue ? Colors.Black : Colors.DarkRed);
     }

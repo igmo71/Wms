@@ -149,4 +149,10 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         ApplyButton.IsEnabled = !busy;
         RemoveButton.IsEnabled = !busy;
     }
+
+    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element)
+            AndroidFocus.Suppress(element);
+    }
 }

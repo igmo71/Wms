@@ -34,7 +34,7 @@
                                         <Label Grid.RowSpan="2" FontSize="12" Text="{Binding LineNumber}" VerticalTextAlignment="Center" />
                                         <Label Grid.Column="1" FontAttributes="Bold" FontSize="12" LineBreakMode="WordWrap" Text="{Binding SkuName}" />
                                         <Label Grid.Row="1" Grid.Column="1" FontSize="11" Text="{Binding SkuCode}" />
-                                        <VerticalStackLayout Grid.Column="2" Grid.RowSpan="2" Spacing="0" MinimumWidthRequest="70">
+                                        <VerticalStackLayout Grid.Column="2" Grid.RowSpan="2" Spacing="0" MinimumWidthRequest="48">
                                             <Label FontSize="12" HorizontalTextAlignment="End" Text="{Binding PlanText}" />
                                             <Label FontAttributes="Bold" FontSize="13" HorizontalTextAlignment="End" Text="{Binding FactText}" TextColor="{Binding FactColor}" />
                                         </VerticalStackLayout>

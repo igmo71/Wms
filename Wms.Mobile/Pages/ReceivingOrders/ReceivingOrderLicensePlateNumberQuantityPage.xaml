@@ -25,8 +25,8 @@
         <VerticalStackLayout Grid.Row="1" Spacing="6">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
-            <Button x:Name="ApplyButton" Clicked="OnApplyClicked" HeightRequest="48" Text="Применить" />
-            <Button x:Name="RemoveButton" Clicked="OnRemoveClicked" HeightRequest="42" Text="Удалить из палеты" />
+            <Button x:Name="ApplyButton" Clicked="OnApplyClicked" HeightRequest="48" Loaded="OnNonScanControlLoaded" Text="Применить" />
+            <Button x:Name="RemoveButton" Clicked="OnRemoveClicked" HeightRequest="42" Loaded="OnNonScanControlLoaded" Text="Удалить из палеты" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

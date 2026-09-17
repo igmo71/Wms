@@ -221,9 +221,10 @@ read-only: unchecked fact is a red question mark, a mismatch is highlighted
 yellow, and an exact match green. Tapping an order SKU opens its aggregate plan
 and fact plus only the LPNs that contain that SKU, with quantity per LPN. An LPN
 page lists only its retained item rows, not every planned order SKU. Pallet
-actions remain visible below the scrolling composition; closing returns to the
-order, and an empty pallet uses a compact cancel action. Cancelled LPNs are
-hidden from operational Mobile lists but remain permanently used and auditable.
+actions remain visible below the scrolling composition; closing always returns
+to the order's nomenclature tab, and an empty pallet uses a compact cancel
+action. Cancelled LPNs are hidden from operational Mobile lists but remain
+permanently used and auditable.
 Mobile SKU names wrap and are never ellipsized.
 
 Receiving imports never discard active local work. WMS owns the receiving
@@ -445,6 +446,12 @@ fallback implement one scanner boundary; operational screens prefer the
 embedded scanner when available. Manual SKU search, where present, uses name,
 code, or barcode and rejoins the same operation as scanning. Decimal 1C GUID
 barcodes accept and normalize leading zeroes.
+
+The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
+only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
+can activate a focused UI action after the Intent scan has already navigated.
+Scanner-driven pages suppress Android focus on action buttons and ignore scan
+callbacks queued after the page has disappeared.
 
 The API address is packaged per build configuration and is not editable by the
 operator.

@@ -74,7 +74,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async Task HandleScanAsync(string barcode)
     {
-        if (_busy || _details is null)
+        if (!_isVisible || _busy || _details is null)
             return;
         if (IsLicensePlateNumberCode(barcode))
         {
@@ -197,8 +197,31 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             _details = response.Details;
             ApplyDetails();
             if (returnToOrder)
-                await Navigation.PopAsync();
+                await ReturnToMainOrderPageAsync(response.Details);
         }, uncertainMessage);
+    }
+
+    private async Task ReturnToMainOrderPageAsync(MobileReceivingOrderDetailsResponse details)
+    {
+        var orderPage = Navigation.NavigationStack
+            .OfType<ReceivingOrderReceivingPage>()
+            .LastOrDefault();
+        if (orderPage is null)
+        {
+            await Navigation.PopAsync();
+            return;
+        }
+
+        orderPage.ShowMain(details);
+        var intermediatePages = Navigation.NavigationStack
+            .SkipWhile(page => !ReferenceEquals(page, orderPage))
+            .Skip(1)
+            .Where(page => !ReferenceEquals(page, this))
+            .ToArray();
+        foreach (var page in intermediatePages)
+            Navigation.RemovePage(page);
+
+        await Navigation.PopAsync();
     }
 
     private async Task ExecuteAsync(Func<Task> action, string uncertainMessage)
@@ -296,6 +319,12 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         CloseButton.IsEnabled = !busy;
         ReopenButton.IsEnabled = !busy;
         CancelButton.IsEnabled = !busy;
+    }
+
+    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element)
+            AndroidFocus.Suppress(element);
     }
 
     private async Task UpdateCameraAsync()
