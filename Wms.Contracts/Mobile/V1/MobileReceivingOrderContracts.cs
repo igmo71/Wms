@@ -140,10 +140,6 @@ public sealed record MobileReceivingOrderLineCandidateResponse(
     decimal? RemainingPutawayQuantity,
     bool IsExactMatch);
 
-public sealed record MobileReceivingOrderLineSearchResponse(
-    IReadOnlyList<MobileReceivingOrderLineCandidateResponse> Items,
-    bool HasMore);
-
 public sealed record MobileResolveReceivingOrderDocumentRequest(
     Guid WarehouseId,
     string Barcode);
@@ -164,19 +160,7 @@ public sealed record MobileSetReceivingLicensePlateNumberItemQuantityRequest(
     Guid ClientRequestId,
     decimal Quantity);
 
-public sealed record MobileSetReceivingOrderLineQuantityRequest(
-    Guid ClientRequestId,
-    decimal Quantity);
-
-public sealed record MobileAddReceivingOrderPutawayMovementRequest(
-    Guid ClientRequestId,
-    int LineNumber,
-    string DestinationStorageLocationBarcode,
-    decimal Quantity);
-
 public sealed record MobileReceivingOrderCommandResponse(
     MobileReceivingOrderDetailsResponse Details,
-    int? ChangedLineNumber = null,
-    Guid? ChangedMovementId = null,
     Guid? SelectedLicensePlateNumberId = null);
 

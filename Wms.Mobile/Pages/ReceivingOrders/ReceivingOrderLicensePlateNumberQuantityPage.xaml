@@ -1,0 +1,32 @@
+<ContentPage
+    x:Class="Wms.Mobile.ReceivingOrderLicensePlateNumberQuantityPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Количество">
+    <Grid RowDefinitions="*,Auto" Padding="16" RowSpacing="10">
+        <ScrollView>
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="22" />
+                <Label x:Name="SkuCodeLabel" FontSize="13" />
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="5">
+                    <Label Text="План" />
+                    <Label x:Name="PlanLabel" Grid.Column="1" FontAttributes="Bold" />
+                    <Label Grid.Row="1" Text="Проверено по ордеру" />
+                    <Label x:Name="FactLabel" Grid.Row="1" Grid.Column="1" FontAttributes="Bold" />
+                    <Label Grid.Row="2" Text="В этой паллете" />
+                    <Label x:Name="CurrentLabel" Grid.Row="2" Grid.Column="1" FontAttributes="Bold" />
+                    <Label Grid.Row="3" Text="Единица измерения" />
+                    <Label x:Name="UnitLabel" Grid.Row="3" Grid.Column="1" FontAttributes="Bold" />
+                </Grid>
+                <Label Margin="0,8,0,0" Text="Количество в паллете" />
+                <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="0" />
+            </VerticalStackLayout>
+        </ScrollView>
+        <VerticalStackLayout Grid.Row="1" Spacing="6">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
+            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+            <Button x:Name="ApplyButton" Clicked="OnApplyClicked" HeightRequest="48" Text="Применить" />
+            <Button x:Name="RemoveButton" Clicked="OnRemoveClicked" HeightRequest="42" Text="Удалить из паллеты" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

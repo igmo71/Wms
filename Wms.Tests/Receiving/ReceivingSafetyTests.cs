@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wms.Application.Commands;
 using Wms.Application.Inventory.Movements;
+using Wms.Application.Inventory.Transfers;
 using Wms.Application.LicensePlateNumbers;
 using Wms.Application.ReceivingOrders;
 using Wms.Common;
@@ -122,7 +123,7 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Receiving_lpn_assignment_is_single_owner_and_cancelled_code_is_never_free_again()
+    public async Task Receiving_lpn_assignment_allows_multiple_open_lpn_and_cancelled_code_is_never_free_again()
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "LPN assignment" };
         var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "LPN SKU" };
@@ -162,31 +163,46 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Success(await lpnService.CancelEmptyReceivingAsync(
             new(targetOrder.Id, assignedId), Command(targetOwner)));
 
-        var oneOpenRaceService = LpnService(database.WithInterceptor(new ReceiptSaveBarrier()));
-        var oneOpenRace = await Task.WhenAll(
-            oneOpenRaceService.OpenForReceivingAsync(new(targetOrder.Id, codes[1]), Command(targetOwner)),
-            oneOpenRaceService.OpenForReceivingAsync(new(targetOrder.Id, codes[2]), Command(targetOwner)));
-        Assert.Single(oneOpenRace, x => x.IsSuccess);
-        Error(oneOpenRace.Single(x => !x.IsSuccess), OperationErrorType.Conflict);
+        var multipleOpenService = LpnService(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var multipleOpen = await Task.WhenAll(
+            multipleOpenService.OpenForReceivingAsync(new(targetOrder.Id, codes[1]), Command(targetOwner)),
+            multipleOpenService.OpenForReceivingAsync(new(targetOrder.Id, codes[2]), Command(targetOwner)));
+        Assert.Contains(multipleOpen, result => !result.IsSuccess);
+        var openIds = new List<Guid>();
+        for (var index = 0; index < multipleOpen.Length; index++)
+        {
+            if (multipleOpen[index].IsSuccess)
+            {
+                openIds.Add(Value(multipleOpen[index]));
+                continue;
+            }
+
+            Error(multipleOpen[index], OperationErrorType.Conflict);
+            openIds.Add(Value(await lpnService.OpenForReceivingAsync(
+                new(targetOrder.Id, codes[index + 1]), Command(targetOwner))));
+        }
+        Assert.Equal(2, openIds.Distinct().Count());
 
         await using var verify = database.CreateDbContext();
         var assigned = await verify.LicensePlateNumbers.SingleAsync(x => x.Code == codes[0]);
         Assert.Equal(targetOrder.Id, assigned.ReceivingOrderId);
         Assert.Equal(LicensePlateNumberStatus.Cancelled, assigned.Status);
 
-        var openId = Value(oneOpenRace.Single(x => x.IsSuccess));
-        Success(await lpnService.CancelEmptyReceivingAsync(
-            new(targetOrder.Id, openId), Command(targetOwner)));
-        var nextCode = oneOpenRace[0].IsSuccess ? codes[2] : codes[1];
-        var next = await lpnService.OpenForReceivingAsync(
-            new(targetOrder.Id, nextCode), Command(targetOwner));
-        Success(next);
+        var firstOpenId = openIds[0];
+        Success(await lpnService.CloseReceivingAsync(
+            new(targetOrder.Id, firstOpenId), Command(targetOwner), false));
+        Success(await lpnService.ReopenReceivingAsync(
+            new(targetOrder.Id, firstOpenId), Command("manager"), true));
         var reopenCancelled = await lpnService.OpenForReceivingAsync(
             new(targetOrder.Id, codes[0]), Command(targetOwner));
         Assert.Equal(assigned.Id, Value(reopenCancelled));
 
-        Assert.Equal(LicensePlateNumberStatus.Cancelled, assigned.Status);
-        Assert.Equal(targetOrder.Id, assigned.ReceivingOrderId);
+        var savedLpns = await verify.LicensePlateNumbers
+            .AsNoTracking()
+            .Where(x => x.ReceivingOrderId == targetOrder.Id)
+            .ToListAsync();
+        Assert.Equal(2, savedLpns.Count(x => x.Status == LicensePlateNumberStatus.Open));
+        Assert.Contains(savedLpns, x => x.Id == assigned.Id && x.Status == LicensePlateNumberStatus.Cancelled);
     }
 
     [Fact]
@@ -579,6 +595,154 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         Error(await PutawayService(database).PutawayAsync(
             new(lpnId, itemId, currentAddressFirst.Id, 1m), Command("worker")),
             OperationErrorType.Conflict);
+    }
+
+    [Fact]
+    public async Task Two_workers_complete_and_putaway_lpn_receiving_without_losing_history()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "End-to-end LPN" };
+        var bolts = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Bolts", Code = "BOLT" };
+        var nuts = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Nuts", Code = "NUT" };
+        var receivingZone = Zone(warehouse.Id, "ER", ZoneType.Receiving);
+        var storageZone = Zone(warehouse.Id, "ES", ZoneType.Storage);
+        var receivingLocation = Location(warehouse.Id, receivingZone, 1);
+        var firstDestination = RecommendationLocation(warehouse.Id, storageZone, 1, "01", 1);
+        var secondDestination = RecommendationLocation(warehouse.Id, storageZone, 2, "02", 2);
+        var snapshot = new ReceivingOrderImportSnapshot(
+            Guid.NewGuid(), false, true, "End-to-end LPN", DateTime.UtcNow, warehouse.Id, null,
+            ReceivingOrderStatus.ReadyForReceiving, default, WarehouseOperation.VendorReceipt,
+            BusinessOperation.VendorPurchase, Guid.NewGuid(), default, Guid.NewGuid(), null,
+            [new(1, bolts.Id, 100m, 100m, null), new(2, nuts.Id, 20m, 20m, null)]);
+        var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
+        Success(order.SetReceivingLocation(receivingLocation.Id));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "worker-a"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "worker-a"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "worker-b"));
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(
+                warehouse, bolts, nuts, receivingZone, storageZone,
+                receivingLocation, firstDestination, secondDestination, order);
+            await seed.SaveChangesAsync();
+        }
+
+        var lpnService = LpnService(database);
+        var batchId = Value(await lpnService.IssueAsync(2, Command("issuer")));
+        string[] codes;
+        await using (var read = database.CreateDbContext())
+            codes = await read.LicensePlateNumbers
+                .Where(x => x.BatchId == batchId)
+                .OrderBy(x => x.Code)
+                .Select(x => x.Code)
+                .ToArrayAsync();
+
+        var firstLpnId = Value(await lpnService.OpenForReceivingAsync(
+            new(order.Id, codes[0]), Command("worker-a")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, firstLpnId, bolts.Id, 40m), Command("worker-a"), false));
+        Success(await lpnService.CloseReceivingAsync(
+            new(order.Id, firstLpnId), Command("worker-a"), false));
+
+        var secondLpnId = Value(await lpnService.OpenForReceivingAsync(
+            new(order.Id, codes[1]), Command("worker-b")));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, secondLpnId, bolts.Id, 60m), Command("worker-b"), false));
+        Success(await lpnService.SetReceivingItemQuantityAsync(
+            new(order.Id, secondLpnId, nuts.Id, 20m), Command("worker-b"), false));
+        Success(await lpnService.CloseReceivingAsync(
+            new(order.Id, secondLpnId), Command("worker-b"), false));
+
+        await using (var beforeCompletion = database.CreateDbContext())
+            Assert.Empty(await beforeCompletion.InventoryBalances
+                .Where(x => x.WarehouseId == warehouse.Id)
+                .ToListAsync());
+
+        var source = new FixedSource(snapshot);
+        var synchronization = new ReceivingOrderSynchronizationService(
+            database, source, NullLogger<ReceivingOrderSynchronizationService>.Instance);
+        var preview = Value(await synchronization.CheckCompletionAsync(order.Id));
+        var completionContext = Command("worker-a");
+        var receivingService = ReceivingService(database, source);
+        Value(await receivingService.CompleteReceivingAsync(
+            new(order.Id, null, preview.Assessment.Fingerprint, null),
+            completionContext,
+            false));
+        Value(await receivingService.CompleteReceivingAsync(
+            new(order.Id, null, preview.Assessment.Fingerprint, null),
+            completionContext,
+            false));
+
+        Dictionary<(Guid LpnId, Guid SkuId), Guid> itemIds;
+        await using (var read = database.CreateDbContext())
+            itemIds = await read.LicensePlateNumberItems
+                .Where(x => x.LicensePlateNumberId == firstLpnId || x.LicensePlateNumberId == secondLpnId)
+                .ToDictionaryAsync(x => (x.LicensePlateNumberId, x.StockKeepingUnitId), x => x.Id);
+
+        var putawayService = PutawayService(database);
+        var firstPutaway = new PutawayLicensePlateNumberCommand(
+            firstLpnId, itemIds[(firstLpnId, bolts.Id)], firstDestination.Id, 40m);
+        var firstPutawayContext = Command("worker-a");
+        Value(await putawayService.PutawayAsync(firstPutaway, firstPutawayContext));
+        Value(await putawayService.PutawayAsync(firstPutaway, firstPutawayContext));
+
+        var boltSelection = Value(await putawayService.GetSelectionAsync(
+            secondLpnId, itemIds[(secondLpnId, bolts.Id)]));
+        Assert.Contains(boltSelection.Recommendations, x =>
+            x.StorageLocationId == firstDestination.Id
+            && x.Category == LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock);
+
+        Value(await putawayService.PutawayAsync(
+            new(secondLpnId, itemIds[(secondLpnId, bolts.Id)], firstDestination.Id, 30m),
+            Command("worker-b")));
+        Value(await putawayService.PutawayAsync(
+            new(secondLpnId, itemIds[(secondLpnId, bolts.Id)], secondDestination.Id, 30m),
+            Command("worker-b")));
+        Value(await putawayService.PutawayAsync(
+            new(secondLpnId, itemIds[(secondLpnId, nuts.Id)], secondDestination.Id, 20m),
+            Command("worker-b")));
+
+        var transferService = new InventoryTransferCommandService(
+            new CommandExecutor(database),
+            new InventoryPostingService(NullLogger<InventoryPostingService>.Instance));
+        var transferId = Value(await transferService.CreateAsync(
+            new(warehouse.Id, null), Command("picker")));
+        Value(await transferService.MoveDirectAsync(
+            new(transferId, firstDestination.Id, secondDestination.Id, bolts.Id, 10m),
+            Command("picker")));
+
+        var firstDetails = Value(await putawayService.GetAsync(firstLpnId));
+        var secondDetails = Value(await putawayService.GetAsync(secondLpnId));
+        Assert.True(firstDetails.IsCompleted);
+        Assert.True(secondDetails.IsCompleted);
+        var allItems = firstDetails.Items.Concat(secondDetails.Items).ToList();
+        var allHistory = firstDetails.History.Concat(secondDetails.History).ToList();
+        Assert.Equal(100m, allItems.Where(x => x.StockKeepingUnitId == bolts.Id).Sum(x => x.AcceptedQuantity));
+        Assert.Equal(20m, allItems.Where(x => x.StockKeepingUnitId == nuts.Id).Sum(x => x.AcceptedQuantity));
+        Assert.All(allItems, x => Assert.Equal(0m, x.RemainingQuantity));
+        Assert.Equal(100m, allHistory.Where(x => x.StockKeepingUnitId == bolts.Id).Sum(x => x.Quantity));
+        Assert.Equal(20m, allHistory.Where(x => x.StockKeepingUnitId == nuts.Id).Sum(x => x.Quantity));
+        Assert.All(firstDetails.History, x => Assert.Equal("worker-a", x.CreatedBy));
+        Assert.All(secondDetails.History, x => Assert.Equal("worker-b", x.CreatedBy));
+        Assert.Equal(4, allHistory.Count);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(0m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == receivingLocation.Id && x.StockKeepingUnitId == bolts.Id)).Quantity);
+        Assert.Equal(0m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == receivingLocation.Id && x.StockKeepingUnitId == nuts.Id)).Quantity);
+        Assert.Equal(60m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == firstDestination.Id && x.StockKeepingUnitId == bolts.Id)).Quantity);
+        Assert.Equal(40m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == secondDestination.Id && x.StockKeepingUnitId == bolts.Id)).Quantity);
+        Assert.Equal(20m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == secondDestination.Id && x.StockKeepingUnitId == nuts.Id)).Quantity);
+        Assert.Equal(4, await verify.LicensePlateNumberPutaways.CountAsync(x =>
+            x.LicensePlateNumberId == firstLpnId || x.LicensePlateNumberId == secondLpnId));
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.RequestId == completionContext.RequestId));
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.RequestId == firstPutawayContext.RequestId));
     }
 
     private static ReceivingOrder StartedOrder(

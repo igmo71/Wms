@@ -41,10 +41,10 @@ public static class MauiProgram
         builder.Services.AddTransient<InventoryCountPage>();
         builder.Services.AddTransient<ReceivingOrderPage>();
         builder.Services.AddTransient<ReceivingOrderReceivingPage>();
+        builder.Services.AddTransient<ReceivingOrderLicensePlateNumberPage>();
+        builder.Services.AddTransient<ReceivingOrderLicensePlateNumberQuantityPage>();
         builder.Services.AddTransient(serviceProvider => new ReceivingOrderReceivingProcess(
             serviceProvider.GetRequiredService<MobileReceivingOrderClient>()));
-        builder.Services.AddTransient<ReceivingOrderPutawayPage>();
-        builder.Services.AddTransient<ReceivingOrderPutawayMovementPage>();
         builder.Services.AddTransient<LicensePlateNumberPutawayPage>();
         builder.Services.AddTransient<ShippingOrderPage>();
         builder.Services.AddTransient<ShippingOrderPickingPage>();

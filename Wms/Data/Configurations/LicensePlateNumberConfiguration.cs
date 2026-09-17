@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wms.Domain;
-using Wms.Domain.Enums;
 
 namespace Wms.Data.Configurations;
 
@@ -20,10 +19,6 @@ public sealed class LicensePlateNumberConfiguration : IEntityTypeConfiguration<L
         builder.Property(x => x.ReopenedBy).HasMaxLength(450);
         builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
         builder.HasIndex(x => x.ReceivingOrderId);
-        builder.HasIndex(x => new { x.ReceivingOrderId, x.ResponsibleUserId })
-            .HasDatabaseName(DatabaseObjectNames.LicensePlateNumbersOpenOwnerIndex)
-            .HasFilter($"[Status] = {(int)LicensePlateNumberStatus.Open}")
-            .IsUnique();
         builder.HasOne(x => x.Batch).WithMany(x => x.Labels).HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.LicensePlateNumbers)
             .HasForeignKey(x => x.ReceivingOrderId).OnDelete(DeleteBehavior.Restrict);

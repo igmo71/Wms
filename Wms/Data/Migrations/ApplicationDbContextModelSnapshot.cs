@@ -736,11 +736,6 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("ReceivingOrderId");
 
-                    b.HasIndex("ReceivingOrderId", "ResponsibleUserId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_LicensePlateNumbers_OpenOwner")
-                        .HasFilter("[Status] = 1");
-
                     b.ToTable("LicensePlateNumbers");
                 });
 

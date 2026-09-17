@@ -166,50 +166,6 @@ public sealed class MobileReceivingOrderQueryService(
                     : "Товар с таким штрихкодом не найден в приходном ордере.");
     }
 
-    public async Task<OperationResult<MobileReceivingOrderLineSearchResult>> SearchLinesAsync(
-        Guid orderId,
-        string? searchText,
-        int take,
-        CancellationToken ct = default)
-    {
-        var term = searchText?.Trim() ?? string.Empty;
-        if (term.Length < 2)
-        {
-            return new MobileReceivingOrderLineSearchResult([], false);
-        }
-
-        var workResult = await LoadLineWorkAsync(orderId, ct);
-        if (!workResult.IsSuccess)
-        {
-            return workResult.Error!;
-        }
-
-        var work = workResult.Value!;
-        var context = work.Context;
-        var maximumItems = Math.Clamp(take, 1, 10);
-        var matches = work.Order.Items
-            .Where(x => !x.StockKeepingUnit!.DeletionMark
-                && ((x.StockKeepingUnit.Name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (x.StockKeepingUnit.Code?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || x.StockKeepingUnit.Barcodes.Any(barcode =>
-                        barcode.Value?.Contains(term, StringComparison.OrdinalIgnoreCase) == true)))
-            .Select(x => MapCandidate(
-                x,
-                work.AllocatedByLine,
-                IsExactMatch(x.StockKeepingUnit!, term)))
-            .Where(x => IsAvailableInContext(x, context))
-            .OrderByDescending(x => x.IsExactMatch)
-            .ThenBy(x => x.SkuName)
-            .ThenBy(x => x.SkuCode)
-            .ThenBy(x => x.LineNumber)
-            .Take(maximumItems + 1)
-            .ToList();
-
-        return new MobileReceivingOrderLineSearchResult(
-            matches.Take(maximumItems).ToList(),
-            matches.Count > maximumItems);
-    }
-
     private async Task<OperationResult<ReceivingOrderLineWork>> LoadLineWorkAsync(
         Guid orderId,
         CancellationToken ct)

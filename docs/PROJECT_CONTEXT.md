@@ -157,12 +157,12 @@ same code cannot move to another order. `Open`, `Closed`, and `Cancelled` are
 persisted LPN states; I03 creates and cancels empty LPNs but leaves contents and
 closing to I04.
 
-One employee may have only one open LPN in an order. The aggregate operational
+One employee may have several open LPNs in an order. The aggregate operational
 revision coordinates parallel creation, and SQL constraints independently guard
-both a label race and the open-owner rule. Scanning an existing LPN of the same
-order opens its server state, including another employee's read-only LPN.
+the label race. Scanning an existing LPN of the same order opens its server
+state, including another employee's read-only LPN.
 Only the responsible employee can cancel their empty open LPN. Cancellation
-allows another LPN to be opened but never makes the cancelled code available.
+never makes the cancelled code available.
 Every mutation and its command receipt commit together.
 
 ### Receiving LPN counting (I04)
@@ -176,7 +176,7 @@ concurrent LPN changes are coordinated by the receiving-order revision.
 
 The responsible employee may edit and close their open LPN, including an empty
 one. A Manager or Administrator may correct any open LPN and may reopen a closed
-LPN when its responsible employee has no other open LPN in the order. Creation,
+LPN without closing the employee's other LPNs. Creation,
 last update/removal, closing and reopening retain user and UTC time audit.
 Closing and reopening do not post inventory or complete the receiving order.
 Mobile uses one SKU → absolute quantity confirmation cycle and repeat-safe
@@ -209,11 +209,19 @@ be joined. The order view shows the source plan read-only and its LPN list.
 Direct facts and order-based putaway are removed from the Mobile API. Receiving
 completion is available in Web; Mobile completion remains unavailable.
 
+The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
+accepted from either tab and opens its separate pallet page; an SKU scan is
+accepted only on that pallet page and opens a separate absolute-quantity page.
+No quantity field is focused by navigation or scanning. The order SKU table is
+read-only: unchecked fact is a red question mark, a mismatch is highlighted
+yellow, and an exact match green. Pallet actions remain visible below the
+scrolling composition; an empty pallet uses a compact cancel action.
+
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
-means unchecked; zero is an explicit result. Mobile scans add one to a selected
-line, while manual input sets an absolute nonnegative fact without overwriting
-a Web comment. Every line requires a fact before completion.
+means unchecked; zero is an explicit result. Mobile changes facts only through
+absolute quantities of LPN items; the aggregate fact is read-only. Every line
+requires a fact before completion.
 
 Starting receiving and selecting its scanned receiving location form one save.
 Completion is available to an order participant only after every active LPN is

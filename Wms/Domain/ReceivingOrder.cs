@@ -374,14 +374,6 @@ public class ReceivingOrder
                     $"LPN {lpn.Code} относится к другому приходному ордеру.");
         }
 
-        if (_licensePlateNumbers.Any(x =>
-                x.Status == LicensePlateNumberStatus.Open
-                && x.ResponsibleUserId == userId))
-        {
-            return OperationError.Conflict(
-                "У вас уже есть открытый LPN в этом ордере. Закройте или отмените его перед созданием следующего.");
-        }
-
         var assignResult = lpn.Assign(Id, userId, createdAtUtc);
         if (!assignResult.IsSuccess)
             return assignResult.Error!;
@@ -476,15 +468,6 @@ public class ReceivingOrder
         var validation = ValidateLicensePlateNumberMutation(lpn);
         if (!validation.IsSuccess)
             return validation;
-        if (_licensePlateNumbers.Any(x =>
-                x.Id != lpn.Id
-                && x.Status == LicensePlateNumberStatus.Open
-                && x.ResponsibleUserId == lpn.ResponsibleUserId))
-        {
-            return OperationError.Conflict(
-                "У ответственного сотрудника уже есть открытый LPN в этом ордере.");
-        }
-
         var result = lpn.Reopen(userId, occurredAtUtc, canManage);
         if (result.IsSuccess)
             AdvanceOperationalRevision();

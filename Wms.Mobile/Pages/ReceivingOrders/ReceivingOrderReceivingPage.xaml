@@ -3,351 +3,71 @@
     x:Name="Page"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
     xmlns:local="clr-namespace:Wms.Mobile"
     Title="Приёмка">
-
-    <RefreshView x:Name="OrderRefreshView" Refreshing="OnOrderRefreshing">
-    <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="16">
-            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="26" />
-            <Label x:Name="StatusLabel" FontAttributes="Bold" FontSize="18" />
-
-            <Border Padding="16">
-                <VerticalStackLayout Spacing="6">
-                    <Label x:Name="WarehouseLabel" />
-                    <Label x:Name="ShipperLabel" />
-                    <Label x:Name="LocationLabel" />
-                    <Label x:Name="ProgressLabel" FontAttributes="Bold" />
-                </VerticalStackLayout>
-            </Border>
-
-            <Border x:Name="SynchronizationPanel" IsVisible="False" Padding="16">
-                <VerticalStackLayout Spacing="6">
-                    <Label
-                        x:Name="SynchronizationTitleLabel"
-                        FontAttributes="Bold"
-                        FontSize="18"
-                        TextColor="DarkOrange" />
-                    <Label x:Name="SynchronizationDetailsLabel" />
-                </VerticalStackLayout>
-            </Border>
-
-            <Border Padding="16">
-                <VerticalStackLayout Spacing="12">
-                    <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="22" />
-                    <Label x:Name="InstructionLabel" FontSize="18" />
-
-                    <Button
-                        x:Name="StartReceivingButton"
-                        Clicked="OnStartReceivingClicked"
-                        HeightRequest="58"
-                        Loaded="OnNonScanControlLoaded"
-                        Text="Начать приёмку" />
-
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="22" />
+            <Label x:Name="StatusLabel" Grid.Column="1" FontAttributes="Bold" VerticalTextAlignment="Center" />
+            <Label x:Name="ShipperLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="13" />
+            <Label x:Name="FactLabel" Grid.Row="2" FontSize="13" />
+            <Label x:Name="CheckedLabel" Grid.Row="2" Grid.Column="1" FontSize="13" HorizontalTextAlignment="End" />
+        </Grid>
+        <Border x:Name="SynchronizationPanel" Grid.Row="1" IsVisible="False" Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
+            <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
+        </Border>
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="6">
+            <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
+            <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Паллеты" />
+        </Grid>
+        <RefreshView x:Name="OrderRefreshView" Grid.Row="3" Refreshing="OnOrderRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="4">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-
-                    <VerticalStackLayout
-                        x:Name="LocationConfirmationPanel"
-                        IsVisible="False"
-                        Spacing="10">
-                        <Label
-                            x:Name="ScannedLocationLabel"
-                            FontAttributes="Bold"
-                            FontSize="19" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                            <Button
-                                x:Name="ConfirmLocationButton"
-                                Clicked="OnConfirmLocationClicked"
-                                HeightRequest="54"
-                                Loaded="OnNonScanControlLoaded"
-                                Text="Начать" />
-                            <Button
-                                x:Name="CancelLocationButton"
-                                Clicked="OnCancelLocationClicked"
-                                Grid.Column="1"
-                                HeightRequest="54"
-                                Loaded="OnNonScanControlLoaded"
-                                Text="Отмена" />
-                        </Grid>
-                    </VerticalStackLayout>
-
-                    <Border
-                        x:Name="LineSearchPrompt"
-                        BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}"
-                        IsVisible="False"
-                        Loaded="OnNonScanControlLoaded"
-                        Padding="14">
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnOpenLineSearchTapped" />
-                        </Border.GestureRecognizers>
-                        <Label
-                            FontSize="17"
-                            HorizontalTextAlignment="Center"
-                            Text="Найти строку вручную" />
-                    </Border>
-
-                    <VerticalStackLayout x:Name="LineSearchPanel" IsVisible="False" Spacing="10">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <Entry
-                                x:Name="LineSearchEntry"
-                                ClearButtonVisibility="WhileEditing"
-                                FontSize="18"
-                                Placeholder="Наименование, код или штрихкод"
-                                TextChanged="OnLineSearchTextChanged" />
-                            <Label Grid.Column="1" FontSize="22" SemanticProperties.Description="Закрыть поиск" Text="✕" VerticalTextAlignment="Center">
-                                <Label.GestureRecognizers>
-                                    <TapGestureRecognizer Tapped="OnCancelLineSearchTapped" />
-                                </Label.GestureRecognizers>
-                            </Label>
-                        </Grid>
-                        <BoxView
-                            x:Name="LineSearchIndicator"
-                            Color="{StaticResource Primary}"
-                            HeightRequest="3"
-                            Opacity="0" />
-                        <Label
-                            x:Name="LineSearchStatusLabel"
-                            HorizontalTextAlignment="Center"
-                            Text="Введите не менее двух символов." />
-                        <VerticalStackLayout
-                            x:Name="LineSearchResultsLayout"
-                            BindableLayout.ItemsSource="{Binding SearchCandidates, Source={x:Reference Page}}"
-                            Spacing="8">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="contracts:MobileReceivingOrderLineCandidateResponse">
-                                    <Border Padding="12">
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer
-                                                CommandParameter="{Binding .}"
-                                                Tapped="OnSearchCandidateTapped" />
-                                        </Border.GestureRecognizers>
-                                        <VerticalStackLayout Spacing="3">
-                                            <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
-                                            <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
-                                            <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
+                    <VerticalStackLayout x:Name="ProductLinesPanel" BindableLayout.ItemsSource="{Binding LineRows, Source={x:Reference Page}}" Spacing="3">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingOrderLineRow">
+                                <Border Padding="7,5" BackgroundColor="{Binding BackgroundColor}" Stroke="#D4D4D4" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="28,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
+                                        <Label Grid.RowSpan="2" FontSize="12" Text="{Binding LineNumber}" VerticalTextAlignment="Center" />
+                                        <Label Grid.Column="1" FontAttributes="Bold" FontSize="14" LineBreakMode="TailTruncation" Text="{Binding SkuName}" />
+                                        <Label Grid.Row="1" Grid.Column="1" FontSize="11" Text="{Binding SkuCode}" />
+                                        <VerticalStackLayout Grid.Column="2" Grid.RowSpan="2" Spacing="0" MinimumWidthRequest="70">
+                                            <Label FontSize="12" HorizontalTextAlignment="End" Text="{Binding PlanText}" />
+                                            <Label FontAttributes="Bold" FontSize="13" HorizontalTextAlignment="End" Text="{Binding FactText}" TextColor="{Binding FactColor}" />
                                         </VerticalStackLayout>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
-
-                    <VerticalStackLayout x:Name="LineCandidatesPanel" IsVisible="False" Spacing="10">
-                        <Label
-                            Text="Товар найден в нескольких строках. Выберите строку для +1."
-                            FontSize="17" />
-                        <VerticalStackLayout
-                            BindableLayout.ItemsSource="{Binding ScanCandidates, Source={x:Reference Page}}"
-                            Spacing="8">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="contracts:MobileReceivingOrderLineCandidateResponse">
-                                    <Border Padding="12">
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer
-                                                CommandParameter="{Binding .}"
-                                                Tapped="OnScanCandidateTapped" />
-                                        </Border.GestureRecognizers>
-                                        <VerticalStackLayout Spacing="3">
-                                            <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
-                                            <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                            <Label Text="{Binding PlanQuantity, StringFormat='План: {0:g}'}" />
-                                            <Label Text="{Binding FactQuantity, StringFormat='Факт: {0:g}'}" />
-                                        </VerticalStackLayout>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-                        <Button
-                            x:Name="CancelCandidateButton"
-                            Clicked="OnCancelCandidateClicked"
-                            Loaded="OnNonScanControlLoaded"
-                            Text="Отмена" />
+                    <VerticalStackLayout x:Name="LpnPanel" BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" IsVisible="False" Spacing="4">
+                        <BindableLayout.EmptyView>
+                            <Label Padding="8" Text="Паллет пока нет. Отсканируйте свободную этикетку LPN." />
+                        </BindableLayout.EmptyView>
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingOrderLpnRow">
+                                <Border Padding="8" Stroke="#C8C8C8" StrokeThickness="1">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnLicensePlateNumberTapped" />
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                                        <Label FontAttributes="Bold" FontSize="16" Text="{Binding Code}" />
+                                        <Label Grid.Row="1" FontSize="12" Text="{Binding Details}" />
+                                        <Button Grid.Column="1" Grid.RowSpan="2" Clicked="OnCancelLicensePlateNumberClicked" CommandParameter="{Binding Id}" FontSize="20" HeightRequest="36" IsVisible="{Binding CanCancel}" Padding="0" Text="×" WidthRequest="36" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
-
-                    <BoxView
-                        x:Name="CommandProgressIndicator"
-                        Color="{StaticResource Primary}"
-                        HeightRequest="3"
-                        Opacity="0" />
-                    <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
                 </VerticalStackLayout>
-            </Border>
-
-            <Button
-                x:Name="CompleteReceivingButton"
-                Clicked="OnCompleteReceivingClicked"
-                HeightRequest="60"
-                IsVisible="False"
-                Loaded="OnNonScanControlLoaded"
-                Text="Завершить приёмку" />
-
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" Text="Товары" />
-                <Button x:Name="LpnTabButton" Clicked="OnLpnTabClicked" Grid.Column="1" Opacity="0.65" Text="LPN" />
-            </Grid>
-            <VerticalStackLayout x:Name="ProductLinesPanel" Spacing="10">
-            <Label FontAttributes="Bold" FontSize="20" Text="Товары ордера" />
-            <VerticalStackLayout
-                BindableLayout.ItemsSource="{Binding LineStates, Source={x:Reference Page}}"
-                Spacing="10">
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="local:ReceivingOrderLineViewState">
-                        <Border Padding="13" Stroke="Gray" StrokeThickness="1">
-                            <Border.Triggers>
-                                <DataTrigger Binding="{Binding IsAccented}" TargetType="Border" Value="True">
-                                    <Setter Property="Stroke" Value="{StaticResource Primary}" />
-                                    <Setter Property="StrokeThickness" Value="3" />
-                                </DataTrigger>
-                            </Border.Triggers>
-                            <VerticalStackLayout Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                    <Label
-                                        FontAttributes="Bold"
-                                        FontSize="17"
-                                        LineBreakMode="TailTruncation"
-                                        Text="{Binding SkuName}" />
-                                    <Label
-                                        Grid.Column="1"
-                                        FontAttributes="Bold"
-                                        IsVisible="{Binding HasAccentText}"
-                                        Text="{Binding AccentText}"
-                                        TextColor="{StaticResource Primary}" />
-                                </Grid>
-                                <Label Text="{Binding LineText}" />
-                                <Label FontSize="16" Text="{Binding QuantitySummary}" />
-                                <Label
-                                    FontAttributes="Italic"
-                                    IsVisible="{Binding HasComment}"
-                                    Text="{Binding Comment, StringFormat='Комментарий: {0}'}" />
-                                <Label
-                                    FontSize="15"
-                                    IsEnabled="{Binding ActionsEnabled}"
-                                    IsVisible="{Binding ShowActions}"
-                                    Loaded="OnNonScanControlLoaded"
-                                    Text="Количество"
-                                    TextColor="{StaticResource Primary}">
-                                    <Label.GestureRecognizers>
-                                        <TapGestureRecognizer
-                                            CommandParameter="{Binding .}"
-                                            Tapped="OnEditQuantityTapped" />
-                                    </Label.GestureRecognizers>
-                                </Label>
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
-                                    <Entry
-                                        FontSize="20"
-                                        Keyboard="Numeric"
-                                        Placeholder="Итоговое количество"
-                                        Text="{Binding QuantityText, Mode=TwoWay}">
-                                        <Entry.Triggers>
-                                            <DataTrigger Binding="{Binding HasQuantityError}" TargetType="Entry" Value="True">
-                                                <Setter Property="TextColor" Value="Red" />
-                                            </DataTrigger>
-                                        </Entry.Triggers>
-                                    </Entry>
-                                    <Button
-                                        Grid.Column="1"
-                                        Clicked="OnSaveQuantityClicked"
-                                        CommandParameter="{Binding .}"
-                                        FontSize="22"
-                                        HeightRequest="46"
-                                        Loaded="OnNonScanControlLoaded"
-                                        Padding="0"
-                                        Text="✓"
-                                        WidthRequest="46" />
-                                    <Button
-                                        Grid.Column="2"
-                                        Clicked="OnCancelQuantityClicked"
-                                        CommandParameter="{Binding .}"
-                                        FontSize="24"
-                                        HeightRequest="46"
-                                        Loaded="OnNonScanControlLoaded"
-                                        Padding="0"
-                                        Text="×"
-                                        WidthRequest="46" />
-                                </Grid>
-                            </VerticalStackLayout>
-                        </Border>
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </VerticalStackLayout>
-            </VerticalStackLayout>
-            <VerticalStackLayout x:Name="LpnPanel" IsVisible="False" Spacing="10">
-                <Label FontAttributes="Bold" FontSize="20" Text="LPN ордера" />
-                <Label x:Name="LpnScanInstructionLabel" />
-                <Border x:Name="SelectedLpnPanel" IsVisible="False" Padding="14" Stroke="Gray">
-                    <VerticalStackLayout Spacing="4" BindingContext="{Binding SelectedLicensePlateNumber, Source={x:Reference Page}}">
-                        <Label FontAttributes="Bold" FontSize="20" Text="{Binding Code}" />
-                        <Label Text="{Binding StatusName, StringFormat='Состояние: {0}'}" />
-                        <Label Text="{Binding ResponsibleUserName, StringFormat='Ответственный: {0}'}" />
-                        <Label Text="{Binding ClosedAtUtc, StringFormat='Закрыт: {0:dd.MM.yyyy HH:mm}'}" />
-                        <Label Text="{Binding ReopenedAtUtc, StringFormat='Возобновлён: {0:dd.MM.yyyy HH:mm}'}" />
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6">
-                            <BindableLayout.EmptyView>
-                                <Label Text="Состав LPN пуст." />
-                            </BindableLayout.EmptyView>
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="contracts:MobileReceivingOrderLicensePlateNumberItemResponse">
-                                    <Border Padding="10" Stroke="LightGray">
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLpnItemTapped" />
-                                        </Border.GestureRecognizers>
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <VerticalStackLayout>
-                                                <Label FontAttributes="Bold" Text="{Binding SkuName}" />
-                                                <Label Text="{Binding SkuCode}" />
-                                            </VerticalStackLayout>
-                                            <Label Grid.Column="1" FontAttributes="Bold" Text="{Binding Quantity, StringFormat='{0:0.###}'}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-                        <HorizontalStackLayout Spacing="8">
-                            <Button Clicked="OnCloseLicensePlateNumberClicked" IsVisible="{Binding CanClose}" Text="Закрыть" />
-                            <Button Clicked="OnReopenLicensePlateNumberClicked" IsVisible="{Binding CanReopen}" Text="Возобновить" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-                <Border x:Name="LpnQuantityEditor" IsVisible="False" Padding="14" Stroke="{StaticResource Primary}">
-                    <VerticalStackLayout Spacing="8">
-                        <Label x:Name="LpnQuantitySkuLabel" FontAttributes="Bold" FontSize="18" />
-                        <Label x:Name="LpnQuantityUnitLabel" />
-                        <Entry x:Name="LpnQuantityEntry" Keyboard="Numeric" Placeholder="Абсолютное количество" />
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                            <Button Clicked="OnSaveLpnQuantityClicked" Text="Подтвердить" />
-                            <Button x:Name="RemoveLpnItemButton" Grid.Column="1" Clicked="OnRemoveLpnItemClicked" Text="Удалить" />
-                            <Button Grid.Column="2" Clicked="OnCancelLpnQuantityClicked" Text="Отмена" />
-                        </Grid>
-                    </VerticalStackLayout>
-                </Border>
-                <VerticalStackLayout BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" Spacing="8">
-                    <BindableLayout.ItemTemplate>
-                        <DataTemplate x:DataType="contracts:MobileReceivingOrderLicensePlateNumberResponse">
-                            <Border Padding="12" Stroke="Gray">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLicensePlateNumberTapped" />
-                                </Border.GestureRecognizers>
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                    <VerticalStackLayout Spacing="3">
-                                        <Label FontAttributes="Bold" FontSize="18" Text="{Binding Code}" />
-                                        <Label Text="{Binding StatusName}" />
-                                        <Label Text="{Binding ResponsibleUserName, StringFormat='Ответственный: {0}'}" />
-                                    </VerticalStackLayout>
-                                    <Button
-                                        Grid.Column="1"
-                                        Clicked="OnCancelLicensePlateNumberClicked"
-                                        CommandParameter="{Binding .}"
-                                        IsVisible="{Binding CanCancel}"
-                                        Loaded="OnNonScanControlLoaded"
-                                        Text="Отменить" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
-            </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="4" Spacing="5">
+            <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
+            <Label x:Name="InstructionLabel" FontSize="12" HorizontalTextAlignment="Center" />
+            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+            <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
         </VerticalStackLayout>
-    </ScrollView>
-    </RefreshView>
+    </Grid>
 </ContentPage>

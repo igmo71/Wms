@@ -121,7 +121,3 @@ public sealed record MobileReceivingOrderLineCandidate(
     decimal AllocatedQuantity,
     decimal? RemainingPutawayQuantity,
     bool IsExactMatch);
-
-public sealed record MobileReceivingOrderLineSearchResult(
-    IReadOnlyList<MobileReceivingOrderLineCandidate> Items,
-    bool HasMore);
