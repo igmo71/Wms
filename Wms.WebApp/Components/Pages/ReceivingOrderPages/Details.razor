@@ -147,90 +147,11 @@ else
             </MudAlert>
         }
 
-        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
-            <MudText Typo="Typo.h6" Class="mb-2">Участники приёмки</MudText>
-            @if (_order.Participants.Count == 0)
-            {
-                <MudText>К ордеру ещё никто не присоединился.</MudText>
-            }
-            else
-            {
-                <MudDataGrid T="ReceivingOrderParticipant"
-                             Items="_order.Participants.OrderBy(x => x.JoinedAtUtc)"
-                             Dense="true">
-                    <Columns>
-                        <TemplateColumn Title="Сотрудник"><CellTemplate>@GetUserName(context.Item.UserId)</CellTemplate></TemplateColumn>
-                        <PropertyColumn Property="x => x.JoinedAtUtc" Title="Присоединился" Format="dd.MM.yyyy HH:mm" />
-                    </Columns>
-                </MudDataGrid>
-            }
-        </MudPaper>
-
-        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
-            <MudText Typo="Typo.h6" Class="mb-2">LPN ордера</MudText>
-            @if (_order.LicensePlateNumbers.Count == 0)
-            {
-                <MudText>LPN ещё не созданы.</MudText>
-            }
-            else
-            {
-                <MudDataGrid T="LicensePlateNumber"
-                             Items="_order.LicensePlateNumbers.OrderByDescending(x => x.CreatedAtUtc)"
-                             Dense="true">
-                    <Columns>
-                        <PropertyColumn Property="x => x.Code" Title="LPN" />
-                        <TemplateColumn Title="Состояние"><CellTemplate>@context.Item.Status.GetDisplayName()</CellTemplate></TemplateColumn>
-                        <TemplateColumn Title="Ответственный"><CellTemplate>@GetUserName(context.Item.ResponsibleUserId)</CellTemplate></TemplateColumn>
-                        <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
-                        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создан" Format="dd.MM.yyyy HH:mm" />
-                        <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Items.Where(x => !x.IsDeleted).Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
-                        <PropertyColumn Property="x => x.ClosedAtUtc" Title="Закрыт" Format="dd.MM.yyyy HH:mm" />
-                        <TemplateColumn Title="Закрыл"><CellTemplate>@GetUserName(context.Item.ClosedBy)</CellTemplate></TemplateColumn>
-                        <PropertyColumn Property="x => x.ReopenedAtUtc" Title="Возобновлён" Format="dd.MM.yyyy HH:mm" />
-                        <TemplateColumn Title="Возобновил"><CellTemplate>@GetUserName(context.Item.ReopenedBy)</CellTemplate></TemplateColumn>
-                        <PropertyColumn Property="x => x.CancelledAtUtc" Title="Отменён" Format="dd.MM.yyyy HH:mm" />
-                        <TemplateColumn Title="Размещено"><CellTemplate>@FormatQuantity(context.Item.Putaways.Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
-                        <TemplateColumn Title="Осталось"><CellTemplate>@FormatQuantity(context.Item.Items.Where(x => !x.IsDeleted).Sum(x => x.Quantity) - context.Item.Putaways.Sum(x => x.Quantity))</CellTemplate></TemplateColumn>
-                    </Columns>
-                </MudDataGrid>
-                @if (_order.LicensePlateNumbers.Any(x => x.Items.Count > 0))
-                {
-                    <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">Состав и аудит пересчёта</MudText>
-                    <MudDataGrid T="LicensePlateNumberItem"
-                                 Items="_order.LicensePlateNumbers.SelectMany(x => x.Items).OrderByDescending(x => x.UpdatedAtUtc ?? x.CreatedAtUtc)"
-                                 Dense="true">
-                        <Columns>
-                            <TemplateColumn Title="LPN"><CellTemplate>@context.Item.LicensePlateNumber.Code</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="SKU"><CellTemplate>@context.Item.StockKeepingUnit?.Name</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Единица"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation ?? "—")</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Состояние"><CellTemplate>@(context.Item.IsDeleted ? "Удалено" : "В составе")</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Изменил"><CellTemplate>@GetUserName(context.Item.UpdatedBy)</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Удалил"><CellTemplate>@GetUserName(context.Item.DeletedBy)</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Последнее действие"><CellTemplate>@((context.Item.UpdatedAtUtc ?? context.Item.CreatedAtUtc).ToString("dd.MM.yyyy HH:mm"))</CellTemplate></TemplateColumn>
-                        </Columns>
-                    </MudDataGrid>
-                }
-                @if (_order.LicensePlateNumbers.Any(x => x.Putaways.Count > 0))
-                {
-                    <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2">История размещения LPN</MudText>
-                    <MudDataGrid T="LicensePlateNumberPutaway"
-                                 Items="_order.LicensePlateNumbers.SelectMany(x => x.Putaways).OrderByDescending(x => x.CreatedAtUtc)"
-                                 Dense="true">
-                        <Columns>
-                            <TemplateColumn Title="LPN"><CellTemplate>@context.Item.LicensePlateNumber.Code</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="SKU"><CellTemplate>@context.Item.StockKeepingUnit.Name</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Назначение"><CellTemplate>@($"{context.Item.DestinationStorageLocation.Zone.Code}-{context.Item.DestinationStorageLocation.Code}")</CellTemplate></TemplateColumn>
-                            <TemplateColumn Title="Исполнитель"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
-                            <PropertyColumn Property="x => x.CreatedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" />
-                            <TemplateColumn Title="Движение"><CellTemplate><MudLink Href="@($"inventory-movements?search={context.Item.InventoryMovementId}")">@context.Item.InventoryMovementId</MudLink></CellTemplate></TemplateColumn>
-                        </Columns>
-                    </MudDataGrid>
-                }
-            }
-        </MudPaper>
+        <ReceivingOrderContents Order="_order"
+                                UserNames="_userNames"
+                                ShowCurrentPlan="@(_order.Status == ReceivingOrderStatus.Received)"
+                                CurrentPlanTitle="Актуальный план при завершении"
+                                CurrentPlanQuantity="CompletionCurrentPlanQuantity" />
 
         @if (_order.Status == ReceivingOrderStatus.Received
             && !_order.LicensePlateNumbers.SelectMany(x => x.Items).Any(x => !x.IsDeleted && x.Quantity > 0))
@@ -238,30 +159,5 @@ else
             <MudAlert Severity="Severity.Warning">Размещение недоступно: в ордере отсутствует фактически принятое количество.</MudAlert>
         }
 
-        <MudDataGrid T="ReceivingOrderItem"
-                     Items="_order.Items"
-                     Hover="true"
-                     Striped="true"
-                     Dense="true">
-            <Columns>
-                <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
-                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="Исходный план" />
-                @if (_order.Status == ReceivingOrderStatus.Received)
-                {
-                    <TemplateColumn Title="Актуальный план при завершении">
-                        <CellTemplate>@FormatQuantity(CompletionCurrentPlanQuantity(context.Item))</CellTemplate>
-                    </TemplateColumn>
-                }
-                <TemplateColumn Title="Факт">
-                    <CellTemplate>@FormatQuantity(context.Item.FactQuantity, "Не проверено")</CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                <TemplateColumn Title="Осталось">
-                    <CellTemplate>@FormatQuantity(context.Item.RemainingQuantity)</CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.Comment" Title="Комментарий" />
-            </Columns>
-        </MudDataGrid>
     </MudStack>
 }

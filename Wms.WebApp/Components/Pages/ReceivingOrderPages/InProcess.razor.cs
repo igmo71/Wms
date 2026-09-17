@@ -96,7 +96,13 @@ public partial class InProcess
                 _order.CompletedBy,
                 _order.PutawayStartedBy,
                 _order.PutawayCompletedBy,
-                _order.SynchronizationAcknowledgedBy]);
+                _order.SynchronizationAcknowledgedBy,
+                .. _order.Participants.Select(x => x.UserId),
+                .. _order.LicensePlateNumbers.SelectMany(x =>
+                    new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy, x.CancelledBy }
+                        .Concat(x.Items.SelectMany(item =>
+                            new[] { item.CreatedBy, item.UpdatedBy, item.DeletedBy }))
+                        .Concat(x.Putaways.Select(putaway => putaway.CreatedBy))) ]);
         _receivingZone = _order?.ReceivingLocation?.Zone;
         _receivingLocation = _order?.ReceivingLocation;
         _isLoading = false;

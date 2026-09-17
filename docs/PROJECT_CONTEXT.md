@@ -453,6 +453,14 @@ can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages suppress Android focus on action buttons and ignore scan
 callbacks queued after the page has disappeared.
 
+Web uses the same read-only order-content layout while receiving and after
+completion. The nomenclature tab shows aggregate order lines. The pallet tab
+shows a compact selectable pallet list on the left and only the selected
+pallet's item audit and putaway history on the right. Open pallets sort first,
+cancelled pallets remain visible but muted for audit, and participants appear in
+a compact block below the operational content. Completion and 1C reconciliation
+remain above the tabs; Web LPN composition editing is outside this result.
+
 The API address is packaged per build configuration and is not editable by the
 operator.
 

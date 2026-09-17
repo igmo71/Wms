@@ -155,43 +155,10 @@ else
             </MudGrid>
         </MudPaper>
 
-        <MudDataGrid T="ReceivingOrderItem"
-                     Items="_order.Items"
-                     Hover="true"
-                     Striped="true"
-                     Dense="true">
-            <Columns>
-                <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
-                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="Исходный план" />
-                <TemplateColumn Title="Актуальный план 1С">
-                    <CellTemplate>@FormatQuantity(CurrentPlanQuantity(context.Item))</CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Факт">
-                    <CellTemplate>
-                        <MudNumericField T="decimal?"
-                                         Value="context.Item.FactQuantity"
-                                         Disabled="@InputsLocked"
-                                         ValueChanged="value => UpdateFactQuantityAsync(context.Item, value)"
-                                         Placeholder="Не проверено"
-                                         Variant="Variant.Text"
-                                         HideSpinButtons="true" />
-                    </CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                <TemplateColumn Title="Осталось">
-                    <CellTemplate>@FormatQuantity(context.Item.RemainingQuantity)</CellTemplate>
-                </TemplateColumn>
-                <TemplateColumn Title="Комментарий">
-                    <CellTemplate>
-                        <MudTextField T="string"
-                                      Value="context.Item.Comment"
-                                      Disabled="@InputsLocked"
-                                      ValueChanged="value => UpdateCommentAsync(context.Item, value)"
-                                      Variant="Variant.Text" />
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-        </MudDataGrid>
+        <ReceivingOrderContents Order="_order"
+                                UserNames="_userNames"
+                                ShowCurrentPlan="true"
+                                CurrentPlanTitle="Актуальный план 1С"
+                                CurrentPlanQuantity="CurrentPlanQuantity" />
     </MudStack>
 }
