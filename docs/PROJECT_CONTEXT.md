@@ -31,8 +31,8 @@ Shared command, replay and client-recovery rules are defined once in
 HTTP timeout and caller-cancellation behavior follows the
 [client recovery convention](ARCHITECTURE.md#client-organization).
 
-Corrections from the I01–I08 review are tracked in the
-[active safety specification](../specs/2026-09-18-lpn-receiving-safety/spec.md).
+Corrections from the I01–I08 review are recorded in the
+[frozen safety specification](../specs/2026-09-18-lpn-receiving-safety/spec.md).
 
 ## Identity and access
 

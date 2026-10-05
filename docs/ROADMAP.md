@@ -8,14 +8,17 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-Plan and implement the corrections from the I01–I08 risk-based review under
-[LPN receiving safety and command recovery](../specs/2026-09-18-lpn-receiving-safety/spec.md).
-Verify R4 live-screen command recovery and stale scanner callback protection.
-After acceptance, close the safety specification; no additional increments remain
-in its scope.
-These corrections do not start new functional stages.
+Specify and implement multiple WMS roles per user, including the explicit
+Administrator + Manager combination, while preserving Manager-only approval of
+receiving quantity differences and last-active-administrator protection.
 
 ## Future delivery areas
+
+The following separate issue improves receiving Web/Mobile usability: one Web
+order page, clear completion guidance, consistent quantities and SKU-to-LPN
+visibility, and manual selection of an order SKU within an open receiving LPN.
+It should evaluate destination scanning directly from the putaway quantity screen
+without weakening quantity validation or uncertain-command recovery.
 
 E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
 rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,

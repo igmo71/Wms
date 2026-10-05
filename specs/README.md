@@ -6,11 +6,13 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-- [LPN receiving safety and command recovery](2026-09-18-lpn-receiving-safety/spec.md)
-  — R1–R3 accepted; R4 live-screen command recovery and stale scanner callback
-  protection awaits developer verification, then the specification can be frozen.
+No active specifications.
 
 ## Frozen
+
+- [LPN receiving safety and command recovery](2026-09-18-lpn-receiving-safety/spec.md)
+  — R1–R4 accepted on 2026-10-05: joining eligibility, Manager completion,
+  uncertain-command recovery and stale scanner callback protection.
 
 - [LPN receiving and putaway](2026-09-15-lpn-receiving-putaway/spec.md)
   — I01–I08 accepted on 2026-09-17: LPN issuance, participation and counting,
