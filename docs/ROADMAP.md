@@ -17,8 +17,13 @@ receiving quantity differences and last-active-administrator protection.
 The following separate issue improves receiving Web/Mobile usability: one Web
 order page, clear completion guidance, consistent quantities and SKU-to-LPN
 visibility, and manual selection of an order SKU within an open receiving LPN.
-It should evaluate destination scanning directly from the putaway quantity screen
-without weakening quantity validation or uncertain-command recovery.
+On the putaway quantity screen, the amount starts unconfirmed: the employee
+enters it and completes input, or explicitly selects "Entire remainder". Only
+then does a destination scan post that quantity, without a separate advance
+button. A focused quantity field, an unconfirmed or invalid amount, and an
+uncertain prior command must not post a scan. Preserve the original amount,
+destination and request id for explicit retry after a lost response. Verify
+focus and ScanWedge behavior on the target Urovo device.
 
 E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
 rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,
