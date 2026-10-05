@@ -496,13 +496,11 @@ internal static class MobileReceivingOrderEndpoints
         order.PutawayStartedAtUtc,
         order.PutawayCompletedAtUtc,
         order.IsParticipant,
+        // CanJoin comes from the persisted source assessment. For an in-progress
+        // order, assessment describes completion and may include unchecked facts.
         order.CanJoin
-            && string.IsNullOrWhiteSpace(verificationError)
-            && (assessment is null || assessment.Level == OrderSynchronizationLevel.Synchronized),
-        verificationError
-            ?? (assessment is { Level: not OrderSynchronizationLevel.Synchronized }
-                ? "Ордер заблокирован расхождениями с 1С."
-                : order.JoinBlockedReason));
+            && string.IsNullOrWhiteSpace(verificationError),
+        verificationError ?? order.JoinBlockedReason);
 
     private static MobileOrderSynchronizationResponse MapSynchronization(
         OrderSynchronizationLevel persistedLevel,

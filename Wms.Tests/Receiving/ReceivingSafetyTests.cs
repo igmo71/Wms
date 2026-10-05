@@ -294,8 +294,8 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
             [new(1, sku.Id, 5m, 5m, null)]);
         var order = Value(ReceivingOrder.Create(snapshot, DateTimeOffset.UtcNow));
         Success(order.SetReceivingLocation(location.Id));
-        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "manager"));
-        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "manager"));
+        Success(order.SetInReceiving(DateTimeOffset.UtcNow, "receiver"));
+        Success(order.JoinReceiving(DateTimeOffset.UtcNow, "receiver"));
 
         await using (var seed = database.CreateDbContext())
         {
@@ -308,16 +308,40 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         string code;
         await using (var read = database.CreateDbContext())
             code = await read.LicensePlateNumbers.Where(x => x.BatchId == batchId).Select(x => x.Code).SingleAsync();
-        Guid lpnId = Value(await lpnService.OpenForReceivingAsync(new(order.Id, code), Command("manager")));
+        Guid lpnId = Value(await lpnService.OpenForReceivingAsync(new(order.Id, code), Command("receiver")));
         Success(await lpnService.SetReceivingItemQuantityAsync(
-            new(order.Id, lpnId, sku.Id, 4m), Command("manager"), true));
-        Success(await lpnService.CloseReceivingAsync(new(order.Id, lpnId), Command("manager"), true));
+            new(order.Id, lpnId, sku.Id, 4m), Command("receiver"), false));
+        Success(await lpnService.CloseReceivingAsync(new(order.Id, lpnId), Command("receiver"), false));
 
         var source = new FixedSource(snapshot);
         var synchronization = new ReceivingOrderSynchronizationService(
             database, source, NullLogger<ReceivingOrderSynchronizationService>.Instance);
         var preview = Value(await synchronization.CheckCompletionAsync(order.Id));
         Assert.True(preview.RequiresManager);
+
+        // Participation alone cannot authorize a discrepancy; Manager authority
+        // still requires a reason even when the caller is not a participant.
+        var guardedService = ReceivingService(database, source);
+        var approvalCommand = new CompleteReceivingCommand(
+            order.Id, null, preview.Assessment.Fingerprint, "Недостача при приёмке");
+        Error(await guardedService.CompleteReceivingAsync(
+            approvalCommand, Command("receiver"), false), OperationErrorType.Conflict);
+        Error(await guardedService.CompleteReceivingAsync(
+            approvalCommand, Command("administrator"), false), OperationErrorType.Conflict);
+        Error(await guardedService.CompleteReceivingAsync(
+            approvalCommand with { ManagerReason = null }, Command("manager"), true),
+            OperationErrorType.Conflict);
+
+        // A Manager outside the participants cannot use ordinary exact completion.
+        var exactSnapshot = snapshot with { Items = [new(1, sku.Id, 4m, 4m, null)] };
+        var exactSource = new FixedSource(exactSnapshot);
+        var exactPreview = Value(await new ReceivingOrderSynchronizationService(
+            database, exactSource, NullLogger<ReceivingOrderSynchronizationService>.Instance)
+            .CheckCompletionAsync(order.Id));
+        Assert.False(exactPreview.RequiresManager);
+        Error(await ReceivingService(database, exactSource).CompleteReceivingAsync(
+            new(order.Id, null, exactPreview.Assessment.Fingerprint, null),
+            Command("manager"), true), OperationErrorType.Conflict);
 
         var barrier = new CompletionReceiptBarrier();
         var racingService = ReceivingService(database.WithInterceptor(barrier), source);
@@ -356,6 +380,14 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         var completed = await verify.ReceivingOrders.SingleAsync(x => x.Id == order.Id);
         Assert.Equal(ReceivingOrderStatus.Received, completed.Status);
         Assert.Equal("manager", completed.CompletionApprovedBy);
+        Assert.Equal("manager", completed.CompletedBy);
+        var participants = await verify.ReceivingOrderParticipants
+            .Where(x => x.ReceivingOrderId == order.Id).ToListAsync();
+        Assert.Equal("receiver", Assert.Single(participants).UserId);
+        var acceptedLpn = await verify.LicensePlateNumbers.Include(x => x.Items)
+            .SingleAsync(x => x.Id == lpnId);
+        Assert.Equal("receiver", acceptedLpn.ResponsibleUserId);
+        Assert.Equal("receiver", Assert.Single(acceptedLpn.Items).CreatedBy);
         Assert.Equal("Недостача при приёмке", completed.CompletionApprovalReason);
         Assert.False(string.IsNullOrWhiteSpace(completed.CompletionOriginalPlanJson));
         Assert.False(string.IsNullOrWhiteSpace(completed.CompletionCurrentPlanJson));

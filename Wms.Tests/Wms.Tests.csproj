@@ -15,7 +15,16 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Wms\Wms.csproj" />
+    <ProjectReference Include="..\Wms.Contracts\Wms.Contracts.csproj" />
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exercise the actual platform-independent transport without loading MAUI. -->
+    <Compile Include="..\Wms.Mobile\Services\MobileApiTransport.cs" Link="Mobile\MobileApiTransport.cs" />
+    <Compile Include="..\Wms.Mobile\Services\MobileApiException.cs" Link="Mobile\MobileApiException.cs" />
+    <Compile Include="..\Wms.Mobile\Services\MobileReceivingOrderClient.cs" Link="Mobile\MobileReceivingOrderClient.cs" />
+    <Compile Include="..\Wms.Mobile\Services\ReceivingOrderReceivingProcess.cs" Link="Mobile\ReceivingOrderReceivingProcess.cs" />
   </ItemGroup>
 
   <ItemGroup>

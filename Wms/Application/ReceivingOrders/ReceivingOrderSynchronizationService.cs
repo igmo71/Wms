@@ -42,7 +42,10 @@ public sealed class ReceivingOrderSynchronizationService(
             order,
             snapshotResult.Value!,
             DateTimeOffset.UtcNow);
-        order.ApplySynchronizationAssessment(reconciliation.Assessment, reconciliation.CheckedAtUtc);
+        // Participation follows source synchronization, not unfinished LPN counting.
+        order.ApplySynchronizationAssessment(
+            order.AssessSynchronization(snapshotResult.Value!, reconciliation.CheckedAtUtc),
+            reconciliation.CheckedAtUtc);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess ? reconciliation : saveResult.Error!;
     }
@@ -115,7 +118,11 @@ public sealed class ReceivingOrderSynchronizationService(
             order,
             snapshotResult.Value!,
             DateTimeOffset.UtcNow);
-        order.ApplySynchronizationAssessment(reconciliation.Assessment, reconciliation.CheckedAtUtc);
+        // Keep the checkpoint source-only; the returned completion decision still
+        // carries the source + LPN fingerprint and all completion blockers.
+        order.ApplySynchronizationAssessment(
+            order.AssessSynchronization(snapshotResult.Value!, reconciliation.CheckedAtUtc),
+            reconciliation.CheckedAtUtc);
         OperationResult saveResult = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
         return saveResult.IsSuccess ? reconciliation : saveResult.Error!;
     }

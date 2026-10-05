@@ -46,7 +46,8 @@ public partial class InProcess
         || _pendingItem is not null
         || _isCompleting
         || _order is not { Status: ReceivingOrderStatus.InReceiving }
-        || !_isParticipant
+        || (!_isParticipant
+            && !(_completionReconciliation?.RequiresManager == true && _canApproveQuantityDifference))
         || _order.LicensePlateNumbers.Any(x => x.Status == LicensePlateNumberStatus.Open)
         || _completionReconciliation is null
         || _completionReconciliation.IsBlocking

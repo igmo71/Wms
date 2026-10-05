@@ -152,6 +152,22 @@ reload/recreation reads current server state and does not recover or replay the
 old intent automatically. Mobile error codes remain `invalid_command`,
 `resource_not_found`, `request_conflict` and `command_failed`.
 
+Mobile transport converts HTTP timeout cancellation into `HttpRequestException`,
+so existing uncertain-result handlers retain the command for explicit retry.
+Explicit cancellation of the caller's token remains `OperationCanceledException`;
+it is not a business rejection or evidence that a dispatched command did not
+commit. The transport never retries automatically. LPN pages currently send
+commands without a caller cancellation token.
+
+The receiving order, LPN, quantity and SKU-distribution pages share one receiving
+process explicitly passed along that order's navigation chain. One unresolved
+command retains its original value inputs and request id. Refresh updates the
+display without replacing this intent; a separate retry action remains available
+regardless of current business-action eligibility. Conflicting actions, quantity
+editing and back navigation are blocked until the outcome is resolved. LPN
+putaway similarly keeps an immutable pending request separate from display state.
+These processes are not application singletons and are not persisted on restart.
+
 Treat roughly 300 lines as a review signal, not a limit. Extract a
 business-named or clearly technical cohesive responsibility only when it
 reduces the context required to follow the primary path. Keep cohesive

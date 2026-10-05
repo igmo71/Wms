@@ -43,6 +43,7 @@
         <VerticalStackLayout Grid.Row="2" Spacing="5">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+            <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" Loaded="OnNonScanControlLoaded" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
             <Button x:Name="CloseButton" Clicked="OnCloseClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" Text="Закрыть палету" />
             <Button x:Name="ReopenButton" Clicked="OnReopenClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" Text="Возобновить палету" />
         </VerticalStackLayout>

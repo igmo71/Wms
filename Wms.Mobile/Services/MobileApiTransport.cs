@@ -7,45 +7,46 @@ namespace Wms.Mobile.Services;
 
 internal sealed class MobileApiTransport(HttpClient httpClient)
 {
-    public async Task<HttpResponseMessage> GetAsync(
+    public Task<HttpResponseMessage> GetAsync(
         string route,
         CancellationToken ct = default)
-    {
-        HttpResponseMessage response = await httpClient.GetAsync(route, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            try
-            {
-                throw await CreateApiExceptionAsync(response, ct);
-            }
-            finally
-            {
-                response.Dispose();
-            }
-        }
+        => SendAsync(() => httpClient.GetAsync(route, ct), ct);
 
-        return response;
-    }
-
-    public async Task<HttpResponseMessage> PostAsync<TRequest>(
+    public Task<HttpResponseMessage> PostAsync<TRequest>(
         string route,
         TRequest request,
         CancellationToken ct = default)
-    {
-        HttpResponseMessage response = await httpClient.PostAsJsonAsync(route, request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            try
-            {
-                throw await CreateApiExceptionAsync(response, ct);
-            }
-            finally
-            {
-                response.Dispose();
-            }
-        }
+        => SendAsync(() => httpClient.PostAsJsonAsync(route, request, ct), ct);
 
-        return response;
+    private static async Task<HttpResponseMessage> SendAsync(
+        Func<Task<HttpResponseMessage>> send,
+        CancellationToken ct)
+    {
+        try
+        {
+            HttpResponseMessage response = await send();
+            if (!response.IsSuccessStatusCode)
+            {
+                try
+                {
+                    throw await CreateApiExceptionAsync(response, ct);
+                }
+                finally
+                {
+                    response.Dispose();
+                }
+            }
+
+            return response;
+        }
+        catch (OperationCanceledException exception) when (!ct.IsCancellationRequested)
+        {
+            // HttpClient timeout uses cancellation, but the server may have committed.
+            // Route it through the existing uncertain-result handling, without retrying.
+            throw new HttpRequestException(
+                "Время ожидания ответа WMS истекло. Результат запроса не подтверждён.",
+                exception);
+        }
     }
 
     public static async Task<TResponse> ReadCommandResponseAsync<TResponse>(
@@ -60,6 +61,10 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
         }
         catch (Exception exception) when (
             exception is JsonException or NotSupportedException or IOException)
+        {
+            throw new HttpRequestException(message, exception, response.StatusCode);
+        }
+        catch (OperationCanceledException exception) when (!ct.IsCancellationRequested)
         {
             throw new HttpRequestException(message, exception, response.StatusCode);
         }

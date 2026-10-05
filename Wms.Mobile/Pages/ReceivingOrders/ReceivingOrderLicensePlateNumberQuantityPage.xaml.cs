@@ -6,7 +6,7 @@ namespace Wms.Mobile;
 
 public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
 {
-    private readonly ReceivingOrderReceivingProcess _process;
+    private ReceivingOrderReceivingProcess _process = null!;
     private readonly MobileReceivingOrderClient _orderClient;
     private Guid _orderId;
     private Guid _lpnId;
@@ -15,16 +15,15 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
     private bool _busy;
 
     public ReceivingOrderLicensePlateNumberQuantityPage(
-        ReceivingOrderReceivingProcess process,
         MobileReceivingOrderClient orderClient)
     {
         InitializeComponent();
-        _process = process;
         _orderClient = orderClient;
     }
 
-    public void Show(Guid orderId, Guid lpnId, Guid skuId)
+    public void Show(Guid orderId, Guid lpnId, Guid skuId, ReceivingOrderReceivingProcess process)
     {
+        _process = process;
         _orderId = orderId;
         _lpnId = lpnId;
         _skuId = skuId;
@@ -84,7 +83,7 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
 
     private async void OnApplyClicked(object? sender, EventArgs e)
     {
-        if (_busy || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
+        if (_busy || _process.HasPendingCommand)
             return;
         var text = QuantityEntry.Text?.Trim().Replace(',', '.');
         if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var quantity)
@@ -101,9 +100,9 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
 
     private async void OnRemoveClicked(object? sender, EventArgs e)
     {
-        if (_busy || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
+        if (_busy || _process.HasPendingCommand)
             return;
-        if (!_process.IsLpnMutationPending && !await DisplayAlertAsync(
+        if (!await DisplayAlertAsync(
                 "Удалить товар", "Удалить товар из состава палеты?", "Удалить", "Назад"))
             return;
         await ExecuteAsync(
@@ -142,12 +141,41 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         }
     }
 
+
+    private async void OnRetryCommandClicked(object? sender, EventArgs e)
+    {
+        if (_busy || !_process.HasPendingCommand)
+            return;
+        await ExecuteAsync(_process.RetryAsync, "Ответ не получен. Повторите сохранённую команду.");
+    }
+
+    private void UpdateRecoveryControls()
+    {
+        RetryCommandButton.IsVisible = _process.HasPendingCommand;
+        RetryCommandButton.IsEnabled = !_busy;
+        RetryCommandButton.Text = $"Повторить: {_process.PendingLabel}";
+        NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
+    }
+
+    protected override bool OnBackButtonPressed()
+    {
+        if (_busy || _process.HasPendingCommand)
+        {
+            ErrorLabel.Text = "Сначала получите результат текущей команды.";
+            return true;
+        }
+        return base.OnBackButtonPressed();
+    }
+
     private void SetBusy(bool busy)
     {
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
-        ApplyButton.IsEnabled = !busy;
-        RemoveButton.IsEnabled = !busy;
+        bool canEdit = _details?.LicensePlateNumbers.SingleOrDefault(x => x.Id == _lpnId)?.CanEdit == true;
+        ApplyButton.IsEnabled = !busy && !_process.HasPendingCommand && canEdit;
+        RemoveButton.IsEnabled = ApplyButton.IsEnabled;
+        QuantityEntry.IsEnabled = ApplyButton.IsEnabled;
+        UpdateRecoveryControls();
     }
 
     private void OnNonScanControlLoaded(object? sender, EventArgs e)

@@ -15,10 +15,10 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     private PutawayStep _step = PutawayStep.Lpn;
     private bool _busy;
     private bool _isVisible;
+    private long _scanGeneration;
     private bool _scannerSubscribed;
     private decimal _quantity;
-    private Guid? _pendingRequestId;
-    private string? _pendingDestinationBarcode;
+    private PendingPutaway? _pending;
 
     public LicensePlateNumberPutawayPage(
         MobileLicensePlateNumberPutawayClient client,
@@ -55,6 +55,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     protected override void OnDisappearing()
     {
         _isVisible = false;
+        Interlocked.Increment(ref _scanGeneration);
         CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
@@ -66,7 +67,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     protected override bool OnBackButtonPressed()
     {
-        if (_busy || _pendingRequestId is not null)
+        if (_busy || _pending is not null)
         {
             ErrorLabel.Text = "Сначала завершите повтор текущего размещения.";
             return true;
@@ -74,12 +75,19 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         return base.OnBackButtonPressed();
     }
 
-    private void OnScanReceived(object? sender, BarcodeScanEvent e) =>
-        MainThread.BeginInvokeOnMainThread(async () => await HandleScanAsync(e.Value));
+    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
+    {
+        long generation = Volatile.Read(ref _scanGeneration);
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (_isVisible && generation == Volatile.Read(ref _scanGeneration))
+                await HandleScanAsync(scanEvent.Value);
+        });
+    }
 
     private async Task HandleScanAsync(string barcode)
     {
-        if (_busy || _pendingRequestId is not null)
+        if (!_isVisible || _busy || _pending is not null)
             return;
 
         if (_step == PutawayStep.Lpn)
@@ -149,7 +157,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private async void OnQuantityConfirmed(object? sender, EventArgs e)
     {
-        if (_busy || _selectedItem is null) return;
+        if (_busy || _pending is not null || _selectedItem is null) return;
         var text = (QuantityEntry.Text ?? string.Empty).Trim().Replace(',', '.');
         if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out _quantity)
             || !WarehouseQuantityInput.IsSupported(_quantity)
@@ -169,9 +177,8 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private async Task PutawayAsync(string destinationBarcode)
     {
-        if (_details is null || _selectedItem is null) return;
-        _pendingRequestId = Guid.NewGuid();
-        _pendingDestinationBarcode = destinationBarcode;
+        if (!_isVisible || _busy || _pending is not null || _details is null || _selectedItem is null) return;
+        _pending = new(_details.Id, _selectedItem.Id, _quantity, destinationBarcode, Guid.NewGuid());
         await ExecutePendingPutawayAsync();
     }
 
@@ -180,9 +187,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private async Task ExecutePendingPutawayAsync()
     {
-        if (_busy || _details is null || _selectedItem is null
-            || _pendingRequestId is not Guid requestId
-            || _pendingDestinationBarcode is not string destinationBarcode)
+        if (_busy || _pending is not { } pending)
             return;
 
         SetBusy(true);
@@ -190,10 +195,9 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         try
         {
             var response = await _client.PutawayAsync(
-                _details.Id, _selectedItem.Id, _quantity,
-                destinationBarcode, requestId);
-            _pendingRequestId = null;
-            _pendingDestinationBarcode = null;
+                pending.LpnId, pending.ItemId, pending.Quantity,
+                pending.DestinationBarcode, pending.RequestId);
+            _pending = null;
             RetryButton.IsVisible = false;
             _selectedItem = null;
             ClearRecommendations();
@@ -201,8 +205,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         }
         catch (MobileApiException exception)
         {
-            _pendingRequestId = null;
-            _pendingDestinationBarcode = null;
+            _pending = null;
             RetryButton.IsVisible = false;
             ErrorLabel.Text = exception.Message;
             if (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
@@ -241,14 +244,14 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private async void OnChangeQuantityClicked(object? sender, EventArgs e)
     {
-        if (_busy || _pendingRequestId is not null) return;
+        if (_busy || _pending is not null) return;
         ApplyStep(PutawayStep.Quantity);
         await UpdateCameraAsync();
     }
 
     private async void OnNextLpnClicked(object? sender, EventArgs e)
     {
-        if (_busy || _pendingRequestId is not null) return;
+        if (_busy || _pending is not null) return;
         _details = null;
         _selectedItem = null;
         ClearRecommendations();
@@ -292,7 +295,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private async Task UpdateCameraAsync()
     {
-        if (_isVisible && !_busy && _pendingRequestId is null
+        if (_isVisible && !_busy && _pending is null
             && _scanner.ActiveSource == BarcodeScanSource.Camera
             && _step is PutawayStep.Lpn or PutawayStep.Sku or PutawayStep.Destination)
             await CameraScannerView.StartAsync();
@@ -304,6 +307,10 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     {
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
+        RetryButton.IsVisible = _pending is not null;
+        RetryButton.IsEnabled = !busy;
+        QuantityEntry.IsEnabled = !busy && _pending is null;
+        NavigationPage.SetHasBackButton(this, !busy && _pending is null);
     }
 
     private IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> Recommendations(
@@ -317,6 +324,9 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         OnPropertyChanged(nameof(EmptyWithSkuHistoryRecommendations));
         OnPropertyChanged(nameof(EmptyRecommendations));
     }
+
+    private sealed record PendingPutaway(
+        Guid LpnId, Guid ItemId, decimal Quantity, string DestinationBarcode, Guid RequestId);
 
     private enum PutawayStep { Lpn, Sku, Quantity, Destination, Status }
 }

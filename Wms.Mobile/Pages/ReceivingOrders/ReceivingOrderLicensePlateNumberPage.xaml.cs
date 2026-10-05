@@ -7,7 +7,7 @@ namespace Wms.Mobile;
 
 public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 {
-    private readonly ReceivingOrderReceivingProcess _process;
+    private ReceivingOrderReceivingProcess _process = null!;
     private readonly MobileReceivingOrderClient _orderClient;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
@@ -15,17 +15,16 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private Guid _lpnId;
     private MobileReceivingOrderDetailsResponse? _details;
     private bool _isVisible;
+    private long _scanGeneration;
     private bool _scannerSubscribed;
     private bool _busy;
 
     public ReceivingOrderLicensePlateNumberPage(
-        ReceivingOrderReceivingProcess process,
         MobileReceivingOrderClient orderClient,
         IOperationalBarcodeScanner scanner,
         IServiceProvider services)
     {
         InitializeComponent();
-        _process = process;
         _orderClient = orderClient;
         _scanner = scanner;
         _services = services;
@@ -38,8 +37,9 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         _details?.LicensePlateNumbers.SingleOrDefault(x => x.Id == _lpnId)
         ?? throw new InvalidOperationException("Палета не найдена в приходном ордере.");
 
-    public void Show(Guid orderId, Guid lpnId)
+    public void Show(Guid orderId, Guid lpnId, ReceivingOrderReceivingProcess process)
     {
+        _process = process;
         _orderId = orderId;
         _lpnId = lpnId;
     }
@@ -60,6 +60,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     protected override void OnDisappearing()
     {
         _isVisible = false;
+        Interlocked.Increment(ref _scanGeneration);
         CameraScannerView.Stop();
         if (_scannerSubscribed)
         {
@@ -69,12 +70,19 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         base.OnDisappearing();
     }
 
-    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
-        MainThread.BeginInvokeOnMainThread(async () => await HandleScanAsync(scanEvent.Value));
+    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
+    {
+        long generation = Volatile.Read(ref _scanGeneration);
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (_isVisible && generation == Volatile.Read(ref _scanGeneration))
+                await HandleScanAsync(scanEvent.Value);
+        });
+    }
 
     private async Task HandleScanAsync(string barcode)
     {
-        if (!_isVisible || _busy || _details is null)
+        if (!_isVisible || _busy || _process.HasPendingCommand || _details is null)
             return;
         if (IsLicensePlateNumberCode(barcode))
         {
@@ -91,7 +99,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async Task OpenOrSwitchLicensePlateNumberAsync(string code)
     {
-        if (_process.HasPendingCommand && !_process.IsOpenLpnPending)
+        if (_process.HasPendingCommand)
             return;
         await ExecuteAsync(async () =>
         {
@@ -136,23 +144,23 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async void OnSkuTapped(object? sender, TappedEventArgs e)
     {
-        if (!_busy && LicensePlateNumber.CanEdit && e.Parameter is Guid skuId)
+        if (!_busy && !_process.HasPendingCommand && LicensePlateNumber.CanEdit && e.Parameter is Guid skuId)
             await OpenQuantityPageAsync(skuId);
     }
 
     private async Task OpenQuantityPageAsync(Guid skuId)
     {
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberQuantityPage>();
-        page.Show(_orderId, _lpnId, skuId);
+        page.Show(_orderId, _lpnId, skuId, _process);
         await Navigation.PushAsync(page);
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
         if (_busy || !LicensePlateNumber.CanClose
-            || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
+            || _process.HasPendingCommand)
             return;
-        if (!_process.IsLpnMutationPending && !await DisplayAlertAsync(
+        if (!await DisplayAlertAsync(
                 "Закрыть палету", "Завершить пересчёт этой палеты?", "Закрыть", "Назад"))
             return;
         await MutateAsync(
@@ -164,7 +172,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async void OnReopenClicked(object? sender, EventArgs e)
     {
         if (_busy || !LicensePlateNumber.CanReopen
-            || (_process.HasPendingCommand && !_process.IsLpnMutationPending))
+            || _process.HasPendingCommand)
             return;
         await MutateAsync(
             () => _process.ReopenLicensePlateNumberAsync(_orderId, _lpnId),
@@ -174,9 +182,9 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async void OnCancelClicked(object? sender, EventArgs e)
     {
         if (_busy || !LicensePlateNumber.CanCancel
-            || (_process.HasPendingCommand && !_process.IsCancelLpnPending))
+            || _process.HasPendingCommand)
             return;
-        if (!_process.IsCancelLpnPending && !await DisplayAlertAsync(
+        if (!await DisplayAlertAsync(
                 "Отменить палету", $"Отменить пустую палету {LicensePlateNumber.Code}?", "Отменить", "Назад"))
             return;
         await ExecuteAsync(async () =>
@@ -312,13 +320,53 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         OnPropertyChanged(nameof(Rows));
     }
 
+
+    private async void OnRetryCommandClicked(object? sender, EventArgs e)
+    {
+        if (_busy || !_process.HasPendingCommand)
+            return;
+        bool closing = _process.IsClosePending;
+        bool cancelling = _process.IsCancelLpnPending;
+        await ExecuteAsync(async () =>
+        {
+            var response = await _process.RetryAsync();
+            _details = response.Details;
+            if (response.SelectedLicensePlateNumberId is Guid id)
+                _lpnId = id;
+            ApplyDetails();
+            if (closing)
+                await ReturnToMainOrderPageAsync(response.Details);
+            else if (cancelling)
+                await Navigation.PopAsync();
+        }, "Ответ не получен. Повторите сохранённую команду.");
+    }
+
+    private void UpdateRecoveryControls()
+    {
+        RetryCommandButton.IsVisible = _process.HasPendingCommand;
+        RetryCommandButton.IsEnabled = !_busy;
+        RetryCommandButton.Text = $"Повторить: {_process.PendingLabel}";
+        NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
+    }
+
+    protected override bool OnBackButtonPressed()
+    {
+        if (_busy || _process.HasPendingCommand)
+        {
+            ErrorLabel.Text = "Сначала получите результат текущей команды.";
+            return true;
+        }
+        return base.OnBackButtonPressed();
+    }
+
     private void SetBusy(bool busy)
     {
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
-        CloseButton.IsEnabled = !busy;
-        ReopenButton.IsEnabled = !busy;
-        CancelButton.IsEnabled = !busy;
+        CloseButton.IsEnabled = !busy && !_process.HasPendingCommand;
+        ReopenButton.IsEnabled = !busy && !_process.HasPendingCommand;
+        CancelButton.IsEnabled = !busy && !_process.HasPendingCommand;
+        UpdateRecoveryControls();
     }
 
     private void OnNonScanControlLoaded(object? sender, EventArgs e)
@@ -329,7 +377,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async Task UpdateCameraAsync()
     {
-        if (_isVisible && _scanner.ActiveSource == BarcodeScanSource.Camera)
+        if (_isVisible && !_busy && !_process.HasPendingCommand && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else
             CameraScannerView.Stop();

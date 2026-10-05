@@ -610,7 +610,7 @@ public class ReceivingOrder
             : OperationError.Invalid(
                 "Строки приходного ордера можно изменять только во время приёмки или обработки ордера.");
 
-    private OperationResult ValidateToSetReceived(string userId)
+    private OperationResult ValidateToSetReceived(string userId, bool isManagerDecision)
     {
         if (Status != ReceivingOrderStatus.InReceiving)
         {
@@ -624,7 +624,7 @@ public class ReceivingOrder
                 "Перед завершением приёмки необходимо указать позицию приёмки.");
         }
 
-        if (!_participants.Any(x => x.UserId == userId))
+        if (!isManagerDecision && !_participants.Any(x => x.UserId == userId))
         {
             return OperationError.Conflict(
                 "Завершить приёмку может только участник приходного ордера.");
@@ -660,7 +660,8 @@ public class ReceivingOrder
         bool canApproveQuantityDifference,
         string? approvalReason)
     {
-        var validationResult = ValidateToSetReceived(completedBy);
+        var validationResult = ValidateToSetReceived(
+            completedBy, reconciliation.RequiresManager && canApproveQuantityDifference);
         if (!validationResult.IsSuccess)
         {
             return validationResult;

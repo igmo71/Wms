@@ -72,6 +72,7 @@
             <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
             <Label x:Name="InstructionLabel" FontSize="12" HorizontalTextAlignment="Center" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+            <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
             <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
             <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
         </VerticalStackLayout>

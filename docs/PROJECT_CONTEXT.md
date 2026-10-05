@@ -28,6 +28,11 @@ LPN tracks receiving provenance and initial putaway, not stored inventory.
 
 Shared command, replay and client-recovery rules are defined once in
 [`ARCHITECTURE.md`](ARCHITECTURE.md#persistence-and-integration).
+HTTP timeout and caller-cancellation behavior follows the
+[client recovery convention](ARCHITECTURE.md#client-organization).
+
+Corrections from the I01–I08 review are tracked in the
+[active safety specification](../specs/2026-09-18-lpn-receiving-safety/spec.md).
 
 ## Identity and access
 
@@ -195,6 +200,12 @@ winning location on explicit retry.
 Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
 be joined. The order view shows the source plan read-only and its LPN list.
+Participation uses the source synchronization assessment. Completion checks
+persist that source assessment separately from their returned completion
+decision: unchecked facts and partial counts do not block joining. Open LPNs,
+unchecked lines and plan/fact differences still restrict completion. Mobile
+join availability uses the source assessment even when the same response shows
+a blocking completion decision; a failed fresh source check also disables joining.
 Direct facts and order-based putaway are removed from the Mobile API. Receiving
 completion with a fresh exact plan/fact match is available to a participant in
 Mobile. Quantity-difference approval and its reason remain a Manager-only Web
@@ -222,13 +233,21 @@ means unchecked; zero is an explicit result. Mobile changes facts only through
 absolute quantities of LPN items; the aggregate fact is read-only. Every line
 requires a fact before completion.
 
-Completion is available to an order participant only after every active LPN is
+Ordinary exact completion is available to an order participant only after every active LPN is
 closed and every source SKU has an explicit aggregate LPN fact, including zero.
 It first persists a fresh 1C synchronization checkpoint. Source deletion,
 unposting, unsupported quantity semantics, duplicate SKU, or a changed/ambiguous
 line-to-SKU composition blocks completion. A quantity-only plan/fact difference
 requires a reasoned server-side decision by the `Manager` role specifically;
 `Administrator` does not receive that permission implicitly.
+
+A Manager decision on a quantity difference does not require joining the order
+as a receiving participant. It does not create participation or attribute LPN
+counting to that Manager. The Manager supplies a reason and immediately finalizes
+the order with atomic receipt posting and decision audit. All active LPNs must
+still be closed, every line checked, and the source and LPN fingerprint fresh.
+The participation requirement above continues to apply to ordinary exact
+completion, including when the caller is a Manager.
 
 The completion decision fingerprint covers both the fresh source snapshot and
 the complete local LPN composition. A source or LPN change after display rejects
@@ -392,8 +411,9 @@ barcodes accept and normalize leading zeroes.
 The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
 only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
 can activate a focused UI action after the Intent scan has already navigated.
-Scanner-driven pages suppress Android focus on action buttons and ignore scan
-callbacks queued after the page has disappeared.
+Scanner-driven pages suppress Android focus on action buttons. Receiving order,
+LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
+page activity, including after leaving and returning to the same live page.
 
 Web uses the same read-only order-content layout while receiving and after
 completion. The nomenclature tab shows aggregate order lines. The pallet tab

@@ -6,7 +6,9 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-No active specification.
+- [LPN receiving safety and command recovery](2026-09-18-lpn-receiving-safety/spec.md)
+  — R1–R3 accepted; R4 live-screen command recovery and stale scanner callback
+  protection awaits developer verification, then the specification can be frozen.
 
 ## Frozen
 

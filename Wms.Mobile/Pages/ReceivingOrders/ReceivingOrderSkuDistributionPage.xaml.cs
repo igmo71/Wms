@@ -10,6 +10,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
     private readonly IServiceProvider _services;
     private Guid _orderId;
     private Guid _skuId;
+    private ReceivingOrderReceivingProcess _process = null!;
     private bool _busy;
 
     public ReceivingOrderSkuDistributionPage(
@@ -23,8 +24,9 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 
     public IReadOnlyList<ReceivingOrderSkuPalletRow> PalletRows { get; private set; } = [];
 
-    public void Show(Guid orderId, Guid skuId)
+    public void Show(Guid orderId, Guid skuId, ReceivingOrderReceivingProcess process)
     {
+        _process = process;
         _orderId = orderId;
         _skuId = skuId;
     }
@@ -107,10 +109,10 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 
     private async void OnPalletTapped(object? sender, TappedEventArgs e)
     {
-        if (_busy || e.Parameter is not Guid lpnId)
+        if (_busy || _process.HasPendingCommand || e.Parameter is not Guid lpnId)
             return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
-        page.Show(_orderId, lpnId);
+        page.Show(_orderId, lpnId, _process);
         await Navigation.PushAsync(page);
     }
 }

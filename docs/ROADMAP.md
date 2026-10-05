@@ -8,11 +8,12 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-After documentation reconciliation, perform a separate risk-based review of
-the accepted I01–I08 implementation at `9ea6620`. Review does not start new
-functional stages. Acceptance status is recorded in
-[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md); active scope is selected through
-the [specification registry](../specs/README.md).
+Plan and implement the corrections from the I01–I08 risk-based review under
+[LPN receiving safety and command recovery](../specs/2026-09-18-lpn-receiving-safety/spec.md).
+Verify R4 live-screen command recovery and stale scanner callback protection.
+After acceptance, close the safety specification; no additional increments remain
+in its scope.
+These corrections do not start new functional stages.
 
 ## Future delivery areas
 
