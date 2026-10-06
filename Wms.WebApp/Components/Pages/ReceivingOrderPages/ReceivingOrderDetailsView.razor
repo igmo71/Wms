@@ -1,0 +1,40 @@
+@using Wms.Domain.Enums
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_order is null)
+{
+    <MudAlert Severity="Severity.Warning">Приходный ордер не найден.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="2">
+        <ReceivingOrderHeader Order="_order" UserNames="_userNames" />
+
+        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
+        }
+
+        <ReceivingOrderDiscrepancies Order="_order"
+                                     Assessment="_synchronizationAssessment"
+                                     UserNames="_userNames"
+                                     IsAcknowledging="@(_isAcknowledgingSynchronization || _order.Status == ReceivingOrderStatus.Received)"
+                                     OnAcknowledge="AcknowledgeSynchronizationAsync" />
+
+        <ReceivingOrderDecisionReason Order="_order" />
+
+        <ReceivingOrderContents Order="_order"
+                                UserNames="_userNames"
+                                ShowCurrentPlan="@(_order.Status == ReceivingOrderStatus.Received)"
+                                CurrentPlanQuantity="CompletionCurrentPlanQuantity" />
+
+        @if (_order.Status == ReceivingOrderStatus.Received
+            && !_order.LicensePlateNumbers.SelectMany(x => x.Items).Any(x => !x.IsDeleted && x.Quantity > 0))
+        {
+            <MudAlert Severity="Severity.Warning">Размещение недоступно: в ордере отсутствует фактически принятое количество.</MudAlert>
+        }
+    </MudStack>
+}

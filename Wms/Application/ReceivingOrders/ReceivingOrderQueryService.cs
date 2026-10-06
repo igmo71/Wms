@@ -21,6 +21,7 @@ public class ReceivingOrderQueryService(
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
+                    .ThenInclude(x => x.BaseUnitOfMeasure)
             .Include(x => x.Participants)
             .Include(x => x.LicensePlateNumbers)
                 .ThenInclude(x => x.Items)

@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
     xmlns:local="clr-namespace:Wms.Mobile"
-    Title="Размещение LPN">
+    Title="Размещение LPN"
+    HideSoftInputOnTapped="True">
 
     <ScrollView>
         <VerticalStackLayout Padding="24" Spacing="16">
@@ -45,8 +46,14 @@
                 <VerticalStackLayout Spacing="10">
                     <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
                     <Label x:Name="RemainingLabel" />
-                    <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="Количество" />
-                    <Button Clicked="OnQuantityConfirmed" Text="К скану позиции" />
+                    <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="Количество"
+                           ReturnType="Done" Focused="OnQuantityFocused" TextChanged="OnQuantityTextChanged"
+                           Completed="OnQuantityCompleted" Unfocused="OnQuantityUnfocused" />
+                    <Button x:Name="EntireRemainderButton" Clicked="OnEntireRemainderClicked"
+                            Loaded="OnNonScanControlLoaded" Text="Весь остаток" />
+                    <Label x:Name="QuantityStatusLabel" FontAttributes="Bold" />
+                    <Button x:Name="RetryButton" Clicked="OnRetryClicked" IsVisible="False"
+                            Loaded="OnNonScanControlLoaded" Text="Повторить то же размещение" />
                     <Label FontAttributes="Bold" Text="Рекомендации позиций" />
                     <Label Text="1. Позиции с текущим остатком SKU" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding CurrentSkuStockRecommendations, Source={x:Reference Page}}" Spacing="4">
@@ -91,16 +98,6 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Border x:Name="DestinationPanel" IsVisible="False" Padding="16">
-                <VerticalStackLayout Spacing="8">
-                    <Label x:Name="DestinationSkuLabel" FontAttributes="Bold" FontSize="20" />
-                    <Label x:Name="DestinationQuantityLabel" />
-                    <Label Text="Скан позиции сразу проводит движение." />
-                    <Button x:Name="RetryButton" Clicked="OnRetryClicked" IsVisible="False" Text="Повторить то же размещение" />
-                    <Button Clicked="OnChangeQuantityClicked" Text="Изменить количество" />
-                </VerticalStackLayout>
-            </Border>
-
             <Border x:Name="HistoryPanel" IsVisible="False" Padding="16">
                 <VerticalStackLayout Spacing="8">
                     <Label FontAttributes="Bold" Text="История размещения" />
@@ -124,7 +121,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <Button x:Name="NextLpnButton" Clicked="OnNextLpnClicked" IsVisible="False" Text="Следующий LPN" />
+            <Button x:Name="NextLpnButton" Loaded="OnNonScanControlLoaded" Clicked="OnNextLpnClicked" IsVisible="False" Text="Следующий LPN" />
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
             <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" TextColor="Red" />
         </VerticalStackLayout>

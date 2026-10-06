@@ -9,6 +9,7 @@ public partial class OperationalCameraScannerView : ContentView
     private int _detectionAccepted;
     private bool _requested;
     private bool _starting;
+    private long _scanGeneration;
 
     public OperationalCameraScannerView()
     {
@@ -26,6 +27,7 @@ public partial class OperationalCameraScannerView : ContentView
         }
 
         _requested = true;
+        Interlocked.Increment(ref _scanGeneration);
         IsVisible = true;
         Interlocked.Exchange(ref _detectionAccepted, 0);
         CameraInstructionLabel.Text = "Совместите нужный код с красной точкой.";
@@ -66,6 +68,7 @@ public partial class OperationalCameraScannerView : ContentView
 
     public void Stop()
     {
+        Interlocked.Increment(ref _scanGeneration);
         _requested = false;
         CameraView.CameraEnabled = false;
         IsVisible = false;
@@ -73,6 +76,7 @@ public partial class OperationalCameraScannerView : ContentView
 
     private void OnDetectionFinished(object? sender, OnDetectionFinishedEventArg e)
     {
+        var generation = Volatile.Read(ref _scanGeneration);
         var value = e.BarcodeResults.FirstOrDefault()?.DisplayValue;
         if (string.IsNullOrEmpty(value)
             || Interlocked.CompareExchange(ref _detectionAccepted, 1, 0) != 0)
@@ -80,11 +84,14 @@ public partial class OperationalCameraScannerView : ContentView
             return;
         }
 
-        MainThread.BeginInvokeOnMainThread(() => AcceptDetection(value));
+        MainThread.BeginInvokeOnMainThread(() => AcceptDetection(value, generation));
     }
 
-    private void AcceptDetection(string value)
+    private void AcceptDetection(string value, long generation)
     {
+        if (generation != Volatile.Read(ref _scanGeneration))
+            return;
+
         if (!_requested)
         {
             Interlocked.Exchange(ref _detectionAccepted, 0);

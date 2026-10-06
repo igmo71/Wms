@@ -13,6 +13,7 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
     private Guid _skuId;
     private MobileReceivingOrderDetailsResponse? _details;
     private bool _busy;
+    private bool _hideManualSkuSelectionAfterSave;
 
     public ReceivingOrderLicensePlateNumberQuantityPage(
         MobileReceivingOrderClient orderClient)
@@ -93,6 +94,7 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
             ErrorLabel.Text = "Введите неотрицательное количество, не более трёх знаков после запятой.";
             return;
         }
+        _hideManualSkuSelectionAfterSave = true;
         await ExecuteAsync(
             () => _process.SetLicensePlateNumberItemQuantityAsync(_orderId, _lpnId, _skuId, quantity),
             "Ответ сервера не получен. Повторите сохранение того же количества.");
@@ -105,6 +107,7 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         if (!await DisplayAlertAsync(
                 "Удалить товар", "Удалить товар из состава палеты?", "Удалить", "Назад"))
             return;
+        _hideManualSkuSelectionAfterSave = false;
         await ExecuteAsync(
             () => _process.RemoveLicensePlateNumberItemAsync(_orderId, _lpnId, _skuId),
             "Ответ сервера не получен. Повторите удаление этого же товара.");
@@ -119,6 +122,10 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         try
         {
             await mutation();
+            if (_hideManualSkuSelectionAfterSave)
+                Navigation.NavigationStack.OfType<ReceivingOrderLicensePlateNumberPage>()
+                    .LastOrDefault()?.HideManualSkuSelection();
+            _hideManualSkuSelectionAfterSave = false;
             QuantityEntry.Unfocus();
             await QuantityEntry.HideSoftInputAsync(CancellationToken.None);
             await Navigation.PopAsync();
@@ -137,6 +144,8 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
         }
         finally
         {
+            if (!_process.HasPendingCommand)
+                _hideManualSkuSelectionAfterSave = false;
             SetBusy(false);
         }
     }

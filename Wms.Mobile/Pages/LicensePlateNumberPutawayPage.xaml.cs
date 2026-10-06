@@ -18,6 +18,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     private long _scanGeneration;
     private bool _scannerSubscribed;
     private decimal _quantity;
+    private bool _quantityConfirmed;
     private PendingPutaway? _pending;
 
     public LicensePlateNumberPutawayPage(
@@ -94,8 +95,13 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             await ResolveLpnAsync(barcode);
         else if (_step == PutawayStep.Sku)
             await ResolveSkuAsync(barcode);
-        else if (_step == PutawayStep.Destination)
-            await PutawayAsync(barcode);
+        else if (_step == PutawayStep.Quantity)
+        {
+            if (CanScanDestination)
+                await PutawayAsync(barcode);
+            else
+                ErrorLabel.Text = "Завершите ввод количества или выберите «Весь остаток», затем повторите скан позиции.";
+        }
     }
 
     private async Task ResolveLpnAsync(string code)
@@ -151,33 +157,90 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         OnPropertyChanged(nameof(EmptyRecommendations));
         SelectedSkuLabel.Text = item.SkuName;
         RemainingLabel.Text = $"Осталось {item.RemainingQuantity:0.###} {item.UnitOfMeasure}";
-        QuantityEntry.Text = item.RemainingQuantity.ToString("0.###", CultureInfo.InvariantCulture);
+        _quantityConfirmed = false;
+        _quantity = 0;
+        QuantityEntry.Text = string.Empty;
         ApplyStep(PutawayStep.Quantity);
     }
 
-    private async void OnQuantityConfirmed(object? sender, EventArgs e)
+    private bool CanScanDestination => _step == PutawayStep.Quantity
+        && _quantityConfirmed && !QuantityEntry.IsFocused
+        && _details?.CanPutaway == true && _selectedItem is not null
+        && _quantity > 0 && _quantity <= _selectedItem.RemainingQuantity;
+
+    private async void OnQuantityFocused(object? sender, FocusEventArgs e)
     {
-        if (_busy || _pending is not null || _selectedItem is null) return;
-        var text = (QuantityEntry.Text ?? string.Empty).Trim().Replace(',', '.');
-        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out _quantity)
-            || !WarehouseQuantityInput.IsSupported(_quantity)
-            || _quantity <= 0 || _quantity > _selectedItem.RemainingQuantity)
-        {
-            ErrorLabel.Text = $"Количество должно быть больше нуля и не превышать {_selectedItem.RemainingQuantity:0.###}.";
-            return;
-        }
-        QuantityEntry.Unfocus();
-        await QuantityEntry.HideSoftInputAsync(CancellationToken.None);
-        DestinationSkuLabel.Text = _selectedItem.SkuName;
-        DestinationQuantityLabel.Text = $"Количество: {_quantity:0.###} {_selectedItem.UnitOfMeasure}";
-        ErrorLabel.Text = string.Empty;
-        ApplyStep(PutawayStep.Destination);
+        InvalidateQuantity();
         await UpdateCameraAsync();
+    }
+
+    private async void OnQuantityTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        InvalidateQuantity();
+        await UpdateCameraAsync();
+    }
+
+    private void InvalidateQuantity()
+    {
+        _quantityConfirmed = false;
+        Interlocked.Increment(ref _scanGeneration);
+        UpdateQuantityStatus();
+    }
+
+    private async void OnQuantityCompleted(object? sender, EventArgs e)
+    {
+        QuantityEntry.Unfocus();
+        await ConfirmQuantityAsync();
+    }
+
+    private async void OnQuantityUnfocused(object? sender, FocusEventArgs e) =>
+        await ConfirmQuantityAsync();
+
+    private async void OnEntireRemainderClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _pending is not null || _step != PutawayStep.Quantity || _selectedItem is null)
+            return;
+        QuantityEntry.Text = _selectedItem.RemainingQuantity.ToString("0.###", CultureInfo.InvariantCulture);
+        QuantityEntry.Unfocus();
+        await ConfirmQuantityAsync();
+    }
+
+    private async Task ConfirmQuantityAsync()
+    {
+        if (!_isVisible || _busy || _pending is not null || _step != PutawayStep.Quantity
+            || _selectedItem is null || QuantityEntry.IsFocused)
+            return;
+        InvalidateQuantity();
+        var text = (QuantityEntry.Text ?? string.Empty).Trim().Replace(',', '.');
+        if (!decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var quantity)
+            || !WarehouseQuantityInput.IsSupported(quantity)
+            || quantity <= 0 || quantity > _selectedItem.RemainingQuantity
+            || _details?.CanPutaway != true)
+        {
+            ErrorLabel.Text = $"Введите количество больше нуля, не более {_selectedItem.RemainingQuantity:0.###} и не более трёх знаков после запятой.";
+        }
+        else
+        {
+            _quantity = quantity;
+            _quantityConfirmed = true;
+            ErrorLabel.Text = string.Empty;
+        }
+        UpdateQuantityStatus();
+        await QuantityEntry.HideSoftInputAsync(CancellationToken.None);
+        await UpdateCameraAsync();
+    }
+
+    private void UpdateQuantityStatus()
+    {
+        QuantityStatusLabel.Text = _quantityConfirmed
+            ? $"Подтверждено: {_quantity:0.###} {_selectedItem?.UnitOfMeasure}. Скан позиции сразу проводит движение."
+            : "Количество не подтверждено. Завершите ввод или выберите «Весь остаток».";
     }
 
     private async Task PutawayAsync(string destinationBarcode)
     {
-        if (!_isVisible || _busy || _pending is not null || _details is null || _selectedItem is null) return;
+        if (!_isVisible || _busy || _pending is not null || !CanScanDestination
+            || _details is null || _selectedItem is null) return;
         _pending = new(_details.Id, _selectedItem.Id, _quantity, destinationBarcode, Guid.NewGuid());
         await ExecutePendingPutawayAsync();
     }
@@ -200,6 +263,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             _pending = null;
             RetryButton.IsVisible = false;
             _selectedItem = null;
+            InvalidateQuantity();
             ClearRecommendations();
             ApplyDetails(response.Details);
         }
@@ -232,21 +296,21 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             if (_selectedItem is not null)
             {
                 RemainingLabel.Text = $"Осталось {_selectedItem.RemainingQuantity:0.###} {_selectedItem.UnitOfMeasure}";
-                DestinationQuantityLabel.Text =
-                    $"Выбрано: {_quantity:0.###}; актуальный остаток: {_selectedItem.RemainingQuantity:0.###} {_selectedItem.UnitOfMeasure}";
             }
+            if (_selectedItem is null || !_details.CanPutaway || _selectedItem.RemainingQuantity <= 0)
+            {
+                InvalidateQuantity();
+                _selectedItem = null;
+                ClearRecommendations();
+                ApplyDetails(_details);
+            }
+            else if (_quantity > _selectedItem.RemainingQuantity)
+                InvalidateQuantity();
         }
         catch
         {
             // The original business error remains actionable even if refresh fails.
         }
-    }
-
-    private async void OnChangeQuantityClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _pending is not null) return;
-        ApplyStep(PutawayStep.Quantity);
-        await UpdateCameraAsync();
     }
 
     private async void OnNextLpnClicked(object? sender, EventArgs e)
@@ -277,27 +341,27 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private void ApplyStep(PutawayStep step)
     {
+        Interlocked.Increment(ref _scanGeneration);
         _step = step;
         LpnPanel.IsVisible = step is PutawayStep.Sku or PutawayStep.Status;
         QuantityPanel.IsVisible = step == PutawayStep.Quantity;
-        DestinationPanel.IsVisible = step == PutawayStep.Destination;
         HistoryPanel.IsVisible = step == PutawayStep.Status && History.Count > 0;
         NextLpnButton.IsVisible = step == PutawayStep.Status;
         (StepLabel.Text, InstructionLabel.Text) = step switch
         {
             PutawayStep.Lpn => ("LPN", "Отсканируйте LPN."),
             PutawayStep.Sku => ("Товар", "Отсканируйте SKU или выберите строку LPN."),
-            PutawayStep.Quantity => ("Количество", "Указан весь остаток LPN. При необходимости уменьшите его."),
-            PutawayStep.Destination => ("Позиция назначения", "Отсканируйте активную позицию хранения."),
+            PutawayStep.Quantity => ("Количество и позиция", "Подтвердите количество, затем отсканируйте позицию хранения."),
             _ => ("Размещение", "Просмотрите состояние и историю LPN.")
         };
+        UpdateQuantityStatus();
     }
 
     private async Task UpdateCameraAsync()
     {
         if (_isVisible && !_busy && _pending is null
             && _scanner.ActiveSource == BarcodeScanSource.Camera
-            && _step is PutawayStep.Lpn or PutawayStep.Sku or PutawayStep.Destination)
+            && (_step is PutawayStep.Lpn or PutawayStep.Sku || CanScanDestination))
             await CameraScannerView.StartAsync();
         else
             CameraScannerView.Stop();
@@ -305,11 +369,13 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
 
     private void SetBusy(bool busy)
     {
+        Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
         RetryButton.IsVisible = _pending is not null;
         RetryButton.IsEnabled = !busy;
         QuantityEntry.IsEnabled = !busy && _pending is null;
+        EntireRemainderButton.IsEnabled = QuantityEntry.IsEnabled;
         NavigationPage.SetHasBackButton(this, !busy && _pending is null);
     }
 
@@ -328,5 +394,11 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     private sealed record PendingPutaway(
         Guid LpnId, Guid ItemId, decimal Quantity, string DestinationBarcode, Guid RequestId);
 
-    private enum PutawayStep { Lpn, Sku, Quantity, Destination, Status }
+    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element)
+            AndroidFocus.Suppress(element);
+    }
+
+    private enum PutawayStep { Lpn, Sku, Quantity, Status }
 }

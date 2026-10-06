@@ -27,15 +27,18 @@
                               InputType="InputType.Password" />
             }
             <MudSelect T="string"
-                       @bind-Value="_role"
-                       Label="Роль"
+                       @bind-SelectedValues="_roles"
+                       MultiSelection="true"
+                       Label="Роли"
                        Required="true">
                 <MudSelectItem T="string" Value="@ApplicationRoles.Operator">Оператор</MudSelectItem>
                 <MudSelectItem T="string" Value="@ApplicationRoles.Manager">Менеджер</MudSelectItem>
                 <MudSelectItem T="string" Value="@ApplicationRoles.Administrator">Администратор</MudSelectItem>
             </MudSelect>
+            <MudText Typo="Typo.caption">Решение по количественному расхождению требует роли «Менеджер», в том числе для администратора.</MudText>
             @if (User is not null)
             {
+                <MudText Typo="Typo.caption">После изменения ролей войдите в учетную запись заново, чтобы сразу применить новые права.</MudText>
                 <MudSwitch T="bool"
                            @bind-Value="_isBlocked"
                            Color="Color.Error"

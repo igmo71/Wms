@@ -132,12 +132,23 @@
         <PropertyColumn Property="x => x.PutawayStatus" Title="Размещение">
             <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
         </PropertyColumn>
-        <TemplateColumn Title="1C" Sortable="false">
+        <TemplateColumn Title="Сверка" Sortable="false">
             <CellTemplate>
-                <MudTooltip Text="@context.Item.SynchronizationLevel.GetDisplayText()">
-                    <MudIcon Icon="@context.Item.SynchronizationLevel.GetIcon()"
-                             Color="@context.Item.SynchronizationLevel.GetColor()" />
-                </MudTooltip>
+                @if (context.Item.Status == ReceivingOrderStatus.Received
+                    && context.Item.CompletionApprovedAtUtc is not null
+                    && context.Item.SynchronizationLevel == OrderSynchronizationLevel.Synchronized)
+                {
+                    <MudTooltip Text="Принят с расхождением; документ 1С синхронизирован.">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="@context.Item.SynchronizationLevel.GetDisplayText()">
+                        <MudIcon Icon="@context.Item.SynchronizationLevel.GetIcon()"
+                                 Color="@context.Item.SynchronizationLevel.GetColor()" />
+                    </MudTooltip>
+                }
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Принято" SortBy="x => x.CompletedAtUtc">

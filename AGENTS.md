@@ -6,6 +6,7 @@ Before reading specifications, consult [the specification registry](specs/README
 
 - Treat the context as the current architectural and business guide. The code remains the source of truth for implementation details.
 - This is an MVP: prefer explicit, straightforward changes that fit the existing structure. Do not introduce abstractions, layers, or infrastructure unless the task needs them.
+- When replacing a screen, route, or workflow, remove obsolete code and links. Keep compatibility aliases or redirects only for a concrete, supported need; do not accumulate them by default.
 - Keep changes scoped to the request. Do not implement roadmap processes prematurely.
 - When a task changes a lasting business rule, integration boundary, workflow, or architectural convention, update `docs/PROJECT_CONTEXT.md` in the same change.
 - Keep each detailed rule in one owning document and link to it elsewhere.

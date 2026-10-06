@@ -1,0 +1,80 @@
+@using Wms.Common
+@using Wms.Domain
+@using Wms.Domain.Enums
+
+<MudStack Spacing="2">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Приходный ордер @Order.Number от @Order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+        <MudSpacer />
+        @if (!string.IsNullOrWhiteSpace(ActionHint))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Warning" Style="max-width: 360px; text-align: right;">@ActionHint</MudText>
+        }
+        @Actions
+        <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">К списку</MudButton>
+    </MudStack>
+
+    <MudPaper Class="pa-2" Elevation="0" Outlined="true">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption">Статус</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@Order.Status.GetChipColor()">@Order.Status.GetDisplayName()</MudChip>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@Order.Warehouse?.Name</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@Order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Отправитель</MudText><MudText>@PartyDisplay.Format(Order.Shipper, Order.ShipperId, Order.ShipperType)</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption">Очередь</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Order.Queue.GetIcon()" Size="Size.Small" />
+                    <MudText>@Order.Queue.GetDisplayName()</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption">Статус размещения</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@Order.PutawayStatus.GetChipColor()">@Order.PutawayStatus.GetDisplayName()</MudChip>
+            </MudItem>
+        </MudGrid>
+        <MudDivider Class="my-1" />
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона приёмки</MudText><MudText>@(Order.ReceivingLocation?.Zone?.Name ?? "—")</MudText></MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место приёмки</MudText><MudText>@StorageLocationDisplay.FormatOrDash(Order.ReceivingLocation)</MudText></MudItem>
+            <MudItem xs="12" md="6">
+                <MudTooltip Text="@(Order.Comment ?? "—")">
+                    <MudText Typo="Typo.caption">Комментарий</MudText>
+                    <MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(Order.Comment ?? "—")</MudText>
+                </MudTooltip>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(Order.KnownFactWeightKg, Order.IsFactWeightComplete)</MudText></MudItem>
+        </MudGrid>
+        <MudDivider Class="my-1" />
+        <MudGrid Spacing="2">
+            <DocumentOperationInfo Title="Взял в работу" UserName="@GetUserName(Order.StartedBy)" Timestamp="Order.StartedAtUtc" />
+            <DocumentOperationInfo Title="Принял" UserName="@GetUserName(Order.CompletedBy)" Timestamp="Order.CompletedAtUtc" />
+            @if (Order.CompletionApprovedAtUtc is not null)
+            {
+                <DocumentOperationInfo Title="Подтвердил расхождение" UserName="@GetUserName(Order.CompletionApprovedBy)" Timestamp="Order.CompletionApprovedAtUtc" />
+            }
+        </MudGrid>
+        <MudDivider Class="my-1" />
+        <MudText Typo="Typo.caption">Участники приёмки</MudText>
+        <MudText Typo="Typo.body2">@ParticipantsText</MudText>
+    </MudPaper>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public ReceivingOrder Order { get; set; } = null!;
+    [Parameter] public IReadOnlyDictionary<string, string> UserNames { get; set; } = new Dictionary<string, string>();
+    [Parameter] public string? ActionHint { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    private string ParticipantsText => Order.Participants.Count == 0
+        ? "К ордеру ещё никто не присоединился."
+        : string.Join(" · ", Order.Participants
+            .OrderBy(x => x.JoinedAtUtc)
+            .Select(x => $"{GetUserName(x.UserId)} — {x.JoinedAtUtc:dd.MM.yyyy HH:mm}"));
+
+    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—"
+        : UserNames.TryGetValue(userId, out var userName) ? userName : "Пользователь не найден";
+}

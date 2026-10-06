@@ -8,22 +8,27 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-Specify and implement multiple WMS roles per user, including the explicit
-Administrator + Manager combination, while preserving Manager-only approval of
-receiving quantity differences and last-active-administrator protection.
+Scope Web SKU-to-LPN visibility: from a receiving order's nomenclature line,
+show which pallets contain that SKU and each pallet's quantity. Keep the
+aggregate order table and pallet audit available, and agree the smallest
+interaction before implementation.
 
 ## Future delivery areas
 
-The following separate issue improves receiving Web/Mobile usability: one Web
-order page, clear completion guidance, consistent quantities and SKU-to-LPN
-visibility, and manual selection of an order SKU within an open receiving LPN.
-On the putaway quantity screen, the amount starts unconfirmed: the employee
-enters it and completes input, or explicitly selects "Entire remainder". Only
-then does a destination scan post that quantity, without a separate advance
-button. A focused quantity field, an unconfirmed or invalid amount, and an
-uncertain prior command must not post a scan. Preserve the original amount,
-destination and request id for explicit retry after a lost response. Verify
-focus and ScanWedge behavior on the target Urovo device.
+Later, review quantity presentation across the entire Web and Mobile UI:
+find inconsistent precision and missing units, consider compact TSD layouts,
+and agree a shared display rule before changing other workflows. The current
+three-decimal Web receiving format does not predetermine every screen's format.
+
+Mobile already explains completion blocks next to its
+completion button; revisit that guidance only if device review exposes a gap.
+Do not combine these with putaway.
+
+Putaway screen improvements are deferred. Verify the accepted safe putaway
+quantity flow with the camera fallback when camera use becomes relevant; TSD
+behavior was accepted on 2026-10-06.
+Separately review domain and view models for unused or obsolete properties and
+remove them only after checking their persistence, integration and audit uses.
 
 E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
 rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,
@@ -71,6 +76,3 @@ exchange, an interrupted command, and operator recovery.
   non-production environments.
 - Update or replace the vulnerable `Microsoft.OpenApi 2.0.0` dependency reported
   by `NU1903`.
-- Make multi-step Identity role updates atomic and protect the last active
-  administrator under concurrent administration before relying on that
-  invariant in production.

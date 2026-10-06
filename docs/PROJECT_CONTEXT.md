@@ -40,9 +40,21 @@ WebApp uses ASP.NET Core Identity with three roles: `Operator` may run warehouse
 operations and reports; `Manager` additionally corrects and reopens receiving
 LPNs; `Administrator` also has Manager operational rights and manages configuration
 and users. Public self-registration is not offered. Administrator-created accounts
-are confirmed local accounts with one WMS role. An administrator cannot block
-or demote themselves, and the last active administrator cannot be blocked or
-demoted.
+are confirmed local accounts with one or more explicitly assigned WMS roles.
+Rights combine across assigned roles. Receiving quantity-difference approval
+requires explicit `Manager` membership even for an `Administrator`; assign both
+roles when both permissions are needed. An administrator may change their other
+roles but cannot block themselves or remove their own `Administrator` membership.
+The last active administrator cannot be blocked or lose that membership, including
+through concurrent user-management requests.
+
+User creation and updates save memberships and account state atomically. A changed
+WMS role set or block state also updates the security stamp in that transaction;
+reordering the same roles does not invalidate sessions. Web cookies and connected
+circuits retain their existing 30-minute stamp-validation interval. Mobile rejects
+an old stamp on refresh; an issued access token remains valid until expiration.
+Signing in again loads all current role claims. Instant session revocation is not
+provided.
 
 `ApplicationUser.DisplayName` is used for audit and reports, falling back to
 `UserName`. Operational records retain the Identity user id, so renamed users
@@ -50,7 +62,8 @@ change historical display and deleted users display the stored id.
 
 Startup initializes roles idempotently, assigns `Operator` to existing users
 without a role, and creates a missing bootstrap administrator from
-`IdentityBootstrap` configuration.
+`IdentityBootstrap` configuration. Startup preserves additional roles explicitly
+assigned to the bootstrap administrator; it does not automatically grant `Manager`.
 
 Mobile uses the same confirmed accounts. A transient refresh failure
 (transport, `408`, `5xx`, or an unreadable successful response) retains the
@@ -103,7 +116,11 @@ Dimensions use meters, maximum weight uses kilograms, and coordinates use the
 warehouse-local meter system. Usable volume is
 `Volume * (VolumeFactor ?? 1)`. Capacity values are stored but not enforced.
 The current integration requires document quantity and package quantity to
-match 1:1. Package keys and characteristics do not participate in SKU identity.
+match 1:1. The canonical unit comes from the SKU's base unit of measure:
+for example, a SKU named "(500 шт)" can be counted as five `упак` when its
+base unit is `упак`; the number in the name does not multiply its quantity.
+Refilling into another pack size is represented by a different SKU. Package
+keys and characteristics do not participate in SKU identity.
 
 `InventoryBalance` is current quantity at a location. Posted
 `InventoryMovement` records warehouse movement, and `InventoryTurnover` is its
@@ -216,6 +233,14 @@ line, a quantity difference, or a failed/blocking fresh 1C check.
 The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
 accepted from either tab and opens its separate pallet page; an SKU scan is
 accepted only on that pallet page and opens a separate absolute-quantity page.
+An editable open pallet also offers manual search and selection of any planned
+order SKU by name or code, including one not yet counted on that pallet. The
+manual selection opens the same quantity page without creating a pallet row;
+the pallet's main list continues to show only its retained item rows. Plan choices
+and retained rows have neutral headings; plan cards are light gray and retained
+rows white, without using success colors for a counted quantity. A successful quantity
+save closes the manual selector on return to the pallet page; failed or cancelled
+edits leave it open.
 No quantity field is focused by navigation or scanning. The order SKU table is
 read-only: unchecked fact is a red question mark, a mismatch is highlighted
 yellow, and an exact match green. Tapping an order SKU opens its aggregate plan
@@ -260,12 +285,24 @@ Completion makes no outbound change to 1C; later notifications do not replace
 the accepted facts or completion audit.
 
 Independent putaway starts from a closed LPN rather than an order. Mobile uses
-LPN → SKU → quantity → destination scan; scanning the destination immediately
+LPN → SKU → confirmed quantity → destination scan; scanning the destination immediately
 posts one movement from the order's Receiving location to an active unlocked
 Storage location in the same warehouse. Partial putaway is allowed. The
 remaining quantity is the immutable accepted LPN-item quantity minus its posted
 LPN putaway history, so later picking or other consumption from a destination
 does not change receiving history or make quantity pending again.
+
+Each SKU selection starts with an empty, unconfirmed quantity and no automatic
+input focus. Finishing input (Done or leaving the field) or explicitly choosing
+"Entire remainder" confirms a positive supported quantity within the displayed
+remainder. Editing or focusing the field revokes confirmation. Quantity and
+recommendations remain on the same screen; there is no advance-to-scan button.
+A focused, invalid or unconfirmed amount cannot post a destination scan, and
+queued scans from before confirmation are discarded. Busy or uncertain commands
+block changes and new scans; explicit retry follows the shared recovery convention.
+After conflict refresh, an insufficient remainder revokes confirmation; an
+unavailable SKU or LPN returns to the current selection/status. Success resets
+quantity confirmation before the next SKU selection.
 
 Putaway is blocked until the receiving order is completed. Each command checks
 both the physical source balance and the separate remaining limit of its LPN
@@ -415,13 +452,34 @@ Scanner-driven pages suppress Android focus on action buttons. Receiving order,
 LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
 
-Web uses the same read-only order-content layout while receiving and after
-completion. The nomenclature tab shows aggregate order lines. The pallet tab
-shows a compact selectable pallet list on the left and only the selected
+Web uses one receiving-order page across ready, receiving and received states.
+The list's "Сверка" indicator prioritizes an accepted quantity difference over
+the successful source-synchronization mark; its tooltip distinguishes the two.
+The route chooses between in-progress and ready/received views; successful Web
+completion changes the view on the same URL. Its shared header
+shows status and participants immediately below the order number and date.
+The shared "Расхождения" block appears above the order content; Manager
+confirmation is a separate block in the same position for entry and later
+review. The summary header omits putaway action timestamps. The page uses the
+same read-only order-content layout while receiving and after completion. The
+nomenclature tab shows aggregate order lines. A ready order shows its stored
+"План" only. During and after receiving, equal WMS and 1C quantities on every
+line collapse to one "План" column; otherwise the whole table shows "План WMS"
+and "План 1С". A missing compared 1C value is not treated as equal. After
+acceptance, "План 1С" uses the saved completion snapshot. The Web nomenclature
+table shows each SKU's canonical unit alongside its quantities; Mobile already
+shows the unit beside line plan and fact. Read-only Web receiving quantities
+(plan, fact, remainder and pallet quantities) display three decimal places,
+matching the 1C quantity precision; nullable unchecked facts retain their
+textual state. The pallet tab shows a compact
+selectable pallet list on the left and only the selected
 pallet's item audit and putaway history on the right. Open pallets sort first,
-cancelled pallets remain visible but muted for audit, and participants appear in
-a compact block below the operational content. Completion and 1C reconciliation
+and their nonzero count appears on the tab badge. Cancelled pallets remain
+visible but muted for audit. Completion and 1C reconciliation
 remain above the tabs; Web LPN composition editing is outside this result.
+When Web completion is unavailable, a concise reason between the order title
+and the action points to the next step; Mobile already shows completion
+guidance near its action.
 
 The API address is packaged per build configuration and is not editable by the
 operator.

@@ -32,9 +32,7 @@ public partial class Index : IAsyncDisposable
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
 
     private static string GetOrderHref(ReceivingOrder order) =>
-        order.Status == ReceivingOrderStatus.InReceiving
-            ? $"receiving-orders/{order.Id}/in-process"
-            : $"receiving-orders/{order.Id}";
+        $"receiving-orders/{order.Id}";
 
     private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(GridState<ReceivingOrder> state, CancellationToken cancellationToken)
     {

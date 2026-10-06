@@ -1,7 +1,7 @@
 /*
     Очистка прикладных данных WMS для текущей схемы базы данных.
     Включает справочники и топологию склада.
-    Схема: AddLicensePlateNumbers.
+    Учитывает состав LPN, историю размещения и участников приемки.
     Запускать при остановленных WebApp, WebApi и обработчиках интеграции.
 
     Не очищаются:
@@ -24,6 +24,9 @@ BEGIN TRY
     -- Квитанции повторных команд относятся к удаляемым операциям.
     DELETE FROM [dbo].[CommandReceipts];
 
+    -- История размещения ссылается на LPN, его строки и складские движения.
+    DELETE FROM [dbo].[LicensePlateNumberPutaways];
+    DELETE FROM [dbo].[LicensePlateNumberItems];
     DELETE FROM [dbo].[LicensePlateNumbers];
     DELETE FROM [dbo].[LicensePlateNumberBatches];
 
@@ -39,6 +42,7 @@ BEGIN TRY
     -- Строки документов удаляются раньше их заголовков.
     DELETE FROM [dbo].[InventoryCountItems];
     DELETE FROM [dbo].[ReceivingOrderItems];
+    DELETE FROM [dbo].[ReceivingOrderParticipants];
     DELETE FROM [dbo].[ShippingOrderBaseItems];
     DELETE FROM [dbo].[ShippingOrderItems];
 

@@ -6,9 +6,35 @@ specifications unless a current task explicitly needs their rationale.
 
 ## Active
 
-No active specifications.
+None.
 
 ## Frozen
+
+- [Web receiving quantity format](2026-10-06-web-receiving-quantity-format/spec.md)
+  — accepted on 2026-10-06: read-only Web receiving quantities use three
+  decimal places; a broader UI review remains future work.
+
+- [Web receiving quantity units](2026-10-06-web-receiving-quantity-units/spec.md)
+  — accepted on 2026-10-06: `Ед изм` shows the SKU's canonical unit on both
+  Web receiving tabs without changing quantity semantics.
+
+- [Web receiving completion guidance](2026-10-06-web-receiving-completion-guidance/spec.md)
+  — accepted on 2026-10-06: the Web completion action explains its unavailable
+  state, and the discrepancy panel omits the misleading source-fix sentence.
+
+- [One Web receiving order page](2026-10-06-one-web-receiving-order-page/spec.md)
+  — accepted on 2026-10-06: one URL, shared views, discrepancies and compact
+  audit, with the final WebApp build and startup confirmed.
+
+- [Manual SKU selection in an open receiving LPN](2026-10-06-receiving-lpn-sku-selection/spec.md)
+  — accepted on 2026-10-06: planned SKU search, return behavior and neutral styling.
+
+- [Safe quantity confirmation before LPN putaway](2026-10-05-safe-putaway-quantity/spec.md)
+  — TSD behavior accepted on 2026-10-06; camera fallback awaits separate verification.
+
+- [Multiple WMS roles per account](2026-10-05-multiple-wms-roles/spec.md)
+  — accepted on 2026-10-05: explicit role sets, atomic permission updates,
+  last-active-administrator protection and bootstrap role preservation.
 
 - [LPN receiving safety and command recovery](2026-09-18-lpn-receiving-safety/spec.md)
   — R1–R4 accepted on 2026-10-05: joining eligibility, Manager completion,

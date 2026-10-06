@@ -24,7 +24,7 @@ public partial class UserDialog
     private string _displayName = string.Empty;
     private string _email = string.Empty;
     private string _password = string.Empty;
-    private string _role = ApplicationRoles.Operator;
+    private IReadOnlyCollection<string> _roles = [ApplicationRoles.Operator];
     private bool _isBlocked;
     private bool _isSaving;
     private string? _errorMessage;
@@ -32,7 +32,7 @@ public partial class UserDialog
     private bool IsSaveDisabled => _isSaving
         || string.IsNullOrWhiteSpace(_displayName)
         || string.IsNullOrWhiteSpace(_email)
-        || string.IsNullOrWhiteSpace(_role)
+        || !_roles.Any()
         || (User is null && string.IsNullOrWhiteSpace(_password));
 
     protected override void OnInitialized()
@@ -42,7 +42,7 @@ public partial class UserDialog
 
         _displayName = User.DisplayName;
         _email = User.Email;
-        _role = User.Role;
+        _roles = User.Roles.ToArray();
         _isBlocked = User.IsBlocked;
     }
 
@@ -62,7 +62,7 @@ public partial class UserDialog
                     Email = _email,
                     DisplayName = _displayName,
                     Password = _password,
-                    Role = _role
+                    Roles = _roles.ToArray()
                 })
                 : await UpdateAsync();
 
@@ -96,7 +96,7 @@ public partial class UserDialog
             UserId = User!.Id,
             CurrentUserId = currentUserId,
             DisplayName = _displayName,
-            Role = _role,
+            Roles = _roles.ToArray(),
             IsBlocked = _isBlocked
         });
     }

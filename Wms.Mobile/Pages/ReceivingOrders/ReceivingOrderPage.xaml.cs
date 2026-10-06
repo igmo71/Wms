@@ -265,8 +265,8 @@ public partial class ReceivingOrderPage : ContentPage
                 queue.Personal.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList(),
                 queue.Available.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList());
             ReceivingStatusLabel.Text = queue.Personal.Count == 0
-                ? "Личных ордеров в работе нет."
-                : $"Личных ордеров: {queue.Personal.Count}.";
+                ? "Ордеров в работе нет."
+                : $"Ордеров в работе: {queue.Personal.Count}.";
             PutawayStatusLabel.Text = queue.Available.Count == 0
                 ? "Доступных ордеров нет."
                 : $"Доступных ордеров: {queue.Available.Count}.";

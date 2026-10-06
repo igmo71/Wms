@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using System.Data;
 using Wms.Common;
 using Wms.Data;
 
@@ -7,7 +9,7 @@ namespace Wms.Application.Users;
 
 public sealed class ApplicationUserManagementService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    UserManager<ApplicationUser> userManager)
+    IServiceScopeFactory scopeFactory)
 {
     public async Task<ListResult<ApplicationUserListItem>> ListAsync(
         ApplicationUserListQuery listQuery,
@@ -24,13 +26,14 @@ public sealed class ApplicationUserManagementService(
                 DisplayName = string.IsNullOrWhiteSpace(user.DisplayName)
                     ? user.UserName ?? user.Id
                     : user.DisplayName,
-                Role = (from userRole in dbContext.UserRoles
+                Roles = (from userRole in dbContext.UserRoles
                         join role in dbContext.Roles on userRole.RoleId equals role.Id
                         where userRole.UserId == user.Id
                             && (role.Name == ApplicationRoles.Administrator
                                 || role.Name == ApplicationRoles.Manager
                                 || role.Name == ApplicationRoles.Operator)
-                        select role.Name).FirstOrDefault() ?? string.Empty,
+                        orderby role.Name
+                        select role.Name!).ToArray(),
                 IsBlocked = user.LockoutEnd != null && user.LockoutEnd > DateTimeOffset.UtcNow
             });
 
@@ -46,9 +49,6 @@ public sealed class ApplicationUserManagementService(
             "Email" => listQuery.SortDescending
                 ? query.OrderByDescending(x => x.Email).ThenBy(x => x.DisplayName)
                 : query.OrderBy(x => x.Email).ThenBy(x => x.DisplayName),
-            "Role" => listQuery.SortDescending
-                ? query.OrderByDescending(x => x.Role).ThenBy(x => x.DisplayName)
-                : query.OrderBy(x => x.Role).ThenBy(x => x.DisplayName),
             _ => listQuery.SortDescending
                 ? query.OrderByDescending(x => x.DisplayName).ThenBy(x => x.Email)
                 : query.OrderBy(x => x.DisplayName).ThenBy(x => x.Email)
@@ -69,7 +69,7 @@ public sealed class ApplicationUserManagementService(
 
     public async Task<OperationResult> CreateAsync(CreateApplicationUserCommand command)
     {
-        var validationError = Validate(command.DisplayName, command.Role);
+        var validationError = Validate(command.DisplayName, command.Roles);
         if (validationError is not null)
             return validationError;
 
@@ -78,6 +78,11 @@ public sealed class ApplicationUserManagementService(
 
         if (string.IsNullOrWhiteSpace(command.Password))
             return OperationError.Invalid("Укажите начальный пароль пользователя.");
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
         var email = command.Email.Trim();
         var user = new ApplicationUser
@@ -93,30 +98,45 @@ public sealed class ApplicationUserManagementService(
         if (!createResult.Succeeded)
             return ToOperationError(createResult, "Не удалось создать пользователя");
 
-        var roleResult = await userManager.AddToRoleAsync(user, command.Role);
-        if (roleResult.Succeeded)
-            return OperationResult.Success();
+        var roleResult = await userManager.AddToRolesAsync(user, command.Roles.Distinct());
+        if (!roleResult.Succeeded)
+            return ToOperationError(roleResult, "Не удалось назначить роли пользователю");
 
-        await userManager.DeleteAsync(user);
-        return ToOperationError(roleResult, "Не удалось назначить роль пользователю");
+        await transaction.CommitAsync();
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> UpdateAsync(UpdateApplicationUserCommand command)
     {
-        var validationError = Validate(command.DisplayName, command.Role);
+        var validationError = Validate(command.DisplayName, command.Roles);
         if (validationError is not null)
             return validationError;
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        // Serialize user administration before reading membership: concurrent demotions
+        // must not each observe the other administrator as still active.
+        await dbContext.Roles.FromSqlInterpolated($"""
+            SELECT * FROM [AspNetRoles] WITH (UPDLOCK, HOLDLOCK)
+            WHERE [NormalizedName] = {ApplicationRoles.Administrator.ToUpperInvariant()}
+            """).LoadAsync();
 
         var user = await userManager.FindByIdAsync(command.UserId);
         if (user is null)
             return OperationError.NotFound($"Пользователь {command.UserId} не найден.");
 
         var currentRoles = await userManager.GetRolesAsync(user);
-        var currentRole = currentRoles.FirstOrDefault(ApplicationRoles.All.Contains);
-        var securityChanged = currentRole != command.Role || IsBlocked(user) != command.IsBlocked;
-        var removesAdministrator = currentRole == ApplicationRoles.Administrator
-            && command.Role != ApplicationRoles.Administrator;
-        var blocksActiveAdministrator = currentRole == ApplicationRoles.Administrator
+        var requestedRoles = command.Roles.ToHashSet(StringComparer.Ordinal);
+        var currentWmsRoles = currentRoles.Where(ApplicationRoles.All.Contains).ToHashSet(StringComparer.Ordinal);
+        var rolesChanged = !currentWmsRoles.SetEquals(requestedRoles);
+        var securityChanged = rolesChanged || IsBlocked(user) != command.IsBlocked;
+        var isAdministrator = currentWmsRoles.Contains(ApplicationRoles.Administrator);
+        var removesAdministrator = isAdministrator
+            && !requestedRoles.Contains(ApplicationRoles.Administrator);
+        var blocksActiveAdministrator = isAdministrator
             && command.IsBlocked
             && !IsBlocked(user);
 
@@ -127,7 +147,7 @@ public sealed class ApplicationUserManagementService(
         }
 
         if ((removesAdministrator || blocksActiveAdministrator)
-            && !await HasAnotherActiveAdministratorAsync(user.Id))
+            && !await HasAnotherActiveAdministratorAsync(userManager, user.Id))
         {
             return OperationError.Invalid(
                 "Нельзя заблокировать или понизить последнего активного администратора.");
@@ -138,18 +158,22 @@ public sealed class ApplicationUserManagementService(
         if (!updateResult.Succeeded)
             return ToOperationError(updateResult, "Не удалось обновить пользователя");
 
-        if (currentRole != command.Role)
+        if (rolesChanged)
         {
-            var addRoleResult = await userManager.AddToRoleAsync(user, command.Role);
-            if (!addRoleResult.Succeeded)
-                return ToOperationError(addRoleResult, "Не удалось назначить роль пользователю");
+            var addedRoles = requestedRoles.Except(currentWmsRoles).ToArray();
+            if (addedRoles.Length > 0)
+            {
+                var addRoleResult = await userManager.AddToRolesAsync(user, addedRoles);
+                if (!addRoleResult.Succeeded)
+                    return ToOperationError(addRoleResult, "Не удалось назначить роли пользователю");
+            }
 
-            var obsoleteRoles = currentRoles.Where(ApplicationRoles.All.Contains).ToArray();
+            var obsoleteRoles = currentWmsRoles.Except(requestedRoles).ToArray();
             if (obsoleteRoles.Length > 0)
             {
                 var removeRoleResult = await userManager.RemoveFromRolesAsync(user, obsoleteRoles);
                 if (!removeRoleResult.Succeeded)
-                    return ToOperationError(removeRoleResult, "Не удалось снять прежнюю роль пользователя");
+                    return ToOperationError(removeRoleResult, "Не удалось снять прежние роли пользователя");
             }
         }
 
@@ -165,10 +189,12 @@ public sealed class ApplicationUserManagementService(
                 return ToOperationError(securityStampResult, "Не удалось обновить сессию пользователя");
         }
 
+        await transaction.CommitAsync();
         return OperationResult.Success();
     }
 
-    private async Task<bool> HasAnotherActiveAdministratorAsync(string excludedUserId)
+    private static async Task<bool> HasAnotherActiveAdministratorAsync(
+        UserManager<ApplicationUser> userManager, string excludedUserId)
     {
         var administrators = await userManager.GetUsersInRoleAsync(ApplicationRoles.Administrator);
         return administrators.Any(x => x.Id != excludedUserId && !IsBlocked(x));
@@ -177,7 +203,7 @@ public sealed class ApplicationUserManagementService(
     private static bool IsBlocked(ApplicationUser user) =>
         user.LockoutEnd is DateTimeOffset lockoutEnd && lockoutEnd > DateTimeOffset.UtcNow;
 
-    private static OperationError? Validate(string displayName, string role)
+    private static OperationError? Validate(string displayName, string[]? roles)
     {
         if (string.IsNullOrWhiteSpace(displayName))
             return OperationError.Invalid("Укажите отображаемое имя пользователя.");
@@ -186,7 +212,10 @@ public sealed class ApplicationUserManagementService(
             return OperationError.Invalid(
                 $"Отображаемое имя не должно превышать {ApplicationUser.DisplayNameMaxLength} символов.");
 
-        if (!ApplicationRoles.All.Contains(role))
+        if (roles is null || roles.Length == 0)
+            return OperationError.Invalid("Выберите хотя бы одну роль пользователя.");
+
+        if (roles.Any(role => !ApplicationRoles.All.Contains(role)))
             return OperationError.Invalid("Выбрана неизвестная роль пользователя.");
 
         return null;

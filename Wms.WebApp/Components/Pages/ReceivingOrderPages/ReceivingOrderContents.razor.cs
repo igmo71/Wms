@@ -17,11 +17,20 @@ public partial class ReceivingOrderContents
     public bool ShowCurrentPlan { get; set; }
 
     [Parameter]
-    public string CurrentPlanTitle { get; set; } = "Актуальный план 1С";
-
-    [Parameter]
     public Func<ReceivingOrderItem, decimal?>? CurrentPlanQuantity { get; set; }
 
+    private bool _showSeparatePlans;
+    private string PlanColumnTitle => _showSeparatePlans ? "План WMS" : "План";
+    private object? OpenPalletBadge
+    {
+        get
+        {
+            int count = Order.LicensePlateNumbers.Count(x => x.Status == LicensePlateNumberStatus.Open);
+            if (count == 0)
+                return null;
+            return count;
+        }
+    }
     private Guid? _selectedPalletId;
 
     private IReadOnlyList<LicensePlateNumber> OrderedPallets => Order.LicensePlateNumbers
@@ -32,14 +41,12 @@ public partial class ReceivingOrderContents
     private LicensePlateNumber? SelectedPallet => Order.LicensePlateNumbers
         .SingleOrDefault(x => x.Id == _selectedPalletId);
 
-    private string ParticipantsText => Order.Participants.Count == 0
-        ? "К ордеру ещё никто не присоединился."
-        : string.Join(" · ", Order.Participants
-            .OrderBy(x => x.JoinedAtUtc)
-            .Select(x => $"{GetUserName(x.UserId)} — {x.JoinedAtUtc:dd.MM.yyyy HH:mm}"));
-
     protected override void OnParametersSet()
     {
+        _showSeparatePlans = ShowCurrentPlan
+            && (CurrentPlanQuantity is null
+                || Order.Items.Any(item => CurrentPlanQuantity(item) != item.PlanQuantity));
+
         if (_selectedPalletId is Guid selectedId
             && Order.LicensePlateNumbers.Any(x => x.Id == selectedId))
         {
@@ -76,11 +83,14 @@ public partial class ReceivingOrderContents
     };
 
     private static string FormatQuantity(decimal? quantity, string emptyText = "—") =>
-        quantity?.ToString("0.###") ?? emptyText;
+        quantity?.ToString("N3") ?? emptyText;
 
-    private static string UnitName(LicensePlateNumberItem item) =>
-        item.StockKeepingUnit?.BaseUnitOfMeasure?.Description
-        ?? item.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation
+    private static string UnitName(LicensePlateNumberItem item) => UnitName(item.StockKeepingUnit);
+
+    private static string UnitName(StockKeepingUnit? sku) =>
+        sku?.BaseUnitOfMeasure?.Description
+        ?? sku?.BaseUnitOfMeasure?.Abbreviation
+        ?? sku?.BaseUnitOfMeasure?.Name
         ?? "—";
 
     private static string Destination(LicensePlateNumberPutaway putaway) =>

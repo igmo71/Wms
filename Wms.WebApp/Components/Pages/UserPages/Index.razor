@@ -45,9 +45,9 @@
     <Columns>
         <PropertyColumn Property="x => x.DisplayName" Title="Отображаемое имя" Sortable="true" />
         <PropertyColumn Property="x => x.Email" Title="Email" Sortable="true" />
-        <PropertyColumn Property="x => x.Role" Title="Роль" Sortable="true">
-            <CellTemplate>@GetRoleName(context.Item.Role)</CellTemplate>
-        </PropertyColumn>
+        <TemplateColumn Title="Роли" Sortable="false">
+            <CellTemplate>@string.Join(", ", context.Item.Roles.Select(GetRoleName))</CellTemplate>
+        </TemplateColumn>
         <TemplateColumn Title="Статус" Sortable="false">
             <CellTemplate>
                 <MudChip T="string"

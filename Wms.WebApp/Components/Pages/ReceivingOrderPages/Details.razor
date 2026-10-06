@@ -1,9 +1,7 @@
 @page "/receiving-orders/{Id:guid}"
-@using Wms.Common
-@using Wms.Domain
 @using Wms.Domain.Enums
 
-<PageTitle>Детали приходного ордера</PageTitle>
+<PageTitle>Приходный ордер</PageTitle>
 
 @if (_isLoading)
 {
@@ -13,151 +11,11 @@ else if (_order is null)
 {
     <MudAlert Severity="Severity.Warning">Приходный ордер не найден.</MudAlert>
 }
+else if (_order.Status == ReceivingOrderStatus.InReceiving)
+{
+    <ReceivingInProgressView Id="Id" OnCompleted="ReloadAfterCompletionAsync" />
+}
 else
 {
-    <MudStack Spacing="2">
-        <MudAlert Severity="Severity.Info">Приёмка и независимое размещение LPN выполняются на ТСД. Web показывает происхождение и историю операций.</MudAlert>
-        <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Приходный ордер @_order.Number от @_order.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
-            <MudSpacer />
-            @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving || _pendingStart is not null)
-            {
-                <MudTooltip Text="Чтобы взять ордер в работу, выберите зону и место приёмки.">
-                    <span>
-                        <MudButton Color="Color.Primary"
-                                   Variant="Variant.Filled"
-                                   Disabled="true"
-                                   StartIcon="@Icons.Material.Filled.PlayArrow"
-                                   OnClick="SetInReceivingAsync">
-                            @(_pendingStart is null ? "Взять в работу" : "Повторить начало приёмки")
-                        </MudButton>
-                    </span>
-                </MudTooltip>
-            }
-            <MudButton Href="receiving-orders" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">
-                К списку
-            </MudButton>
-        </MudStack>
-
-        @if (_isStarting)
-        {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.caption">Отправляется запрос в 1С…</MudText>
-        }
-
-        @if (_startOrderFailed)
-        {
-            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(_synchronizationErrorMessage))
-        {
-            <MudAlert Severity="Severity.Error">@_synchronizationErrorMessage</MudAlert>
-        }
-
-        <OrderSynchronizationPanel Assessment="_synchronizationAssessment"
-                                   IsAcknowledging="@(_isAcknowledgingSynchronization || _order.Status == ReceivingOrderStatus.Received)"
-                                   ShowAcknowledgeButton="@(_order.Status != ReceivingOrderStatus.Received)"
-                                   RequiresDecisionMessage="@(_order.Status == ReceivingOrderStatus.Received
-                                       ? "Сохранённые расхождения, по которым было завершено принятие. Принятый состав неизменяем."
-                                       : "Прочитайте изменения. Подтверждение применит перечисленные значения из 1С в WMS.")"
-                                   OnAcknowledge="AcknowledgeSynchronizationAsync"
-                                   AcknowledgedBy="@GetUserName(_order.SynchronizationAcknowledgedBy)"
-                                   AcknowledgedAtUtc="_order.SynchronizationAcknowledgedAtUtc" />
-
-        <MudPaper Class="pa-2" Elevation="0" Outlined="true">
-            <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Склад</MudText><MudText>@_order.Warehouse?.Name</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Складская операция</MudText><MudText>@_order.WarehouseOperation.GetDisplayName()</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Отправитель</MudText><MudText>@PartyDisplay.Format(_order.Shipper, _order.ShipperId, _order.ShipperType)</MudText></MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Статус</MudText><MudChip T="string" Size="Size.Small" Color="@_order.Status.GetChipColor()">@_order.Status.GetDisplayName()</MudChip></MudItem>
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Очередь</MudText>
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        <MudIcon Icon="@_order.Queue.GetIcon()" Size="Size.Small" />
-                        <MudText>@_order.Queue.GetDisplayName()</MudText>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-            <MudDivider Class="my-1" />
-            <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Зона приёмки</MudText>
-                    @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
-                    {
-                        <MudAutocomplete T="Zone"
-                                         Disabled="true"
-                                         Value="_receivingZone"
-                                         ValueChanged="OnReceivingZoneChanged"
-                                         SearchFunc="SearchReceivingZonesAsync"
-                                         ToStringFunc="zone => zone?.Name ?? string.Empty"
-                                         Variant="Variant.Text"
-                                         Dense="true"
-                                         Margin="Margin.Dense"
-                                         Clearable="true" />
-                    }
-                    else
-                    {
-                        <MudText>@(_receivingZone?.Name ?? "—")</MudText>
-                    }
-                </MudItem>
-                <MudItem xs="12" sm="6" md="2">
-                    <MudText Typo="Typo.caption">Место приёмки</MudText>
-                    @if (_order.Status == ReceivingOrderStatus.ReadyForReceiving)
-                    {
-                        <MudAutocomplete T="StorageLocation"
-                                         Value="_receivingLocation"
-                                         ValueChanged="OnReceivingLocationChanged"
-                                         SearchFunc="SearchReceivingLocationsAsync"
-                                         ToStringFunc="StorageLocationDisplay.Format"
-                                         Disabled="true"
-                                         Variant="Variant.Text"
-                                         Dense="true"
-                                         Margin="Margin.Dense"
-                                         Clearable="true" />
-                    }
-                    else
-                    {
-                        <MudText>@StorageLocationDisplay.FormatOrDash(_receivingLocation)</MudText>
-                    }
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudTooltip Text="@(_order.Comment ?? "—")">
-                        <MudText Typo="Typo.caption">Комментарий</MudText>
-                        <MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(_order.Comment ?? "—")</MudText>
-                    </MudTooltip>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(_order.KnownFactWeightKg, _order.IsFactWeightComplete)</MudText></MudItem>
-            </MudGrid>
-            <MudDivider Class="my-1" />
-            <MudGrid Spacing="2">
-                <DocumentOperationInfo Title="Взял в работу" UserName="@GetUserName(_order.StartedBy)" Timestamp="_order.StartedAtUtc" />
-                <DocumentOperationInfo Title="Принял" UserName="@GetUserName(_order.CompletedBy)" Timestamp="_order.CompletedAtUtc" />
-                @if (_order.CompletionApprovedAtUtc is not null)
-                {
-                    <DocumentOperationInfo Title="Подтвердил расхождение" UserName="@GetUserName(_order.CompletionApprovedBy)" Timestamp="_order.CompletionApprovedAtUtc" />
-                }
-            </MudGrid>
-        </MudPaper>
-
-        @if (_order.CompletionApprovedAtUtc is not null)
-        {
-            <MudAlert Severity="Severity.Info">
-                Причина решения Manager: @_order.CompletionApprovalReason
-            </MudAlert>
-        }
-
-        <ReceivingOrderContents Order="_order"
-                                UserNames="_userNames"
-                                ShowCurrentPlan="@(_order.Status == ReceivingOrderStatus.Received)"
-                                CurrentPlanTitle="Актуальный план при завершении"
-                                CurrentPlanQuantity="CompletionCurrentPlanQuantity" />
-
-        @if (_order.Status == ReceivingOrderStatus.Received
-            && !_order.LicensePlateNumbers.SelectMany(x => x.Items).Any(x => !x.IsDeleted && x.Quantity > 0))
-        {
-            <MudAlert Severity="Severity.Warning">Размещение недоступно: в ордере отсутствует фактически принятое количество.</MudAlert>
-        }
-
-    </MudStack>
+    <ReceivingOrderDetailsView Id="Id" />
 }

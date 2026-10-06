@@ -12,10 +12,13 @@
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="№" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="Исходный план" />
-                @if (ShowCurrentPlan)
+                <TemplateColumn Title="Ед изм">
+                    <CellTemplate>@UnitName(context.Item.StockKeepingUnit)</CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.PlanQuantity" Title="@PlanColumnTitle" Format="N3" />
+                @if (_showSeparatePlans)
                 {
-                    <TemplateColumn Title="@CurrentPlanTitle">
+                    <TemplateColumn Title="План 1С">
                         <CellTemplate>@FormatQuantity(CurrentPlanQuantity?.Invoke(context.Item))</CellTemplate>
                     </TemplateColumn>
                 }
@@ -33,7 +36,10 @@
         </MudDataGrid>
     </MudTabPanel>
 
-    <MudTabPanel Text="Палеты" Disabled="@(Order.LicensePlateNumbers.Count == 0)">
+    <MudTabPanel Text="Палеты"
+                 BadgeData="@OpenPalletBadge"
+                 BadgeColor="Color.Warning"
+                 Disabled="@(Order.LicensePlateNumbers.Count == 0)">
         @if (Order.LicensePlateNumbers.Count == 0)
         {
             <MudText Class="pa-3">К ордеру не привязаны палеты.</MudText>
@@ -83,7 +89,7 @@
                                              Dense="true">
                                     <Columns>
                                         <TemplateColumn Title="Номенклатура"><CellTemplate>@context.Item.StockKeepingUnit?.Name</CellTemplate></TemplateColumn>
-                                        <TemplateColumn Title="Единица"><CellTemplate>@UnitName(context.Item)</CellTemplate></TemplateColumn>
+                                        <TemplateColumn Title="Ед изм"><CellTemplate>@UnitName(context.Item)</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Состояние"><CellTemplate>@(context.Item.IsDeleted ? "Удалено" : "В составе")</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
@@ -118,8 +124,3 @@
         }
     </MudTabPanel>
 </MudTabs>
-
-<MudPaper Class="pa-2 mt-2" Elevation="0" Outlined="true">
-    <MudText Typo="Typo.caption">Участники приёмки</MudText>
-    <MudText Typo="Typo.body2">@ParticipantsText</MudText>
-</MudPaper>

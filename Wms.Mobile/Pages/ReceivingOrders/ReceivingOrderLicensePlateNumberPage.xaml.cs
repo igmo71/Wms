@@ -32,6 +32,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     }
 
     public IReadOnlyList<ReceivingOrderLpnSkuRow> Rows { get; private set; } = [];
+    public IReadOnlyList<ReceivingOrderPlannedSkuRow> PlannedSkuRows { get; private set; } = [];
 
     private MobileReceivingOrderLicensePlateNumberResponse LicensePlateNumber =>
         _details?.LicensePlateNumbers.SingleOrDefault(x => x.Id == _lpnId)
@@ -148,8 +149,64 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             await OpenQuantityPageAsync(skuId);
     }
 
+    private async void OnManualSkuClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _details is null || !LicensePlateNumber.CanEdit)
+            return;
+
+        if (ManualSkuPanel.IsVisible)
+        {
+            HideManualSkuSelection();
+            return;
+        }
+
+        ManualSkuPanel.IsVisible = true;
+        ManualSkuButton.Text = "Скрыть выбор товара";
+        ManualSkuSearch.Text = string.Empty;
+        UpdatePlannedSkuRows();
+        await LpnScrollView.ScrollToAsync(0, 0, false);
+    }
+
+    internal void HideManualSkuSelection()
+    {
+        ManualSkuSearch.Unfocus();
+        ManualSkuPanel.IsVisible = false;
+        ManualSkuButton.Text = "Выбрать товар из ордера";
+    }
+
+    private void OnManualSkuSearchChanged(object? sender, TextChangedEventArgs e) =>
+        UpdatePlannedSkuRows();
+
+    private void UpdatePlannedSkuRows()
+    {
+        var search = ManualSkuSearch.Text?.Trim();
+        var candidates = (_details?.Lines ?? [])
+            .GroupBy(line => line.StockKeepingUnitId)
+            .Select(group => group.First())
+            .OrderBy(line => line.SkuName)
+            .ThenBy(line => line.SkuCode)
+            .Where(line => string.IsNullOrEmpty(search)
+                || line.SkuName.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || line.SkuCode.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        PlannedSkuRows = candidates.Take(50)
+            .Select(line => new ReceivingOrderPlannedSkuRow(
+                line.StockKeepingUnitId, line.SkuName, line.SkuCode))
+            .ToArray();
+        ManualSkuHint.Text = candidates.Length > 50
+            ? $"Показаны первые 50 из {candidates.Length}. Уточните поиск."
+            : candidates.Length == 0 ? "Товар не найден в плане ордера." : string.Empty;
+        OnPropertyChanged(nameof(PlannedSkuRows));
+    }
+
     private async Task OpenQuantityPageAsync(Guid skuId)
     {
+        if (_process.HasPendingCommand || _details is null || !LicensePlateNumber.CanEdit
+            || !_details.Lines.Any(line => line.StockKeepingUnitId == skuId))
+            return;
+
+        ManualSkuSearch.Unfocus();
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberQuantityPage>();
         page.Show(_orderId, _lpnId, skuId, _process);
         await Navigation.PushAsync(page);
@@ -294,6 +351,11 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private void ApplyDetails()
     {
         var lpn = LicensePlateNumber;
+        if (!lpn.CanEdit && ManualSkuPanel.IsVisible)
+            HideManualSkuSelection();
+        ManualSkuButton.IsVisible = lpn.CanEdit;
+        if (ManualSkuPanel.IsVisible)
+            UpdatePlannedSkuRows();
         Title = lpn.Code;
         StatusLabel.Text = $"{lpn.StatusName} · {lpn.ResponsibleUserName}";
         InstructionLabel.Text = lpn.CanEdit
@@ -366,6 +428,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         CloseButton.IsEnabled = !busy && !_process.HasPendingCommand;
         ReopenButton.IsEnabled = !busy && !_process.HasPendingCommand;
         CancelButton.IsEnabled = !busy && !_process.HasPendingCommand;
+        ManualSkuButton.IsEnabled = !busy && !_process.HasPendingCommand;
         UpdateRecoveryControls();
     }
 
@@ -398,3 +461,8 @@ public sealed record ReceivingOrderLpnSkuRow(
     string SkuName,
     string PlanText,
     string QuantityText);
+
+public sealed record ReceivingOrderPlannedSkuRow(
+    Guid StockKeepingUnitId,
+    string SkuName,
+    string SkuCode);
