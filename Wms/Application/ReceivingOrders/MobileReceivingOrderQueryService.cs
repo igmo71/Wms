@@ -25,13 +25,9 @@ public sealed class MobileReceivingOrderQueryService(
             .AsSplitQuery()
             .ToListAsync(ct);
 
-        var movements = await LoadDraftMovementsAsync(
-            dbContext,
-            orders.Select(x => x.Id),
-            ct);
         var shippers = await LoadShippersAsync(orders, ct);
         var summaries = orders
-            .Select(order => MapSummary(order, movements, shippers, userId))
+            .Select(order => MapSummary(order, shippers, userId))
             .ToList();
 
         return new MobileReceivingOrderWorkQueue(
@@ -77,13 +73,12 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
-        if (requireMobileWork && !IsMobileWork(order))
+        if (requireMobileWork && !IsReceivingWork(order))
         {
             return OperationError.Invalid(
                 "Для приходного ордера нет доступного мобильного действия.");
         }
 
-        var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
         var shippers = await LoadShippersAsync([order], ct);
         var lpnUserIds = order.LicensePlateNumbers
             .SelectMany(x => new[] { x.ResponsibleUserId, x.CreatedBy, x.ClosedBy, x.ReopenedBy }
@@ -104,7 +99,7 @@ public sealed class MobileReceivingOrderQueryService(
                           && (role.Name == ApplicationRoles.Manager
                               || role.Name == ApplicationRoles.Administrator)
                       select role.Id).AnyAsync(ct);
-        return MapDetails(order, movements, shippers, userId, canManage, lpnUserNames);
+        return MapDetails(order, shippers, userId, canManage, lpnUserNames);
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> ResolveDocumentAsync(
@@ -148,25 +143,20 @@ public sealed class MobileReceivingOrderQueryService(
             return workResult.Error!;
         }
 
-        var work = workResult.Value!;
-        var context = work.Context;
-        var matches = work.Order.Items
+        var matches = workResult.Value!.Items
             .Where(x => !x.StockKeepingUnit!.DeletionMark
                 && x.StockKeepingUnit.Barcodes.Any(itemBarcode => itemBarcode.Value == barcode))
-            .Select(x => MapCandidate(x, work.AllocatedByLine, true))
-            .Where(x => IsAvailableInContext(x, context))
+            .Select(x => MapCandidate(x, true))
             .OrderBy(x => x.LineNumber)
             .ToList();
 
         return matches.Count > 0
             ? matches
             : OperationError.NotFound(
-                context == ReceivingOrderLineContext.Putaway
-                    ? "В ордере нет остатка к размещению для товара с таким штрихкодом."
-                    : "Товар с таким штрихкодом не найден в приходном ордере.");
+                "Товар с таким штрихкодом не найден в приходном ордере.");
     }
 
-    private async Task<OperationResult<ReceivingOrderLineWork>> LoadLineWorkAsync(
+    private async Task<OperationResult<ReceivingOrder>> LoadLineWorkAsync(
         Guid orderId,
         CancellationToken ct)
     {
@@ -179,25 +169,12 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
         }
 
-        var context = order.Status switch
-        {
-            ReceivingOrderStatus.InReceiving =>
-                ReceivingOrderLineContext.Receiving,
-            ReceivingOrderStatus.Received when order.PutawayStatus == PutawayStatus.InProgress =>
-                ReceivingOrderLineContext.Putaway,
-            _ => (ReceivingOrderLineContext?)null
-        };
-        if (context is null)
+        if (order.Status != ReceivingOrderStatus.InReceiving)
         {
             return OperationError.Invalid(
-                "Выбор товара доступен только во время приёмки или размещения ордера.");
+                "Выбор товара доступен только во время приёмки ордера.");
         }
-
-        var movements = await LoadDraftMovementsAsync(dbContext, [order.Id], ct);
-        return new ReceivingOrderLineWork(
-            order,
-            context.Value,
-            BuildAllocatedByLine(movements));
+        return order;
     }
 
     private static IQueryable<ReceivingOrder> BaseOrderQuery(ApplicationDbContext dbContext) =>
@@ -229,30 +206,6 @@ public sealed class MobileReceivingOrderQueryService(
             .Include(x => x.Items)
             .Include(x => x.Participants);
 
-    private static Task<List<InventoryMovement>> LoadDraftMovementsAsync(
-        ApplicationDbContext dbContext,
-        IEnumerable<Guid> orderIds,
-        CancellationToken ct)
-    {
-        var ids = orderIds.Distinct().ToArray();
-        if (ids.Length == 0)
-        {
-            return Task.FromResult(new List<InventoryMovement>());
-        }
-
-        return dbContext.InventoryMovements
-            .AsNoTracking()
-            .Include(x => x.DestinationStorageLocation)
-                .ThenInclude(x => x!.Zone)
-            .Where(x => x.PostedAtUtc == null
-                && x.RecorderType == RecorderType.ReceivingOrder
-                && x.RecorderId != null
-                && ids.Contains(x.RecorderId.Value))
-            .OrderBy(x => x.CreatedAtUtc)
-            .ThenBy(x => x.Id)
-            .ToListAsync(ct);
-    }
-
     private async Task<IReadOnlyDictionary<PartyReference, PartyInfo>> LoadShippersAsync(
         IReadOnlyCollection<ReceivingOrder> orders,
         CancellationToken ct) =>
@@ -262,22 +215,14 @@ public sealed class MobileReceivingOrderQueryService(
 
     private static MobileReceivingOrderDetails MapDetails(
         ReceivingOrder order,
-        IReadOnlyCollection<InventoryMovement> movements,
         IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
         string userId,
         bool canManage,
         IReadOnlyDictionary<string, string> userNames)
     {
-        var orderMovements = movements
-            .Where(x => x.RecorderId == order.Id)
-            .ToList();
-        var allocatedByLine = BuildAllocatedByLine(orderMovements);
         var lines = order.Items
             .OrderBy(x => x.LineNumber)
-            .Select(item => MapLine(item, allocatedByLine))
-            .ToList();
-        var mappedMovements = orderMovements
-            .Select(MapMovement)
+            .Select(MapLine)
             .ToList();
         var lpns = order.LicensePlateNumbers
             .OrderByDescending(x => x.CreatedAtUtc)
@@ -326,9 +271,8 @@ public sealed class MobileReceivingOrderQueryService(
             .ToList();
 
         return new MobileReceivingOrderDetails(
-            MapSummary(order, orderMovements, shippers, userId),
+            MapSummary(order, shippers, userId),
             lines,
-            mappedMovements,
             lpns);
     }
 
@@ -341,14 +285,9 @@ public sealed class MobileReceivingOrderQueryService(
 
     private static MobileReceivingOrderSummary MapSummary(
         ReceivingOrder order,
-        IReadOnlyCollection<InventoryMovement> movements,
         IReadOnlyDictionary<PartyReference, PartyInfo> shippers,
         string userId)
     {
-        var orderMovements = movements
-            .Where(x => x.RecorderId == order.Id)
-            .ToList();
-        var allocatedByLine = BuildAllocatedByLine(orderMovements);
         var shipperReference = new PartyReference(order.ShipperId, order.ShipperType);
         shippers.TryGetValue(shipperReference, out var shipper);
         OperationResult eligibility = order.ValidateReceivingParticipationEligibility();
@@ -367,22 +306,16 @@ public sealed class MobileReceivingOrderQueryService(
             order.WarehouseOperation,
             order.BusinessOperation,
             order.Status,
-            order.PutawayStatus,
             order.SynchronizationLevel,
             order.Comment,
             order.ReceivingLocation is null ? null : MapLocation(order.ReceivingLocation),
             order.Items.Count,
             order.Items.Count(x => x.IsFactConfirmed),
             order.Items.Count(x => x.FactQuantity > 0),
-            order.Items.Count(item => item.FactQuantity > 0
-                && GetAllocatedQuantity(allocatedByLine, item.LineNumber) == item.FactQuantity),
             order.Items.Sum(x => x.PlanQuantity),
             order.Items.Sum(x => x.FactQuantity ?? 0),
-            orderMovements.Sum(x => x.Quantity),
             order.StartedAtUtc,
             order.CompletedAtUtc,
-            order.PutawayStartedAtUtc,
-            order.PutawayCompletedAtUtc,
             isParticipant,
             !isParticipant
                 && order.Status is ReceivingOrderStatus.ReadyForReceiving or ReceivingOrderStatus.InReceiving
@@ -393,12 +326,7 @@ public sealed class MobileReceivingOrderQueryService(
                 : eligibility.Error?.Message ?? "Ордер заблокирован расхождениями с 1С.");
     }
 
-    private static MobileReceivingOrderLine MapLine(
-        ReceivingOrderItem item,
-        IReadOnlyDictionary<int, decimal> allocatedByLine)
-    {
-        var allocatedQuantity = GetAllocatedQuantity(allocatedByLine, item.LineNumber);
-        return new MobileReceivingOrderLine(
+    private static MobileReceivingOrderLine MapLine(ReceivingOrderItem item) => new(
             item.LineNumber,
             item.StockKeepingUnitId,
             item.StockKeepingUnit?.Code ?? string.Empty,
@@ -406,30 +334,12 @@ public sealed class MobileReceivingOrderQueryService(
             GetUnitOfMeasure(item.StockKeepingUnit),
             item.PlanQuantity,
             item.FactQuantity,
-            allocatedQuantity,
-            item.FactQuantity is decimal factQuantity
-                ? Math.Max(0, factQuantity - allocatedQuantity)
-                : null,
             item.Comment);
-    }
-
-    private static MobileReceivingOrderMovement MapMovement(InventoryMovement movement) => new(
-        movement.Id,
-        movement.RecorderLineNumber!.Value,
-        movement.StockKeepingUnitId,
-        movement.Quantity,
-        MapLocation(movement.DestinationStorageLocation!),
-        movement.CreatedAtUtc,
-        movement.UpdatedAtUtc,
-        movement.PostedAtUtc);
 
     private static MobileReceivingOrderLineCandidate MapCandidate(
         ReceivingOrderItem item,
-        IReadOnlyDictionary<int, decimal> allocatedByLine,
         bool isExactMatch)
-    {
-        var allocatedQuantity = GetAllocatedQuantity(allocatedByLine, item.LineNumber);
-        return new MobileReceivingOrderLineCandidate(
+        => new MobileReceivingOrderLineCandidate(
             item.LineNumber,
             item.StockKeepingUnitId,
             item.StockKeepingUnit?.Code ?? string.Empty,
@@ -437,12 +347,7 @@ public sealed class MobileReceivingOrderQueryService(
             GetUnitOfMeasure(item.StockKeepingUnit),
             item.PlanQuantity,
             item.FactQuantity,
-            allocatedQuantity,
-            item.FactQuantity is decimal factQuantity
-                ? Math.Max(0, factQuantity - allocatedQuantity)
-                : null,
             isExactMatch);
-    }
 
     private static MobileReceivingOrderLocation MapLocation(StorageLocation location) => new(
         location.Id,
@@ -450,30 +355,6 @@ public sealed class MobileReceivingOrderQueryService(
         $"{location.Zone?.Code}-{location.Code}",
         location.ZoneId,
         location.Zone?.Name ?? string.Empty);
-
-    private static Dictionary<int, decimal> BuildAllocatedByLine(
-        IEnumerable<InventoryMovement> movements) =>
-        movements
-            .Where(x => x.RecorderLineNumber.HasValue)
-            .GroupBy(x => x.RecorderLineNumber!.Value)
-            .ToDictionary(x => x.Key, x => x.Sum(movement => movement.Quantity));
-
-    private static decimal GetAllocatedQuantity(
-        IReadOnlyDictionary<int, decimal> allocatedByLine,
-        int lineNumber) =>
-        allocatedByLine.TryGetValue(lineNumber, out var quantity) ? quantity : 0;
-
-    private static bool IsAvailableInContext(
-        MobileReceivingOrderLineCandidate candidate,
-        ReceivingOrderLineContext context) =>
-        context == ReceivingOrderLineContext.Receiving
-            || candidate.RemainingPutawayQuantity > 0;
-
-    private static bool IsExactMatch(StockKeepingUnit sku, string term) =>
-        string.Equals(sku.Code, term, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(sku.Name, term, StringComparison.OrdinalIgnoreCase)
-        || sku.Barcodes.Any(barcode =>
-            string.Equals(barcode.Value, term, StringComparison.OrdinalIgnoreCase));
 
     private static string? GetUnitOfMeasure(StockKeepingUnit? sku) =>
         sku?.BaseUnitOfMeasure?.Description
@@ -489,33 +370,7 @@ public sealed class MobileReceivingOrderQueryService(
             .ThenBy(x => x.Id)
             .ToList();
 
-    private static bool IsMobileWork(ReceivingOrder order) =>
-        IsReceivingWork(order) || IsPutawayWork(order);
-
     private static bool IsReceivingWork(ReceivingOrder order) =>
         order.Status is ReceivingOrderStatus.ReadyForReceiving or ReceivingOrderStatus.InReceiving;
 
-    private static bool IsReceivingWork(ReceivingOrderStatus status) =>
-        status is ReceivingOrderStatus.ReadyForReceiving
-            or ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired;
-
-    private static bool IsReceivingEditing(ReceivingOrderStatus status) =>
-        status is ReceivingOrderStatus.InReceiving
-            or ReceivingOrderStatus.ProcessingRequired;
-
-    private static bool IsPutawayWork(ReceivingOrder order) =>
-        order.Status == ReceivingOrderStatus.Received
-        && order.PutawayStatus is PutawayStatus.Pending or PutawayStatus.InProgress;
-
-    private static bool IsPutawayWork(
-        ReceivingOrderStatus status,
-        PutawayStatus putawayStatus) =>
-        status == ReceivingOrderStatus.Received
-        && putawayStatus is PutawayStatus.Pending or PutawayStatus.InProgress;
-
-    private sealed record ReceivingOrderLineWork(
-        ReceivingOrder Order,
-        ReceivingOrderLineContext Context,
-        IReadOnlyDictionary<int, decimal> AllocatedByLine);
 }

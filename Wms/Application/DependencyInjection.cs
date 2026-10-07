@@ -47,8 +47,6 @@ public static class DependencyInjection
         services.AddScoped<PartyQueryService>();
         services.AddScoped<PartnerService>();
         services.AddScoped<PickingQueryService>();
-        services.AddScoped<PutawayCommandService>();
-        services.AddScoped<PutawayQueryService>();
         services.AddScoped<ReceivingOrderCommandService>();
         services.AddScoped<ReceivingOrderSynchronizationService>();
         services.AddScoped<MobileReceivingOrderQueryService>();

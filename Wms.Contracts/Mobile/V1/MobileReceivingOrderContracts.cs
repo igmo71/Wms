@@ -9,14 +9,6 @@ public enum MobileReceivingOrderStatus
     Received = 4
 }
 
-public enum MobilePutawayStatus
-{
-    Inactive = 0,
-    Pending = 1,
-    InProgress = 2,
-    Completed = 3
-}
-
 public enum MobileLicensePlateNumberStatus
 {
     Available = 0,
@@ -35,10 +27,8 @@ public sealed record MobileReceivingOrderProgressResponse(
     int TotalLineCount,
     int ConfirmedLineCount,
     int PositiveLineCount,
-    int FullyAllocatedLineCount,
     decimal PlanQuantity,
-    decimal FactQuantity,
-    decimal AllocatedQuantity);
+    decimal FactQuantity);
 
 public sealed record MobileReceivingOrderSummaryResponse(
     Guid Id,
@@ -51,15 +41,12 @@ public sealed record MobileReceivingOrderSummaryResponse(
     string WarehouseOperation,
     string BusinessOperation,
     MobileReceivingOrderStatus Status,
-    MobilePutawayStatus PutawayStatus,
     MobileOrderSynchronizationResponse Synchronization,
     string? Comment,
     MobileReceivingOrderLocationResponse? ReceivingLocation,
     MobileReceivingOrderProgressResponse Progress,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
-    DateTimeOffset? PutawayStartedAtUtc,
-    DateTimeOffset? PutawayCompletedAtUtc,
     bool IsParticipant,
     bool CanJoin,
     string? JoinBlockedReason);
@@ -73,19 +60,7 @@ public sealed record MobileReceivingOrderLineResponse(
     decimal PlanQuantity,
     decimal? FactQuantity,
     decimal? DifferenceQuantity,
-    decimal AllocatedQuantity,
-    decimal? RemainingPutawayQuantity,
     string? Comment);
-
-public sealed record MobileReceivingOrderMovementResponse(
-    Guid Id,
-    int LineNumber,
-    Guid StockKeepingUnitId,
-    decimal Quantity,
-    MobileReceivingOrderLocationResponse Destination,
-    DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? UpdatedAtUtc,
-    DateTimeOffset? PostedAtUtc);
 
 public sealed record MobileReceivingOrderLicensePlateNumberResponse(
     Guid Id,
@@ -121,7 +96,6 @@ public sealed record MobileReceivingOrderLicensePlateNumberItemResponse(
 public sealed record MobileReceivingOrderDetailsResponse(
     MobileReceivingOrderSummaryResponse Order,
     IReadOnlyList<MobileReceivingOrderLineResponse> Lines,
-    IReadOnlyList<MobileReceivingOrderMovementResponse> Movements,
     IReadOnlyList<MobileReceivingOrderLicensePlateNumberResponse> LicensePlateNumbers);
 
 public sealed record MobileReceivingOrderWorkQueueResponse(
@@ -136,8 +110,6 @@ public sealed record MobileReceivingOrderLineCandidateResponse(
     string? UnitOfMeasure,
     decimal PlanQuantity,
     decimal? FactQuantity,
-    decimal AllocatedQuantity,
-    decimal? RemainingPutawayQuantity,
     bool IsExactMatch);
 
 public sealed record MobileResolveReceivingOrderDocumentRequest(

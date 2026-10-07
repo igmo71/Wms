@@ -78,19 +78,6 @@
                 </MudSelectItem>
             }
         </MudSelect>
-        <MudSelect T="PutawayStatus?"
-                   Label="Статус размещения"
-                   Value="_putawayStatus"
-                   ValueChanged="OnPutawayStatusChangedAsync"
-                   Clearable="true"
-                   Class="ml-4">
-            @foreach (var status in Enum.GetValues<PutawayStatus>())
-            {
-                <MudSelectItem T="PutawayStatus?" Value="@((PutawayStatus?)status)">
-                    @status.GetDisplayName()
-                </MudSelectItem>
-            }
-        </MudSelect>
         <MudSpacer />
     </MudStack>
 </MudPaper>
@@ -129,9 +116,6 @@
         <TemplateColumn Title="Отправитель" Sortable="false">
             <CellTemplate>@PartyDisplay.Format(context.Item.Shipper, context.Item.ShipperId, context.Item.ShipperType)</CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.PutawayStatus" Title="Размещение">
-            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.PutawayStatus.GetChipColor()">@context.Item.PutawayStatus.GetDisplayName()</MudChip></CellTemplate>
-        </PropertyColumn>
         <TemplateColumn Title="Сверка" Sortable="false">
             <CellTemplate>
                 @if (context.Item.Status == ReceivingOrderStatus.Received
@@ -155,12 +139,6 @@
             <CellTemplate>
                 <MudText Typo="Typo.body2">@GetUserName(context.Item.CompletedBy)</MudText>
                 <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.CompletedAtUtc)</MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Размещено" SortBy="x => x.PutawayCompletedAtUtc">
-            <CellTemplate>
-                <MudText Typo="Typo.body2">@GetUserName(context.Item.PutawayCompletedBy)</MudText>
-                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.PutawayCompletedAtUtc)</MudText>
             </CellTemplate>
         </TemplateColumn>
     </Columns>

@@ -13,10 +13,9 @@ from the future delivery areas below.
 
 ## Future delivery areas
 
-Review receiving and putaway models for obsolete fields and methods before
-removing them. Trace each candidate through persistence, integration, audit,
-and supported UI/API paths. In particular, legacy order-level putaway status
-still appears in Web and Mobile order views and API responses.
+Review remaining receiving and putaway models for obsolete fields and methods
+before removing them. Trace each candidate through persistence, integration,
+audit, and supported UI/API paths.
 
 Later, review quantity presentation across the entire Web and Mobile UI:
 find inconsistent precision and missing units, consider compact TSD layouts,

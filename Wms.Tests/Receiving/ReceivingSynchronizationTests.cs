@@ -18,7 +18,11 @@ public sealed class ReceivingSynchronizationTests
         var order = Value(ReceivingOrder.Create(source, now));
         Success(order.SetReceivingLocation(Guid.NewGuid()));
         Success(order.SetInReceiving(now, "synchronization"));
-        Success(order.UpdateItemFact(1, 15m, "Shortage note"));
+        Success(order.JoinReceiving(now, "synchronization"));
+        var lpn = Value(LicensePlateNumberBatch.Issue(1, "synchronization", now)).Labels.Single();
+        Value(order.OpenOrCreateLicensePlateNumber(lpn, now, "synchronization"));
+        Success(order.SetLicensePlateNumberItemQuantity(
+            lpn, source.Items.Single().StockKeepingUnitId, 15m, now, "synchronization", false));
         var sourceItem = source.Items.Single();
 
         var target = source with

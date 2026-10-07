@@ -30,22 +30,18 @@
                     <MudText>@Order.Queue.GetDisplayName()</MudText>
                 </MudStack>
             </MudItem>
-            <MudItem xs="12" sm="6" md="2">
-                <MudText Typo="Typo.caption">Статус размещения</MudText>
-                <MudChip T="string" Size="Size.Small" Color="@Order.PutawayStatus.GetChipColor()">@Order.PutawayStatus.GetDisplayName()</MudChip>
-            </MudItem>
+            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(Order.KnownFactWeightKg, Order.IsFactWeightComplete)</MudText></MudItem>
         </MudGrid>
         <MudDivider Class="my-1" />
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Зона приёмки</MudText><MudText>@(Order.ReceivingLocation?.Zone?.Name ?? "—")</MudText></MudItem>
             <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Место приёмки</MudText><MudText>@StorageLocationDisplay.FormatOrDash(Order.ReceivingLocation)</MudText></MudItem>
-            <MudItem xs="12" md="6">
+            <MudItem xs="12" md="8">
                 <MudTooltip Text="@(Order.Comment ?? "—")">
                     <MudText Typo="Typo.caption">Комментарий</MudText>
                     <MudText Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@(Order.Comment ?? "—")</MudText>
                 </MudTooltip>
             </MudItem>
-            <MudItem xs="12" sm="6" md="2"><MudText Typo="Typo.caption">Фактический вес</MudText><MudText>@WeightDisplay.FormatTotal(Order.KnownFactWeightKg, Order.IsFactWeightComplete)</MudText></MudItem>
         </MudGrid>
         <MudDivider Class="my-1" />
         <MudGrid Spacing="2">
@@ -55,10 +51,21 @@
             {
                 <DocumentOperationInfo Title="Подтвердил расхождение" UserName="@GetUserName(Order.CompletionApprovedBy)" Timestamp="Order.CompletionApprovedAtUtc" />
             }
+            <MudItem xs="12" sm="6" md="@(Order.CompletionApprovedAtUtc is null ? 6 : 3)">
+                <MudText Typo="Typo.caption">Участники приёмки</MudText>
+                @if (Order.Participants.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">К ордеру ещё никто не присоединился.</MudText>
+                }
+                else
+                {
+                    @foreach (var participant in Order.Participants.OrderBy(x => x.JoinedAtUtc))
+                    {
+                        <MudText Typo="Typo.body2">@($"{GetUserName(participant.UserId)} — {participant.JoinedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}")</MudText>
+                    }
+                }
+            </MudItem>
         </MudGrid>
-        <MudDivider Class="my-1" />
-        <MudText Typo="Typo.caption">Участники приёмки</MudText>
-        <MudText Typo="Typo.body2">@ParticipantsText</MudText>
     </MudPaper>
 </MudStack>
 
@@ -67,12 +74,6 @@
     [Parameter] public IReadOnlyDictionary<string, string> UserNames { get; set; } = new Dictionary<string, string>();
     [Parameter] public string? ActionHint { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
-
-    private string ParticipantsText => Order.Participants.Count == 0
-        ? "К ордеру ещё никто не присоединился."
-        : string.Join(" · ", Order.Participants
-            .OrderBy(x => x.JoinedAtUtc)
-            .Select(x => $"{GetUserName(x.UserId)} — {x.JoinedAtUtc:dd.MM.yyyy HH:mm}"));
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"

@@ -10,6 +10,14 @@ None.
 
 ## Frozen
 
+- [Remove direct receiving fact edits](2026-10-07-remove-direct-receiving-facts/spec.md)
+  — accepted on 2026-10-07: obsolete direct line edits removed while
+  LPN-derived facts and receiving synchronization remain.
+
+- [Remove obsolete order-level putaway](2026-10-07-remove-order-putaway/spec.md)
+  — accepted on 2026-10-07: old order-level status, commands, Mobile branch and
+  database columns removed while LPN putaway remains.
+
 - [Web pallet putaway progress](2026-10-07-web-pallet-putaway-progress/spec.md)
   — accepted on 2026-10-07: read-only LPN placement progress, direct pallet
   selection from the SKU menu, and removal of the unused order-level Web view.

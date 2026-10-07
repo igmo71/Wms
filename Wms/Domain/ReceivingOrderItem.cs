@@ -66,37 +66,6 @@ public class ReceivingOrderItem
         return OperationResult.Success();
     }
 
-    internal OperationResult UpdateFact(decimal factQuantity, string? comment)
-    {
-        if (!WarehouseQuantity.IsNonNegative(factQuantity))
-        {
-            return OperationError.Invalid(
-                "Фактическое количество должно быть конечным неотрицательным числом.");
-        }
-
-        FactQuantity = factQuantity;
-        Comment = comment;
-        return OperationResult.Success();
-    }
-
-    internal OperationResult IncrementFact()
-    {
-        var factQuantity = (FactQuantity ?? 0) + 1;
-        if (!WarehouseQuantity.IsNonNegative(factQuantity))
-        {
-            return OperationError.Invalid(
-                "Фактическое количество должно быть конечным неотрицательным числом.");
-        }
-
-        FactQuantity = factQuantity;
-        return OperationResult.Success();
-    }
-
-    internal void UpdateComment(string? comment)
-    {
-        Comment = comment;
-    }
-
     internal void SetAggregatedLpnFact(decimal? factQuantity) => FactQuantity = factQuantity;
 
     internal static OperationResult ValidateImport(

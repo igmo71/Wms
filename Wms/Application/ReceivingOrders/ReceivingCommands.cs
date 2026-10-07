@@ -8,7 +8,3 @@ public sealed record CompleteReceivingCommand(
     Guid? ReceivingLocationId,
     string ExpectedFingerprint,
     string? ManagerReason);
-
-public sealed record IncrementReceivingFactCommand(Guid OrderId, int LineNumber);
-public sealed record SetReceivingFactCommand(Guid OrderId, int LineNumber, decimal FactQuantity);
-public sealed record SetReceivingItemCommentCommand(Guid OrderId, int LineNumber, string? Comment);

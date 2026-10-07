@@ -44,23 +44,7 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <Button
-                        x:Name="ReceivingTabButton"
-                        Clicked="OnReceivingTabClicked"
-                        Grid.Column="0"
-                        Loaded="OnNonScanControlLoaded"
-                        Text="В работе" />
-                    <Button
-                        x:Name="PutawayTabButton"
-                        Clicked="OnPutawayTabClicked"
-                        Grid.Column="1"
-                        IsVisible="False"
-                        Loaded="OnNonScanControlLoaded"
-                        Text="Добавить ордер" />
-                </Grid>
-
-                <VerticalStackLayout x:Name="ReceivingSection" Spacing="10">
+                <VerticalStackLayout Spacing="10">
                     <Label
                         x:Name="ReceivingStatusLabel"
                         HorizontalTextAlignment="Center"
@@ -102,62 +86,6 @@
                                             IsVisible="{Binding HasJoinBlock}"
                                             Text="{Binding JoinBlockText}"
                                             TextColor="Red" />
-                                        <Label
-                                            FontSize="16"
-                                            Text="{Binding ProgressText}" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
-                </VerticalStackLayout>
-
-                <VerticalStackLayout
-                    x:Name="PutawaySection"
-                    IsVisible="False"
-                    Spacing="10">
-                    <Label
-                        x:Name="PutawayStatusLabel"
-                        HorizontalTextAlignment="Center"
-                        Text="Выберите склад." />
-                    <VerticalStackLayout
-                        x:Name="PutawayOrdersLayout"
-                        BindableLayout.ItemsSource="{Binding PutawayOrders}"
-                        Spacing="10">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
-                                <Border
-                                    Loaded="OnNonScanControlLoaded"
-                                    Padding="14">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer
-                                            CommandParameter="{Binding Id}"
-                                            Tapped="OnOrderTapped" />
-                                    </Border.GestureRecognizers>
-                                    <VerticalStackLayout Spacing="4">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <Label
-                                                FontAttributes="Bold"
-                                                FontSize="18"
-                                                Text="{Binding Number, StringFormat='Ордер {0}'}" />
-                                            <Label
-                                                Grid.Column="1"
-                                                Text="{Binding DateText}" />
-                                        </Grid>
-                                        <Label
-                                            FontAttributes="Bold"
-                                            Text="{Binding StatusText}" />
-                                        <Label
-                                            FontAttributes="Bold"
-                                            IsVisible="{Binding HasSynchronizationIssue}"
-                                            Text="{Binding SynchronizationText}"
-                                            TextColor="DarkOrange" />
-                                        <Label
-                                            FontAttributes="Bold"
-                                            IsVisible="{Binding HasJoinBlock}"
-                                            Text="{Binding JoinBlockText}"
-                                            TextColor="Red" />
-                                        <Label Text="{Binding DetailsText}" />
                                         <Label
                                             FontSize="16"
                                             Text="{Binding ProgressText}" />

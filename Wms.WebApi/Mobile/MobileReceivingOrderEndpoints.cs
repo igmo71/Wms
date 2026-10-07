@@ -424,7 +424,6 @@ internal static class MobileReceivingOrderEndpoints
         bool requiresManager = false) => new(
         MapSummary(details.Order, assessment, verificationError, requiresManager),
         details.Lines.Select(MapLine).ToList(),
-        details.Movements.Select(MapMovement).ToList(),
         details.LicensePlateNumbers.Select(MapLicensePlateNumber).ToList());
 
     private static MobileReceivingOrderLicensePlateNumberResponse MapLicensePlateNumber(
@@ -479,7 +478,6 @@ internal static class MobileReceivingOrderEndpoints
         order.WarehouseOperation.GetDisplayName(),
         order.BusinessOperation.GetDisplayName(),
         MapStatus(order.Status),
-        MapPutawayStatus(order.PutawayStatus),
         MapSynchronization(order.SynchronizationLevel, assessment, verificationError, requiresManager),
         order.Comment,
         order.ReceivingLocation is null ? null : MapLocation(order.ReceivingLocation),
@@ -487,14 +485,10 @@ internal static class MobileReceivingOrderEndpoints
             order.TotalLineCount,
             order.ConfirmedLineCount,
             order.PositiveLineCount,
-            order.FullyAllocatedLineCount,
             order.PlanQuantity,
-            order.FactQuantity,
-            order.AllocatedQuantity),
+            order.FactQuantity),
         order.StartedAtUtc,
         order.CompletedAtUtc,
-        order.PutawayStartedAtUtc,
-        order.PutawayCompletedAtUtc,
         order.IsParticipant,
         // CanJoin comes from the persisted source assessment. For an in-progress
         // order, assessment describes completion and may include unchecked facts.
@@ -546,20 +540,7 @@ internal static class MobileReceivingOrderEndpoints
         line.FactQuantity is decimal factQuantity
             ? factQuantity - line.PlanQuantity
             : null,
-        line.AllocatedQuantity,
-        line.RemainingPutawayQuantity,
         line.Comment);
-
-    private static MobileReceivingOrderMovementResponse MapMovement(
-        MobileReceivingOrderMovement movement) => new(
-        movement.Id,
-        movement.LineNumber,
-        movement.StockKeepingUnitId,
-        movement.Quantity,
-        MapLocation(movement.Destination),
-        movement.CreatedAtUtc,
-        movement.UpdatedAtUtc,
-        movement.PostedAtUtc);
 
     private static MobileReceivingOrderLineCandidateResponse MapCandidate(
         MobileReceivingOrderLineCandidate candidate) => new(
@@ -570,8 +551,6 @@ internal static class MobileReceivingOrderEndpoints
         candidate.UnitOfMeasure,
         candidate.PlanQuantity,
         candidate.FactQuantity,
-        candidate.AllocatedQuantity,
-        candidate.RemainingPutawayQuantity,
         candidate.IsExactMatch);
 
     private static MobileReceivingOrderLocationResponse MapLocation(
@@ -591,16 +570,6 @@ internal static class MobileReceivingOrderEndpoints
             ReceivingOrderStatus.ProcessingRequired => MobileReceivingOrderStatus.ProcessingRequired,
             ReceivingOrderStatus.Received => MobileReceivingOrderStatus.Received,
             _ => throw new InvalidOperationException($"Неизвестный статус приходного ордера: {status}.")
-        };
-
-    private static MobilePutawayStatus MapPutawayStatus(PutawayStatus status) =>
-        status switch
-        {
-            PutawayStatus.Inactive => MobilePutawayStatus.Inactive,
-            PutawayStatus.Pending => MobilePutawayStatus.Pending,
-            PutawayStatus.InProgress => MobilePutawayStatus.InProgress,
-            PutawayStatus.Completed => MobilePutawayStatus.Completed,
-            _ => throw new InvalidOperationException($"Неизвестный статус размещения: {status}.")
         };
 
     private static string? GetUserId(ClaimsPrincipal principal) =>

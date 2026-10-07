@@ -15,8 +15,6 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
         builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.PutawayStartedBy).HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.PutawayCompletedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.BaseOrderType).HasMaxLength(DefaultConfiguration.Name);
         builder.Property(x => x.SynchronizationFingerprint)
             .HasMaxLength(DefaultConfiguration.Fingerprint);

@@ -986,23 +986,6 @@ namespace Wms.Data.Migrations
                     b.Property<bool>("Posted")
                         .HasColumnType("bit");
 
-                    b.Property<DateTimeOffset?>("PutawayCompletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("PutawayCompletedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<DateTimeOffset?>("PutawayStartedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("PutawayStartedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<int>("PutawayStatus")
-                        .HasColumnType("int");
-
                     b.Property<int>("Queue")
                         .HasColumnType("int");
 

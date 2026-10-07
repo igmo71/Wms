@@ -112,8 +112,6 @@ public class ReceivingOrderQueryService(
         if (listQuery.Status is not null)
             query = query.Where(x => x.Status == listQuery.Status);
 
-        if (listQuery.PutawayStatus is not null)
-            query = query.Where(x => x.PutawayStatus == listQuery.PutawayStatus);
 
         if (listQuery.Queue is not null)
             query = query.Where(x => x.Queue == listQuery.Queue);
@@ -134,10 +132,8 @@ public class ReceivingOrderQueryService(
             "Status" => listQuery.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
             "Queue" => listQuery.SortDescending ? query.OrderByDescending(x => x.Queue) : query.OrderBy(x => x.Queue),
             "WarehouseOperation" => listQuery.SortDescending ? query.OrderByDescending(x => x.WarehouseOperation) : query.OrderBy(x => x.WarehouseOperation),
-            "PutawayStatus" => listQuery.SortDescending ? query.OrderByDescending(x => x.PutawayStatus) : query.OrderBy(x => x.PutawayStatus),
             "StartedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.StartedAtUtc) : query.OrderBy(x => x.StartedAtUtc),
             "CompletedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.CompletedAtUtc) : query.OrderBy(x => x.CompletedAtUtc),
-            "PutawayCompletedAtUtc" => listQuery.SortDescending ? query.OrderByDescending(x => x.PutawayCompletedAtUtc) : query.OrderBy(x => x.PutawayCompletedAtUtc),
             _ => query.OrderByDescending(x => x.Date),
         };
     }

@@ -21,6 +21,13 @@ This file owns current product boundaries and lasting business rules.
 decision history. Code and migrations remain the implementation source of
 truth.
 
+During development the database may be cleaned or recreated when changing the
+schema; migration compatibility is not a blocker for removing obsolete MVP
+data. A full rebuild invalidates printed LPN labels; the cleanup scripts below
+preserve the issued-code sequence. Production database changes are also
+possible, but require a separate review of existing data and a more careful
+rollout.
+
 LPN receiving and initial putaway (I01–I08) were accepted on 2026-09-17.
 The specification is frozen; status and future E1/E5/E6/E7 boundaries are in
 [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md), and the next task is in ROADMAP.
@@ -308,8 +315,8 @@ Putaway is blocked until the receiving order is completed. Each command checks
 both the physical source balance and the separate remaining limit of its LPN
 item. The LPN operational revision coordinates concurrent employees, while
 balance row versions independently protect shared physical stock. Movement,
-balances, turnover, LPN history and command receipt commit atomically. The old
-order-level draft/start/complete putaway UI and API are unavailable. I06 does
+balances, turnover, LPN history and command receipt commit atomically. Receiving
+orders have no placement status or order-level putaway commands. I06 does
 not restrict the destination to a recommendation; any scanned destination is
 validated at posting time.
 
@@ -327,8 +334,8 @@ balances are pre-created, and movement history is not queried for recommendation
 
 Completion uses an explicitly supplied receiving location or the order's assigned
 location after receipt lookup. Supported UI/API paths change facts only through
-LPN items; legacy direct-fact methods and order-level putaway code remain in the
-repository but are not exposed as supported workflows. LPN mutations save audit,
+LPN items; order-line facts are recalculated from active LPN items and cannot be
+edited directly. LPN mutations save audit,
 aggregate fact and revisions without posting inventory or calling 1C.
 Putaway has no 1C checkpoint. After a definitive destination rejection, Mobile
 keeps the selected quantity and allows another destination scan.
@@ -451,16 +458,21 @@ can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages suppress Android focus on action buttons. Receiving order,
 LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
+The Mobile receiving queue shows the current user's orders; other orders can
+be opened by scanning their document barcode. Independent putaway starts from
+its own LPN screen.
 
 Web uses one receiving-order page across ready, receiving and received states.
 The list's "Сверка" indicator prioritizes an accepted quantity difference over
 the successful source-synchronization mark; its tooltip distinguishes the two.
 The route chooses between in-progress and ready/received views; successful Web
-completion changes the view on the same URL. Its shared header
-shows status and participants immediately below the order number and date.
+completion changes the view on the same URL. Its shared header shows status
+and factual weight in the top row below the order number and date; participants
+appear beside the receiving-operation audit and stack when there are several.
 The shared "Расхождения" block appears above the order content; Manager
 confirmation is a separate block in the same position for entry and later
-review. The summary header omits putaway action timestamps. The page uses the
+review. The order header and list omit the obsolete order-level placement
+status and timestamps. The page uses the
 same read-only order-content layout while receiving and after completion. The
 nomenclature tab shows aggregate order lines. A ready order shows its stored
 "План" only. During and after receiving, equal WMS and 1C quantities on every

@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Wms.Application.Commands;
 using Wms.Application.Inventory.Movements;
-using System.Globalization;
 using System.Text.Json;
 using Wms.Common;
 using Wms.Data;
@@ -237,42 +236,6 @@ public class ReceivingOrderCommandService(
             _ => OperationError.Conflict(
                 "Работа с приходным ордером заблокирована из-за расхождений с 1С.")
         };
-
-    private const string IncrementFactCommandType = "receiving-order.increment-fact";
-    private const string SetFactCommandType = "receiving-order.set-fact";
-    private const string SetItemCommentCommandType = "receiving-order.set-item-comment";
-
-    public Task<OperationResult<Guid>> IncrementItemFactAsync(
-        IncrementReceivingFactCommand command, CommandContext context, CancellationToken ct = default) =>
-        ExecuteItemActionAsync(IncrementFactCommandType, command.OrderId, context,
-            CommandExecutor.ComputeHash($"{command.OrderId:N}|{command.LineNumber.ToString(CultureInfo.InvariantCulture)}"),
-            order => order.IncrementItemFact(command.LineNumber), ct);
-
-    public Task<OperationResult<Guid>> SetItemFactQuantityAsync(
-        SetReceivingFactCommand command, CommandContext context, CancellationToken ct = default) =>
-        ExecuteItemActionAsync(SetFactCommandType, command.OrderId, context,
-            CommandExecutor.ComputeHash($"{command.OrderId:N}|{command.LineNumber.ToString(CultureInfo.InvariantCulture)}|{command.FactQuantity.ToString("G29", CultureInfo.InvariantCulture)}"),
-            order => order.UpdateItemFactQuantity(command.LineNumber, command.FactQuantity), ct);
-
-    public Task<OperationResult<Guid>> SetItemCommentAsync(
-        SetReceivingItemCommentCommand command, CommandContext context, CancellationToken ct = default) =>
-        ExecuteItemActionAsync(SetItemCommentCommandType, command.OrderId, context,
-            // JSON distinguishes null/empty and escapes arbitrary separators in original input.
-            CommandExecutor.ComputeHash($"{command.OrderId:N}|{command.LineNumber.ToString(CultureInfo.InvariantCulture)}|{JsonSerializer.Serialize(command.Comment)}"),
-            order => order.UpdateItemComment(command.LineNumber, command.Comment), ct);
-
-    private Task<OperationResult<Guid>> ExecuteItemActionAsync(
-        string commandType, Guid orderId, CommandContext context, string requestHash,
-        Func<ReceivingOrder, OperationResult> action, CancellationToken ct) =>
-        commandExecutor.ExecuteAsync(commandType, context.RequestId, requestHash, context.UserId,
-            async (dbContext, token) =>
-            {
-                var order = await LoadOrderAsync(dbContext, orderId, token);
-                if (order is null)
-                    return OperationError.NotFound($"Приходный ордер '{orderId}' не найден.");
-                var result = action(order);
-                return result.IsSuccess ? orderId : result.Error!;
-            }, ct);
 
     private static async Task<OperationResult> SetReceivingLocationAsync(
         ApplicationDbContext dbContext,

@@ -23,7 +23,6 @@ public partial class Index : IAsyncDisposable
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private ReceivingOrderStatus? _status;
-    private PutawayStatus? _putawayStatus;
     private ReceivingOrderQueue? _queue;
     private WarehouseOperation? _warehouseOperation;
     private Warehouse? _warehouse;
@@ -45,7 +44,6 @@ public partial class Index : IAsyncDisposable
             DateTo = _dateTo,
             WarehouseId = _warehouse?.Id,
             Status = _status,
-            PutawayStatus = _putawayStatus,
             Queue = _queue,
             WarehouseOperation = _warehouseOperation,
             SortBy = sortDefinition?.SortBy,
@@ -55,7 +53,7 @@ public partial class Index : IAsyncDisposable
         }, cancellationToken);
 
         _userNames = await ApplicationUserQueryService.GetUserNamesAsync(
-            result.Items.SelectMany(x => new[] { x.CompletedBy, x.PutawayCompletedBy }),
+            result.Items.Select(x => x.CompletedBy),
             cancellationToken);
 
         return new GridData<ReceivingOrder>
@@ -95,12 +93,6 @@ public partial class Index : IAsyncDisposable
     private Task OnStatusChangedAsync(ReceivingOrderStatus? status)
     {
         _status = status;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnPutawayStatusChangedAsync(PutawayStatus? status)
-    {
-        _putawayStatus = status;
         return _dataGrid.ReloadServerData();
     }
 

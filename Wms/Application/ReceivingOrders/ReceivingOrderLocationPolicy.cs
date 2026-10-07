@@ -61,28 +61,6 @@ internal static class ReceivingOrderLocationPolicy
         return OperationResult.Success();
     }
 
-    public static async Task<OperationResult> RequirePutawayDestinationAsync(
-        ApplicationDbContext dbContext,
-        ReceivingOrder order,
-        Guid destinationStorageLocationId,
-        CancellationToken ct)
-    {
-        var destination = await dbContext.StorageLocations
-            .Include(x => x.Warehouse)
-            .Include(x => x.Zone)
-            .Include(x => x.ActiveLock)
-            .SingleOrDefaultAsync(x => x.Id == destinationStorageLocationId, ct);
-
-        if (destination is null
-            || !IsActiveLocation(destination, order.WarehouseId, ZoneType.Storage))
-        {
-            return OperationError.Invalid(
-                "Позиция размещения должна быть активной позицией хранения на складе ордера.");
-        }
-
-        return StorageLocationAvailability.ValidateUnlocked(destination);
-    }
-
     private static async Task<Dictionary<Guid, StorageLocation>> LoadRouteLocationsAsync(
         ApplicationDbContext dbContext,
         IReadOnlyCollection<InventoryMovement> movements,

@@ -2,12 +2,6 @@ using Wms.Domain.Enums;
 
 namespace Wms.Application.ReceivingOrders;
 
-public enum ReceivingOrderLineContext
-{
-    Receiving = 1,
-    Putaway = 2
-}
-
 public sealed record MobileReceivingOrderLocation(
     Guid Id,
     string Name,
@@ -28,21 +22,16 @@ public sealed record MobileReceivingOrderSummary(
     WarehouseOperation WarehouseOperation,
     BusinessOperation BusinessOperation,
     ReceivingOrderStatus Status,
-    PutawayStatus PutawayStatus,
     OrderSynchronizationLevel SynchronizationLevel,
     string? Comment,
     MobileReceivingOrderLocation? ReceivingLocation,
     int TotalLineCount,
     int ConfirmedLineCount,
     int PositiveLineCount,
-    int FullyAllocatedLineCount,
     decimal PlanQuantity,
     decimal FactQuantity,
-    decimal AllocatedQuantity,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
-    DateTimeOffset? PutawayStartedAtUtc,
-    DateTimeOffset? PutawayCompletedAtUtc,
     bool IsParticipant,
     bool CanJoin,
     string? JoinBlockedReason);
@@ -55,19 +44,7 @@ public sealed record MobileReceivingOrderLine(
     string? UnitOfMeasure,
     decimal PlanQuantity,
     decimal? FactQuantity,
-    decimal AllocatedQuantity,
-    decimal? RemainingPutawayQuantity,
     string? Comment);
-
-public sealed record MobileReceivingOrderMovement(
-    Guid Id,
-    int LineNumber,
-    Guid StockKeepingUnitId,
-    decimal Quantity,
-    MobileReceivingOrderLocation Destination,
-    DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? UpdatedAtUtc,
-    DateTimeOffset? PostedAtUtc);
 
 public sealed record MobileReceivingOrderLicensePlateNumber(
     Guid Id,
@@ -103,7 +80,6 @@ public sealed record MobileReceivingOrderLicensePlateNumberItem(
 public sealed record MobileReceivingOrderDetails(
     MobileReceivingOrderSummary Order,
     IReadOnlyList<MobileReceivingOrderLine> Lines,
-    IReadOnlyList<MobileReceivingOrderMovement> Movements,
     IReadOnlyList<MobileReceivingOrderLicensePlateNumber> LicensePlateNumbers);
 
 public sealed record MobileReceivingOrderWorkQueue(
@@ -118,6 +94,4 @@ public sealed record MobileReceivingOrderLineCandidate(
     string? UnitOfMeasure,
     decimal PlanQuantity,
     decimal? FactQuantity,
-    decimal AllocatedQuantity,
-    decimal? RemainingPutawayQuantity,
     bool IsExactMatch);

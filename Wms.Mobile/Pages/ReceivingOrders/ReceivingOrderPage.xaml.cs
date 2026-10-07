@@ -14,7 +14,6 @@ public partial class ReceivingOrderPage : ContentPage
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
-    private bool _showPutaway;
     private Guid? _pendingJoinOrderId;
     private Guid? _pendingJoinRequestId;
     private int _loadVersion;
@@ -35,7 +34,6 @@ public partial class ReceivingOrderPage : ContentPage
     }
 
     public IReadOnlyList<ReceivingOrderQueueItemViewState> ReceivingOrders { get; private set; } = [];
-    public IReadOnlyList<ReceivingOrderQueueItemViewState> PutawayOrders { get; private set; } = [];
 
     protected override async void OnAppearing()
     {
@@ -120,19 +118,6 @@ public partial class ReceivingOrderPage : ContentPage
     {
         await LoadQueueAsync();
         QueueRefreshView.IsRefreshing = false;
-    }
-
-    private void OnReceivingTabClicked(object? sender, EventArgs e) => ShowPutaway(false);
-
-    private void OnPutawayTabClicked(object? sender, EventArgs e) => ShowPutaway(true);
-
-    private void ShowPutaway(bool showPutaway)
-    {
-        _showPutaway = showPutaway;
-        ReceivingSection.IsVisible = !showPutaway;
-        PutawaySection.IsVisible = showPutaway;
-        ReceivingTabButton.Opacity = showPutaway ? 0.65 : 1;
-        PutawayTabButton.Opacity = showPutaway ? 1 : 0.65;
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
@@ -247,9 +232,8 @@ public partial class ReceivingOrderPage : ContentPage
         var loadVersion = ++_loadVersion;
         if (SelectedWarehouse is not MobileWarehouseResponse warehouse)
         {
-            ApplyQueue([], []);
+            ApplyQueue([]);
             ReceivingStatusLabel.Text = "Выберите склад.";
-            PutawayStatusLabel.Text = "Выберите склад.";
             return;
         }
 
@@ -261,22 +245,17 @@ public partial class ReceivingOrderPage : ContentPage
                 return;
             }
 
-            ApplyQueue(
-                queue.Personal.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList(),
-                queue.Available.Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList());
-            ReceivingStatusLabel.Text = queue.Personal.Count == 0
+            ApplyQueue(queue.Personal
+                .Select(ReceivingOrderQueueItemViewState.ForReceiving).ToList());
+            ReceivingStatusLabel.Text = ReceivingOrders.Count == 0
                 ? "Ордеров в работе нет."
                 : $"Ордеров в работе: {queue.Personal.Count}.";
-            PutawayStatusLabel.Text = queue.Available.Count == 0
-                ? "Доступных ордеров нет."
-                : $"Доступных ордеров: {queue.Available.Count}.";
         }
         catch (MobileApiException exception)
         {
             if (loadVersion == _loadVersion)
             {
                 ReceivingStatusLabel.Text = exception.Message;
-                PutawayStatusLabel.Text = exception.Message;
             }
         }
         catch (HttpRequestException)
@@ -284,20 +263,14 @@ public partial class ReceivingOrderPage : ContentPage
             if (loadVersion == _loadVersion)
             {
                 ReceivingStatusLabel.Text = "Не удалось обновить очередь.";
-                PutawayStatusLabel.Text = "Не удалось обновить очередь.";
             }
         }
     }
 
-    private void ApplyQueue(
-        IReadOnlyList<ReceivingOrderQueueItemViewState> receiving,
-        IReadOnlyList<ReceivingOrderQueueItemViewState> putaway)
+    private void ApplyQueue(IReadOnlyList<ReceivingOrderQueueItemViewState> receiving)
     {
         ReceivingOrders = receiving;
-        PutawayOrders = putaway;
         OnPropertyChanged(nameof(ReceivingOrders));
-        OnPropertyChanged(nameof(PutawayOrders));
-        ShowPutaway(_showPutaway);
     }
 
     private async Task UpdateCameraAsync()
@@ -320,8 +293,6 @@ public partial class ReceivingOrderPage : ContentPage
         _busy = busy;
         ProgressIndicator.Opacity = busy ? 1 : 0;
         WarehousePicker.IsEnabled = !busy;
-        ReceivingTabButton.IsEnabled = !busy;
-        PutawayTabButton.IsEnabled = !busy;
     }
 
     private void OnNonScanControlLoaded(object? sender, EventArgs e)
