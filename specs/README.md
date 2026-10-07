@@ -10,6 +10,14 @@ None.
 
 ## Frozen
 
+- [Web pallet putaway progress](2026-10-07-web-pallet-putaway-progress/spec.md)
+  — accepted on 2026-10-07: read-only LPN placement progress, direct pallet
+  selection from the SKU menu, and removal of the unused order-level Web view.
+
+- [Web receiving SKU distribution](2026-10-06-web-receiving-sku-distribution/spec.md)
+  — accepted on 2026-10-07: a Web order SKU menu shows its retained quantities
+  by active pallet without changing the table width.
+
 - [Web receiving quantity format](2026-10-06-web-receiving-quantity-format/spec.md)
   — accepted on 2026-10-06: read-only Web receiving quantities use three
   decimal places; a broader UI review remains future work.

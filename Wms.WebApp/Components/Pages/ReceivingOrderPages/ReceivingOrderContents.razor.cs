@@ -31,7 +31,12 @@ public partial class ReceivingOrderContents
             return count;
         }
     }
+    private int _activeTabIndex;
     private Guid? _selectedPalletId;
+    private IReadOnlyList<LicensePlateNumber> GetSkuPallets(Guid skuId) => OrderedPallets
+            .Where(pallet => pallet.Status != LicensePlateNumberStatus.Cancelled
+                && pallet.Items.Any(item => !item.IsDeleted && item.StockKeepingUnitId == skuId))
+            .ToList();
 
     private IReadOnlyList<LicensePlateNumber> OrderedPallets => Order.LicensePlateNumbers
         .OrderBy(StatusOrder)
@@ -59,6 +64,40 @@ public partial class ReceivingOrderContents
     }
 
     private void SelectPallet(Guid palletId) => _selectedPalletId = palletId;
+
+    private void OpenPallet(Guid palletId)
+    {
+        _selectedPalletId = palletId;
+        _activeTabIndex = 1;
+    }
+
+    private static decimal GetSkuQuantity(LicensePlateNumber pallet, Guid skuId) => pallet.Items
+        .Where(item => !item.IsDeleted && item.StockKeepingUnitId == skuId)
+        .Sum(item => item.Quantity);
+
+    private static decimal PlacedQuantity(LicensePlateNumber pallet, LicensePlateNumberItem item) =>
+        pallet.Putaways.Where(x => x.LicensePlateNumberItemId == item.Id).Sum(x => x.Quantity);
+
+    private static int UnplacedLineCount(LicensePlateNumber pallet) => pallet.Items
+        .Count(item => !item.IsDeleted && item.Quantity > PlacedQuantity(pallet, item));
+
+    private static string PutawayQuantityText(LicensePlateNumber pallet, LicensePlateNumberItem item) =>
+        item.IsDeleted ? "—" : FormatQuantity(PlacedQuantity(pallet, item));
+
+    private static string PutawayRemainingText(LicensePlateNumber pallet, LicensePlateNumberItem item) =>
+        item.IsDeleted ? "—" : FormatQuantity(Math.Max(0, item.Quantity - PlacedQuantity(pallet, item)));
+
+    private static string PutawayProgress(LicensePlateNumber pallet)
+    {
+        var items = pallet.Items.Where(x => !x.IsDeleted && x.Quantity > 0).ToArray();
+        if (items.Length == 0)
+            return "нет товара для размещения";
+        if (items.All(item => PlacedQuantity(pallet, item) >= item.Quantity))
+            return "завершено";
+        return items.Any(item => PlacedQuantity(pallet, item) > 0)
+            ? "частично"
+            : "не начато";
+    }
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"

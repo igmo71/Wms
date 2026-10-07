@@ -8,12 +8,15 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-Scope Web SKU-to-LPN visibility: from a receiving order's nomenclature line,
-show which pallets contain that SKU and each pallet's quantity. Keep the
-aggregate order table and pallet audit available, and agree the smallest
-interaction before implementation.
+No immediate implementation task is agreed. Choose the next focused issue
+from the future delivery areas below.
 
 ## Future delivery areas
+
+Review receiving and putaway models for obsolete fields and methods before
+removing them. Trace each candidate through persistence, integration, audit,
+and supported UI/API paths. In particular, legacy order-level putaway status
+still appears in Web and Mobile order views and API responses.
 
 Later, review quantity presentation across the entire Web and Mobile UI:
 find inconsistent precision and missing units, consider compact TSD layouts,
@@ -27,8 +30,6 @@ Do not combine these with putaway.
 Putaway screen improvements are deferred. Verify the accepted safe putaway
 quantity flow with the camera fallback when camera use becomes relevant; TSD
 behavior was accepted on 2026-10-06.
-Separately review domain and view models for unused or obsolete properties and
-remove them only after checking their persistence, integration and audit uses.
 
 E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
 rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,

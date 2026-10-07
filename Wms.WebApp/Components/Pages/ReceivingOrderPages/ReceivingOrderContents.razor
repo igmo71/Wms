@@ -2,7 +2,7 @@
 @using Wms.Domain
 @using Wms.Domain.Enums
 
-<MudTabs Elevation="0" Outlined="true" Rounded="true">
+<MudTabs Elevation="0" Outlined="true" Rounded="true" @bind-ActivePanelIndex="_activeTabIndex">
     <MudTabPanel Text="Номенклатура">
         <MudDataGrid T="ReceivingOrderItem"
                      Items="Order.Items.OrderBy(x => x.LineNumber)"
@@ -11,7 +11,35 @@
                      Class="pa-2">
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="№" />
-                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура">
+                    <CellTemplate Context="line">
+                        <MudMenu Dense="true" MaxHeight="320">
+                            <ActivatorContent Context="menu">
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Class="pa-0"
+                                           Style="text-transform: none; white-space: normal; text-align: left; justify-content: flex-start; max-width: 100%;"
+                                           OnClick="@menu.ToggleAsync">
+                                    @line.Item.StockKeepingUnit?.Name
+                                </MudButton>
+                            </ActivatorContent>
+                            <ChildContent>
+                                @if (GetSkuPallets(line.Item.StockKeepingUnitId) is { Count: > 0 } pallets)
+                                {
+                                    @foreach (var pallet in pallets)
+                                    {
+                                        <MudMenuItem OnClick="@(() => OpenPallet(pallet.Id))">@pallet.Code — @FormatQuantity(GetSkuQuantity(pallet, line.Item.StockKeepingUnitId)) @UnitName(line.Item.StockKeepingUnit)</MudMenuItem>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudMenuItem Disabled="true">Товара нет ни в одной палете</MudMenuItem>
+                                }
+                            </ChildContent>
+                        </MudMenu>
+                    </CellTemplate>
+                </PropertyColumn>
                 <TemplateColumn Title="Ед изм">
                     <CellTemplate>@UnitName(context.Item.StockKeepingUnit)</CellTemplate>
                 </TemplateColumn>
@@ -51,17 +79,32 @@
                     <MudStack Spacing="1">
                         @foreach (var pallet in OrderedPallets)
                         {
+                            var unfinishedLineCount = Order.Status == ReceivingOrderStatus.Received
+                                && pallet.Status != LicensePlateNumberStatus.Cancelled
+                                ? UnplacedLineCount(pallet)
+                                : 0;
                             <MudPaper Class="pa-2"
                                       Elevation="0"
                                       Outlined="true"
                                       Style="@PalletStyle(pallet)"
                                       @onclick="() => SelectPallet(pallet.Id)">
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudText Typo="Typo.subtitle2">@pallet.Code</MudText>
+                                    <MudBadge Content="@unfinishedLineCount"
+                                              Visible="@(unfinishedLineCount > 0)"
+                                              Color="Color.Warning"
+                                              BadgeAriaLabel="@($"Не полностью размещённых строк: {unfinishedLineCount}")"
+                                              Class="mr-3">
+                                        <MudText Typo="Typo.subtitle2">@pallet.Code</MudText>
+                                    </MudBadge>
                                     <MudSpacer />
                                     <MudChip T="string" Size="Size.Small">@pallet.Status.GetDisplayName()</MudChip>
                                 </MudStack>
                                 <MudText Typo="Typo.caption">@GetUserName(pallet.ResponsibleUserId)</MudText>
+                                @if (Order.Status == ReceivingOrderStatus.Received
+                                    && pallet.Status != LicensePlateNumberStatus.Cancelled)
+                                {
+                                    <MudText Typo="Typo.caption">Размещение: @PutawayProgress(pallet)</MudText>
+                                }
                             </MudPaper>
                         }
                     </MudStack>
@@ -91,6 +134,11 @@
                                         <TemplateColumn Title="Номенклатура"><CellTemplate>@context.Item.StockKeepingUnit?.Name</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Ед изм"><CellTemplate>@UnitName(context.Item)</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
+                                        @if (Order.Status == ReceivingOrderStatus.Received)
+                                        {
+                                            <TemplateColumn Title="Размещено"><CellTemplate>@PutawayQuantityText(selected, context.Item)</CellTemplate></TemplateColumn>
+                                            <TemplateColumn Title="Осталось"><CellTemplate>@PutawayRemainingText(selected, context.Item)</CellTemplate></TemplateColumn>
+                                        }
                                         <TemplateColumn Title="Состояние"><CellTemplate>@(context.Item.IsDeleted ? "Удалено" : "В составе")</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Создал"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Изменил"><CellTemplate>@GetUserName(context.Item.UpdatedBy)</CellTemplate></TemplateColumn>
@@ -110,10 +158,9 @@
                                     <Columns>
                                         <TemplateColumn Title="Номенклатура"><CellTemplate>@context.Item.StockKeepingUnit.Name</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Количество"><CellTemplate>@FormatQuantity(context.Item.Quantity)</CellTemplate></TemplateColumn>
-                                        <TemplateColumn Title="Назначение"><CellTemplate>@Destination(context.Item)</CellTemplate></TemplateColumn>
+                                        <TemplateColumn Title="Ячейка"><CellTemplate>@Destination(context.Item)</CellTemplate></TemplateColumn>
                                         <TemplateColumn Title="Исполнитель"><CellTemplate>@GetUserName(context.Item.CreatedBy)</CellTemplate></TemplateColumn>
                                         <PropertyColumn Property="x => x.CreatedAtUtc" Title="Проведено" Format="dd.MM.yyyy HH:mm" />
-                                        <TemplateColumn Title="Движение"><CellTemplate><MudLink Href="@($"inventory-movements?search={context.Item.InventoryMovementId}")">@context.Item.InventoryMovementId</MudLink></CellTemplate></TemplateColumn>
                                     </Columns>
                                 </MudDataGrid>
                             }

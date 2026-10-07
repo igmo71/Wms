@@ -471,11 +471,21 @@ table shows each SKU's canonical unit alongside its quantities; Mobile already
 shows the unit beside line plan and fact. Read-only Web receiving quantities
 (plan, fact, remainder and pallet quantities) display three decimal places,
 matching the 1C quantity precision; nullable unchecked facts retain their
-textual state. The pallet tab shows a compact
+textual state. Clicking a Web nomenclature name opens a compact menu next to
+that row with the active pallets containing the SKU and each pallet's retained
+quantity. Clicking a pallet in that menu switches to the pallet tab with that
+pallet selected. Cancelled pallets and deleted pallet items are excluded. The
+pallet tab shows a compact
 selectable pallet list on the left and only the selected
 pallet's item audit and putaway history on the right. Open pallets sort first,
 and their nonzero count appears on the tab badge. Cancelled pallets remain
-visible but muted for audit. Completion and 1C reconciliation
+visible but muted for audit. After receiving completion, the pallet list shows
+derived putaway progress and a badge counting retained item rows that are not
+fully placed. Each retained pallet item shows placed and remaining quantity
+from its LPN putaway history. History names the destination cell and keeps
+technical movement IDs in the stored audit rather than presenting them as
+nonfunctional links. Quantities of different SKUs are not summed across units.
+Completion and 1C reconciliation
 remain above the tabs; Web LPN composition editing is outside this result.
 When Web completion is unavailable, a concise reason between the order title
 and the action points to the next step; Mobile already shows completion
