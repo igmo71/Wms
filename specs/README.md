@@ -10,6 +10,10 @@ None.
 
 ## Frozen
 
+- [Consistent quantity display across Web and TSD](2026-10-07-quantity-display-consistency/spec.md)
+  — accepted on 2026-10-07: Web/TSD quantity display aligned; line-based
+  progress and per-line picking discrepancy confirmation verified.
+
 - [Finish receiving and putaway model cleanup](2026-10-07-receiving-model-cleanup/spec.md)
   — accepted on 2026-10-07: unused receiving paths and hidden Mobile queue data
   removed; completion and LPN audit data retained.

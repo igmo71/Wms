@@ -370,8 +370,6 @@ public sealed class MobileShippingOrderQueryService(
             order.Items.Count(x => x.FactQuantity > 0
                 && x.FactQuantity < x.PlanQuantity),
             order.Items.Count(x => x.FactQuantity == 0),
-            order.Items.Sum(x => x.PlanQuantity),
-            order.Items.Sum(x => x.FactQuantity),
             order.PickingStartedAtUtc,
             order.ReadyForShipmentAtUtc,
             order.ShippedAtUtc);

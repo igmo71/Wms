@@ -79,7 +79,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
             throw new InvalidOperationException("Номенклатура отсутствует в плане приходного ордера.");
 
         var first = lines[0];
-        var unit = first.UnitOfMeasure ?? string.Empty;
+        var unit = string.IsNullOrWhiteSpace(first.UnitOfMeasure) ? "—" : first.UnitOfMeasure;
         SkuNameLabel.Text = first.SkuName;
         SkuCodeLabel.Text = first.SkuCode;
         PlanLabel.Text = lines.Sum(x => x.PlanQuantity).ToString("0.###");
@@ -100,9 +100,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
                 x.LicensePlateNumber.Code,
                 x.LicensePlateNumber.StatusName,
                 x.LicensePlateNumber.ResponsibleUserName,
-                string.IsNullOrWhiteSpace(unit)
-                    ? $"{x.Item!.Quantity:g}"
-                    : $"{x.Item!.Quantity:g} {unit}"))
+                $"{x.Item!.Quantity:0.###} {unit}"))
             .ToArray();
         OnPropertyChanged(nameof(PalletRows));
     }

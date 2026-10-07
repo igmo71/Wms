@@ -378,7 +378,7 @@ public partial class Work
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
 
-    private static string FormatQuantity(decimal value) => value.ToString("0.###");
+    private static string FormatQuantity(decimal value) => value.ToString("N3");
 
     private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
         ? "—"

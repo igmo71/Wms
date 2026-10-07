@@ -31,7 +31,6 @@ public sealed class ReceivingOrderQueueItemViewState
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         HasJoinBlock = !order.IsParticipant && !order.CanJoin,
         JoinBlockText = order.JoinBlockedReason ?? string.Empty,
-        ProgressText = $"Факт: {order.Progress.FactQuantity:g} из {order.Progress.PlanQuantity:g} · "
-            + $"Проверено строк: {order.Progress.ConfirmedLineCount} из {order.Progress.TotalLineCount}"
+        ProgressText = $"Проверено строк: {order.Progress.ConfirmedLineCount} из {order.Progress.TotalLineCount}"
     };
 }

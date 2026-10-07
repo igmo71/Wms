@@ -123,7 +123,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             return;
         _awaitingReceivingLocation = true;
         ErrorLabel.Text = string.Empty;
-        InstructionLabel.Text = "Отсканируйте позицию зоны приёмки.";
+        SynchronizationDetailsLabel.Text = "Отсканируйте позицию зоны приёмки.";
+        SynchronizationPanel.IsVisible = true;
         StartReceivingButton.IsVisible = false;
         await UpdateCameraAsync();
     }
@@ -358,10 +359,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             MobileReceivingOrderStatus.ProcessingRequired => "Обработка",
             _ => "Завершён"
         };
-        FactLabel.Text = $"Факт: {details.Order.Progress.FactQuantity:g} из {details.Order.Progress.PlanQuantity:g}";
         CheckedLabel.Text = $"Проверено: {details.Order.Progress.ConfirmedLineCount} из {details.Order.Progress.TotalLineCount}";
-        SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(_synchronization);
-        SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(_synchronization);
         LineRows = details.Lines.Select(ReceivingOrderLineRow.From).ToArray();
         LicensePlateNumbers = details.LicensePlateNumbers
             .Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
@@ -383,13 +381,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             && details.Order.IsParticipant;
         CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
         UpdateRecoveryControls();
-        InstructionLabel.Text = CompleteReceivingButton.IsVisible
-            ? GetCompletionHint()
-            : CanUseLicensePlateNumbers
-                ? "Сканируйте LPN на любой вкладке. Товар — внутри палеты."
-            : details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
-                ? "Начните приёмку."
-                : string.Empty;
+        UpdateGuidance();
     }
 
 
@@ -451,6 +443,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             && _synchronization is not null
             && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
         CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
+        UpdateGuidance();
         UpdateRecoveryControls();
     }
 
@@ -459,35 +452,53 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         if (_busy
             || _details is not
             {
-                Order: { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true },
-                LicensePlateNumbers: var licensePlateNumbers,
-                Lines: var lines
+                Order: { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true }
             }
-            || _synchronization is not { Fingerprint.Length: > 0 } synchronization)
+            || _synchronization is not { Fingerprint.Length: > 0 })
         {
             return false;
         }
 
         return !_process.HasPendingCommand
-            && licensePlateNumbers.All(x => x.Status != MobileLicensePlateNumberStatus.Open)
-            && lines.All(x => x.FactQuantity.HasValue)
-            && !synchronization.RequiresManager
-            && OrderSynchronizationPresentation.CanPerformCriticalTransition(synchronization);
+            && GetCompletionHint() is null;
     }
 
-    private string GetCompletionHint()
+    private void UpdateGuidance()
+    {
+        var message = _awaitingReceivingLocation
+            ? "Отсканируйте позицию зоны приёмки."
+            : _details?.Order.Status == MobileReceivingOrderStatus.InReceiving
+                ? GetCompletionHint()
+                : _synchronization is not null && OrderSynchronizationPresentation.HasIssue(_synchronization)
+                    ? OrderSynchronizationPresentation.BuildDetails(_synchronization, showChangedFields: false)
+                    : null;
+        SynchronizationDetailsLabel.Text = message;
+        SynchronizationPanel.IsVisible = !string.IsNullOrWhiteSpace(message);
+    }
+
+    private string? GetCompletionHint()
     {
         if (_details is null || _synchronization is null)
             return "Проверяем возможность завершения приёмки…";
-        if (_details.LicensePlateNumbers.Any(x => x.Status == MobileLicensePlateNumberStatus.Open))
-            return "Для завершения закройте все палеты.";
-        if (_details.Lines.Any(x => !x.FactQuantity.HasValue))
-            return "Для завершения пересчитайте всю номенклатуру.";
-        if (_synchronization.RequiresManager)
-            return "Есть расхождение количества — требуется решение Manager в Web.";
+        if (!_synchronization.IsFresh || !string.IsNullOrWhiteSpace(_synchronization.VerificationError))
+            return "Не удалось проверить ордер в 1С. Потяните список вниз для повторной проверки.";
+        if (_synchronization.SourceLevel == MobileOrderSynchronizationLevel.Blocking)
+            return "Есть расхождение с 1С. Обратитесь к ответственному для устранения.";
+        if (_synchronization.SourceLevel == MobileOrderSynchronizationLevel.RequiresOperatorDecision)
+            return "Подтвердите изменения из 1С в веб-приложении.";
+        var openCount = _details.LicensePlateNumbers.Count(x => x.Status == MobileLicensePlateNumberStatus.Open);
+        if (openCount > 0)
+            return $"Закройте открытые палеты: {openCount}.";
+        var uncheckedCount = _details.Lines.Count(x => !x.FactQuantity.HasValue);
+        if (uncheckedCount > 0)
+            return $"Укажите количество для оставшихся позиций: {uncheckedCount}.";
+        if (_synchronization.RequiresManager || _details.Lines.Any(x => x.FactQuantity != x.PlanQuantity))
+            return "Есть расхождения количества. Исправьте или обратитесь к менеджеру";
         if (!OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization))
-            return "Завершение недоступно: проверьте сообщение сверки с 1С.";
-        return "Все палеты закрыты, план и факт совпадают.";
+            return "Не удалось подтвердить возможность завершения. Потяните список вниз для повторной проверки.";
+        if (string.IsNullOrWhiteSpace(_synchronization.Fingerprint))
+            return "Потяните список вниз для проверки перед завершением.";
+        return null;
     }
 
     private async Task UpdateCameraAsync()
@@ -527,7 +538,7 @@ public sealed record ReceivingOrderLineRow(
 {
     public static ReceivingOrderLineRow From(MobileReceivingOrderLineResponse line)
     {
-        var unit = string.IsNullOrWhiteSpace(line.UnitOfMeasure) ? string.Empty : $" {line.UnitOfMeasure}";
+        var unit = string.IsNullOrWhiteSpace(line.UnitOfMeasure) ? " —" : $" {line.UnitOfMeasure}";
         var background = !line.FactQuantity.HasValue
             ? Colors.White
             : line.FactQuantity.Value == line.PlanQuantity
@@ -538,8 +549,8 @@ public sealed record ReceivingOrderLineRow(
             line.StockKeepingUnitId,
             line.SkuCode,
             line.SkuName,
-            $"{line.PlanQuantity:g}{unit}",
-            line.FactQuantity.HasValue ? $"{line.FactQuantity:g}{unit}" : "?",
+            $"{line.PlanQuantity:0.###}{unit}",
+            line.FactQuantity.HasValue ? $"{line.FactQuantity:0.###}{unit}" : "?",
             background,
             line.FactQuantity.HasValue ? Colors.Black : Colors.DarkRed);
     }

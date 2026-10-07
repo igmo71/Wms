@@ -228,10 +228,13 @@ public partial class Picking
             : 0;
     }
 
-    private static string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation) =>
-        $"{StorageLocationDisplay.Format(sourceLocation.StorageLocation)} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
+    private string FormatSourceLocation(PickingSourceLocationAvailability sourceLocation)
+    {
+        var unit = _selectedLine?.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—";
+        return $"{StorageLocationDisplay.Format(sourceLocation.StorageLocation)} · остаток: {FormatQuantity(sourceLocation.PhysicalQuantity)} {unit} / {WeightDisplay.Format(sourceLocation.PhysicalWeightKg)} · доступно: {FormatQuantity(Math.Max(0, sourceLocation.PhysicalQuantity - sourceLocation.DraftQuantity))} {unit} / {WeightDisplay.Format(sourceLocation.AvailableWeightKg)}";
+    }
 
-    private static string FormatQuantity(decimal quantity) => quantity.ToString("0.###");
+    private static string FormatQuantity(decimal quantity) => quantity.ToString("N3");
 
     private void CancelEditing() { if (!InputsLocked) ResetEditing(); }
 

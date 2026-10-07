@@ -38,5 +38,6 @@ public sealed record MobileOrderSynchronizationResponse(
     string? OneCComment,
     string? VerificationError,
     string? Fingerprint = null,
-    bool RequiresManager = false);
+    bool RequiresManager = false,
+    MobileOrderSynchronizationLevel? SourceLevel = null);
 

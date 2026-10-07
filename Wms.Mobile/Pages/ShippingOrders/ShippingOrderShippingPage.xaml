@@ -83,8 +83,9 @@
                                 <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
                                 <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
                                 <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                <Label FontSize="16" Text="{Binding FactQuantity, StringFormat='К отгрузке: {0:g}'}" />
-                                <Label Text="{Binding PlanQuantity, StringFormat='План: {0:g}'}" />
+                                <Label Text="{Binding UnitOfMeasure, StringFormat='Ед изм: {0}', TargetNullValue='Ед изм: —'}" />
+                                <Label FontSize="16" Text="{Binding FactQuantity, StringFormat='К отгрузке: {0:0.###}'}" />
+                                <Label Text="{Binding PlanQuantity, StringFormat='План: {0:0.###}'}" />
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

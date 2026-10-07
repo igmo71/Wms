@@ -20,6 +20,7 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
             .Include(x => x.StorageLocation)
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.InventoryMovement);
 
         query = await ApplyFiltersAsync(query, listQuery, dbContext, ct);

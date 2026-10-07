@@ -21,7 +21,7 @@ public sealed class ShippingOrderPickingLineViewState : INotifyPropertyChanged
     public string LineText => $"Строка {LineNumber} · Код: {SkuCode}";
     public string QuantitySummary =>
         $"План: {PlanQuantity:0.###} · Факт: {FactQuantity:0.###} · "
-        + $"Осталось: {RemainingQuantity:0.###} {UnitOfMeasure}";
+        + $"Осталось: {RemainingQuantity:0.###} {(string.IsNullOrWhiteSpace(UnitOfMeasure) ? "—" : UnitOfMeasure)}";
     public bool CanAddMovement => ActionsEnabled && RemainingQuantity > 0;
     public bool HasMovements => Movements.Count > 0;
     public bool HasComment => !string.IsNullOrWhiteSpace(Comment);

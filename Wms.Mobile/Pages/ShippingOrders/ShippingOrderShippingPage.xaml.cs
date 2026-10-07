@@ -154,15 +154,14 @@ public partial class ShippingOrderShippingPage : ContentPage
         LocationLabel.Text = details.Order.ShippingLocation is null
             ? "Позиция отгрузки не указана"
             : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}";
-        ProgressLabel.Text = $"К отгрузке: {details.Order.Progress.FactQuantity:g}";
+        ProgressLabel.Text = $"Строк к отгрузке: {details.Lines.Count}";
         SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(
             _synchronization);
         SynchronizationTitleLabel.Text = OrderSynchronizationPresentation.BuildTitle(
             _synchronization);
         SynchronizationDetailsLabel.Text = OrderSynchronizationPresentation.BuildDetails(
             _synchronization);
-        ShippingSummaryLabel.Text = $"Строк: {details.Lines.Count}; "
-            + $"фактическое количество: {details.Order.Progress.FactQuantity:g}.";
+        ShippingSummaryLabel.Text = $"Проверьте количество по каждой из {details.Lines.Count} строк.";
     }
 
     private void SetMode(ShippingPageMode mode)
@@ -173,7 +172,7 @@ public partial class ShippingOrderShippingPage : ContentPage
         {
             ShippingPageMode.Confirmation => (
                 "Подтверждение отгрузки",
-                "Проверьте позицию и итоговое количество, затем подтвердите отгрузку."),
+                "Проверьте позицию и количества по строкам, затем подтвердите отгрузку."),
             _ => (
                 "Финальная отгрузка",
                 "Проверьте итог ордера и нажмите «Отгрузить».")

@@ -451,18 +451,19 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
         if (transitStorageLocationId is null)
             return [];
 
-        return await dbContext.InventoryBalances
+        var balances = await dbContext.InventoryBalances
             .AsNoTracking()
             .Include(x => x.StockKeepingUnit)
                 .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Where(x => x.StorageLocationId == transitStorageLocationId && x.Quantity > 0)
             .OrderBy(x => x.StockKeepingUnit!.Name)
-            .Select(x => new InventoryTransferTransitBalance
-            {
-                StockKeepingUnit = x.StockKeepingUnit!,
-                Quantity = x.Quantity
-            })
             .ToListAsync(ct);
+        return balances.Select(x => new InventoryTransferTransitBalance
+        {
+            StockKeepingUnit = x.StockKeepingUnit!,
+            Quantity = x.Quantity
+        })
+            .ToList();
     }
 
     public async Task<List<InventoryTransferStorageLocationBalance>> GetStorageLocationBalancesAsync(
@@ -471,17 +472,19 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        return await dbContext.InventoryBalances
+        var balances = await dbContext.InventoryBalances
             .AsNoTracking()
             .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Where(x => x.StorageLocationId == storageLocationId && x.Quantity > 0)
             .OrderBy(x => x.StockKeepingUnit!.Name)
-            .Select(x => new InventoryTransferStorageLocationBalance
-            {
-                StockKeepingUnit = x.StockKeepingUnit!,
-                Quantity = x.Quantity
-            })
             .ToListAsync(ct);
+        return balances.Select(x => new InventoryTransferStorageLocationBalance
+        {
+            StockKeepingUnit = x.StockKeepingUnit!,
+            Quantity = x.Quantity
+        })
+            .ToList();
     }
 
     public async Task<List<StorageLocation>> GetAvailableTransitStorageLocationsAsync(

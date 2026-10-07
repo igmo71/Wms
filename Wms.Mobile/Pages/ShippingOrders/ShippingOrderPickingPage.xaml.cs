@@ -64,7 +64,7 @@ public partial class ShippingOrderPickingPage : ContentPage
         || _pendingCompletionRequestId is not null;
 
     private bool HasPickingDeviation =>
-        Details.Order.Progress.FactQuantity != Details.Order.Progress.PlanQuantity;
+        Details.Lines.Any(line => line.FactQuantity != line.PlanQuantity);
 
     private bool CanStartMovement => IsEditable
         && !_busy
@@ -638,8 +638,8 @@ public partial class ShippingOrderPickingPage : ContentPage
         LocationLabel.Text = details.Order.ShippingLocation is null
             ? "Позиция отгрузки не указана"
             : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}";
-        ProgressLabel.Text = $"Отобрано: {details.Order.Progress.FactQuantity:g} "
-            + $"из {details.Order.Progress.PlanQuantity:g}";
+        ProgressLabel.Text = $"Полностью отобрано строк: {details.Order.Progress.FullyPickedLineCount} "
+            + $"из {details.Order.Progress.TotalLineCount}";
         CommentLabel.Text = details.Order.Comment;
         CommentLabel.IsVisible = !string.IsNullOrWhiteSpace(details.Order.Comment);
         SynchronizationPanel.IsVisible = OrderSynchronizationPresentation.HasIssue(
@@ -656,19 +656,18 @@ public partial class ShippingOrderPickingPage : ContentPage
     private void ApplyCompletionSummary(MobileShippingOrderDetailsResponse details)
     {
         var progress = details.Order.Progress;
-        var deviation = progress.PlanQuantity - progress.FactQuantity;
+        var deviatingLines = details.Lines.Count(line => line.FactQuantity != line.PlanQuantity);
         CompletionLinesLabel.Text = $"Полностью: {progress.FullyPickedLineCount}; "
             + $"частично: {progress.PartiallyPickedLineCount}; "
             + $"нулевой факт: {progress.ZeroPickedLineCount}.";
-        CompletionQuantitiesLabel.Text = $"План: {progress.PlanQuantity:g}; "
-            + $"факт: {progress.FactQuantity:g}; отклонение: {deviation:g}.";
+        CompletionDeviationLabel.Text = $"Строк с расхождением: {deviatingLines}.";
         CompletionLocationLabel.Text = details.Order.ShippingLocation is null
             ? "Позиция отгрузки не указана."
             : $"Позиция отгрузки: {details.Order.ShippingLocation.Address}.";
-        CompletionWarningLabel.Text = deviation == 0
+        CompletionWarningLabel.Text = deviatingLines == 0
             ? "Отбор выполнен полностью."
-            : "Отбор выполнен не полностью. Неотобранное количество будет передано в 1С.";
-        CompletionWarningLabel.TextColor = deviation == 0 ? Colors.Green : Colors.DarkOrange;
+            : "Количество в отдельных строках отличается от плана. Проверьте строки перед завершением.";
+        CompletionWarningLabel.TextColor = deviatingLines == 0 ? Colors.Green : Colors.DarkOrange;
     }
 
     private void SynchronizeLines(MobileShippingOrderDetailsResponse details)

@@ -156,7 +156,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         OnPropertyChanged(nameof(EmptyWithSkuHistoryRecommendations));
         OnPropertyChanged(nameof(EmptyRecommendations));
         SelectedSkuLabel.Text = item.SkuName;
-        RemainingLabel.Text = $"Осталось {item.RemainingQuantity:0.###} {item.UnitOfMeasure}";
+        RemainingLabel.Text = $"Осталось {item.RemainingQuantity:0.###} {item.UnitOfMeasure ?? "—"}";
         _quantityConfirmed = false;
         _quantity = 0;
         QuantityEntry.Text = string.Empty;
@@ -233,7 +233,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     private void UpdateQuantityStatus()
     {
         QuantityStatusLabel.Text = _quantityConfirmed
-            ? $"Подтверждено: {_quantity:0.###} {_selectedItem?.UnitOfMeasure}. Скан позиции сразу проводит движение."
+            ? $"Подтверждено: {_quantity:0.###} {_selectedItem?.UnitOfMeasure ?? "—"}. Скан позиции сразу проводит движение."
             : "Количество не подтверждено. Завершите ввод или выберите «Весь остаток».";
     }
 
@@ -295,7 +295,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             OnPropertyChanged(nameof(History));
             if (_selectedItem is not null)
             {
-                RemainingLabel.Text = $"Осталось {_selectedItem.RemainingQuantity:0.###} {_selectedItem.UnitOfMeasure}";
+                RemainingLabel.Text = $"Осталось {_selectedItem.RemainingQuantity:0.###} {_selectedItem.UnitOfMeasure ?? "—"}";
             }
             if (_selectedItem is null || !_details.CanPutaway || _selectedItem.RemainingQuantity <= 0)
             {
@@ -330,10 +330,9 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
     {
         _details = details;
         LpnCodeLabel.Text = details.Code;
-        OrderLabel.Text = $"Ордер: {details.OrderNumber}";
-        LpnStatusLabel.Text = details.IsCompleted
-            ? "LPN полностью размещён."
-            : details.BlockedReason ?? "Выберите или отсканируйте SKU.";
+        CompletedLabel.IsVisible = details.IsCompleted && details.BlockedReason is null;
+        LpnStatusLabel.Text = details.BlockedReason;
+        LpnStatusLabel.IsVisible = !string.IsNullOrWhiteSpace(details.BlockedReason);
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(History));
         ApplyStep(details.CanPutaway ? PutawayStep.Sku : PutawayStep.Status);
@@ -347,13 +346,8 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
         QuantityPanel.IsVisible = step == PutawayStep.Quantity;
         HistoryPanel.IsVisible = step == PutawayStep.Status && History.Count > 0;
         NextLpnButton.IsVisible = step == PutawayStep.Status;
-        (StepLabel.Text, InstructionLabel.Text) = step switch
-        {
-            PutawayStep.Lpn => ("LPN", "Отсканируйте LPN."),
-            PutawayStep.Sku => ("Товар", "Отсканируйте SKU или выберите строку LPN."),
-            PutawayStep.Quantity => ("Количество и позиция", "Подтвердите количество, затем отсканируйте позицию хранения."),
-            _ => ("Размещение", "Просмотрите состояние и историю LPN.")
-        };
+        InstructionLabel.Text = "Отсканируйте LPN.";
+        InstructionLabel.IsVisible = step == PutawayStep.Lpn;
         UpdateQuantityStatus();
     }
 

@@ -148,10 +148,11 @@ else
                     </HierarchyColumn>
                     <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                     <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                    <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
-                    <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                    <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
+                    <PropertyColumn Property="x => x.PlanQuantity" Title="План" Format="N3" />
+                    <PropertyColumn Property="x => x.FactQuantity" Title="Факт" Format="N3" />
                     <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                    <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+                    <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" Format="N3" />
 
                 </Columns>
                 <ChildRowContent>
@@ -163,7 +164,7 @@ else
                                     <TemplateColumn Title="Ячейка-источник">
                                         <CellTemplate Context="sourceContext">@StorageLocationDisplay.FormatOrDash(sourceContext.Item.SourceStorageLocation)</CellTemplate>
                                     </TemplateColumn>
-                                    <PropertyColumn Property="x => x.Quantity" Title="Количество" />
+                                    <PropertyColumn Property="x => x.Quantity" Title="Количество" Format="N3" />
                                     <TemplateColumn Title="Вес"><CellTemplate Context="weightContext">@WeightDisplay.Format(weightContext.Item.WeightKg)</CellTemplate></TemplateColumn>
                                     <PropertyColumn Property="x => x.CreatedAtUtc" Title="Создано" Format="dd.MM.yyyy HH:mm" />
                                     <PropertyColumn Property="x => x.UpdatedAtUtc" Title="Изменено" Format="dd.MM.yyyy HH:mm" />
@@ -191,12 +192,12 @@ else
                                     </MudSelect>
                                     @if (_selectedSourceLocation is not null)
                                     {
-                                        <MudText Typo="Typo.caption">Фактический остаток: @FormatQuantity(SelectedSourcePhysicalQuantity) / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourcePhysicalQuantity, _selectedLine.StockKeepingUnit)) · Доступно к отбору: @FormatQuantity(SelectedSourceAvailableQuantity) / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourceAvailableQuantity, _selectedLine.StockKeepingUnit))</MudText>
+                                        <MudText Typo="Typo.caption">Фактический остаток: @FormatQuantity(SelectedSourcePhysicalQuantity) @(_selectedLine.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—") / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourcePhysicalQuantity, _selectedLine.StockKeepingUnit)) · Доступно к отбору: @FormatQuantity(SelectedSourceAvailableQuantity) @(_selectedLine.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—") / @WeightDisplay.Format(WeightCalculation.CalculateKg(SelectedSourceAvailableQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                     }
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudNumericField T="decimal" Disabled="@InputsLocked" Label="Фактическое количество" @bind-Value="_movementQuantity" Min="0" Max="MaximumPickingQuantity" HideSpinButtons="true" />
-                                    <MudText Typo="Typo.caption">Можно отобрать: @FormatQuantity(MaximumPickingQuantity)</MudText>
+                                    <MudText Typo="Typo.caption">Можно отобрать: @FormatQuantity(MaximumPickingQuantity) @(_selectedLine.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</MudText>
                                     <MudText Typo="Typo.caption">Вес: @WeightDisplay.Format(WeightCalculation.CalculateKg(_movementQuantity, _selectedLine.StockKeepingUnit))</MudText>
                                 </MudItem>
                                 <MudItem xs="12" md="3">

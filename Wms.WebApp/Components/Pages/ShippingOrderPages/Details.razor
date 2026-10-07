@@ -172,10 +172,11 @@ else
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
-                <PropertyColumn Property="x => x.PlanQuantity" Title="План" />
-                <PropertyColumn Property="x => x.FactQuantity" Title="Факт" />
+                <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
+                <PropertyColumn Property="x => x.PlanQuantity" Title="План" Format="N3" />
+                <PropertyColumn Property="x => x.FactQuantity" Title="Факт" Format="N3" />
                 <TemplateColumn Title="Фактический вес"><CellTemplate>@WeightDisplay.Format(context.Item.FactWeightKg)</CellTemplate></TemplateColumn>
-                <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" />
+                <PropertyColumn Property="x => x.RemainingQuantity" Title="Осталось" Format="N3" />
             </Columns>
         </MudDataGrid>
     </MudStack>

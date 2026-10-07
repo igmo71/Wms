@@ -9,8 +9,7 @@
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
             <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="22" />
             <Label x:Name="StatusLabel" Grid.Column="1" FontAttributes="Bold" VerticalTextAlignment="Center" />
-            <Label x:Name="FactLabel" Grid.Row="1" FontSize="13" />
-            <Label x:Name="CheckedLabel" Grid.Row="1" Grid.Column="1" FontSize="13" HorizontalTextAlignment="End" />
+            <Label x:Name="CheckedLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="13" />
         </Grid>
         <Border x:Name="SynchronizationPanel" Grid.Row="1" IsVisible="False" Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
             <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
@@ -70,7 +69,6 @@
         </RefreshView>
         <VerticalStackLayout Grid.Row="4" Spacing="5">
             <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
-            <Label x:Name="InstructionLabel" FontSize="12" HorizontalTextAlignment="Center" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
             <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
             <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />

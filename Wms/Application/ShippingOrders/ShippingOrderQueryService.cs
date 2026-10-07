@@ -23,6 +23,7 @@ public class ShippingOrderQueryService(
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
+                    .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.BaseItems)
                 .ThenInclude(x => x.StockKeepingUnit)
             .FirstOrDefaultAsync(x => x.Id == id, ct);

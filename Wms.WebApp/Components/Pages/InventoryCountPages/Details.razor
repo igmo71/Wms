@@ -125,7 +125,7 @@ else
                 <MudTd DataLabel="Товар">
                     <b>@context.StockKeepingUnit?.Name</b><br />
                     <MudText Typo="Typo.caption">
-                        Код: @context.StockKeepingUnit?.Code · @context.StockKeepingUnit?.BaseUnitOfMeasure?.Description
+                        Код: @context.StockKeepingUnit?.Code · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")
                     </MudText>
                 </MudTd>
                 <MudTd DataLabel="Ожидается">@FormatQuantity(context.ExpectedQuantity)</MudTd>

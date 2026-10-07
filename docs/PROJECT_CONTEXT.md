@@ -15,6 +15,16 @@ The supported interactive clients are `Wms.WebApp` and Android `Wms.Mobile`.
 `Wms.WebApi` exposes authenticated Mobile V1 plus separate 1C integration
 endpoints.
 
+Warehouse quantities retain at most three decimal places. Read-only Web
+quantity tables show three places; compact TSD displays show up to three.
+Each SKU quantity group shows its base unit once, with an unknown unit shown
+explicitly. Quantity inputs retain their existing validation and compact
+editing behavior. Counts of lines and pallets are integers, and weight is a
+separate kg measure. Order progress does not total quantities across SKUs;
+TSD receiving and shipping show progress by line count instead. TSD picking
+requires discrepancy confirmation when any shipping line differs from its plan;
+differences on separate SKUs cannot cancel each other.
+
 This file owns current product boundaries and lasting business rules.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) owns engineering conventions,
 [`ROADMAP.md`](ROADMAP.md) owns unfinished work, and frozen specifications keep
@@ -234,8 +244,14 @@ Direct facts and order-based putaway are removed from the Mobile API. Receiving
 completion with a fresh exact plan/fact match is available to a participant in
 Mobile. Quantity-difference approval and its reason remain a Manager-only Web
 action. The Mobile completion action remains visible while the order is in
-receiving and explains why it is unavailable: an open pallet, an unchecked
-line, a quantity difference, or a failed/blocking fresh 1C check.
+receiving. One compact yellow instruction below the order header shows the
+first obstacle: a failed or blocking fresh source check, open pallets (count),
+unchecked lines (count), then quantity differences requiring correction or a
+manager. There is no second completion hint above the button. The panel and
+completion availability use the same eligibility decision; the panel disappears
+when completion is available. Busy and pending-command guards still apply.
+The Mobile response exposes the persisted source synchronization level separately
+from the completion assessment, so unfinished counting is not shown as a 1C error.
 
 The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
 accepted from either tab and opens its separate pallet page; an SKU scan is
@@ -245,7 +261,9 @@ order SKU by name or code, including one not yet counted on that pallet. The
 manual selection opens the same quantity page without creating a pallet row;
 the pallet's main list continues to show only its retained item rows. Plan choices
 and retained rows have neutral headings; plan cards are light gray and retained
-rows white, without using success colors for a counted quantity. A successful quantity
+rows white. Manual plan choices have a green border only when the order-wide
+checked fact exactly matches the SKU plan across all active pallets; unchecked
+and excess quantities do not receive this border. A successful quantity
 save closes the manual selector on return to the pallet page; failed or cancelled
 edits leave it open.
 No quantity field is focused by navigation or scanning. The order SKU table is
@@ -298,6 +316,16 @@ Storage location in the same warehouse. Partial putaway is allowed. The
 remaining quantity is the immutable accepted LPN-item quantity minus its posted
 LPN putaway history, so later picking or other consumption from a destination
 does not change receiving history or make quantity pending again.
+
+The Mobile putaway screen keeps the navigation title and uses the LPN code as
+the content heading, with a checkmark for completed, unblocked pallets. It omits
+the order number and routine step explanations, while retaining blocking reasons
+and quantity-confirmation feedback. Composition and history have no outer cards;
+SKU code and unit share a row, and quantities use compact labelled columns.
+Composition cards with zero remaining quantity have a light green background.
+History shows the SKU, destination with quantity and unit, then employee name and
+timestamp. Employee names follow the shared Identity display-name fallback rule;
+stored audit user ids remain unchanged.
 
 Each SKU selection starts with an empty, unconfirmed quantity and no automatic
 input focus. Finishing input (Done or leaving the field) or explicitly choosing
@@ -426,6 +454,9 @@ fresh synchronization check. A rejected completion conflict also refreshes the
 assessment; unresolved or failed verification disables completion. Refresh
 does not acknowledge source changes or replay pending commands.
 
+Mobile receiving omits the technical changed-field list from synchronization
+messages, retaining verification errors, blocking guidance and required actions.
+
 Starting work rejects a known unresolved assessment. Receiving completion,
 picking completion, and final shipping fetch and persist a fresh checkpoint
 before final effects. Receiving applies the LPN plan/fact and Manager-decision
@@ -502,7 +533,7 @@ Completion and 1C reconciliation
 remain above the tabs; Web LPN composition editing is outside this result.
 When Web completion is unavailable, a concise reason between the order title
 and the action points to the next step; Mobile already shows completion
-guidance near its action.
+guidance below its order header as described in the receiving workflow above.
 
 The API address is packaged per build configuration and is not editable by the
 operator.

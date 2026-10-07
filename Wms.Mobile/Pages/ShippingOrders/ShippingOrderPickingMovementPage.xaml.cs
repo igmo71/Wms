@@ -215,7 +215,7 @@ public partial class ShippingOrderPickingMovementPage : ContentPage
         SelectedSkuLabel.Text = _selectedLine.SkuName;
         SelectedLineLabel.Text = $"Строка {_selectedLine.LineNumber} · "
             + $"Осталось {_selectedLine.RemainingQuantity:0.###} "
-            + _selectedLine.UnitOfMeasure;
+            + (_selectedLine.UnitOfMeasure ?? "—");
     }
 
     private async Task LoadSourceHintsAsync()

@@ -43,12 +43,14 @@ public sealed record LicensePlateNumberPutawayHistoryItem(
     Guid LicensePlateNumberItemId,
     Guid StockKeepingUnitId,
     string SkuName,
+    string? UnitOfMeasure,
     decimal Quantity,
     string DestinationAddress,
     string DestinationName,
     string CreatedBy,
     DateTimeOffset CreatedAtUtc,
-    Guid InventoryMovementId);
+    Guid InventoryMovementId,
+    string? CreatedByName = null);
 
 public sealed record PutawayLicensePlateNumberCommand(
     Guid LicensePlateNumberId,

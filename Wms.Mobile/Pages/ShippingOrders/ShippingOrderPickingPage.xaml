@@ -83,7 +83,8 @@
                                             <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
                                             <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
                                             <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                            <Label Text="{Binding UnitOfMeasure, StringFormat='Ед изм: {0}', TargetNullValue='Ед изм: —'}" />
+                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:0.###}'}" />
                                         </VerticalStackLayout>
                                     </Border>
                                 </DataTemplate>
@@ -133,7 +134,8 @@
                                             <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
                                             <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
                                             <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                            <Label Text="{Binding UnitOfMeasure, StringFormat='Ед изм: {0}', TargetNullValue='Ед изм: —'}" />
+                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:0.###}'}" />
                                         </VerticalStackLayout>
                                     </Border>
                                 </DataTemplate>
@@ -158,7 +160,7 @@
                 <VerticalStackLayout Spacing="10">
                     <Label FontAttributes="Bold" FontSize="22" Text="Итог отбора" />
                     <Label x:Name="CompletionLinesLabel" FontSize="17" />
-                    <Label x:Name="CompletionQuantitiesLabel" FontAttributes="Bold" FontSize="17" />
+                    <Label x:Name="CompletionDeviationLabel" FontAttributes="Bold" FontSize="17" />
                     <Label x:Name="CompletionLocationLabel" FontSize="17" />
                     <Label
                         x:Name="CompletionWarningLabel"

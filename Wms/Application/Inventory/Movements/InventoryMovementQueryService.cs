@@ -22,6 +22,7 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
             .Include(x => x.DestinationStorageLocation)
                 .ThenInclude(x => x!.Zone)
             .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Where(x => x.PostedAtUtc != null);
 
         query = await ApplyFiltersAsync(query, listQuery, dbContext, ct);

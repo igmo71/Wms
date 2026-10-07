@@ -73,11 +73,12 @@
             <CellTemplate>@StorageLocationDisplay.Format(context.Item.StorageLocation)</CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
-        <PropertyColumn Property="x => x.QuantityDelta" Title="Изменение" Sortable="true" />
+        <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
+        <PropertyColumn Property="x => x.QuantityDelta" Title="Изменение" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес изменения" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightDeltaKg)</CellTemplate></TemplateColumn>
-        <PropertyColumn Property="x => x.BalanceBefore" Title="Остаток до" Sortable="true" />
+        <PropertyColumn Property="x => x.BalanceBefore" Title="Остаток до" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес до" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightBeforeKg)</CellTemplate></TemplateColumn>
-        <PropertyColumn Property="x => x.BalanceAfter" Title="Остаток после" Sortable="true" />
+        <PropertyColumn Property="x => x.BalanceAfter" Title="Остаток после" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес после" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightAfterKg)</CellTemplate></TemplateColumn>
         <TemplateColumn Title="Основание" Sortable="false">
             <CellTemplate>

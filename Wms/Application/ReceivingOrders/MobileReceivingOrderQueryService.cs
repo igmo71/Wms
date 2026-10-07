@@ -311,8 +311,6 @@ public sealed class MobileReceivingOrderQueryService(
             order.Items.Count,
             order.Items.Count(x => x.IsFactConfirmed),
             order.Items.Count(x => x.FactQuantity > 0),
-            order.Items.Sum(x => x.PlanQuantity),
-            order.Items.Sum(x => x.FactQuantity ?? 0),
             order.StartedAtUtc,
             order.CompletedAtUtc,
             isParticipant,

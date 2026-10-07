@@ -287,7 +287,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         foreach (var result in results)
         {
             var unit = string.IsNullOrWhiteSpace(result.UnitOfMeasure)
-                ? string.Empty
+                ? " —"
                 : $" {result.UnitOfMeasure}";
             var resultLayout = new VerticalStackLayout { Spacing = 3 };
             resultLayout.Children.Add(new Label
@@ -346,7 +346,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         CloseSkuSearch(showPrompt: false);
 
         var unit = string.IsNullOrWhiteSpace(sku.UnitOfMeasure)
-            ? string.Empty
+                ? " —"
             : $" {sku.UnitOfMeasure}";
         SkuLabel.Text = $"{sku.Name}\nКод: {sku.Code}";
         AvailableQuantityLabel.Text =

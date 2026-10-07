@@ -29,7 +29,7 @@ public sealed class LicensePlateNumberPutawayService(
         var lpn = await LoadAsync(dbContext, x => x.Code == normalized, true, ct);
         return lpn is null
             ? OperationError.NotFound("LPN не найден.")
-            : Map(lpn);
+            : await MapDetailsAsync(dbContext, lpn, ct);
     }
 
     public async Task<OperationResult<LicensePlateNumberPutawayDetails>> GetAsync(
@@ -40,7 +40,7 @@ public sealed class LicensePlateNumberPutawayService(
         var lpn = await LoadAsync(dbContext, x => x.Id == lpnId, true, ct);
         return lpn is null
             ? OperationError.NotFound("LPN не найден.")
-            : Map(lpn);
+            : await MapDetailsAsync(dbContext, lpn, ct);
     }
 
     public async Task<OperationResult<LicensePlateNumberPutawaySelection>> ResolveSkuAsync(
@@ -178,7 +178,7 @@ public sealed class LicensePlateNumberPutawayService(
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit).ThenInclude(x => x.BaseUnitOfMeasure)
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit).ThenInclude(x => x.Barcodes)
             .Include(x => x.Putaways).ThenInclude(x => x.DestinationStorageLocation).ThenInclude(x => x.Zone)
-            .Include(x => x.Putaways).ThenInclude(x => x.StockKeepingUnit);
+            .Include(x => x.Putaways).ThenInclude(x => x.StockKeepingUnit).ThenInclude(x => x.BaseUnitOfMeasure);
         if (noTracking)
             query = query.AsNoTracking();
         return query.SingleOrDefaultAsync(predicate, ct);
@@ -250,6 +250,31 @@ public sealed class LicensePlateNumberPutawayService(
         return new LicensePlateNumberPutawaySelection(item, recommendations);
     }
 
+    private static async Task<LicensePlateNumberPutawayDetails> MapDetailsAsync(
+        ApplicationDbContext dbContext,
+        LicensePlateNumber lpn,
+        CancellationToken ct)
+    {
+        var details = Map(lpn);
+        var userIds = details.History.Select(x => x.CreatedBy).Distinct().ToArray();
+        if (userIds.Length == 0)
+            return details;
+
+        var userNames = await dbContext.Users
+            .Where(x => userIds.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => string.IsNullOrWhiteSpace(x.DisplayName) ? x.UserName ?? x.Id : x.DisplayName,
+                ct);
+        return details with
+        {
+            History = details.History.Select(x => x with
+            {
+                CreatedByName = userNames.GetValueOrDefault(x.CreatedBy, x.CreatedBy)
+            }).ToList()
+        };
+    }
+
     private static LicensePlateNumberPutawayDetails Map(LicensePlateNumber lpn)
     {
         var placedByItem = lpn.Putaways
@@ -286,7 +311,10 @@ public sealed class LicensePlateNumberPutawayService(
             lpn.Putaways.OrderByDescending(x => x.CreatedAtUtc).Select(x =>
                 new LicensePlateNumberPutawayHistoryItem(
                     x.Id, x.LicensePlateNumberItemId, x.StockKeepingUnitId,
-                    x.StockKeepingUnit.Name ?? string.Empty, x.Quantity,
+                    x.StockKeepingUnit.Name ?? string.Empty,
+                    x.StockKeepingUnit.BaseUnitOfMeasure?.Description
+                        ?? x.StockKeepingUnit.BaseUnitOfMeasure?.Abbreviation,
+                    x.Quantity,
                     $"{x.DestinationStorageLocation.Zone.Code}-{x.DestinationStorageLocation.Code}",
                     x.DestinationStorageLocation.Name ?? string.Empty,
                     x.CreatedBy, x.CreatedAtUtc, x.InventoryMovementId)).ToList());

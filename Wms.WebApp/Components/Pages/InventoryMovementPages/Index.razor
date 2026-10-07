@@ -47,7 +47,8 @@
             <CellTemplate>@StorageLocationDisplay.FormatOrDash(context.Item.DestinationStorageLocation)</CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
-        <PropertyColumn Property="x => x.Quantity" Title="Количество" Sortable="true" />
+        <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
+        <PropertyColumn Property="x => x.Quantity" Title="Количество" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightKg)</CellTemplate></TemplateColumn>
         <TemplateColumn Title="Основание" Sortable="false">
             <CellTemplate>

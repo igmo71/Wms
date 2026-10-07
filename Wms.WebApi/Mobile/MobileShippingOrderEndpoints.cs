@@ -364,9 +364,7 @@ internal static class MobileShippingOrderEndpoints
             order.TotalLineCount,
             order.FullyPickedLineCount,
             order.PartiallyPickedLineCount,
-            order.ZeroPickedLineCount,
-            order.PlanQuantity,
-            order.FactQuantity),
+            order.ZeroPickedLineCount),
         order.PickingStartedAtUtc,
         order.ReadyForShipmentAtUtc,
         order.ShippedAtUtc);

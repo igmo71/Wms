@@ -28,8 +28,6 @@ public sealed record MobileReceivingOrderSummary(
     int TotalLineCount,
     int ConfirmedLineCount,
     int PositiveLineCount,
-    decimal PlanQuantity,
-    decimal FactQuantity,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     bool IsParticipant,

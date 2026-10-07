@@ -192,7 +192,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
         PlannedSkuRows = candidates.Take(50)
             .Select(line => new ReceivingOrderPlannedSkuRow(
-                line.StockKeepingUnitId, line.SkuName, line.SkuCode))
+                line.StockKeepingUnitId, line.SkuName, line.SkuCode,
+                line.FactQuantity.HasValue && line.FactQuantity.Value == line.PlanQuantity))
             .ToArray();
         ManualSkuHint.Text = candidates.Length > 50
             ? $"Показаны первые 50 из {candidates.Length}. Уточните поиск."
@@ -370,13 +371,13 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
                 var plan = _details!.Lines
                     .Where(x => x.StockKeepingUnitId == item.StockKeepingUnitId)
                     .Sum(x => x.PlanQuantity);
-                var unit = string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? string.Empty : $" {item.UnitOfMeasure}";
+                var unit = string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? " —" : $" {item.UnitOfMeasure}";
                 return new ReceivingOrderLpnSkuRow(
                     item.StockKeepingUnitId,
                     item.SkuCode,
                     item.SkuName,
-                    $"План {plan:g}{unit}",
-                    $"В палете {item.Quantity:g}{unit}");
+                    $"План {plan:0.###}{unit}",
+                    $"В палете {item.Quantity:0.###}{unit}");
             })
             .ToArray();
         OnPropertyChanged(nameof(Rows));
@@ -465,4 +466,5 @@ public sealed record ReceivingOrderLpnSkuRow(
 public sealed record ReceivingOrderPlannedSkuRow(
     Guid StockKeepingUnitId,
     string SkuName,
-    string SkuCode);
+    string SkuCode,
+    bool IsPlanMatched);

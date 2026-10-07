@@ -18,7 +18,8 @@ public class InventoryBalanceQueryService(IDbContextFactory<ApplicationDbContext
             .Include(x => x.Warehouse)
             .Include(x => x.StorageLocation)
                 .ThenInclude(x => x!.Zone)
-            .Include(x => x.StockKeepingUnit);
+            .Include(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure);
 
         query = ApplyFilters(query, listQuery);
 

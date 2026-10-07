@@ -22,9 +22,7 @@ public sealed record MobileShippingOrderProgressResponse(
     int TotalLineCount,
     int FullyPickedLineCount,
     int PartiallyPickedLineCount,
-    int ZeroPickedLineCount,
-    decimal PlanQuantity,
-    decimal FactQuantity);
+    int ZeroPickedLineCount);
 
 public sealed record MobileShippingOrderSummaryResponse(
     Guid Id,

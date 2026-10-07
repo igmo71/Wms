@@ -37,6 +37,7 @@ public class PickingQueryService(IDbContextFactory<ApplicationDbContext> dbConte
             .AsNoTracking()
             .Include(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
+                    .ThenInclude(x => x!.BaseUnitOfMeasure)
             .FirstOrDefaultAsync(x => x.Id == orderId, ct);
 
         if (order is null)

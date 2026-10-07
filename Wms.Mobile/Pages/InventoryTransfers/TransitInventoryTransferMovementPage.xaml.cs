@@ -221,7 +221,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         foreach (var balance in balances)
         {
             var unit = string.IsNullOrWhiteSpace(balance.UnitOfMeasure)
-                ? string.Empty
+                ? " —"
                 : $" {balance.UnitOfMeasure}";
             var layout = new Grid { ColumnSpacing = 8 };
             layout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -274,7 +274,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         TransitSkuChoicesPanel.IsVisible = false;
 
         var unit = string.IsNullOrWhiteSpace(sku.UnitOfMeasure)
-            ? string.Empty
+            ? " —"
             : $" {sku.UnitOfMeasure}";
         SkuLabel.Text = $"{sku.Name}\nКод: {sku.Code}";
         AvailableQuantityLabel.Text = $"Доступно: {sku.AvailableQuantity:0.###}{unit}";
@@ -501,7 +501,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         foreach (var result in results)
         {
             var unit = string.IsNullOrWhiteSpace(result.UnitOfMeasure)
-                ? string.Empty
+                ? " —"
                 : $" {result.UnitOfMeasure}";
             var layout = new VerticalStackLayout { Spacing = 3 };
             layout.Children.Add(new Label

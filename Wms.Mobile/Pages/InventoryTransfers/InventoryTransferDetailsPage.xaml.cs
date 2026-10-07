@@ -265,7 +265,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
         foreach (var balance in _transitBalances)
         {
             var unit = string.IsNullOrWhiteSpace(balance.UnitOfMeasure)
-                ? string.Empty
+                ? " —"
                 : $" {balance.UnitOfMeasure}";
             var layout = new Grid { ColumnSpacing = 8 };
             layout.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -301,7 +301,7 @@ public partial class InventoryTransferDetailsPage : ContentPage
     private MovementListItem MapMovement(MobileInventoryTransferMovementResponse movement)
     {
         var unit = string.IsNullOrWhiteSpace(movement.UnitOfMeasure)
-            ? string.Empty
+                ? " —"
             : $" {movement.UnitOfMeasure}";
         var highlighted = movement.MovementId == _highlightMovementId;
         return new MovementListItem(

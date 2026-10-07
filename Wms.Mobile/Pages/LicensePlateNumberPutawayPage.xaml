@@ -9,40 +9,58 @@
     HideSoftInputOnTapped="True">
 
     <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="16">
-            <Label x:Name="StepLabel" FontAttributes="Bold" FontSize="25" />
-            <Label x:Name="InstructionLabel" FontSize="18" />
+        <VerticalStackLayout Padding="12" Spacing="10">
+            <Label x:Name="InstructionLabel" IsVisible="False" />
             <local:OperationalCameraScannerView x:Name="CameraScannerView" />
 
-            <Border x:Name="LpnPanel" IsVisible="False" Padding="16">
+            <VerticalStackLayout x:Name="LpnPanel" IsVisible="False">
                 <VerticalStackLayout Spacing="8">
-                    <Label x:Name="LpnCodeLabel" FontAttributes="Bold" FontSize="22" />
-                    <Label x:Name="OrderLabel" />
-                    <Label x:Name="LpnStatusLabel" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Label x:Name="LpnCodeLabel" FontAttributes="Bold" FontSize="22" />
+                        <Label x:Name="CompletedLabel" Text="✓" TextColor="Green" FontSize="22"
+                               SemanticProperties.Description="Палета полностью размещена" IsVisible="False" />
+                    </HorizontalStackLayout>
+                    <Label x:Name="LpnStatusLabel" IsVisible="False" />
                     <VerticalStackLayout
                         BindableLayout.ItemsSource="{Binding Items, Source={x:Reference Page}}"
                         Spacing="8">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayItemResponse">
-                                <Border Padding="12">
+                                <Border Padding="8">
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding RemainingQuantity}">
+                                            <DataTrigger.Value>
+                                                <x:Decimal>0</x:Decimal>
+                                            </DataTrigger.Value>
+                                            <Setter Property="BackgroundColor" Value="#E8F5E9" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnItemTapped" />
                                     </Border.GestureRecognizers>
                                     <VerticalStackLayout Spacing="3">
                                         <Label FontAttributes="Bold" Text="{Binding SkuName}" />
-                                        <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
-                                        <Label Text="{Binding AcceptedQuantity, StringFormat='Принято: {0:g}'}" />
-                                        <Label Text="{Binding PlacedQuantity, StringFormat='Размещено: {0:g}'}" />
-                                        <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding SkuCode}" />
+                                            <Label Grid.Column="1" Text="{Binding UnitOfMeasure, TargetNullValue='—'}" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" RowDefinitions="Auto,Auto">
+                                            <Label FontSize="12" Text="Принято" />
+                                            <Label Grid.Column="1" FontSize="12" Text="Размещено" />
+                                            <Label Grid.Column="2" FontSize="12" Text="Осталось" />
+                                            <Label Grid.Row="1" Text="{Binding AcceptedQuantity, StringFormat='{0:0.###}'}" />
+                                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding PlacedQuantity, StringFormat='{0:0.###}'}" />
+                                            <Label Grid.Row="1" Grid.Column="2" Text="{Binding RemainingQuantity, StringFormat='{0:0.###}'}" />
+                                        </Grid>
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
-            </Border>
+            </VerticalStackLayout>
 
-            <Border x:Name="QuantityPanel" IsVisible="False" Padding="16">
+            <VerticalStackLayout x:Name="QuantityPanel" IsVisible="False">
                 <VerticalStackLayout Spacing="10">
                     <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
                     <Label x:Name="RemainingLabel" />
@@ -96,9 +114,9 @@
                     </VerticalStackLayout>
                     <Label FontSize="12" Text="Можно отсканировать любую допустимую позицию хранения." />
                 </VerticalStackLayout>
-            </Border>
+            </VerticalStackLayout>
 
-            <Border x:Name="HistoryPanel" IsVisible="False" Padding="16">
+            <VerticalStackLayout x:Name="HistoryPanel" IsVisible="False">
                 <VerticalStackLayout Spacing="8">
                     <Label FontAttributes="Bold" Text="История размещения" />
                     <VerticalStackLayout
@@ -106,20 +124,25 @@
                         Spacing="6">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayHistoryResponse">
-                                <Border Padding="10">
+                                <Border Padding="8">
                                     <VerticalStackLayout Spacing="2">
                                         <Label FontAttributes="Bold" Text="{Binding SkuName}" />
-                                        <Label Text="{Binding Quantity, StringFormat='Количество: {0:g}'}" />
-                                        <Label Text="{Binding DestinationAddress, StringFormat='Назначение: {0}'}" />
-                                        <Label Text="{Binding CreatedBy, StringFormat='Исполнитель: {0}'}" />
-                                        <Label Text="{Binding CreatedAtUtc, StringFormat='Проведено: {0:dd.MM.yyyy HH:mm}'}" />
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                            <Label Text="{Binding DestinationAddress}" />
+                                            <Label Grid.Column="1" Text="{Binding Quantity, StringFormat='{0:0.###}'}" />
+                                            <Label Grid.Column="2" Text="{Binding UnitOfMeasure, TargetNullValue='—'}" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding CreatedByName}" FontSize="12" />
+                                            <Label Grid.Column="1" Text="{Binding CreatedAtUtc, StringFormat='{0:dd.MM.yyyy HH:mm}'}" FontSize="12" />
+                                        </Grid>
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
-            </Border>
+            </VerticalStackLayout>
 
             <Button x:Name="NextLpnButton" Loaded="OnNonScanControlLoaded" Clicked="OnNextLpnClicked" IsVisible="False" Text="Следующий LPN" />
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />

@@ -219,5 +219,5 @@ public partial class Details
     private sealed record PendingCountOperation(Guid CountId, string Label, CommandContext Context,
         Func<CommandContext, Task<OperationResult<Guid>>> Execute, Func<Task> OnSuccess);
 
-    private static string FormatQuantity(decimal? quantity) => quantity?.ToString("0.###") ?? "—";
+    private static string FormatQuantity(decimal? quantity) => quantity?.ToString("N3") ?? "—";
 }

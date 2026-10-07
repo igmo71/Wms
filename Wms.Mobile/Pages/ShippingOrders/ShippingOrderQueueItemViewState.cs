@@ -23,8 +23,7 @@ public sealed class ShippingOrderQueueItemViewState
         DetailsText = BuildDetails(order),
         HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
-        ProgressText = $"Отобрано: {order.Progress.FactQuantity:g} из {order.Progress.PlanQuantity:g} · "
-            + $"Строк: {order.Progress.FullyPickedLineCount} из {order.Progress.TotalLineCount}"
+        ProgressText = $"Полностью отобрано строк: {order.Progress.FullyPickedLineCount} из {order.Progress.TotalLineCount}"
     };
 
     public static ShippingOrderQueueItemViewState ForShipping(
@@ -37,8 +36,7 @@ public sealed class ShippingOrderQueueItemViewState
         DetailsText = BuildDetails(order),
         HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
-        ProgressText = $"К отгрузке: {order.Progress.FactQuantity:g} · "
-            + $"Строк: {order.Progress.TotalLineCount}"
+        ProgressText = $"Строк к отгрузке: {order.Progress.TotalLineCount}"
     };
 
     private static string BuildDetails(MobileShippingOrderSummaryResponse order)

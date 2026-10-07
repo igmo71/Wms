@@ -39,7 +39,8 @@
                                             <Label FontAttributes="Bold" FontSize="17" Text="{Binding SkuName}" />
                                             <Label Text="{Binding SkuCode, StringFormat='Код: {0}'}" />
                                             <Label Text="{Binding LineNumber, StringFormat='Строка: {0}'}" />
-                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:g}'}" />
+                                            <Label Text="{Binding UnitOfMeasure, StringFormat='Ед изм: {0}', TargetNullValue='Ед изм: —'}" />
+                                            <Label Text="{Binding RemainingQuantity, StringFormat='Осталось: {0:0.###}'}" />
                                         </VerticalStackLayout>
                                     </Border>
                                 </DataTemplate>
@@ -58,8 +59,8 @@
                                     <Border Padding="10" BackgroundColor="{AppThemeBinding Light=#F2F2F2, Dark=#2A2A2A}">
                                         <VerticalStackLayout Spacing="2">
                                             <Label FontAttributes="Bold" Text="{Binding Source.Address}" />
-                                            <Label Text="{Binding AvailableQuantity, StringFormat='Доступно: {0:g}'}" />
-                                            <Label FontSize="13" Text="{Binding PhysicalQuantity, StringFormat='Физически: {0:g}'}" />
+                                            <Label Text="{Binding AvailableQuantity, StringFormat='Доступно: {0:0.###}'}" />
+                                            <Label FontSize="13" Text="{Binding PhysicalQuantity, StringFormat='Физически: {0:0.###}'}" />
                                         </VerticalStackLayout>
                                     </Border>
                                 </DataTemplate>

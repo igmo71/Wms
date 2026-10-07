@@ -25,6 +25,12 @@
                                 <DataTemplate x:DataType="local:ReceivingOrderPlannedSkuRow">
                                     <Border Padding="8,6" BackgroundColor="#F3F3F3"
                                             Stroke="#D4D4D4" StrokeThickness="1">
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsPlanMatched}" Value="True">
+                                                <Setter Property="Stroke" Value="#81C784" />
+                                                <Setter Property="StrokeThickness" Value="2" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer CommandParameter="{Binding StockKeepingUnitId}" Tapped="OnSkuTapped" />
                                         </Border.GestureRecognizers>

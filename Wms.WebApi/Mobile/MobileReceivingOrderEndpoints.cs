@@ -483,9 +483,7 @@ internal static class MobileReceivingOrderEndpoints
         new MobileReceivingOrderProgressResponse(
             order.TotalLineCount,
             order.ConfirmedLineCount,
-            order.PositiveLineCount,
-            order.PlanQuantity,
-            order.FactQuantity),
+            order.PositiveLineCount),
         order.StartedAtUtc,
         order.CompletedAtUtc,
         order.IsParticipant,
@@ -511,7 +509,8 @@ internal static class MobileReceivingOrderEndpoints
             commentDifference?.OneCValue,
             verificationError,
             assessment?.Fingerprint,
-            requiresManager);
+            requiresManager,
+            MapSynchronizationLevel(persistedLevel));
     }
 
     private sealed record MobileReceivingSynchronization(

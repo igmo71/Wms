@@ -26,9 +26,7 @@ public sealed record MobileReceivingOrderLocationResponse(
 public sealed record MobileReceivingOrderProgressResponse(
     int TotalLineCount,
     int ConfirmedLineCount,
-    int PositiveLineCount,
-    decimal PlanQuantity,
-    decimal FactQuantity);
+    int PositiveLineCount);
 
 public sealed record MobileReceivingOrderSummaryResponse(
     Guid Id,

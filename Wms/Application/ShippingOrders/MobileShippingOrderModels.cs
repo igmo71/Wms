@@ -30,8 +30,6 @@ public sealed record MobileShippingOrderSummary(
     int FullyPickedLineCount,
     int PartiallyPickedLineCount,
     int ZeroPickedLineCount,
-    decimal PlanQuantity,
-    decimal FactQuantity,
     DateTimeOffset? PickingStartedAtUtc,
     DateTimeOffset? ReadyForShipmentAtUtc,
     DateTimeOffset? ShippedAtUtc);

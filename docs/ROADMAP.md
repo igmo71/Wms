@@ -8,23 +8,12 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-No immediate implementation task is agreed. Choose the next focused issue
-from the future delivery areas below.
+Not yet selected. Agree one small increment before implementation.
 
 ## Future delivery areas
 
-Later, review quantity presentation across the entire Web and Mobile UI:
-find inconsistent precision and missing units, consider compact TSD layouts,
-and agree a shared display rule before changing other workflows. The current
-three-decimal Web receiving format does not predetermine every screen's format.
-
-Mobile already explains completion blocks next to its
-completion button; revisit that guidance only if device review exposes a gap.
-Do not combine these with putaway.
-
-Putaway screen improvements are deferred. Verify the accepted safe putaway
-quantity flow with the camera fallback when camera use becomes relevant; TSD
-behavior was accepted on 2026-10-06.
+Verify the accepted safe putaway quantity flow with the camera fallback when
+camera use becomes relevant; TSD behavior was accepted on 2026-10-06.
 
 E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
 rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,

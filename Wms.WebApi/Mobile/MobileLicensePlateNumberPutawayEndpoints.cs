@@ -116,8 +116,8 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
             details.Items.Select(MapItem).ToList(),
             details.History.Select(x => new MobileLicensePlateNumberPutawayHistoryResponse(
                 x.Id, x.LicensePlateNumberItemId, x.StockKeepingUnitId,
-                x.SkuName, x.Quantity, x.DestinationAddress, x.DestinationName,
-                x.CreatedBy, x.CreatedAtUtc, x.InventoryMovementId)).ToList());
+                x.SkuName, x.UnitOfMeasure, x.Quantity, x.DestinationAddress, x.DestinationName,
+                x.CreatedBy, x.CreatedAtUtc, x.InventoryMovementId, x.CreatedByName)).ToList());
 
     private static MobileLicensePlateNumberPutawayItemResponse MapItem(
         LicensePlateNumberPutawayItem item) => new(

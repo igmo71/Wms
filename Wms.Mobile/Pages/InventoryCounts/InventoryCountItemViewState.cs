@@ -26,7 +26,7 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     public bool ActionsEnabled { get; private set; }
 
     public string QuantitySummary =>
-        $"Ожид.: {Format(ExpectedQuantity)} · Факт: {Format(CountedQuantity)} · Разн.: {Format(DifferenceQuantity)} {UnitOfMeasure}";
+        $"Ожид.: {Format(ExpectedQuantity)} · Факт: {Format(CountedQuantity)} · Разн.: {Format(DifferenceQuantity)} {(string.IsNullOrWhiteSpace(UnitOfMeasure) ? "—" : UnitOfMeasure)}";
     public bool HasAccentText => !string.IsNullOrEmpty(AccentText);
     public bool ShowActions => CanEdit && !IsEditing;
     public bool ShowRemoveAction => ShowActions && !IsExpected;

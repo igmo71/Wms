@@ -42,7 +42,9 @@ internal static class OrderSynchronizationPresentation
             _ => string.Empty
         };
 
-    public static string BuildDetails(MobileOrderSynchronizationResponse synchronization)
+    public static string BuildDetails(
+        MobileOrderSynchronizationResponse synchronization,
+        bool showChangedFields = true)
     {
         if (IsSynchronized(synchronization)
             && string.IsNullOrWhiteSpace(synchronization.VerificationError))
@@ -59,7 +61,7 @@ internal static class OrderSynchronizationPresentation
                 : $"Последнее известное состояние: {BuildLevelTitle(synchronization.Level).ToLowerInvariant()}.");
         }
 
-        if (synchronization.ChangedFields.Count > 0)
+        if (showChangedFields && synchronization.ChangedFields.Count > 0)
         {
             parts.Add($"Изменено: {string.Join(", ", synchronization.ChangedFields)}.");
         }
