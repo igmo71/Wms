@@ -57,8 +57,6 @@ public class ReceivingOrder
     public IReadOnlyCollection<ReceivingOrderParticipant> Participants => _participants;
     public IReadOnlyCollection<LicensePlateNumber> LicensePlateNumbers => _licensePlateNumbers;
 
-    public bool IsFullyReceived => _items.All(x => x.IsFullyReceived);
-    public bool HasPlanFactDifference => _items.Any(x => x.IsPlanFactDifference);
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
     public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is decimal factQuantity
         && (factQuantity == 0 || x.FactWeightKg.HasValue));

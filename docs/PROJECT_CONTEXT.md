@@ -440,8 +440,9 @@ operation therefore requires the recovery procedure tracked in the roadmap.
 Shipping completion treats an already-applied exact 1C item-table target as
 success, and its target status and posting calls are repeatable.
 
-Receiving line comments are WMS-owned annotations, not warehouse facts.
-Receiving does not send item updates or comments to 1C. Comment differences
+Historical receiving line comments are retained as WMS-owned annotations, not
+warehouse facts. Current receiving has no direct line-comment command and does
+not send status, item updates or comments to 1C. Comment differences
 do not affect synchronization assessments or fingerprints and never block work.
 
 ## Mobile boundary
@@ -458,9 +459,9 @@ can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages suppress Android focus on action buttons. Receiving order,
 LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
-The Mobile receiving queue shows the current user's orders; other orders can
-be opened by scanning their document barcode. Independent putaway starts from
-its own LPN screen.
+The Mobile receiving queue API and screen show only the current user's orders;
+other orders can be opened by scanning their document barcode. Independent
+putaway starts from its own LPN screen.
 
 Web uses one receiving-order page across ready, receiving and received states.
 The list's "Сверка" indicator prioritizes an accepted quantity difference over

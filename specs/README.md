@@ -10,6 +10,10 @@ None.
 
 ## Frozen
 
+- [Finish receiving and putaway model cleanup](2026-10-07-receiving-model-cleanup/spec.md)
+  — accepted on 2026-10-07: unused receiving paths and hidden Mobile queue data
+  removed; completion and LPN audit data retained.
+
 - [Remove direct receiving fact edits](2026-10-07-remove-direct-receiving-facts/spec.md)
   — accepted on 2026-10-07: obsolete direct line edits removed while
   LPN-derived facts and receiving synchronization remain.

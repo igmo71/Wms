@@ -65,8 +65,7 @@ internal static class MobileReceivingOrderEndpoints
 
         var queue = await queryService.GetWorkQueueAsync(warehouseId, userId, ct);
         return TypedResults.Ok(new MobileReceivingOrderWorkQueueResponse(
-            queue.Personal.Select(x => MapSummary(x)).ToList(),
-            queue.Available.Select(x => MapSummary(x)).ToList()));
+            queue.Select(x => MapSummary(x)).ToList()));
     }
 
     private static async Task<IResult> ResolveDocumentAsync(

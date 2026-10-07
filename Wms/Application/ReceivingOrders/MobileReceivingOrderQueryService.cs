@@ -11,7 +11,7 @@ public sealed class MobileReceivingOrderQueryService(
     IDbContextFactory<ApplicationDbContext> dbContextFactory,
     PartyQueryService partyQueryService)
 {
-    public async Task<MobileReceivingOrderWorkQueue> GetWorkQueueAsync(
+    public async Task<IReadOnlyList<MobileReceivingOrderSummary>> GetWorkQueueAsync(
         Guid warehouseId,
         string userId,
         CancellationToken ct = default)
@@ -20,6 +20,7 @@ public sealed class MobileReceivingOrderQueryService(
 
         var orders = await QueueOrderQuery(dbContext)
             .Where(x => x.WarehouseId == warehouseId
+                && x.Participants.Any(participant => participant.UserId == userId)
                 && (x.Status == ReceivingOrderStatus.ReadyForReceiving
                     || x.Status == ReceivingOrderStatus.InReceiving))
             .AsSplitQuery()
@@ -30,9 +31,7 @@ public sealed class MobileReceivingOrderQueryService(
             .Select(order => MapSummary(order, shippers, userId))
             .ToList();
 
-        return new MobileReceivingOrderWorkQueue(
-            OrderQueue(summaries.Where(x => x.IsParticipant)),
-            OrderQueue(summaries.Where(x => !x.IsParticipant)));
+        return OrderQueue(summaries);
     }
 
     public async Task<OperationResult<MobileReceivingOrderDetails>> GetDetailsAsync(

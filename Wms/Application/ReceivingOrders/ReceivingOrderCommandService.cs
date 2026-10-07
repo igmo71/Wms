@@ -20,13 +20,6 @@ public class ReceivingOrderCommandService(
     private const string JoinReceivingCommandType = "receiving-order.join-receiving";
     private const string CompleteReceivingCommandType = "receiving-order.complete-receiving";
 
-    public Task<OperationResult<Guid>> StartReceivingAsync(
-        StartReceivingCommand command,
-        CommandContext context,
-        CancellationToken ct = default) => Task.FromResult<OperationResult<Guid>>(
-            OperationError.Invalid(
-                "Прежний запуск приёмки отключён. Используйте присоединение к ордеру."));
-
     public Task<OperationResult<Guid>> JoinReceivingAsync(
         JoinReceivingOrderCommand command,
         CommandContext context,

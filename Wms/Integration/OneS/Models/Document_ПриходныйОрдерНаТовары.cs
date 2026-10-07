@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -23,8 +22,6 @@ internal class Document_ПриходныйОрдерНаТовары
     public string? Распоряжение_Type { get; set; }
     public string? ХозяйственнаяОперация { get; set; }
 
-    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
-    public int ВсегоМест { get; set; }
     public List<Document_ПриходныйОрдерНаТовары_Товары> Товары { get; set; } = [];
 
 
@@ -34,7 +31,7 @@ internal class Document_ПриходныйОрдерНаТовары
 
     private static readonly string select =
         "Ref_Key,DeletionMark,Posted,Number,Date,Склад_Key,Статус,СкладскаяОперация,Отправитель,Отправитель_Type,Комментарий," +
-        "Доброга_ТипОчереди,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,ВсегоМест,Товары";
+        "Доброга_ТипОчереди,Распоряжение,Распоряжение_Type,ХозяйственнаяОперация,Товары";
 
     public static string GetListUri(DateTime dateFrom, DateTime dateTo, int page) =>
         $"Document_ПриходныйОрдерНаТовары" +
@@ -50,10 +47,6 @@ internal class Document_ПриходныйОрдерНаТовары
         $"?$format=json" +
         $"&$select={select}" +
         $"&$filter=Ref_Key eq guid'{refKey}'";
-
-    public static string PatchUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')?$format=json";
-
-    public static string PostDocumentUri(string refKey) => $"Document_ПриходныйОрдерНаТовары(guid'{refKey}')/Post?$format=json";
 
     public static ReceivingOrderImportSnapshot MapToImportSnapshot(
         Document_ПриходныйОрдерНаТовары fetchedDocument)

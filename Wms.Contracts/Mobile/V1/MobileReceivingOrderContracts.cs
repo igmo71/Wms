@@ -99,8 +99,7 @@ public sealed record MobileReceivingOrderDetailsResponse(
     IReadOnlyList<MobileReceivingOrderLicensePlateNumberResponse> LicensePlateNumbers);
 
 public sealed record MobileReceivingOrderWorkQueueResponse(
-    IReadOnlyList<MobileReceivingOrderSummaryResponse> Personal,
-    IReadOnlyList<MobileReceivingOrderSummaryResponse> Available);
+    IReadOnlyList<MobileReceivingOrderSummaryResponse> Personal);
 
 public sealed record MobileReceivingOrderLineCandidateResponse(
     int LineNumber,

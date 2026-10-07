@@ -82,10 +82,6 @@ public sealed record MobileReceivingOrderDetails(
     IReadOnlyList<MobileReceivingOrderLine> Lines,
     IReadOnlyList<MobileReceivingOrderLicensePlateNumber> LicensePlateNumbers);
 
-public sealed record MobileReceivingOrderWorkQueue(
-    IReadOnlyList<MobileReceivingOrderSummary> Personal,
-    IReadOnlyList<MobileReceivingOrderSummary> Available);
-
 public sealed record MobileReceivingOrderLineCandidate(
     int LineNumber,
     Guid StockKeepingUnitId,

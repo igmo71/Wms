@@ -36,7 +36,6 @@ public static class DependencyInjection
         services.AddScoped<Catalog_ФизическиеЛица_Service>();
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();
         services.AddScoped<IReceivingOrderSource, Document_ПриходныйОрдерНаТовары_InboundService>();
-        services.AddScoped<IReceivingOrderExecutionSink, Document_ПриходныйОрдерНаТовары_OutboundService>();
         services.AddScoped<IShippingOrderSource, Document_РасходныйОрдерНаТовары_InboundService>();
         services.AddScoped<IShippingOrderExecutionSink, Document_РасходныйОрдерНаТовары_OutboundService>();
         services.AddScoped<InformationRegister_ШтрихкодыНоменклатуры_Service>();

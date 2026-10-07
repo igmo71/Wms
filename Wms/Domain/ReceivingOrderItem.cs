@@ -24,9 +24,6 @@ public class ReceivingOrderItem
         ? WeightCalculation.CalculateKg(factQuantity, StockKeepingUnit)
         : null;
     public bool IsFactConfirmed => FactQuantity.HasValue;
-    public bool IsFullyReceived => FactQuantity == PlanQuantity;
-    public bool IsPlanFactDifference => FactQuantity is decimal factQuantity
-        && factQuantity != PlanQuantity;
 
     internal static OperationResult<ReceivingOrderItem> Create(
         Guid receivingOrderId,

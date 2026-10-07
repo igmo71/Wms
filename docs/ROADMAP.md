@@ -13,10 +13,6 @@ from the future delivery areas below.
 
 ## Future delivery areas
 
-Review remaining receiving and putaway models for obsolete fields and methods
-before removing them. Trace each candidate through persistence, integration,
-audit, and supported UI/API paths.
-
 Later, review quantity presentation across the entire Web and Mobile UI:
 find inconsistent precision and missing units, consider compact TSD layouts,
 and agree a shared display rule before changing other workflows. The current
