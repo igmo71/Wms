@@ -2,7 +2,7 @@
 
 Status: **Frozen** — accepted on 2026-10-05.
 
-Current rules belong to [Identity and access](../../docs/PROJECT_CONTEXT.md#identity-and-access).
+Current rules belong to [Identity and access](../../../docs/PROJECT_CONTEXT.md#identity-and-access).
 
 ## Outcome
 

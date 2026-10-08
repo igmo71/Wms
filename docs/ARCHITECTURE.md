@@ -93,10 +93,10 @@ intermediate saves require explicit documented application semantics. Business
 completion helpers do not save. SQL and 1C remain separate boundaries; receipt
 uniqueness does not prevent concurrent external calls before final persistence.
 
-Warehouse commands no longer expose staging methods for Mobile receipt
+Warehouse commands do not expose staging methods for Mobile receipt
 orchestration. Use business-named private helpers only where they clarify
-substantial logic; do not add a dispatcher or pipeline. Administrative mutations
-and synchronization operations retain their own explicit save boundaries.
+substantial logic. Administrative mutations and synchronization operations
+retain their own explicit save boundaries.
 
 Migrations are immutable after they may have reached a non-disposable database.
 Schema correction then requires a new migration. Replacing history is permitted
@@ -156,17 +156,13 @@ Mobile transport converts HTTP timeout cancellation into `HttpRequestException`,
 so existing uncertain-result handlers retain the command for explicit retry.
 Explicit cancellation of the caller's token remains `OperationCanceledException`;
 it is not a business rejection or evidence that a dispatched command did not
-commit. The transport never retries automatically. LPN pages currently send
-commands without a caller cancellation token.
+commit. The transport never retries automatically.
 
-The receiving order, LPN, quantity and SKU-distribution pages share one receiving
-process explicitly passed along that order's navigation chain. One unresolved
-command retains its original value inputs and request id. Refresh updates the
-display without replacing this intent; a separate retry action remains available
-regardless of current business-action eligibility. Conflicting actions, quantity
-editing and back navigation are blocked until the outcome is resolved. LPN
-putaway similarly keeps an immutable pending request separate from display state.
-These processes are not application singletons and are not persisted on restart.
+A multi-page workflow passes its retry process along the navigation chain rather
+than making it an application singleton. One unresolved command retains its
+original inputs and request id; refresh may update the display without replacing
+that intent. Retry remains available while conflicting actions and back
+navigation are blocked. The process is not persisted across a restart.
 
 Treat roughly 300 lines as a review signal, not a limit. Extract a
 business-named or clearly technical cohesive responsibility only when it
@@ -213,13 +209,6 @@ smallest test that demonstrates the distinct risk; a feature may ship without
 a new test when existing protection is sufficient. Do not expand test helpers
 or infrastructure unless the necessary test requires it.
 
-The developer runs builds and automated tests. Codex runs neither without an
-explicit user request. At a verification checkpoint, provide the exact minimal
-build command and, when relevant, commands for one or two focused existing or
-necessary new tests, then wait for the reported result. This is not a quota:
-documentation and routine low-risk changes may need no test command.
-Do not prescribe the complete suite after every task; reserve it for an agreed
-broader checkpoint. Once sufficient checks pass, stop unless a new change or
-failure justifies another check. Report what was actually verified and any
-remaining uncertainty. Local setup and execution commands belong in
+Execution ownership and verification checkpoints are specified in
+[`AGENTS.md`](../AGENTS.md). Local setup and commands belong in
 [`Wms.Tests/README.md`](../Wms.Tests/README.md).

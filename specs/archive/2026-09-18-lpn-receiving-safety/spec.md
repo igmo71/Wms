@@ -12,8 +12,8 @@
 Основание: статическое ревью I01–I08, код `9ea6620`, документация `368c59b`,
 ветка `2026-09-14-lpn-development-planning`. Исходные выводы получены без запуска
 сборок и тестов. Замороженная спецификация I01–I08 остаётся историей решений.
-Текущие правила — в [PROJECT_CONTEXT](../../docs/PROJECT_CONTEXT.md), общие
-правила команд — в [ARCHITECTURE](../../docs/ARCHITECTURE.md).
+Текущие правила — в [PROJECT_CONTEXT](../../../docs/PROJECT_CONTEXT.md), общие
+правила команд — в [ARCHITECTURE](../../../docs/ARCHITECTURE.md).
 
 ## Объём
 

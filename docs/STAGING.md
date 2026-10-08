@@ -18,17 +18,18 @@ The Mobile Release build uses `https://vm-xms-dev:8316/`.
 
 ## First deployment
 
-Unless a step says otherwise, application commands run from the repository root
-on the development workstation; Compose commands run from `scripts/` on the
-Docker host.
+Run `dotnet`, `adb`, and `publish.ps1` from the repository root on the development
+workstation. The publish script also needs Docker there to tag and push images.
+Run Compose commands, export the Caddy certificate, and manage environment files
+from `scripts/` on the Docker host.
 
 ### 1. Environment and network
 
-Create the untracked environment files:
+On the Docker host, create the untracked environment files in `scripts/`:
 
-```powershell
-Copy-Item dev.env.example dev.env
-Copy-Item test.env.example test.env
+```sh
+cp dev.env.example dev.env
+cp test.env.example test.env
 ```
 
 Set a published `WMS_TAG`, distinct database connection strings, administrator
@@ -50,8 +51,9 @@ that server is upgraded; removing it earlier can break database connectivity.
 
 ### 2. Databases
 
-The current baseline contains `CreateIdentitySchema` and
-`CreateInitialWmsSchema`. Apply it separately to empty dev and test databases:
+The initial migrations are `CreateIdentitySchema` and
+`CreateInitialWmsSchema`; the update command applies them and all later
+migrations. Run it separately for empty dev and test databases:
 
 ```powershell
 dotnet ef database update --project Wms/Wms.csproj --startup-project Wms.WebApp/Wms.WebApp.csproj --connection "<dev connection string>"
@@ -60,13 +62,21 @@ dotnet ef database update --project Wms/Wms.csproj --startup-project Wms.WebApp/
 
 After baseline deployment, migrations are append-only and applied normally.
 
+For a development database that may be discarded, the SQL scripts
+`scripts/clear-wms-operational-data.sql` and
+`scripts/clear-database-except-identity.sql` remove operational data; the second
+also removes catalogs and topology. Stop WebApp, WebApi, and integration workers
+first. Both preserve Identity, EF migration history, and the issued-LPN sequence,
+but invalidate previously printed pallet labels. Review existing data and
+migration compatibility separately before changing a non-disposable database.
+
 ### 3. Publish and start applications
 
-Publish both container images with one tag:
+Publish both container images with one tag. The script generates a timestamp tag
+unless `-Tag` is supplied:
 
 ```powershell
 .\scripts\publish.ps1
-.\scripts\publish.ps1 -Tag "2026-09-08_18-30"
 ```
 
 Set the emitted tag in the target environment file, then on the Docker host run:
@@ -94,18 +104,19 @@ Do not use `docker compose down -v`: deleting `wms-caddy-data` replaces the CA
 and invalidates client trust. A `502` normally means an application container
 is absent or not attached to `xms-network`.
 
-Export the public root certificate after first deployment or an intentional CA
-replacement:
+On the Docker host, export the public root certificate after first deployment
+or an intentional CA replacement:
 
-```powershell
-docker cp wms-caddy:/data/caddy/pki/authorities/local/root.crt .\wms-caddy-root.crt
+```sh
+docker cp wms-caddy:/data/caddy/pki/authorities/local/root.crt ./wms-caddy-root.crt
 ```
 
-Never distribute the CA private key. Install the root on a Windows workstation
-from an elevated terminal:
+Copy only the public certificate to `scripts/wms-caddy-root.crt` on the
+development workstation. Never distribute the CA private key. Install the
+root from an elevated terminal:
 
 ```powershell
-certutil -addstore -f Root .\wms-caddy-root.crt
+certutil -addstore -f Root .\scripts\wms-caddy-root.crt
 ```
 
 On Android, copy and install it as a **CA certificate**:

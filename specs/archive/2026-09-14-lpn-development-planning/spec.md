@@ -5,7 +5,7 @@
 ## Результат
 
 Подготовить на основе текущего кода единый обсуждаемый план развития для работы
-в нескольких чатах: [DEVELOPMENT_PLAN.md](../../docs/DEVELOPMENT_PLAN.md).
+в нескольких чатах: [DEVELOPMENT_PLAN.md](../../../docs/DEVELOPMENT_PLAN.md).
 
 ## Границы
 

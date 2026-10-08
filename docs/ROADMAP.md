@@ -1,63 +1,88 @@
-# WMS roadmap
+# Roadmap WMS
 
-This file contains unfinished accepted work. Current behavior belongs in
-[`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md); engineering conventions belong in
-[`ARCHITECTURE.md`](ARCHITECTURE.md); detailed decision history belongs in
-`specs/`. **Next task** identifies the agreed immediate work; future delivery
-areas are not authorization to begin implementation.
+Здесь собран единый backlog оставшейся работы. Действующие правила находятся в
+[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), технические соглашения — в
+[ARCHITECTURE.md](ARCHITECTURE.md), история принятых решений — в
+[реестре спецификаций](../specs/README.md). Запись в backlog не означает, что
+задача уже взята в работу: для существенного результата отдельно согласуются
+объём и критерии приёмки.
 
-## Next task
+**Ближайшая задача пока не выбрана.** Номера E обозначают области, а не порядок
+выполнения или приоритет.
 
-No immediate task agreed.
+## Как читать старые обозначения
 
-## Future delivery areas
+- **E** — область развития: E0 — исходное планирование, E1 — адресация,
+  E2–E4 — приёмка, размещение, клиентские сценарии и отчётность, E5 — правила
+  хранения, E6 — резерв и подпитка, E7 — подготовка рабочего выпуска.
+- **I** — инкремент реализации. I01–I08 по палетам, приёмке и первоначальному
+  размещению уже приняты; подробности сохраняют замороженные спецификации.
+- **D** — номер решения исходного планирования (D01–D15), **R** — номер
+  последующей корректировки безопасности приёмки (R1–R4). Это исторические
+  ссылки, не дополнительные виды задач в текущем backlog.
 
-Verify the accepted safe putaway quantity flow with the camera fallback when
-camera use becomes relevant; TSD behavior was accepted on 2026-10-06.
+## Продуктовый backlog
 
-E1 addressing, E5 storage restrictions/capacity, E6 replenishment, E7 release
-rehearsal and E3/E4 Web/reporting extensions remain future work. Their decisions,
-dependencies and boundaries belong in DEVELOPMENT_PLAN; order and implementation
-scope require a separate task. The pilot prerequisites below govern E7.
+| Область | Оставшийся результат | Зависимость или граница |
+|---|---|---|
+| E1, основа | Свободное дерево папок и ячеек, независимые адрес и зона; пакетная генерация адресов и печать этикеток. | Адрес уникален внутри склада, одинаковые адреса на разных складах допустимы. |
+| E1, расширение | Перенос папок и ячеек, смена адреса с заменой этикетки, смена зоны пустой незаблокированной ячейки. | После базового E1; правила редактирования согласовать отдельно. |
+| E3/E4 | Полный Web-ввод, корректировки и расширенная отчётность без обхода состава палет; правильный учёт вклада сотрудников. | Отдельный результат. |
+| E5 | Правило одного SKU по умолчанию и исключения, вместимость, группы хранения и развитие рекомендаций. | Включая конкурентные поступления; неизвестные вес и объём требуют отдельного решения, а не трактовки как ноль или бесконечная вместимость. |
+| E6 | Запрет прямого отбора из Reserve вместе с ручной подпиткой, сохраняющей запрошенное и фактическое количество. | После решений по адресации и существующим операциям; запрет не вводить без рабочего пути подпитки. |
+| E7 | Репетиция рабочего выпуска со всеми процессами, обменом с 1С и восстановлением после сбоя. | После выполнения условий пилота ниже. |
 
-Receiving already uses inbound-only 1C integration. Shipping still requires
-the WMS-to-1C recovery procedure below.
+Для E1 согласован формат адреса РЦ: QR `1A01A1`, печать
+`1 · A · 01 · A · 1`. Пятисегментная схема служит генерации и печати, а не
+ограничивает дерево всех складов. Папки могут не иметь функциональной зоны;
+операционная ячейка относится к одной зоне своего склада. Первый генератор
+работает в выбранной папке, принимает диапазоны сегментов, показывает
+предпросмотр и проверяет уникальность. Ручной адрес допустим, автоматическое
+создание вложенных папок пока не требуется; `PickSequence` остаётся отдельным.
 
-## Pilot prerequisites
+Для E5 ещё нужно определить, когда непроверенная вместимость даёт
+предупреждение, а когда запрещает операцию, и откуда берётся классификация
+`SkuStorageGroup`: иерархия 1С автоматически ею не становится. Текущие две
+категории рекомендаций описаны в [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 
-### 1C access
+## Прочие отложенные работы
 
-Authentication of 1C callers is deferred. Until it is implemented, unverified
-1C endpoints must remain inside the trusted network.
+- Разбор изменения состава или нумерации строк 1С после заполнения палет:
+  сохранить связи, не перепривязывая строки автоматически. Сейчас такое
+  изменение блокируется.
+- Коррекция уже проведённого размещения без произвольной перезаписи истории.
+- Проверка подтверждения количества при размещении через камеру, когда этот
+  способ понадобится; сценарий на ТСД принят.
+- Формат отдельного складского принтера для палетных этикеток.
 
-### Operational confidence
+Универсальные связи палет с документами, сложный
+slotting, оптимизация маршрутов, автоматическая подпитка по спросу или
+минимальному остатку и конверсия упаковок не входят в первый выпуск.
 
-- For the release rehearsal, manually validate WebApp and Mobile flows against a representative database:
-  receiving, putaway, picking, shipping, count, and both transfer routes.
-  The accepted I01–I08 Web/Mobile checks are completed; this is the broader
-  release-environment checkpoint.
-- Confirm backup/restore and migration application on the staging topology.
-- Resolve the operator-recovery procedure described below.
+## Условия пилота и E7
 
-### Operator recovery
+- До появления аутентификации входящих вызовов 1С держать непроверенные
+  интерфейсы только внутри доверенной сети.
+- На репрезентативной базе вручную проверить Web и Mobile: приёмку,
+  размещение, отбор, отгрузку, инвентаризацию и оба вида перемещений. Ранее
+  принятые проверки приёмки и размещения не заменяют проверку среды выпуска.
+- Подтвердить восстановление из резервной копии и применение миграций на
+  тестовой среде.
+- Для многошаговой отгрузки WMS → 1С описать контрольные точки и действия
+  оператора: безопасный повтор, уже выполненное действие и случай ручного
+  разбора. Проверить характерные сбои на тестовой среде без изменения правил
+  обмена.
 
-- Map each multi-step WMS-to-1C transition and its observable checkpoints.
-- Distinguish safe retry, already-applied success, and manual escalation.
-- Specify the evidence and operator action for each outcome.
-- Exercise representative failures on staging without changing integration
-  semantics.
+После этого провести одну задокументированную репетицию: восстановление,
+миграции, доступ, перечисленные выше мобильные процессы, обмен с 1С,
+прерванная команда и восстановление работы. Демо не означает готовность к
+рабочему выпуску.
 
-## Pilot rehearsal
+## Технический долг перед рабочим выпуском
 
-After the prerequisites, run one documented end-to-end rehearsal covering
-backup and restore, migration, authentication, all four Mobile workflows, 1C
-exchange, an interrupted command, and operator recovery.
-
-## Production maintenance
-
-- Upgrade the legacy SQL Server and then remove the weakened
-  `openssl-legacy.cnf` compatibility profile from application containers.
-- Disable sensitive EF logging and detailed errors outside approved
-  non-production environments.
-- Update or replace the vulnerable `Microsoft.OpenApi 2.0.0` dependency reported
-  by `NU1903`.
+- Обновить старый SQL Server и затем удалить профиль совместимости
+  `openssl-legacy.cnf` из контейнеров приложения.
+- Отключить подробные ошибки и журналирование чувствительных данных EF вне
+  разрешённых непроизводственных сред.
+- Обновить или заменить уязвимую зависимость `Microsoft.OpenApi 2.0.0`, о
+  которой сообщает `NU1903`.

@@ -2,7 +2,7 @@
 
 Status: **Frozen** — TSD behavior accepted on 2026-10-06. Camera fallback remains unverified.
 
-Current rules belong to [Receiving and putaway](../../docs/PROJECT_CONTEXT.md#receiving-and-putaway).
+Current rules belong to [Receiving and putaway](../../../docs/PROJECT_CONTEXT.md#receiving-and-putaway).
 
 ## Outcome and scope
 

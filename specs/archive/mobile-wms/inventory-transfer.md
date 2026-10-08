@@ -11,7 +11,7 @@
 ```
 
 Мобильная вертикаль использует существующий `InventoryTransfer` и правила из
-`specs/intra-warehouse-transfers/spec.md`. Она не создает параллельный тип
+`specs/archive/intra-warehouse-transfers/spec.md`. Она не создает параллельный тип
 документа и не ослабляет серверные проверки.
 
 ## Этапы вертикали

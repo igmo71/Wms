@@ -31,37 +31,19 @@ This file owns current product boundaries and lasting business rules.
 decision history. Code and migrations remain the implementation source of
 truth.
 
-During development the database may be cleaned or recreated when changing the
-schema; migration compatibility is not a blocker for removing obsolete MVP
-data. A full rebuild invalidates printed LPN labels; the cleanup scripts below
-preserve the issued-code sequence. Production database changes are also
-possible, but require a separate review of existing data and a more careful
-rollout.
-
-LPN receiving and initial putaway (I01–I08) were accepted on 2026-09-17.
-The specification is frozen; status and future E1/E5/E6/E7 boundaries are in
-[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md), and the next task is in ROADMAP.
 LPN tracks receiving provenance and initial putaway, not stored inventory.
-
-Shared command, replay and client-recovery rules are defined once in
-[`ARCHITECTURE.md`](ARCHITECTURE.md#persistence-and-integration).
-HTTP timeout and caller-cancellation behavior follows the
-[client recovery convention](ARCHITECTURE.md#client-organization).
-
-Corrections from the I01–I08 review are recorded in the
-[frozen safety specification](../specs/2026-09-18-lpn-receiving-safety/spec.md).
 
 ## Identity and access
 
-WebApp uses ASP.NET Core Identity with three roles: `Operator` may run warehouse
-operations and reports; `Manager` additionally corrects and reopens receiving
-LPNs; `Administrator` also has Manager operational rights and manages configuration
-and users. Public self-registration is not offered. Administrator-created accounts
-are confirmed local accounts with one or more explicitly assigned WMS roles.
-Rights combine across assigned roles. Receiving quantity-difference approval
-requires explicit `Manager` membership even for an `Administrator`; assign both
-roles when both permissions are needed. An administrator may change their other
-roles but cannot block themselves or remove their own `Administrator` membership.
+WebApp uses ASP.NET Core Identity with three roles. `Operator` runs warehouse
+operations and reports; `Manager` can also correct and reopen receiving LPNs and
+approve quantity differences; `Administrator` manages configuration and users
+and can perform warehouse operations and LPN corrections. Approval still requires
+explicit `Manager` membership, including for an administrator. Public
+self-registration is not offered; administrator-created accounts are confirmed
+local accounts with one or more WMS roles whose rights combine. An administrator
+may change their other roles but cannot block themselves or remove their own
+`Administrator` membership.
 The last active administrator cannot be blocked or lose that membership, including
 through concurrent user-management requests.
 
@@ -88,15 +70,6 @@ session and does not replay the request with a stale token. A definitive refresh
 rejection (`400` or `401`), or an authenticated API `401`, clears the session.
 
 ## Storage and inventory
-
-Database maintenance scripts run with WebApp, WebApi, and integration workers
-stopped. `scripts/clear-wms-operational-data.sql` clears warehouse documents,
-inventory, command receipts, and inventory-count locks while preserving
-Identity, catalogs, warehouse topology, and manual locks.
-`scripts/clear-database-except-identity.sql` also clears catalogs, topology, and
-all locks. Both clear issued LPN and their batches, preserve the LPN sequence
-(old codes are never reissued), preserve EF migration history, and execute in
-a transaction. Labels printed before such cleanup are no longer valid.
 
 A warehouse contains storage, transit, receiving, and shipping zones. Locations
 form an arbitrary-depth tree within one active warehouse zone.
@@ -154,7 +127,7 @@ inventory concurrency failures become business conflicts.
 
 ## Warehouse workflows
 
-### LPN issuance (I01)
+### LPN issuance
 
 The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an
 acceptable local abbreviation. One stored `Code` is used for display, barcode
@@ -172,10 +145,9 @@ search the issued list, and preview/reprint one label or its entire batch.
 Issuance saves the batch, codes and receipt atomically; replay returns the
 original batch. Authenticated printing reads persisted codes without allocating
 numbers or changing stock. A4 portrait contains two columns by five rows of
-SVG Code 128 with the same human-readable code. Physical printing and target
-scanner reading were accepted with I01; changed equipment requires verification.
+SVG Code 128 with the same human-readable code.
 
-### Receiving LPN association (I03)
+### Receiving LPN association
 
 An issued `LicensePlateNumber` starts as `Available`. A participant scans its
 code inside an in-progress receiving order to bind it permanently to that order,
@@ -192,7 +164,7 @@ Only the responsible employee can cancel their empty open LPN. Cancellation
 never makes the cancelled code available.
 Every mutation and its command receipt commit together.
 
-### Receiving LPN counting (I04)
+### Receiving LPN counting
 
 An open LPN contains at most one retained row per order SKU. Quantity entry sets
 an absolute nonnegative canonical-unit quantity; zero is an explicit counted
@@ -215,16 +187,13 @@ commands; Web displays per-LPN composition and employee contribution.
 The local `ReceivingOrder.Status` is the WMS lifecycle: ready for receiving, in
 receiving, or received. The source document status is consumed only from the
 integration snapshot during import and reconciliation; it is not persisted as a
-second aggregate status. A later outbound integration must map local transitions
-at its adapter boundary rather than add a provider status to the aggregate. If
-several consumers require acknowledgements, retries, or conflict tracking, that
-per-consumer delivery state belongs to integration storage outside the aggregate.
+second aggregate status.
 
 Receiving participation is stored in `ReceivingOrderParticipant`, unique by
-order and Identity user. Mobile receiving separates the current user's active
-orders from joinable orders for the selected warehouse. Opening or scanning an
-already joined order reads it; opening or scanning an available in-progress
-order joins the user. The first participant must scan an active unlocked
+order and Identity user. The Mobile queue lists the current user's active orders
+for the selected warehouse; scanning an available order can join the user.
+Opening or scanning an already joined order reads it. The first participant
+must scan an active unlocked
 Receiving location for the order warehouse. Starting the local lifecycle,
 assigning that shared location, adding the participant, and the command receipt
 commit together. Later participants reuse the location. Concurrent first entry
@@ -275,16 +244,15 @@ actions remain visible below the scrolling composition; closing always returns
 to the order's nomenclature tab, and an empty pallet uses a compact cancel
 action. Cancelled LPNs are hidden from operational Mobile lists but remain
 permanently used and auditable.
-Mobile SKU names wrap and are never ellipsized.
-
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
 means unchecked; zero is an explicit result. Mobile changes facts only through
 absolute quantities of LPN items; the aggregate fact is read-only. Every line
 requires a fact before completion.
 
-Ordinary exact completion is available to an order participant only after every active LPN is
-closed and every source SKU has an explicit aggregate LPN fact, including zero.
+Ordinary exact completion is available to an order participant only after every
+active LPN is closed and every source SKU has an explicit aggregate LPN fact,
+including zero.
 It first persists a fresh 1C synchronization checkpoint. Source deletion,
 unposting, unsupported quantity semantics, duplicate SKU, or a changed/ambiguous
 line-to-SKU composition blocks completion. A quantity-only plan/fact difference
@@ -326,20 +294,19 @@ and quantity-confirmation feedback. Composition and history have no outer cards;
 SKU code and unit share a row, and quantities use compact labelled columns.
 Composition cards are uncolored before putaway, light yellow when partially
 placed, and light green when remaining quantity reaches zero.
-History shows the SKU, destination with quantity and unit, then employee name and
+When putaway is unavailable, its history appears if any movements exist. Each
+entry shows the SKU, destination with quantity and unit, then employee name and
 timestamp. Employee names follow the shared Identity display-name fallback rule;
 stored audit user ids remain unchanged.
 Putaway uses "палета" for the physical unit and "ячейка" for a storage
 destination in operator text; the printed LPN code is unchanged. Pending or
 busy commands block backward navigation. A successful movement returns from
 quantity entry to the pallet composition, refreshed from server state.
-The remaining and confirmed quantities share a row; the "Entire remainder"
-button shows the remainder beside the quantity field. After confirmation the
-screen instructs the operator to scan a storage cell to place the item.
-
-Mobile putaway keeps "Entire remainder" beside the quantity field. "Next
-pallet" on the composition page after completion and repeat-safe retry on the
-quantity page after an uncertain posting appear in fixed bottom action areas;
+The remaining and confirmed quantities share a row; "Entire remainder" shows
+the remainder beside the quantity field. After confirmation the screen asks
+for a storage-cell scan. "Next pallet" appears on the composition page when
+further putaway is unavailable. It and repeat-safe retry on the quantity page
+after an uncertain posting use fixed bottom action areas;
 errors and progress occupy those areas only when present.
 
 Each SKU selection starts with an empty, unconfirmed quantity and no automatic
@@ -359,8 +326,8 @@ both the physical source balance and the separate remaining limit of its LPN
 item. The LPN operational revision coordinates concurrent employees, while
 balance row versions independently protect shared physical stock. Movement,
 balances, turnover, LPN history and command receipt commit atomically. Receiving
-orders have no placement status or order-level putaway commands. I06 does
-not restrict the destination to a recommendation; any scanned destination is
+orders have no placement status or order-level putaway commands. A scanned
+destination need not be recommended; any scanned destination is
 validated at posting time.
 
 The LPN quantity screen recommends active unlocked Storage locations in the
@@ -491,7 +458,7 @@ warehouse facts. Current receiving has no direct line-comment command and does
 not send status, item updates or comments to 1C. Comment differences
 do not affect synchronization assessments or fingerprints and never block work.
 
-## Mobile boundary
+## Client behavior
 
 Mobile is online-only. Urovo ScanWedge intent input and the ML Kit camera
 fallback implement one scanner boundary; operational screens prefer the
@@ -505,67 +472,30 @@ can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages suppress Android focus on action buttons. Receiving order,
 LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
-The Mobile receiving queue API and screen show only the current user's orders;
-other orders can be opened by scanning their document barcode. Independent
-putaway starts from its own LPN screen.
-The receiving queue shows one navigation title and a compact scan hint without
-a duplicate heading. In-progress order cards show number and date together,
-then checked-line progress; redundant order and status labels are omitted.
-An active receiving order explains that scanning an available pallet adds it
-to that order.
-Scanning an already received order shows its number, date and accepted state
-in the queue, while a missing order has a specific not-found message.
-
-The Mobile receiving order and pallet screens keep their current actions in one
-fixed bottom row. The order shows its current start, completion or repeat action.
-The order's nomenclature and pallet tabs sit in the same fixed bottom area above
-that action, leaving the scrollable contents directly below the order guidance.
-The pallet shows compact manual SKU selection and its available close or reopen
-action, with a small cancel action only for an eligible empty pallet. When a
-command needs repeat-safe recovery, only its retry action occupies the row.
-Error and progress feedback remain directly above the actions.
-They occupy space only while a message or operation is present.
+Independent putaway starts from its own LPN screen.
+Scanning an accepted order shows its number, date and state; an unknown order
+has a distinct not-found message. The receiving order shows that scanning an
+available pallet adds it. Its nomenclature/pallet tabs and current action remain
+below the scrolling content; pallet actions and uncertain-command retry use the
+same fixed bottom area.
 
 Web uses one receiving-order page across ready, receiving and received states.
-The list's "Сверка" indicator prioritizes an accepted quantity difference over
-the successful source-synchronization mark; its tooltip distinguishes the two.
-The route chooses between in-progress and ready/received views; successful Web
-completion changes the view on the same URL. Its shared header shows status
-and factual weight in the top row below the order number and date; participants
-appear beside the receiving-operation audit and stack when there are several.
-The shared "Расхождения" block appears above the order content; Manager
-confirmation is a separate block in the same position for entry and later
-review. The order header and list omit the obsolete order-level placement
-status and timestamps. The page uses the
-same read-only order-content layout while receiving and after completion. The
-nomenclature tab shows aggregate order lines. A ready order shows its stored
-"План" only. During and after receiving, equal WMS and 1C quantities on every
-line collapse to one "План" column; otherwise the whole table shows "План WMS"
-and "План 1С". A missing compared 1C value is not treated as equal. After
-acceptance, "План 1С" uses the saved completion snapshot. The Web nomenclature
-table shows each SKU's canonical unit alongside its quantities; Mobile already
-shows the unit beside line plan and fact. Read-only Web receiving quantities
-(plan, fact, remainder and pallet quantities) display three decimal places,
-matching the 1C quantity precision; nullable unchecked facts retain their
-textual state. Clicking a Web nomenclature name opens a compact menu next to
-that row with the active pallets containing the SKU and each pallet's retained
-quantity. Clicking a pallet in that menu switches to the pallet tab with that
-pallet selected. Cancelled pallets and deleted pallet items are excluded. The
-pallet tab shows a compact
-selectable pallet list on the left and only the selected
-pallet's item audit and putaway history on the right. Open pallets sort first,
-and their nonzero count appears on the tab badge. Cancelled pallets remain
-visible but muted for audit. After receiving completion, the pallet list shows
-derived putaway progress and a badge counting retained item rows that are not
-fully placed. Each retained pallet item shows placed and remaining quantity
-from its LPN putaway history. History names the destination cell and keeps
-technical movement IDs in the stored audit rather than presenting them as
-nonfunctional links. Quantities of different SKUs are not summed across units.
-Completion and 1C reconciliation
-remain above the tabs; Web LPN composition editing is outside this result.
-When Web completion is unavailable, a concise reason between the order title
-and the action points to the next step; Mobile already shows completion
-guidance below its order header as described in the receiving workflow above.
+The list distinguishes an accepted quantity difference from successful source
+synchronization. Completion and 1C reconciliation stay above the content tabs;
+an unavailable completion action gives a concise reason. Manager confirmation
+is available there for entry and later audit.
+
+The nomenclature tab shows aggregate order lines and each SKU's canonical unit.
+A ready order shows its stored plan. During receiving, equal WMS and 1C plans
+collapse to one column; any difference shows both plans for all lines. An absent
+1C value is not equal, and after acceptance the 1C plan comes from the saved
+completion snapshot. Web read-only quantities show three decimal places;
+unchecked fact remains textual. A SKU can show the active pallets containing it
+and each retained quantity. The pallet tab exposes each pallet's item audit and
+putaway history, including placed and remaining quantities. Cancelled pallets
+remain visible for audit, but deleted items are excluded from active totals.
+Quantities of different SKUs are never summed across units. Web does not edit
+the pallet composition.
 
 The API address is packaged per build configuration and is not editable by the
 operator.
@@ -579,13 +509,3 @@ an explicit field click requests the keyboard separately.
 
 Client organization, receipt compatibility, error codes and retry rules belong
 in [ARCHITECTURE.md](ARCHITECTURE.md#client-organization).
-
-## Automated testing
-
-The project uses one xUnit project, `Wms.Tests`, with only the minimum tests
-needed to protect critical warehouse state. Routine changes default to no new
-test; a new test requires a concrete material risk not already protected.
-The developer runs builds and tests; agents run them only on explicit request.
-[`ARCHITECTURE.md`](ARCHITECTURE.md#testing-strategy) owns the testing policy,
-including selection and stopping rules. [`Wms.Tests/README.md`](../Wms.Tests/README.md)
-contains local setup and execution commands.

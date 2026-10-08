@@ -2,7 +2,7 @@
 
 Status: **Frozen** — accepted on 2026-10-06.
 
-Current rules belong to [Receiving and putaway](../../docs/PROJECT_CONTEXT.md#receiving-and-putaway).
+Current rules belong to [Receiving and putaway](../../../docs/PROJECT_CONTEXT.md#receiving-and-putaway).
 
 ## Outcome
 
