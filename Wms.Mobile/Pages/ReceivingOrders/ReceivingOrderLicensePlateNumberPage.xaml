@@ -6,10 +6,9 @@
     xmlns:local="clr-namespace:Wms.Mobile"
     Title="Палета">
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+        <Grid RowDefinitions="Auto,Auto">
             <Label x:Name="StatusLabel" FontSize="13" />
-            <Button x:Name="CancelButton" Grid.Column="1" Clicked="OnCancelClicked" FontSize="20" HeightRequest="36" Loaded="OnNonScanControlLoaded" Padding="0" Text="×" WidthRequest="36" />
-            <Label x:Name="InstructionLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="12" />
+            <Label x:Name="InstructionLabel" Grid.Row="1" FontSize="12" />
         </Grid>
         <RefreshView x:Name="LpnRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView x:Name="LpnScrollView">
@@ -73,10 +72,13 @@
         <VerticalStackLayout Grid.Row="2" Spacing="5">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
-            <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" Loaded="OnNonScanControlLoaded" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
-            <Button x:Name="ManualSkuButton" Clicked="OnManualSkuClicked" Loaded="OnNonScanControlLoaded" HeightRequest="46" Text="Выбрать товар из ордера" />
-            <Button x:Name="CloseButton" Clicked="OnCloseClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" Text="Закрыть палету" />
-            <Button x:Name="ReopenButton" Clicked="OnReopenClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" Text="Возобновить палету" />
+            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="5">
+                <Button x:Name="CancelButton" Clicked="OnCancelClicked" FontSize="20" HeightRequest="46" WidthRequest="46" Loaded="OnNonScanControlLoaded" Padding="0" Text="×" SemanticProperties.Description="Отменить пустую палету" />
+                <Button x:Name="ManualSkuButton" Grid.Column="1" Clicked="OnManualSkuClicked" Loaded="OnNonScanControlLoaded" HeightRequest="46" FontSize="12" Padding="4,0" Text="Выбрать товар" />
+                <Button x:Name="CloseButton" Grid.Column="2" Clicked="OnCloseClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" FontSize="12" Padding="4,0" Text="Закрыть палету" />
+                <Button x:Name="ReopenButton" Grid.Column="2" Clicked="OnReopenClicked" HeightRequest="46" Loaded="OnNonScanControlLoaded" FontSize="12" Padding="4,0" Text="Возобновить" />
+                <Button x:Name="RetryCommandButton" Grid.Column="1" Grid.ColumnSpan="2" Clicked="OnRetryCommandClicked" Loaded="OnNonScanControlLoaded" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

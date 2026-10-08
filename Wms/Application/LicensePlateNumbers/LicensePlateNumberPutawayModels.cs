@@ -24,15 +24,15 @@ public sealed record LicensePlateNumberPutawayItem(
 public enum LicensePlateNumberPutawayRecommendationCategory
 {
     CurrentSkuStock = 1,
-    EmptyWithSkuBalanceHistory = 2,
-    Empty = 3
+    EmptyWithSkuBalanceHistory = 2
 }
 
 public sealed record LicensePlateNumberPutawayRecommendation(
     Guid StorageLocationId,
     string Address,
     string Name,
-    LicensePlateNumberPutawayRecommendationCategory Category);
+    LicensePlateNumberPutawayRecommendationCategory Category,
+    decimal? CurrentSkuQuantity);
 
 public sealed record LicensePlateNumberPutawaySelection(
     LicensePlateNumberPutawayItem Item,

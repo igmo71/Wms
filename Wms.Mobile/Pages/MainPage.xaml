@@ -6,8 +6,8 @@
 
     <ScrollView>
       <VerticalStackLayout
-          Padding="24"
-          Spacing="16">
+          Padding="16"
+          Spacing="12">
 
         <Label
             Text="WMS Mobile"
@@ -39,47 +39,49 @@
         <VerticalStackLayout
             x:Name="SessionPanel"
             IsVisible="False"
-            Spacing="16">
+            Spacing="10">
 
             <Label
                 x:Name="CurrentUserLabel"
                 FontSize="18"
                 HorizontalOptions="Center" />
 
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button
+                    Clicked="OnReceivingOrdersClicked"
+                    FontSize="16"
+                    HeightRequest="52"
+                    Text="Приёмка" />
+                <Button
+                    Grid.Column="1"
+                    Clicked="OnPutawayClicked"
+                    FontSize="16"
+                    HeightRequest="52"
+                    Text="Размещение" />
+            </Grid>
+
+            <Button
+                Clicked="OnShippingOrdersClicked"
+                FontSize="16"
+                HeightRequest="52"
+                Text="Отбор и отгрузка" />
+
             <Button
                 Clicked="OnInventoryTransferClicked"
-                FontSize="18"
-                HeightRequest="64"
+                FontSize="16"
+                HeightRequest="52"
                 Text="Перемещение" />
 
             <Button
                 Clicked="OnInventoryCountClicked"
-                FontSize="18"
-                HeightRequest="64"
+                FontSize="16"
+                HeightRequest="52"
                 Text="Инвентаризация" />
-
-            <Button
-                Clicked="OnReceivingOrdersClicked"
-                FontSize="18"
-                HeightRequest="64"
-                Text="Приёмка" />
-
-            <Button
-                Clicked="OnPutawayClicked"
-                FontSize="18"
-                HeightRequest="64"
-                Text="Размещение" />
-
-            <Button
-                Clicked="OnShippingOrdersClicked"
-                FontSize="18"
-                HeightRequest="64"
-                Text="Отбор и отгрузка" />
 
             <Button
                 Clicked="OnScannerDiagnosticsClicked"
                 FontSize="16"
-                HeightRequest="56"
+                HeightRequest="48"
                 Text="Диагностика сканера" />
 
             <Button

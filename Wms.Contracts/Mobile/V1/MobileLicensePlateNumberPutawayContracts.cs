@@ -18,20 +18,24 @@ public sealed record MobileLicensePlateNumberPutawayItemResponse(
     string? UnitOfMeasure,
     decimal AcceptedQuantity,
     decimal PlacedQuantity,
-    decimal RemainingQuantity);
+    decimal RemainingQuantity)
+{
+    public bool IsPartiallyPlaced => PlacedQuantity > 0 && RemainingQuantity > 0;
+    public bool IsFullyPlaced => RemainingQuantity == 0;
+}
 
 public enum MobileLicensePlateNumberPutawayRecommendationCategory
 {
     CurrentSkuStock = 1,
-    EmptyWithSkuBalanceHistory = 2,
-    Empty = 3
+    EmptyWithSkuBalanceHistory = 2
 }
 
 public sealed record MobileLicensePlateNumberPutawayRecommendationResponse(
     Guid StorageLocationId,
     string Address,
     string Name,
-    MobileLicensePlateNumberPutawayRecommendationCategory Category);
+    MobileLicensePlateNumberPutawayRecommendationCategory Category,
+    decimal? CurrentSkuQuantity);
 
 public sealed record MobileLicensePlateNumberPutawaySelectionResponse(
     MobileLicensePlateNumberPutawayItemResponse Item,

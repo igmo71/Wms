@@ -161,7 +161,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
 
         ManualSkuPanel.IsVisible = true;
-        ManualSkuButton.Text = "Скрыть выбор товара";
+        ManualSkuButton.Text = "Скрыть товары";
         ManualSkuSearch.Text = string.Empty;
         UpdatePlannedSkuRows();
         await LpnScrollView.ScrollToAsync(0, 0, false);
@@ -171,7 +171,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     {
         ManualSkuSearch.Unfocus();
         ManualSkuPanel.IsVisible = false;
-        ManualSkuButton.Text = "Выбрать товар из ордера";
+        ManualSkuButton.Text = "Выбрать товар";
     }
 
     private void OnManualSkuSearchChanged(object? sender, TextChangedEventArgs e) =>
@@ -354,17 +354,17 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         var lpn = LicensePlateNumber;
         if (!lpn.CanEdit && ManualSkuPanel.IsVisible)
             HideManualSkuSelection();
-        ManualSkuButton.IsVisible = lpn.CanEdit;
+        ManualSkuButton.IsVisible = lpn.CanEdit && !_process.HasPendingCommand;
         if (ManualSkuPanel.IsVisible)
             UpdatePlannedSkuRows();
         Title = lpn.Code;
         StatusLabel.Text = $"{lpn.StatusName} · {lpn.ResponsibleUserName}";
         InstructionLabel.Text = lpn.CanEdit
-            ? "Выберите или отсканируйте товар. LPN переключается сканированием."
+            ? "Выберите или отсканируйте товар."
             : "Палета доступна только для просмотра.";
-        CancelButton.IsVisible = lpn.CanCancel;
-        CloseButton.IsVisible = lpn.CanClose;
-        ReopenButton.IsVisible = lpn.CanReopen;
+        CancelButton.IsVisible = lpn.CanCancel && !_process.HasPendingCommand;
+        CloseButton.IsVisible = lpn.CanClose && !_process.HasPendingCommand;
+        ReopenButton.IsVisible = lpn.CanReopen && !_process.HasPendingCommand;
         Rows = lpn.Items
             .Select(item =>
             {
@@ -409,6 +409,13 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         RetryCommandButton.IsVisible = _process.HasPendingCommand;
         RetryCommandButton.IsEnabled = !_busy;
         RetryCommandButton.Text = $"Повторить: {_process.PendingLabel}";
+        if (_process.HasPendingCommand)
+        {
+            CancelButton.IsVisible = false;
+            ManualSkuButton.IsVisible = false;
+            CloseButton.IsVisible = false;
+            ReopenButton.IsVisible = false;
+        }
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 

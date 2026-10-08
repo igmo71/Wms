@@ -112,7 +112,8 @@ public sealed class MobileReceivingOrderQueryService(
             return OperationError.Invalid("Перед сканированием документа необходимо выбрать склад.");
         }
 
-        var detailsResult = await GetDetailsAsync(orderId, userId, ct);
+        var detailsResult = await GetDetailsAsync(
+            orderId, userId, requireMobileWork: false, ct);
         if (!detailsResult.IsSuccess)
         {
             return detailsResult.Error!;

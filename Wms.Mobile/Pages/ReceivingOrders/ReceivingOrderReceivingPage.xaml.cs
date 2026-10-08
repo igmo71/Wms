@@ -35,6 +35,11 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         _referenceDataClient = referenceDataClient;
         _scanner = scanner;
         _services = services;
+        ErrorLabel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(Label.Text))
+                ErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(ErrorLabel.Text);
+        };
         CameraScannerView.Configure(scanner);
     }
 
@@ -360,6 +365,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             _ => "Завершён"
         };
         CheckedLabel.Text = $"Проверено: {details.Order.Progress.ConfirmedLineCount} из {details.Order.Progress.TotalLineCount}";
+        ScanPalletHintLabel.IsVisible = CanUseLicensePlateNumbers;
         LineRows = details.Lines.Select(ReceivingOrderLineRow.From).ToArray();
         LicensePlateNumbers = details.LicensePlateNumbers
             .Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
@@ -373,12 +379,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             _lpnTabActive = false;
         SetLpnTab(_lpnTabActive);
         StartReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
-            && !_awaitingReceivingLocation;
+            && !_awaitingReceivingLocation && !_process.HasPendingCommand;
         StartReceivingButton.IsEnabled = !_busy
             && !_process.HasPendingCommand
             && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
         CompleteReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.InReceiving
-            && details.Order.IsParticipant;
+            && details.Order.IsParticipant && !_process.HasPendingCommand;
         CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
         UpdateRecoveryControls();
         UpdateGuidance();
@@ -421,6 +427,11 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         RetryCommandButton.IsVisible = _process.HasPendingCommand;
         RetryCommandButton.IsEnabled = !_busy;
         RetryCommandButton.Text = $"Повторить: {_process.PendingLabel}";
+        if (_process.HasPendingCommand)
+        {
+            StartReceivingButton.IsVisible = false;
+            CompleteReceivingButton.IsVisible = false;
+        }
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
@@ -437,7 +448,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        CommandProgressIndicator.Opacity = busy ? 1 : 0;
+        CommandProgressIndicator.IsVisible = busy;
         StartReceivingButton.IsEnabled = !busy
             && !_process.HasPendingCommand
             && _synchronization is not null

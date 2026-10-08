@@ -8,6 +8,7 @@ public sealed class ReceivingOrderQueueItemViewState
     public required string Number { get; init; }
     public required string DateText { get; init; }
     public required string StatusText { get; init; }
+    public required bool ShowStatus { get; init; }
     public required string ProgressText { get; init; }
     public required bool HasSynchronizationIssue { get; init; }
     public required string SynchronizationText { get; init; }
@@ -27,6 +28,7 @@ public sealed class ReceivingOrderQueueItemViewState
             MobileReceivingOrderStatus.ProcessingRequired => "Требуется обработка",
             _ => "Приёмка"
         },
+        ShowStatus = order.Status != MobileReceivingOrderStatus.InReceiving,
         HasSynchronizationIssue = OrderSynchronizationPresentation.HasIssue(order.Synchronization),
         SynchronizationText = OrderSynchronizationPresentation.BuildTitle(order.Synchronization),
         HasJoinBlock = !order.IsParticipant && !order.CanJoin,

@@ -7,11 +7,7 @@
 
     <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
         <ScrollView>
-            <VerticalStackLayout Padding="24" Spacing="16">
-                <Label
-                    FontAttributes="Bold"
-                    FontSize="26"
-                    Text="Приёмка" />
+            <VerticalStackLayout Padding="12" Spacing="10">
 
                 <Picker
                     x:Name="WarehousePicker"
@@ -20,35 +16,35 @@
                     SelectedIndexChanged="OnWarehouseChanged"
                     Title="Выберите склад" />
 
-                <Border Padding="16">
-                    <VerticalStackLayout Spacing="12">
-                        <Label
-                            x:Name="ScanStepLabel"
-                            FontAttributes="Bold"
-                            FontSize="22"
-                            Text="Выберите склад" />
+                <VerticalStackLayout Spacing="5">
+                    <Border Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
                         <Label
                             x:Name="ScanInstructionLabel"
-                            FontSize="18"
+                            FontSize="14"
                             Text="После выбора склада отсканируйте штрихкод приходного ордера." />
-                        <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                        <BoxView
-                            x:Name="ProgressIndicator"
-                            Color="{StaticResource Primary}"
-                            HeightRequest="3"
-                            Opacity="0" />
-                        <Label
-                            x:Name="ErrorLabel"
-                            HorizontalTextAlignment="Center"
-                            TextColor="Red" />
-                    </VerticalStackLayout>
-                </Border>
+                    </Border>
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Border x:Name="ScanResultPanel" Padding="8" BackgroundColor="#E8F5E9"
+                            Stroke="#81C784" IsVisible="False">
+                        <Label x:Name="ScanResultLabel" FontSize="14" />
+                    </Border>
+                    <BoxView
+                        x:Name="ProgressIndicator"
+                        Color="{StaticResource Primary}"
+                        HeightRequest="3"
+                        IsVisible="False" />
+                    <Label
+                        x:Name="ErrorLabel"
+                        HorizontalTextAlignment="Center"
+                        IsVisible="False"
+                        TextColor="Red" />
+                </VerticalStackLayout>
 
                 <VerticalStackLayout Spacing="10">
                     <Label
                         x:Name="ReceivingStatusLabel"
                         HorizontalTextAlignment="Center"
-                        Text="Выберите склад." />
+                        IsVisible="False" />
                     <VerticalStackLayout
                         x:Name="ReceivingOrdersLayout"
                         BindableLayout.ItemsSource="{Binding ReceivingOrders}"
@@ -68,13 +64,14 @@
                                             <Label
                                                 FontAttributes="Bold"
                                                 FontSize="18"
-                                                Text="{Binding Number, StringFormat='Ордер {0}'}" />
+                                                Text="{Binding Number}" />
                                             <Label
                                                 Grid.Column="1"
                                                 Text="{Binding DateText}" />
                                         </Grid>
                                         <Label
                                             FontAttributes="Bold"
+                                            IsVisible="{Binding ShowStatus}"
                                             Text="{Binding StatusText}" />
                                         <Label
                                             FontAttributes="Bold"

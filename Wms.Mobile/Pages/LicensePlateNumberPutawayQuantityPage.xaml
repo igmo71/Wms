@@ -1,0 +1,65 @@
+<ContentPage
+    x:Class="Wms.Mobile.LicensePlateNumberPutawayQuantityPage"
+    x:Name="Page"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Количество и ячейка"
+    HideSoftInputOnTapped="True">
+
+    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="5">
+        <ScrollView>
+            <VerticalStackLayout Spacing="10">
+                <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label x:Name="RemainingLabel" />
+                    <Label x:Name="QuantityStatusLabel" Grid.Column="1" FontAttributes="Bold"
+                           FontSize="13" IsVisible="False" HorizontalTextAlignment="End" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="Количество"
+                           ReturnType="Done" Focused="OnQuantityFocused" TextChanged="OnQuantityTextChanged"
+                           Completed="OnQuantityCompleted" Unfocused="OnQuantityUnfocused" />
+                    <Button x:Name="EntireRemainderButton" Grid.Column="1" Clicked="OnEntireRemainderClicked"
+                            Loaded="OnNonScanControlLoaded" FontSize="13" Padding="6,0" />
+                </Grid>
+                <Label x:Name="ScanCellHintLabel" FontSize="12" />
+                <Label FontAttributes="Bold" Text="Рекомендации ячеек" />
+                <Label x:Name="CurrentStockHeadingLabel" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding CurrentSkuStockRecommendations, Source={x:Reference Page}}" Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayRecommendationResponse">
+                            <Border Padding="8"><VerticalStackLayout Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <Label FontAttributes="Bold" Text="{Binding Address}" />
+                                    <Label Grid.Column="1" Text="{Binding CurrentSkuQuantity, StringFormat='Остаток: {0:0.###}'}" />
+                                </Grid>
+                                <Label Text="{Binding Name}" />
+                            </VerticalStackLayout></Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="2. Пустые ячейки с историей этого SKU" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding EmptyWithSkuHistoryRecommendations, Source={x:Reference Page}}" Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayRecommendationResponse">
+                            <Border Padding="8"><VerticalStackLayout Spacing="2">
+                                <Label FontAttributes="Bold" Text="{Binding Address}" />
+                                <Label Text="{Binding Name}" />
+                            </VerticalStackLayout></Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label FontSize="12" Text="Можно отсканировать любую допустимую ячейку хранения." />
+            </VerticalStackLayout>
+        </ScrollView>
+        <VerticalStackLayout Grid.Row="1" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" IsVisible="False" TextColor="Red" />
+            <Button x:Name="RetryButton" Clicked="OnRetryClicked" HeightRequest="46" IsVisible="False"
+                    Loaded="OnNonScanControlLoaded" Text="Повторить то же размещение" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

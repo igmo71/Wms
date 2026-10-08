@@ -29,6 +29,11 @@ public partial class ReceivingOrderPage : ContentPage
         _referenceDataClient = referenceDataClient;
         _scanner = scanner;
         _services = services;
+        ErrorLabel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(Label.Text))
+                ErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(ErrorLabel.Text);
+        };
         BindingContext = this;
         CameraScannerView.Configure(scanner);
     }
@@ -104,9 +109,7 @@ public partial class ReceivingOrderPage : ContentPage
     private async void OnWarehouseChanged(object? sender, EventArgs e)
     {
         ErrorLabel.Text = string.Empty;
-        ScanStepLabel.Text = SelectedWarehouse is null
-            ? "Выберите склад"
-            : "Приходный ордер";
+        ScanResultPanel.IsVisible = false;
         ScanInstructionLabel.Text = SelectedWarehouse is null
             ? "После выбора склада отсканируйте штрихкод приходного ордера."
             : "Отсканируйте штрихкод приходного ордера или выберите его в очереди ниже.";
@@ -132,16 +135,33 @@ public partial class ReceivingOrderPage : ContentPage
 
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
+        ScanResultPanel.IsVisible = false;
         try
         {
             var details = await _orderClient.ResolveDocumentAsync(
                 warehouse.Id,
                 barcode);
+            if (details.Order.Status is MobileReceivingOrderStatus.Received
+                or MobileReceivingOrderStatus.ProcessingRequired
+                or MobileReceivingOrderStatus.Unknown)
+            {
+                var status = details.Order.Status switch
+                {
+                    MobileReceivingOrderStatus.Received => "уже принят",
+                    MobileReceivingOrderStatus.ProcessingRequired => "требует обработки",
+                    _ => "не готов к приёмке"
+                };
+                ScanResultLabel.Text = $"Ордер {details.Order.Number} от {details.Order.Date:dd.MM.yyyy} {status}.";
+                ScanResultPanel.IsVisible = true;
+                return;
+            }
             await OpenDetailsAsync(details);
         }
         catch (MobileApiException exception)
         {
-            ErrorLabel.Text = exception.Message;
+            ErrorLabel.Text = exception.StatusCode == System.Net.HttpStatusCode.NotFound
+                ? "Приходный ордер по этому штрихкоду не найден."
+                : exception.Message;
         }
         catch (HttpRequestException)
         {
@@ -233,9 +253,11 @@ public partial class ReceivingOrderPage : ContentPage
         if (SelectedWarehouse is not MobileWarehouseResponse warehouse)
         {
             ApplyQueue([]);
-            ReceivingStatusLabel.Text = "Выберите склад.";
+            ReceivingStatusLabel.IsVisible = false;
             return;
         }
+
+        ReceivingStatusLabel.IsVisible = true;
 
         try
         {
@@ -291,7 +313,7 @@ public partial class ReceivingOrderPage : ContentPage
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        ProgressIndicator.Opacity = busy ? 1 : 0;
+        ProgressIndicator.IsVisible = busy;
         WarehousePicker.IsEnabled = !busy;
     }
 

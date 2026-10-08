@@ -317,15 +317,30 @@ remaining quantity is the immutable accepted LPN-item quantity minus its posted
 LPN putaway history, so later picking or other consumption from a destination
 does not change receiving history or make quantity pending again.
 
-The Mobile putaway screen keeps the navigation title and uses the LPN code as
-the content heading, with a checkmark for completed, unblocked pallets. It omits
+Mobile putaway uses three pages: pallet scanning, pallet composition/history,
+and quantity with storage-cell recommendations. Native `NavigationPage` back
+navigation returns through those pages. The composition page uses the LPN code as
+its navigation title, with a checkmark for completed, unblocked pallets. It omits
 the order number and routine step explanations, while retaining blocking reasons
 and quantity-confirmation feedback. Composition and history have no outer cards;
 SKU code and unit share a row, and quantities use compact labelled columns.
-Composition cards with zero remaining quantity have a light green background.
+Composition cards are uncolored before putaway, light yellow when partially
+placed, and light green when remaining quantity reaches zero.
 History shows the SKU, destination with quantity and unit, then employee name and
 timestamp. Employee names follow the shared Identity display-name fallback rule;
 stored audit user ids remain unchanged.
+Putaway uses "палета" for the physical unit and "ячейка" for a storage
+destination in operator text; the printed LPN code is unchanged. Pending or
+busy commands block backward navigation. A successful movement returns from
+quantity entry to the pallet composition, refreshed from server state.
+The remaining and confirmed quantities share a row; the "Entire remainder"
+button shows the remainder beside the quantity field. After confirmation the
+screen instructs the operator to scan a storage cell to place the item.
+
+Mobile putaway keeps "Entire remainder" beside the quantity field. "Next
+pallet" on the composition page after completion and repeat-safe retry on the
+quantity page after an uncertain posting appear in fixed bottom action areas;
+errors and progress occupy those areas only when present.
 
 Each SKU selection starts with an empty, unconfirmed quantity and no automatic
 input focus. Finishing input (Done or leaving the field) or explicitly choosing
@@ -350,10 +365,10 @@ validated at posting time.
 
 The LPN quantity screen recommends active unlocked Storage locations in the
 order warehouse. Locations with positive current stock of the selected SKU come
-first, followed by empty locations retaining a zero balance row for that SKU,
-then other empty locations. Empty means no positive balance of any SKU, and a
-zero row for another SKU does not make the location historical for the selected
-SKU. Each location appears in only its first matching category. Within each
+first and show that SKU's current quantity in its canonical unit, followed by
+empty locations retaining a zero balance row for that SKU. Other empty locations
+are omitted. Empty means no positive balance of any SKU, and a zero row for
+another SKU does not make the location historical for the selected SKU. Within each
 category, locations with `PickSequence` sort first by that value, followed by
 locations without it, then by full address and location id. Recommendations are
 only a snapshot hint; posting revalidates the warehouse, active Storage topology,
@@ -493,6 +508,23 @@ page activity, including after leaving and returning to the same live page.
 The Mobile receiving queue API and screen show only the current user's orders;
 other orders can be opened by scanning their document barcode. Independent
 putaway starts from its own LPN screen.
+The receiving queue shows one navigation title and a compact scan hint without
+a duplicate heading. In-progress order cards show number and date together,
+then checked-line progress; redundant order and status labels are omitted.
+An active receiving order explains that scanning an available pallet adds it
+to that order.
+Scanning an already received order shows its number, date and accepted state
+in the queue, while a missing order has a specific not-found message.
+
+The Mobile receiving order and pallet screens keep their current actions in one
+fixed bottom row. The order shows its current start, completion or repeat action.
+The order's nomenclature and pallet tabs sit in the same fixed bottom area above
+that action, leaving the scrollable contents directly below the order guidance.
+The pallet shows compact manual SKU selection and its available close or reopen
+action, with a small cancel action only for an eligible empty pallet. When a
+command needs repeat-safe recovery, only its retry action occupies the row.
+Error and progress feedback remain directly above the actions.
+They occupy space only while a message or operation is present.
 
 Web uses one receiving-order page across ready, receiving and received states.
 The list's "Сверка" indicator prioritizes an accepted quantity difference over

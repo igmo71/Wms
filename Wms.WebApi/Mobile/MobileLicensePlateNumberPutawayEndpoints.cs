@@ -137,5 +137,6 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
                 x.StorageLocationId,
                 x.Address,
                 x.Name,
-                (MobileLicensePlateNumberPutawayRecommendationCategory)x.Category)).ToList());
+                (MobileLicensePlateNumberPutawayRecommendationCategory)x.Category,
+                x.CurrentSkuQuantity)).ToList());
 }

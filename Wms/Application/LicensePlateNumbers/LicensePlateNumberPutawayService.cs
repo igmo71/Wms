@@ -23,12 +23,12 @@ public sealed class LicensePlateNumberPutawayService(
     {
         var normalized = code?.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(normalized))
-            return OperationError.Invalid("Отсканируйте LPN.");
+            return OperationError.Invalid("Отсканируйте палету.");
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var lpn = await LoadAsync(dbContext, x => x.Code == normalized, true, ct);
         return lpn is null
-            ? OperationError.NotFound("LPN не найден.")
+            ? OperationError.NotFound("Палета не найдена.")
             : await MapDetailsAsync(dbContext, lpn, ct);
     }
 
@@ -39,7 +39,7 @@ public sealed class LicensePlateNumberPutawayService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var lpn = await LoadAsync(dbContext, x => x.Id == lpnId, true, ct);
         return lpn is null
-            ? OperationError.NotFound("LPN не найден.")
+            ? OperationError.NotFound("Палета не найдена.")
             : await MapDetailsAsync(dbContext, lpn, ct);
     }
 
@@ -55,7 +55,7 @@ public sealed class LicensePlateNumberPutawayService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var lpn = await LoadAsync(dbContext, x => x.Id == lpnId, true, ct);
         if (lpn is null)
-            return OperationError.NotFound("LPN не найден.");
+            return OperationError.NotFound("Палета не найдена.");
 
         var details = Map(lpn);
         var matchedSkuIds = await dbContext.StockKeepingUnits
@@ -68,8 +68,8 @@ public sealed class LicensePlateNumberPutawayService(
         if (matches.Count != 1)
         {
             return matches.Count == 0
-                ? OperationError.NotFound("В выбранном LPN нет этого товара с остатком к размещению.")
-                : OperationError.Conflict("Штрихкод соответствует нескольким товарам LPN.");
+                ? OperationError.NotFound("В выбранной палете нет этого товара с остатком к размещению.")
+                : OperationError.Conflict("Штрихкод соответствует нескольким товарам палеты.");
         }
 
         return await BuildSelectionAsync(dbContext, lpn, matches[0], ct);
@@ -83,11 +83,11 @@ public sealed class LicensePlateNumberPutawayService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var lpn = await LoadAsync(dbContext, x => x.Id == lpnId, true, ct);
         if (lpn is null)
-            return OperationError.NotFound("LPN не найден.");
+            return OperationError.NotFound("Палета не найдена.");
 
         var item = Map(lpn).Items.SingleOrDefault(x => x.Id == lpnItemId && x.RemainingQuantity > 0);
         return item is null
-            ? OperationError.NotFound("В выбранном LPN нет этой строки с остатком к размещению.")
+            ? OperationError.NotFound("В выбранной палете нет этой строки с остатком к размещению.")
             : await BuildSelectionAsync(dbContext, lpn, item, ct);
     }
 
@@ -112,7 +112,7 @@ public sealed class LicensePlateNumberPutawayService(
     {
         var lpn = await LoadAsync(dbContext, x => x.Id == command.LicensePlateNumberId, false, ct);
         if (lpn is null)
-            return OperationError.NotFound("LPN не найден.");
+            return OperationError.NotFound("Палета не найдена.");
         if (lpn.ReceivingOrder is not { Status: ReceivingOrderStatus.Received } order)
             return OperationError.Invalid("Размещение запрещено до завершения приходного ордера.");
         if (order.ReceivingLocationId is null)
@@ -120,10 +120,10 @@ public sealed class LicensePlateNumberPutawayService(
 
         var item = lpn.Items.SingleOrDefault(x => x.Id == command.LicensePlateNumberItemId && !x.IsDeleted);
         if (item is null)
-            return OperationError.NotFound("Строка состава LPN не найдена.");
+            return OperationError.NotFound("Строка состава палеты не найдена.");
         var orderItem = order.Items.SingleOrDefault(x => x.StockKeepingUnitId == item.StockKeepingUnitId);
         if (orderItem is null)
-            return OperationError.Invalid("SKU LPN отсутствует в принятом ордере.");
+            return OperationError.Invalid("Товар палеты отсутствует в принятом ордере.");
 
         var movementId = Guid.NewGuid();
         var movementResult = InventoryMovement.Create(
@@ -191,7 +191,7 @@ public sealed class LicensePlateNumberPutawayService(
         CancellationToken ct)
     {
         if (lpn.Status != LicensePlateNumberStatus.Closed)
-            return OperationError.Invalid("Размещать можно только закрытый LPN.");
+            return OperationError.Invalid("Размещать можно только закрытую палету.");
         if (lpn.ReceivingOrder is not { Status: ReceivingOrderStatus.Received } order)
             return OperationError.Invalid("Размещение запрещено до завершения приходного ордера.");
 
@@ -211,10 +211,11 @@ public sealed class LicensePlateNumberPutawayService(
                 Address = location.Zone!.Code + "-" + location.Code,
                 location.Name,
                 location.PickSequence,
-                HasSelectedSkuStock = dbContext.InventoryBalances.Any(balance =>
-                    balance.StorageLocationId == location.Id
-                    && balance.StockKeepingUnitId == item.StockKeepingUnitId
-                    && balance.Quantity > 0),
+                CurrentSkuQuantity = dbContext.InventoryBalances
+                    .Where(balance =>
+                        balance.StorageLocationId == location.Id
+                        && balance.StockKeepingUnitId == item.StockKeepingUnitId)
+                    .Sum(balance => (decimal?)balance.Quantity) ?? 0m,
                 HasSelectedSkuBalance = dbContext.InventoryBalances.Any(balance =>
                     balance.StorageLocationId == location.Id
                     && balance.StockKeepingUnitId == item.StockKeepingUnitId),
@@ -222,18 +223,18 @@ public sealed class LicensePlateNumberPutawayService(
                     balance.StorageLocationId == location.Id
                     && balance.Quantity > 0)
             })
-            .Where(location => location.HasSelectedSkuStock || !location.HasAnyStock)
+            .Where(location => location.CurrentSkuQuantity > 0
+                || (!location.HasAnyStock && location.HasSelectedSkuBalance))
             .Select(location => new
             {
                 location.Id,
                 location.Address,
                 location.Name,
                 location.PickSequence,
-                Category = location.HasSelectedSkuStock
+                location.CurrentSkuQuantity,
+                Category = location.CurrentSkuQuantity > 0
                     ? LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock
-                    : location.HasSelectedSkuBalance
-                        ? LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory
-                        : LicensePlateNumberPutawayRecommendationCategory.Empty
+                    : LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory
             })
             .OrderBy(location => location.Category)
             .ThenBy(location => location.PickSequence.HasValue ? 0 : 1)
@@ -244,7 +245,9 @@ public sealed class LicensePlateNumberPutawayService(
                 location.Id,
                 location.Address,
                 location.Name,
-                location.Category))
+                location.Category,
+                location.Category == LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock
+                    ? location.CurrentSkuQuantity : null))
             .ToListAsync(ct);
 
         return new LicensePlateNumberPutawaySelection(item, recommendations);
@@ -295,7 +298,7 @@ public sealed class LicensePlateNumberPutawayService(
             })
             .ToList();
         var blockedReason = lpn.Status != LicensePlateNumberStatus.Closed
-            ? "Размещать можно только закрытый LPN."
+            ? "Размещать можно только закрытую палету."
             : lpn.ReceivingOrder?.Status != ReceivingOrderStatus.Received
                 ? "Размещение запрещено до завершения приходного ордера."
                 : null;

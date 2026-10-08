@@ -5,20 +5,18 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:Wms.Mobile"
     Title="Приёмка">
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
             <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="22" />
             <Label x:Name="StatusLabel" Grid.Column="1" FontAttributes="Bold" VerticalTextAlignment="Center" />
             <Label x:Name="CheckedLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="13" />
+            <Label x:Name="ScanPalletHintLabel" Grid.Row="2" Grid.ColumnSpan="2" FontSize="12"
+                   Text="Отсканируйте свободную палету, чтобы добавить её к ордеру." IsVisible="False" />
         </Grid>
         <Border x:Name="SynchronizationPanel" Grid.Row="1" IsVisible="False" Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
             <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
         </Border>
-        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="6">
-            <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
-            <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />
-        </Grid>
-        <RefreshView x:Name="OrderRefreshView" Grid.Row="3" Refreshing="OnOrderRefreshing">
+        <RefreshView x:Name="OrderRefreshView" Grid.Row="2" Refreshing="OnOrderRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="4">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
@@ -67,12 +65,18 @@
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
-        <VerticalStackLayout Grid.Row="4" Spacing="5">
-            <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" Opacity="0" />
-            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
-            <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
-            <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
-            <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
+        <VerticalStackLayout Grid.Row="3" Spacing="5">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
+                <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />
+            </Grid>
+            <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" IsVisible="False" TextColor="Red" />
+            <Grid ColumnDefinitions="*">
+                <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
+                <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
+                <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>
