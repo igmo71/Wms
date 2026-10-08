@@ -11,5 +11,10 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
             .HasMaxLength(ApplicationUser.DisplayNameMaxLength)
             .HasDefaultValue(string.Empty)
             .IsRequired();
+
+        builder.HasOne(x => x.DefaultWarehouse)
+            .WithMany()
+            .HasForeignKey(x => x.DefaultWarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

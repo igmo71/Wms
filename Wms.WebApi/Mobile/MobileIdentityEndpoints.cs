@@ -128,7 +128,8 @@ internal static class MobileIdentityEndpoints
         return TypedResults.Ok(new MobileCurrentUserResponse(
             user.Id,
             user.GetDisplayName(),
-            user.Email ?? user.UserName ?? string.Empty));
+            user.Email ?? user.UserName ?? string.Empty,
+            user.DefaultWarehouseId));
     }
 
     private static IResult AuthenticationFailed() => Problem(

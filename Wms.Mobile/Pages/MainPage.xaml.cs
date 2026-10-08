@@ -7,6 +7,7 @@ public partial class MainPage : ContentPage
 {
     private readonly MobileIdentityClient _identityClient;
     private readonly IMobileSessionStore _sessionStore;
+    private readonly MobileWarehouseSelection _warehouseSelection;
     private readonly IServiceProvider _services;
     private bool _checkingSession;
     private bool _currentUserLoaded;
@@ -18,6 +19,7 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _identityClient = identityClient;
         _sessionStore = services.GetRequiredService<IMobileSessionStore>();
+        _warehouseSelection = services.GetRequiredService<MobileWarehouseSelection>();
         _services = services;
     }
 
@@ -132,6 +134,7 @@ public partial class MainPage : ContentPage
 
     private void ShowLoggedIn(MobileCurrentUserResponse user)
     {
+        _warehouseSelection.Initialize(user);
         _currentUserLoaded = true;
         CurrentUserLabel.Text = user.DisplayName;
         LoginPanel.IsVisible = false;
@@ -140,6 +143,7 @@ public partial class MainPage : ContentPage
 
     private void ShowLoggedOut()
     {
+        _warehouseSelection.Clear();
         _currentUserLoaded = false;
         LoginPanel.IsVisible = true;
         SessionPanel.IsVisible = false;

@@ -65,6 +65,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
         builder.Services.AddSingleton<IMobileSessionStore, SecureStorageMobileSessionStore>();
+        builder.Services.AddSingleton<MobileWarehouseSelection>();
         builder.Services.AddSingleton<MobileAuthenticationHandler>();
         builder.Services.AddSingleton(MobileApiSettings.Load());
         builder.Services.AddSingleton(serviceProvider => new HttpClient(

@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using Wms.Application.Users;
+using Wms.Application.Warehouses;
+using Wms.Common;
 using Wms.Data;
+using Wms.Domain;
 
 namespace Wms.WebApp.Components.Pages.UserPages;
 
@@ -19,31 +22,54 @@ public partial class UserDialog
     private ApplicationUserManagementService UserManagementService { get; set; } = null!;
 
     [Inject]
+    private WarehouseService WarehouseService { get; set; } = null!;
+
+    [Inject]
     private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
     private string _displayName = string.Empty;
     private string _email = string.Empty;
     private string _password = string.Empty;
     private IReadOnlyCollection<string> _roles = [ApplicationRoles.Operator];
+    private IReadOnlyList<Warehouse> _warehouses = [];
+    private Guid? _defaultWarehouseId;
+    private bool _warehousesLoaded;
     private bool _isBlocked;
     private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsSaveDisabled => _isSaving
+        || !_warehousesLoaded
         || string.IsNullOrWhiteSpace(_displayName)
         || string.IsNullOrWhiteSpace(_email)
         || !_roles.Any()
         || (User is null && string.IsNullOrWhiteSpace(_password));
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (User is null)
-            return;
+        if (User is not null)
+        {
+            _displayName = User.DisplayName;
+            _email = User.Email;
+            _roles = User.Roles.ToArray();
+            _isBlocked = User.IsBlocked;
+            _defaultWarehouseId = User.DefaultWarehouseId;
+        }
 
-        _displayName = User.DisplayName;
-        _email = User.Email;
-        _roles = User.Roles.ToArray();
-        _isBlocked = User.IsBlocked;
+        try
+        {
+            var result = await WarehouseService.ListAsync(new ListQuery
+            {
+                SortBy = "Name",
+                Take = int.MaxValue
+            });
+            _warehouses = result.Items;
+            _warehousesLoaded = true;
+        }
+        catch
+        {
+            _errorMessage = "Не удалось загрузить склады.";
+        }
     }
 
     private async Task SaveAsync()
@@ -61,6 +87,7 @@ public partial class UserDialog
                 {
                     Email = _email,
                     DisplayName = _displayName,
+                    DefaultWarehouseId = _defaultWarehouseId,
                     Password = _password,
                     Roles = _roles.ToArray()
                 })
@@ -96,6 +123,7 @@ public partial class UserDialog
             UserId = User!.Id,
             CurrentUserId = currentUserId,
             DisplayName = _displayName,
+            DefaultWarehouseId = _defaultWarehouseId,
             Roles = _roles.ToArray(),
             IsBlocked = _isBlocked
         });

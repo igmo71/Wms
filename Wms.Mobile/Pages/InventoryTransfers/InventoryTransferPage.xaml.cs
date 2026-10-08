@@ -8,6 +8,7 @@ public partial class InventoryTransferPage : ContentPage
 {
     private readonly MobileInventoryTransferClient _transferClient;
     private readonly MobileReferenceDataClient _referenceDataClient;
+    private readonly MobileWarehouseSelection _warehouseSelection;
     private readonly IOperationalBarcodeScanner _scanner;
     private bool _loaded;
     private Guid? _pendingCreateRequestId;
@@ -16,11 +17,13 @@ public partial class InventoryTransferPage : ContentPage
     public InventoryTransferPage(
         MobileInventoryTransferClient transferClient,
         MobileReferenceDataClient referenceDataClient,
+        MobileWarehouseSelection warehouseSelection,
         IOperationalBarcodeScanner scanner)
     {
         InitializeComponent();
         _transferClient = transferClient;
         _referenceDataClient = referenceDataClient;
+        _warehouseSelection = warehouseSelection;
         _scanner = scanner;
     }
 
@@ -46,10 +49,11 @@ public partial class InventoryTransferPage : ContentPage
         {
             var warehouses = await _referenceDataClient.GetWarehousesAsync();
             WarehousePicker.ItemsSource = warehouses.ToList();
-            if (warehouses.Count == 1)
-            {
-                WarehousePicker.SelectedIndex = 0;
-            }
+            var (index, warning) = _warehouseSelection.Resolve(warehouses);
+            if (index >= 0)
+                WarehousePicker.SelectedIndex = index;
+            if (warning is not null)
+                ErrorLabel.Text = warning;
         }
         catch (MobileApiException exception)
         {
@@ -67,6 +71,9 @@ public partial class InventoryTransferPage : ContentPage
 
     private async void OnWarehouseChanged(object? sender, EventArgs e)
     {
+        if (WarehousePicker.SelectedItem is MobileWarehouseResponse warehouse)
+            _warehouseSelection.Select(warehouse.Id);
+
         await LoadTransfersAsync();
     }
 

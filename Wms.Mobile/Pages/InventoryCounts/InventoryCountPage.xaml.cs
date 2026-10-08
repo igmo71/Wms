@@ -8,6 +8,7 @@ public partial class InventoryCountPage : ContentPage
 {
     private readonly MobileInventoryCountClient _inventoryCountClient;
     private readonly MobileReferenceDataClient _referenceDataClient;
+    private readonly MobileWarehouseSelection _warehouseSelection;
     private readonly IOperationalBarcodeScanner _scanner;
     private bool _loaded;
     private bool _isVisible;
@@ -20,11 +21,13 @@ public partial class InventoryCountPage : ContentPage
     public InventoryCountPage(
         MobileInventoryCountClient inventoryCountClient,
         MobileReferenceDataClient referenceDataClient,
+        MobileWarehouseSelection warehouseSelection,
         IOperationalBarcodeScanner scanner)
     {
         InitializeComponent();
         _inventoryCountClient = inventoryCountClient;
         _referenceDataClient = referenceDataClient;
+        _warehouseSelection = warehouseSelection;
         _scanner = scanner;
         CameraScannerView.Configure(scanner);
     }
@@ -74,8 +77,11 @@ public partial class InventoryCountPage : ContentPage
             var warehouses = await _referenceDataClient.GetWarehousesAsync();
             WarehousePicker.ItemsSource = warehouses.ToList();
             _loaded = true;
-            if (warehouses.Count == 1)
-                WarehousePicker.SelectedIndex = 0;
+            var (index, warning) = _warehouseSelection.Resolve(warehouses);
+            if (index >= 0)
+                WarehousePicker.SelectedIndex = index;
+            if (warning is not null)
+                ErrorLabel.Text = warning;
         }
         catch (MobileApiException exception)
         {
@@ -95,6 +101,9 @@ public partial class InventoryCountPage : ContentPage
     {
         if (_pendingStartRequestId is not null)
             return;
+
+        if (SelectedWarehouse is { } warehouse)
+            _warehouseSelection.Select(warehouse.Id);
 
         ErrorLabel.Text = string.Empty;
         _pendingBarcode = null;

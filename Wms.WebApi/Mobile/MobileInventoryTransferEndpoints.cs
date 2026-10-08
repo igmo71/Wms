@@ -87,7 +87,7 @@ internal static class MobileInventoryTransferEndpoints
         {
             ExcludeDeleted = true,
             SortBy = "Name",
-            Take = 100
+            Take = int.MaxValue
         }, ct);
 
         return TypedResults.Ok<IReadOnlyList<MobileWarehouseResponse>>(

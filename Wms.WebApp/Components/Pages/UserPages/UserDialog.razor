@@ -17,6 +17,25 @@
                           Immediate="true"
                           InputType="InputType.Email"
                           Disabled="@(User is not null)" />
+            <MudSelect T="Guid?"
+                       @bind-Value="_defaultWarehouseId"
+                       Label="Склад по умолчанию"
+                       Clearable="true"
+                       Disabled="@(!_warehousesLoaded)">
+                @foreach (var warehouse in _warehouses)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)warehouse.Id)">
+                        @(warehouse.Name ?? warehouse.Id.ToString())
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            @if (User is not null && User.DefaultWarehouseIsDeleted
+                && _defaultWarehouseId == User.DefaultWarehouseId)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    Назначенный склад «@(User.DefaultWarehouseName ?? User.DefaultWarehouseId.ToString())» недоступен. Выберите другой или очистите поле.
+                </MudAlert>
+            }
             @if (User is null)
             {
                 <MudTextField T="string"

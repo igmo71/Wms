@@ -8,6 +8,7 @@ public partial class ReceivingOrderPage : ContentPage
 {
     private readonly MobileReceivingOrderClient _orderClient;
     private readonly MobileReferenceDataClient _referenceDataClient;
+    private readonly MobileWarehouseSelection _warehouseSelection;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
     private bool _loaded;
@@ -21,12 +22,14 @@ public partial class ReceivingOrderPage : ContentPage
     public ReceivingOrderPage(
         MobileReceivingOrderClient orderClient,
         MobileReferenceDataClient referenceDataClient,
+        MobileWarehouseSelection warehouseSelection,
         IOperationalBarcodeScanner scanner,
         IServiceProvider services)
     {
         InitializeComponent();
         _orderClient = orderClient;
         _referenceDataClient = referenceDataClient;
+        _warehouseSelection = warehouseSelection;
         _scanner = scanner;
         _services = services;
         ErrorLabel.PropertyChanged += (_, args) =>
@@ -87,10 +90,11 @@ public partial class ReceivingOrderPage : ContentPage
             var warehouses = await _referenceDataClient.GetWarehousesAsync();
             WarehousePicker.ItemsSource = warehouses.ToList();
             _loaded = true;
-            if (warehouses.Count == 1)
-            {
-                WarehousePicker.SelectedIndex = 0;
-            }
+            var (index, warning) = _warehouseSelection.Resolve(warehouses);
+            if (index >= 0)
+                WarehousePicker.SelectedIndex = index;
+            if (warning is not null)
+                ErrorLabel.Text = warning;
         }
         catch (MobileApiException exception)
         {
@@ -108,6 +112,9 @@ public partial class ReceivingOrderPage : ContentPage
 
     private async void OnWarehouseChanged(object? sender, EventArgs e)
     {
+        if (SelectedWarehouse is { } warehouse)
+            _warehouseSelection.Select(warehouse.Id);
+
         ErrorLabel.Text = string.Empty;
         ScanResultPanel.IsVisible = false;
         ScanInstructionLabel.Text = SelectedWarehouse is null

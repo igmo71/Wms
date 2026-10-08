@@ -26,6 +26,12 @@ public sealed class ApplicationUserManagementService(
                 DisplayName = string.IsNullOrWhiteSpace(user.DisplayName)
                     ? user.UserName ?? user.Id
                     : user.DisplayName,
+                DefaultWarehouseId = user.DefaultWarehouseId,
+                DefaultWarehouseName = user.DefaultWarehouse == null
+                    ? null
+                    : user.DefaultWarehouse.Name,
+                DefaultWarehouseIsDeleted = user.DefaultWarehouse != null
+                    && user.DefaultWarehouse.DeletionMark,
                 Roles = (from userRole in dbContext.UserRoles
                         join role in dbContext.Roles on userRole.RoleId equals role.Id
                         where userRole.UserId == user.Id
@@ -84,6 +90,10 @@ public sealed class ApplicationUserManagementService(
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
+        if (command.DefaultWarehouseId is Guid defaultWarehouseId
+            && !await IsActiveWarehouseAsync(dbContext, defaultWarehouseId))
+            return OperationError.Invalid("Склад по умолчанию не найден или недоступен.");
+
         var email = command.Email.Trim();
         var user = new ApplicationUser
         {
@@ -91,7 +101,8 @@ public sealed class ApplicationUserManagementService(
             Email = email,
             EmailConfirmed = true,
             LockoutEnabled = true,
-            DisplayName = NormalizeDisplayName(command.DisplayName)
+            DisplayName = NormalizeDisplayName(command.DisplayName),
+            DefaultWarehouseId = command.DefaultWarehouseId
         };
 
         var createResult = await userManager.CreateAsync(user, command.Password);
@@ -128,6 +139,11 @@ public sealed class ApplicationUserManagementService(
         if (user is null)
             return OperationError.NotFound($"Пользователь {command.UserId} не найден.");
 
+        if (command.DefaultWarehouseId != user.DefaultWarehouseId
+            && command.DefaultWarehouseId is Guid defaultWarehouseId
+            && !await IsActiveWarehouseAsync(dbContext, defaultWarehouseId))
+            return OperationError.Invalid("Склад по умолчанию не найден или недоступен.");
+
         var currentRoles = await userManager.GetRolesAsync(user);
         var requestedRoles = command.Roles.ToHashSet(StringComparer.Ordinal);
         var currentWmsRoles = currentRoles.Where(ApplicationRoles.All.Contains).ToHashSet(StringComparer.Ordinal);
@@ -154,6 +170,7 @@ public sealed class ApplicationUserManagementService(
         }
 
         user.DisplayName = NormalizeDisplayName(command.DisplayName);
+        user.DefaultWarehouseId = command.DefaultWarehouseId;
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
             return ToOperationError(updateResult, "Не удалось обновить пользователя");
@@ -202,6 +219,10 @@ public sealed class ApplicationUserManagementService(
 
     private static bool IsBlocked(ApplicationUser user) =>
         user.LockoutEnd is DateTimeOffset lockoutEnd && lockoutEnd > DateTimeOffset.UtcNow;
+
+    private static Task<bool> IsActiveWarehouseAsync(
+        ApplicationDbContext dbContext, Guid warehouseId) =>
+        dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId && !x.DeletionMark);
 
     private static OperationError? Validate(string displayName, string[]? roles)
     {

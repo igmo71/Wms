@@ -55,6 +55,17 @@ an old stamp on refresh; an issued access token remains valid until expiration.
 Signing in again loads all current role claims. Instant session revocation is not
 provided.
 
+An `ApplicationUser` may have an optional default warehouse. Administrators
+assign only a non-deleted warehouse; this is a Mobile convenience preference,
+not a warehouse access restriction. Mobile reads it from `/me` on sign-in or
+session restoration and selects it across receiving, shipping, inventory count
+and transfer workflows. A manual warehouse change carries to later workflows
+only while that app process runs; logout, a new sign-in, or app restart resets
+selection to the account default. Without a default, Mobile automatically
+selects a sole available warehouse. If the assigned warehouse is unavailable,
+Mobile requires an explicit choice. LPN putaway continues to use the LPN's
+warehouse.
+
 `ApplicationUser.DisplayName` is used for audit and reports, falling back to
 `UserName`. Operational records retain the Identity user id, so renamed users
 change historical display and deleted users display the stored id.

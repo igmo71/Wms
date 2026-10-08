@@ -13,7 +13,8 @@ public sealed record MobileSessionResponse(
 public sealed record MobileCurrentUserResponse(
     string Id,
     string DisplayName,
-    string Email);
+    string Email,
+    Guid? DefaultWarehouseId);
 
 public sealed record MobileProblemResponse(string Code, string Message);
 

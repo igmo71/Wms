@@ -7,6 +7,10 @@ their original time; they do not make a specification active.
 
 ## Accepted records
 
+- [Default warehouse for a WMS user](2026-10-08-default-user-warehouse/spec.md)
+  — accepted on 2026-10-08: optional account preference, shared Mobile selection
+  during an app run, and explicit choice when the assigned warehouse is unavailable.
+
 - [Consistent quantity display across Web and TSD](2026-10-07-quantity-display-consistency/spec.md)
   — accepted on 2026-10-07: Web/TSD quantity display aligned; line-based
   progress and per-line picking discrepancy confirmation verified.
