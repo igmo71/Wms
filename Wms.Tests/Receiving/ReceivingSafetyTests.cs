@@ -598,9 +598,7 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
                 currentAddressFirst.Id,
                 currentAddressSecond.Id,
                 currentWithoutSequence.Id,
-                historical.Id,
-                emptyWithOtherHistory.Id,
-                pristine.Id
+                historical.Id
             },
             recommendations.Select(x => x.StorageLocationId));
         Assert.Equal(
@@ -609,11 +607,12 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
                 LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
                 LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
                 LicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock,
-                LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory,
-                LicensePlateNumberPutawayRecommendationCategory.Empty,
-                LicensePlateNumberPutawayRecommendationCategory.Empty
+                LicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory
             },
             recommendations.Select(x => x.Category));
+        Assert.Equal(
+            new decimal?[] { 3m, 2m, 1m, null },
+            recommendations.Select(x => x.CurrentSkuQuantity));
         Assert.Equal(recommendations.Count, recommendations.Select(x => x.StorageLocationId).Distinct().Count());
         Assert.DoesNotContain(recommendations, x => x.StorageLocationId == occupiedByOtherSku.Id);
 

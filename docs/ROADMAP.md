@@ -8,9 +8,7 @@ areas are not authorization to begin implementation.
 
 ## Next task
 
-Verify the compact receiving queue, fixed bottom actions, putaway quantity
-layout, and three-page putaway navigation on the TSD. The work is isolated on
-`codex/mobile-receiving-bottom-actions` for the upcoming demo.
+No immediate task agreed.
 
 ## Future delivery areas
 
