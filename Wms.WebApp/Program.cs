@@ -87,6 +87,19 @@ public class Program
             return items.Count == 0 ? Results.NotFound("Этикетки не найдены.")
                 : Results.Content(Printing.LicensePlateNumberPrintDocument.Render(items), "text/html; charset=utf-8");
         }).RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Operator, ApplicationRoles.Administrator));
+        app.MapGet("/storage-locations/print/{id:guid}", async Task<IResult> (Guid id, bool? batch,
+            Wms.Application.StorageLocations.StorageLocationQueryService locations,
+            HttpContext context, CancellationToken ct) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var result = await locations.GetForPrintAsync(id, batch == true, ct);
+            if (!result.IsSuccess)
+                return result.Error!.Type == Wms.Common.OperationErrorType.NotFound
+                    ? Results.NotFound(result.Error.Message)
+                    : Results.BadRequest(result.Error.Message);
+            return Results.Content(Printing.StorageLocationPrintDocument.Render(result.Value!),
+                "text/html; charset=utf-8");
+        }).RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Administrator));
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
 

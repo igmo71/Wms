@@ -412,8 +412,8 @@ public sealed class MobileShippingOrderQueryService(
         StorageLocation location) => new(
         location.Id,
         location.Name,
-        $"{location.Zone?.Code}-{location.Code}",
-        location.ZoneId,
+        location.DisplayAddress,
+        location.ZoneId!.Value,
         location.Zone?.Name ?? string.Empty);
 
     private static bool IsExactMatch(StockKeepingUnit sku, string term) =>

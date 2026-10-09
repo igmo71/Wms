@@ -452,7 +452,7 @@ internal static class MobileInventoryTransferEndpoints
     private static MobileInventoryMovementLocationResponse MapLocation(
         Wms.Domain.StorageLocation location) => new(
             location.Id,
-            $"{location.Zone!.Code}-{location.Code}",
+            location.DisplayAddress,
             location.Name);
 
     private static async Task<IResult> CompleteTransferAsync(
@@ -500,7 +500,7 @@ internal static class MobileInventoryTransferEndpoints
             transitLocation = new MobileStorageLocationResponse(
                 transfer.TransitStorageLocation.Id,
                 transfer.TransitStorageLocation.Name,
-                $"{zone.Code}-{transfer.TransitStorageLocation.Code}",
+                transfer.TransitStorageLocation.DisplayAddress,
                 transfer.WarehouseId,
                 transfer.Warehouse?.Name ?? string.Empty,
                 zone.Id,

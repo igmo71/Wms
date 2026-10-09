@@ -150,6 +150,12 @@ internal static class PersistenceConflictClassifier
                 return true;
             }
 
+            if (sqlException.Message.Contains("IX_StorageLocations_WarehouseId_Code", StringComparison.Ordinal))
+            {
+                error = OperationError.Conflict("На этом складе уже есть позиция с таким адресом.");
+                return true;
+            }
+
             if (sqlException.Message.Contains(
                     DatabaseObjectNames.LicensePlateNumberItemsActiveSkuIndex,
                     StringComparison.Ordinal))

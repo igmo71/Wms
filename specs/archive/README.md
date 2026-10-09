@@ -7,6 +7,11 @@ their original time; they do not make a specification active.
 
 ## Accepted records
 
+- [Storage addressing and 1C warehouse maps](2026-10-08-storage-addressing/README.md)
+  — accepted on 2026-10-09: warehouse-wide addresses, physical tree, XLS map
+  import, range generation, and A4 Code 39 labels. Detailed topology editing
+  remains deferred.
+
 - [Default warehouse for a WMS user](2026-10-08-default-user-warehouse/spec.md)
   — accepted on 2026-10-08: optional account preference, shared Mobile selection
   during an app run, and explicit choice when the assigned warehouse is unavailable.

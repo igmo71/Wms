@@ -20,7 +20,6 @@ internal class ZonesConfiguration : IEntityTypeConfiguration<Zone>
 
         builder.HasMany(x => x.StorageLocations).WithOne(x => x.Zone)
             .HasForeignKey(x => x.ZoneId).HasPrincipalKey(x => x.Id)
-            .IsRequired()
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Navigation(x => x.StorageLocations)

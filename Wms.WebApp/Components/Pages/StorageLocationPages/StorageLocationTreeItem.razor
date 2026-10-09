@@ -1,28 +1,35 @@
 @using Wms.Domain
 
-<MudTreeViewItem T="StorageLocation"
-                 Value="Location"
-                 Text="@Text"
-                 Icon="@Icon"
-                 IconColor="@IconColor">
-    @foreach (var child in Children)
-    {
-        <StorageLocationTreeItem Location="child" Locations="Locations" />
-    }
-</MudTreeViewItem>
+@if (Children.Count > 0)
+{
+    <MudTreeViewItem T="StorageLocation" Value="Location" Text="@Text" Icon="@Icon" IconColor="@IconColor">
+        @foreach (var child in Children)
+        {
+            <StorageLocationTreeItem Location="child" ChildrenByParent="ChildrenByParent" />
+        }
+    </MudTreeViewItem>
+}
+else
+{
+    <MudTreeViewItem T="StorageLocation" Value="Location" Text="@Text" Icon="@Icon" IconColor="@IconColor" />
+}
 
 @code {
     [Parameter, EditorRequired]
     public StorageLocation Location { get; set; } = null!;
 
     [Parameter, EditorRequired]
-    public IReadOnlyList<StorageLocation> Locations { get; set; } = [];
+    public IReadOnlyDictionary<Guid, IReadOnlyList<StorageLocation>> ChildrenByParent { get; set; } =
+        new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
 
-    private IEnumerable<StorageLocation> Children => Locations
-        .Where(x => x.ParentId == Location.Id)
-        .OrderBy(x => x.Code);
+    private IReadOnlyList<StorageLocation> Children => ChildrenByParent.TryGetValue(Location.Id, out var children)
+        ? children : [];
 
-    private string Text => $"{Location.Code} · {Location.Name}";
+    private string Text => Location.IsFolder
+        ? Location.Name
+        : string.Equals(Location.Name, Location.DisplayAddress, StringComparison.OrdinalIgnoreCase)
+            ? Location.DisplayAddress
+            : $"{Location.DisplayAddress} · {Location.Name}";
     private string Icon => Location.IsFolder
         ? Icons.Material.Filled.Folder
         : Location.ActiveLock is null

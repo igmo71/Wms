@@ -454,7 +454,7 @@ public partial class DirectInventoryTransferPage : ContentPage
         SelectedQuantityLabel.Text = $"Количество: {quantity:0.###}";
         SelectedQuantityLabel.IsVisible = true;
         StepLabel.Text = "Ячейка назначения";
-        InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
+        InstructionLabel.Text = "Отсканируйте штрихкод ячейки назначения.";
         await UpdateCameraAsync();
     }
 

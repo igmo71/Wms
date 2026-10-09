@@ -1,0 +1,103 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Wms.Application.StorageLocations
+@using Wms.Domain
+
+<MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })">
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText>Склад: <b>@Warehouse.Name</b>. Выберите поярусные и сводные XLS-карты одной выгрузки 1С.</MudText>
+            <InputFile OnChange="UploadAsync" multiple accept=".xls" disabled="@_busy" />
+            <MudText Typo="Typo.caption">Адреса ворот не включаются автоматически: для них ещё нужно определить функциональные зоны.</MudText>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+
+            @if (_uploads.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle1">Файлы</MudText>
+                <MudTable T="UploadState" Items="_uploads" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Загружать</MudTh><MudTh>Карта</MudTh><MudTh>Участок</MudTh><MudTh>Тип</MudTh><MudTh>Записей</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><MudSwitch T="bool" Value="context.Include" ValueChanged="value => SetIncluded(context, value)" Disabled="@(_busy || context.Identity.Area == "gates")" /></MudTd>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@AreaName(context.Identity.Area)</MudTd>
+                        <MudTd>@KindName(context.Identity)</MudTd>
+                        <MudTd>@FileEntryCount(context.Name)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                @foreach (var area in _areas.Values)
+                {
+                    @if (_uploads.Any(x => x.Include && x.Identity.Area == area.Key))
+                    {
+                        <MudSelect T="Guid?" @bind-Value="area.ZoneId" @bind-Value:after="InvalidatePreview"
+                                   Label=$"Зона: @AreaName(area.Key)" Clearable="true" Disabled="@_busy">
+                            @foreach (var zone in _zones)
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)zone.Id)">@zone.Code · @zone.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                }
+
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="@_busy" OnClick="PreviewAsync">
+                    Проверить карты
+                </MudButton>
+            }
+
+            @if (_preview is not null)
+            {
+                <MudDivider />
+                <MudText Typo="Typo.subtitle1">Предпросмотр</MudText>
+                <MudText>Ячейки: @_preview.Locations.Count, новые: @_preview.NewLocationCount, уже есть: @_preview.ExistingLocationCount. Группы: @_preview.FolderCount, новые: @_preview.NewFolderCount.</MudText>
+                <MudText>Замечания: @_preview.Issues.Count; блокирующие: @(_preview.Issues.Count(x => x.BlocksImport)).</MudText>
+                <MudTable T="StorageMapFileSummary" Items="_preview.Files" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Карта</MudTh><MudTh>Записей</MudTh><MudTh>Различных адресов</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.File</MudTd><MudTd>@context.Entries</MudTd><MudTd>@context.UniqueAddresses</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                @if (_preview.Issues.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Повторы, расхождения и ошибки</MudText>
+                    <MudTable T="StorageMapIssue" Items="_preview.Issues" Dense="true" Hover="true" RowsPerPage="10" Elevation="0">
+                        <HeaderContent><MudTh>Карта</MudTh><MudTh>Ячейка файла</MudTh><MudTh>Адрес</MudTh><MudTh>Замечание</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.File</MudTd>
+                            <MudTd>@CellPosition(context)</MudTd>
+                            <MudTd>@context.Address</MudTd>
+                            <MudTd>@(context.BlocksImport ? "Ошибка: " : "Внимание: ")@context.Message</MudTd>
+                        </RowTemplate>
+                        <PagerContent><MudTablePager /></PagerContent>
+                    </MudTable>
+                }
+                <MudText Typo="Typo.subtitle2">Адреса ячеек</MudText>
+                <MudTable T="StorageMapLocationPreview" Items="_preview.Locations" Dense="true" Hover="true" RowsPerPage="10" Elevation="0">
+                    <HeaderContent><MudTh>Адрес</MudTh><MudTh>Участок</MudTh><MudTh>Зона</MudTh><MudTh>Состояние</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.DisplayAddress</MudTd>
+                        <MudTd>@AreaName(context.Area)</MudTd>
+                        <MudTd>@context.Zone</MudTd>
+                        <MudTd>@(context.AlreadyExists ? "Уже есть" : "Новая")</MudTd>
+                    </RowTemplate>
+                    <PagerContent><MudTablePager /></PagerContent>
+                </MudTable>
+                @if (_preview.HasWarnings)
+                {
+                    <label><input type="checkbox" @bind="_acknowledgeWarnings" /> Я просмотрел замечания и согласен загрузить указанные ячейки.</label>
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_busy">Отмена</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ImportAsync"
+                   Disabled="@(_busy || _preview is null || _preview.HasBlockingIssues || (_preview.HasWarnings && !_acknowledgeWarnings))">
+            Загрузить ячейки
+        </MudButton>
+    </DialogActions>
+</MudDialog>

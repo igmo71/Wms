@@ -11,9 +11,7 @@ internal static class StorageLocationDisplay
             return string.Empty;
         }
 
-        return location.Zone is null
-            ? location.Code
-            : $"{location.Zone.Code}-{location.Code}";
+        return location.DisplayAddress;
     }
 
     public static string FormatOrDash(StorageLocation? location) =>

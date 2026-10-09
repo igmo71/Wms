@@ -802,7 +802,7 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         string code,
         long? pickSequence) =>
         Value(StorageLocation.Create(
-            Guid.NewGuid(), warehouseId, zone.Id, null, number, code,
+            Guid.NewGuid(), warehouseId, zone.Id, null, $"{zone.Code}{code}",
             Value(StorageLocationDetails.Create(
                 $"Location {code}", false, LocationDimensions.Empty, LocationCoordinates.Empty, pickSequence))));
 

@@ -5,19 +5,32 @@
         <MudStack Spacing="2">
             @if (StorageLocation is null)
             {
-                <MudStack Row="true">
-                    <MudNumericField T="int" @bind-Value="_number" Label="Номер" Min="1" Required="true" />
-                    <MudNumericField T="int" @bind-Value="_segmentWidth" Label="Ширина сегмента" Min="1" Max="8" Required="true" />
-                </MudStack>
+                <MudTextField T="string" @bind-Value="_code"
+                              Label="@(_isFolder ? "Код группы" : "Адрес (например, 1S02C3)")"
+                              Required="true" Immediate="true" />
             }
             else
             {
-                <MudTextField Value="@FullAddress" Label="Адрес" ReadOnly="true" />
-                <MudTextField Value="@StorageLocation.Barcode" Label="Значение штрихкода" ReadOnly="true" />
+                @if (StorageLocation.IsFolder)
+                {
+                    <MudTextField Value="@StorageLocation.Code" Label="Внутренний код группы" ReadOnly="true" />
+                }
+                else
+                {
+                    <MudTextField Value="@FullAddress" Label="Адрес" ReadOnly="true" />
+                    <MudTextField Value="@StorageLocation.Barcode" Label="Значение штрихкода" ReadOnly="true" />
+                }
             }
 
             <MudTextField T="string" @bind-Value="_name" Label="Наименование" Required="true" Immediate="true" />
-            <MudSwitch T="bool" @bind-Value="_isFolder" Label="Структурная группа" Color="Color.Primary" />
+            <MudSwitch T="bool" @bind-Value="_isFolder" Label="Структурная группа"
+                       Disabled="@(StorageLocation is not null)" Color="Color.Primary" />
+            @if (!_isFolder)
+            {
+                <MudAutocomplete T="Zone" @bind-Value="_zone" SearchFunc="SearchZonesAsync"
+                                 ToStringFunc="ZoneText" Label="Функциональная зона" Required="true"
+                                 Disabled="@(StorageLocation is not null)" Clearable="true" />
+            }
 
             <MudText Typo="Typo.subtitle2">Размеры и ограничения</MudText>
             <MudGrid Spacing="2">
@@ -46,7 +59,7 @@
     <DialogActions>
         <MudButton OnClick="Cancel">Отмена</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                   Disabled="@(_isSaving || string.IsNullOrWhiteSpace(_name))" OnClick="SaveAsync">
+                   Disabled="@(_isSaving || string.IsNullOrWhiteSpace(_name) || (StorageLocation is null && string.IsNullOrWhiteSpace(_code)))" OnClick="SaveAsync">
             Сохранить
         </MudButton>
     </DialogActions>

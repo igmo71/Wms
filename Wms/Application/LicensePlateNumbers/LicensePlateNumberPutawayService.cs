@@ -318,7 +318,7 @@ public sealed class LicensePlateNumberPutawayService(
                     x.StockKeepingUnit.BaseUnitOfMeasure?.Description
                         ?? x.StockKeepingUnit.BaseUnitOfMeasure?.Abbreviation,
                     x.Quantity,
-                    $"{x.DestinationStorageLocation.Zone.Code}-{x.DestinationStorageLocation.Code}",
+                    x.DestinationStorageLocation.DisplayAddress,
                     x.DestinationStorageLocation.Name ?? string.Empty,
                     x.CreatedBy, x.CreatedAtUtc, x.InventoryMovementId)).ToList());
     }

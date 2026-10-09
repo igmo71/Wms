@@ -1351,9 +1351,6 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<int>("Number")
-                        .HasColumnType("int");
-
                     b.Property<long>("OperationalRevision")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
@@ -1367,19 +1364,22 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ZoneId")
+                    b.Property<Guid?>("ZoneId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ParentId");
 
-                    b.HasIndex("WarehouseId");
+                    b.HasIndex("ZoneId");
 
-                    b.HasIndex("ZoneId", "Code")
+                    b.HasIndex("WarehouseId", "Code")
                         .IsUnique();
 
-                    b.ToTable("StorageLocations");
+                    b.ToTable("StorageLocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_StorageLocations_OperationalZone", "[IsFolder] = 1 OR [ZoneId] IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("Wms.Domain.StorageLocationLock", b =>
@@ -1994,8 +1994,7 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.Zone", "Zone")
                         .WithMany("StorageLocations")
                         .HasForeignKey("ZoneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.OwnsOne("Wms.Domain.LocationCoordinates", "Coordinates", b1 =>
                         {

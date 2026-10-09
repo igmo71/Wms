@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Wms.Application.Commands;
 using Wms.Application.ReceivingOrders;
 using Wms.Application.LicensePlateNumbers;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
 using Wms.Data;
@@ -177,6 +178,7 @@ internal static class MobileReceivingOrderEndpoints
         MobileJoinReceivingOrderRequest request,
         ClaimsPrincipal principal,
         MobileReceivingOrderQueryService queryService,
+        StorageLocationQueryService storageLocationQueryService,
         ReceivingOrderCommandService commandService,
         CancellationToken ct)
     {
@@ -189,14 +191,14 @@ internal static class MobileReceivingOrderEndpoints
         Guid? receivingLocationId = null;
         if (!string.IsNullOrWhiteSpace(request.ReceivingLocationBarcode))
         {
-            if (!StorageLocation.TryParseBarcode(
-                request.ReceivingLocationBarcode,
-                out var parsedLocationId))
-            {
-                return MobileEndpointResults.CommandProblem(
-                    OperationError.Invalid("Некорректный QR-код ячейки."));
-            }
-            receivingLocationId = parsedLocationId;
+            var order = await queryService.GetDetailsAsync(orderId, userId, ct);
+            if (!order.IsSuccess)
+                return MobileEndpointResults.CommandProblem(order.Error!);
+            var location = await storageLocationQueryService.ResolveBarcodeAsync(
+                request.ReceivingLocationBarcode, order.Value!.Order.WarehouseId, ZoneType.Receiving, ct);
+            if (!location.IsSuccess)
+                return MobileEndpointResults.CommandProblem(location.Error!);
+            receivingLocationId = location.Value!.Id;
         }
 
         var result = await commandService.JoinReceivingAsync(

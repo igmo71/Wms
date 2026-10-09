@@ -83,19 +83,46 @@ rejection (`400` or `401`), or an authenticated API `401`, clears the session.
 ## Storage and inventory
 
 A warehouse contains storage, transit, receiving, and shipping zones. Locations
-form an arbitrary-depth tree within one active warehouse zone.
+form an arbitrary-depth physical tree within one warehouse. A folder may have no
+functional zone; an operational location belongs to one active zone of its
+warehouse.
 
 - Folder locations are structural and cannot participate in inventory
   operations.
-- `Zone.Code` is unique within a warehouse. `StorageLocation.Code` is a stable
-  numeric path unique within a zone; the displayed address is
-  `{Zone.Code}-{StorageLocation.Code}`.
-- Existing locations cannot be moved or renumbered. Activation follows the
+- `Zone.Code` is unique within a warehouse. `StorageLocation.Code` is the stable
+  compact address, unique within the warehouse, independent of zone and parent.
+  Manual addresses accept Latin letters and digits, with common visual
+  separators ignored. This distribution center uses room, rack row, section,
+  cell and level in that order, for example `1S02C3`. The physical tree groups
+  by room, row, section, level, then cell; level and cell have reversed order
+  relative to the address. Other warehouses may use a different tree.
+- Existing locations cannot be moved or readdressed. Activation follows the
   parent chain, and a node with active children cannot be deactivated.
 - `PickSequence` is optional; duplicates use the location code as stable
   secondary ordering.
-- Location barcodes are derived as
-  `WMSL:{storage-location-guid-N}` rather than persisted.
+- A location barcode carries the compact address, looked up within the selected
+  warehouse. Printed Code 39 labels encode that value; scanner input must not
+  add an unknown prefix or suffix.
+- Administrators can preview and import the existing 1C XLS warehouse maps into
+  a selected warehouse. Tier maps enumerate operational locations; overview
+  maps only check tier coverage and never generate additional addresses. The
+  imported physical hierarchy is room, row, section, level, then location.
+  Each nonempty area requires a chosen functional zone; racks and mezzanine
+  require a storage zone. Repeated map addresses create one location and appear
+  in the preview. Existing matching locations are reused; conflicting zone,
+  parent, type, or deactivation blocks the import. Preview warnings require an
+  explicit acknowledgement. Room-4 address `4A10A1` is deferred. Gate addresses
+  are deferred until their individual functional zones are known, and empty
+  maps create no locations.
+- Administrators can generate up to 1,000 five-segment location addresses into
+  a selected active folder. The preview expands room, row, section, cell, and
+  level ranges, checks warehouse-wide code conflicts, and blocks creation when
+  an imported folder's physical path disagrees with the generated address.
+  Creation saves the accepted batch atomically and does not make nested folders.
+- The A4 location-label preview prints active five-segment addresses with
+  middle-dot separators above a Code 39 barcode carrying the compact address.
+  One label or up to 120 direct child locations of a folder can be printed; labels
+  are approximately 40 mm high. Exact adhesive-stock dimensions remain open.
 
 An active operational location may have one active lock. A lock keeps the
 location visible but excludes it from operational selection and final posting.

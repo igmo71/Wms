@@ -27,7 +27,7 @@ internal static class TestSupport
 
     public static StorageLocation Location(Guid warehouseId, Zone zone, int number) =>
         Value(StorageLocation.Create(
-            Guid.NewGuid(), warehouseId, zone.Id, null, number, number.ToString(),
+            Guid.NewGuid(), warehouseId, zone.Id, null, $"{zone.Code}{number}",
             Value(StorageLocationDetails.Create("Test location", false, LocationDimensions.Empty, LocationCoordinates.Empty, null))));
 
     public static InventoryBalance Balance(Guid warehouseId, Guid locationId, Guid skuId, decimal quantity) =>

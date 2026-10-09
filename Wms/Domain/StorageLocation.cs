@@ -1,16 +1,12 @@
-using System.Globalization;
 using Wms.Common;
 
 namespace Wms.Domain;
 
 public class StorageLocation
 {
-    private const string BarcodePrefix = "WMSL:";
-
     private readonly List<StorageLocation> _children = [];
 
     public Guid Id { get; private set; }
-    public int Number { get; private set; }
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public bool IsFolder { get; private set; }
@@ -19,7 +15,7 @@ public class StorageLocation
     public Guid WarehouseId { get; private set; }
     public Warehouse? Warehouse { get; private set; }
 
-    public Guid ZoneId { get; private set; }
+    public Guid? ZoneId { get; private set; }
     public Zone? Zone { get; private set; }
 
     public Guid? ParentId { get; private set; }
@@ -33,55 +29,14 @@ public class StorageLocation
     public long OperationalRevision { get; private set; }
     public StorageLocationLock? ActiveLock { get; private set; }
 
-    public string Barcode => $"{BarcodePrefix}{Id:N}";
-
-    public static bool TryParseBarcode(string? value, out Guid id)
-    {
-        id = Guid.Empty;
-        return value is not null
-            && value.StartsWith(BarcodePrefix, StringComparison.Ordinal)
-            && Guid.TryParseExact(value[BarcodePrefix.Length..], "N", out id);
-    }
-
-    public static OperationResult<string> BuildCode(
-        string? parentCode,
-        int number,
-        int segmentWidth,
-        int maximumLength)
-    {
-        if (number <= 0)
-        {
-            return OperationError.Invalid("Номер складской позиции должен быть положительным.");
-        }
-
-        if (segmentWidth is < 1 or > 8)
-        {
-            return OperationError.Invalid("Ширина сегмента должна быть от 1 до 8.");
-        }
-
-        if (maximumLength <= 0)
-        {
-            return OperationError.Invalid("Максимальная длина кода должна быть положительной.");
-        }
-
-        var segment = number.ToString($"D{segmentWidth}", CultureInfo.InvariantCulture);
-        var code = string.IsNullOrEmpty(parentCode) ? segment : $"{parentCode}-{segment}";
-
-        if (code.Length > maximumLength)
-        {
-            return OperationError.Invalid(
-                $"Длина кода складской позиции не должна превышать {maximumLength} символов.");
-        }
-
-        return code;
-    }
+    public string Barcode => Code;
+    public string DisplayAddress => StorageLocationAddress.Format(Code);
 
     public static OperationResult<StorageLocation> Create(
         Guid id,
         Guid warehouseId,
-        Guid zoneId,
+        Guid? zoneId,
         Guid? parentId,
-        int number,
         string code,
         StorageLocationDetails details)
     {
@@ -95,24 +50,9 @@ public class StorageLocation
             return OperationError.Invalid("Идентификатор склада обязателен.");
         }
 
-        if (zoneId == Guid.Empty)
-        {
-            return OperationError.Invalid("Идентификатор зоны обязателен.");
-        }
-
         if (parentId == id)
         {
             return OperationError.Invalid("Складская позиция не может быть родительской для самой себя.");
-        }
-
-        if (number <= 0)
-        {
-            return OperationError.Invalid("Номер складской позиции должен быть положительным.");
-        }
-
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return OperationError.Invalid("Код складской позиции обязателен.");
         }
 
         if (details is null)
@@ -120,14 +60,20 @@ public class StorageLocation
             return OperationError.Invalid("Параметры складской позиции обязательны.");
         }
 
+        if (zoneId == Guid.Empty || (!details.IsFolder && zoneId is null))
+            return OperationError.Invalid("Для места хранения выберите функциональную зону.");
+
+        OperationResult<string> normalizedCode = StorageLocationAddress.Normalize(code);
+        if (!normalizedCode.IsSuccess)
+            return normalizedCode.Error!;
+
         var location = new StorageLocation
         {
             Id = id,
             WarehouseId = warehouseId,
             ZoneId = zoneId,
             ParentId = parentId,
-            Number = number,
-            Code = code
+            Code = normalizedCode.Value!
         };
 
         location.ApplyDetails(details);
@@ -140,6 +86,9 @@ public class StorageLocation
         {
             return OperationError.Invalid("Параметры складской позиции обязательны.");
         }
+
+        if (!details.IsFolder && ZoneId is null)
+            return OperationError.Invalid("Для места хранения выберите функциональную зону.");
 
         var eligibilityChanged = IsFolder != details.IsFolder;
         ApplyDetails(details);
@@ -302,7 +251,6 @@ public sealed class LocationDimensions
     private static bool AreFinite(params double?[] values) =>
         values.All(value => !value.HasValue || double.IsFinite(value.Value));
 }
-
 public sealed class LocationCoordinates
 {
     private LocationCoordinates()

@@ -55,7 +55,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         {
             Title = "В транзит";
             StepLabel.Text = "Исходная ячейка";
-            InstructionLabel.Text = "Отсканируйте QR исходной ячейки.";
+            InstructionLabel.Text = "Отсканируйте штрихкод исходной ячейки.";
         }
         else
         {
@@ -320,7 +320,7 @@ public partial class TransitInventoryTransferMovementPage : ContentPage
         else
         {
             StepLabel.Text = "Ячейка назначения";
-            InstructionLabel.Text = "Отсканируйте QR ячейки назначения.";
+            InstructionLabel.Text = "Отсканируйте штрихкод ячейки назначения.";
             await UpdateCameraAsync();
         }
     }

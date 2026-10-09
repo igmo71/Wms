@@ -60,6 +60,8 @@ public static class DependencyInjection
         services.AddScoped<InventoryTransferCommandService>();
         services.AddScoped<InventoryTransferQueryService>();
         services.AddScoped<StorageLocationCommandService>();
+        services.AddScoped<StorageLocationBatchService>();
+        services.AddScoped<StorageMapImportService>();
         services.AddScoped<StorageLocationLockCommandService>();
         services.AddScoped<StorageLocationQueryService>();
         services.AddScoped<UnitOfMeasureService>();

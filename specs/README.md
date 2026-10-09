@@ -8,7 +8,7 @@ current task needs their decision history.
 
 ## Active
 
-None.
+Нет.
 
 ## Archive
 

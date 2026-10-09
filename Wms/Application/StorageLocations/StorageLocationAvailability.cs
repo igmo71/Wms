@@ -15,5 +15,5 @@ internal static class StorageLocationAvailability
             $"Ячейка {GetAddress(location)} заблокирована: {location.ActiveLock!.Reason}");
 
     public static string GetAddress(StorageLocation location) =>
-        location.Zone is null ? location.Code : $"{location.Zone.Code}-{location.Code}";
+        location.DisplayAddress;
 }

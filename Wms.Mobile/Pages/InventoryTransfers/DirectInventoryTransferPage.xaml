@@ -25,7 +25,7 @@
                     <Label
                         x:Name="InstructionLabel"
                         FontSize="18"
-                        Text="Отсканируйте QR исходной ячейки." />
+                        Text="Отсканируйте штрихкод исходной ячейки." />
 
                     <local:OperationalCameraScannerView
                         x:Name="CameraScannerView" />

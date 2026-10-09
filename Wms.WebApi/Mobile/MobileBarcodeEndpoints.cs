@@ -60,10 +60,10 @@ internal static class MobileBarcodeEndpoints
         return TypedResults.Ok(new MobileStorageLocationResponse(
             location.Id,
             location.Name,
-            $"{location.Zone!.Code}-{location.Code}",
+            location.DisplayAddress,
             location.WarehouseId,
             location.Warehouse!.Name ?? string.Empty,
-            location.ZoneId,
+            location.ZoneId!.Value,
             location.Zone.Name,
             MapContext(location.Zone.Type)));
     }

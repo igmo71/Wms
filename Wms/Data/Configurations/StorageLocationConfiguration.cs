@@ -29,7 +29,8 @@ internal class StorageLocationConfiguration : IEntityTypeConfiguration<StorageLo
         builder.OwnsOne(x => x.Dimensions);
         builder.OwnsOne(x => x.Coordinates);
 
-        builder.HasIndex(x => new { x.ZoneId, x.Code }).IsUnique();
+        builder.HasIndex(x => new { x.WarehouseId, x.Code }).IsUnique();
         builder.HasIndex(x => x.ParentId);
+        builder.HasCheckConstraint("CK_StorageLocations_OperationalZone", "[IsFolder] = 1 OR [ZoneId] IS NOT NULL");
     }
 }

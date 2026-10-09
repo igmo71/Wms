@@ -3,7 +3,6 @@ using Wms.Application.Persistence;
 using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Data;
-using Wms.Data.Configurations;
 using Wms.Domain;
 
 namespace Wms.Application.StorageLocations;
@@ -14,23 +13,26 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         CreateStorageLocationCommand command,
         CancellationToken ct = default)
     {
+        if (command.Details is null)
+            return OperationError.Invalid("Параметры складской позиции обязательны.");
+
         await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        OperationResult<StorageLocation?> contextResult = await ValidateContextAsync(dbContext, command.WarehouseId, command.ZoneId, command.ParentId, ct);
+        OperationResult<StorageLocation?> contextResult = await ValidateContextAsync(dbContext, command.WarehouseId, command.ZoneId, command.ParentId, command.Details.IsFolder, ct);
         if (!contextResult.IsSuccess)
         {
             return contextResult.Error!;
         }
 
-        OperationResult<string> codeResult = BuildCode(contextResult.Value, command.Number, command.SegmentWidth);
+        OperationResult<string> codeResult = StorageLocationAddress.Normalize(command.Code);
         if (!codeResult.IsSuccess)
         {
             return codeResult.Error!;
         }
 
         var code = codeResult.Value!;
-        if (await dbContext.StorageLocations.AnyAsync(x => x.ZoneId == command.ZoneId && x.Code == code, ct))
+        if (await dbContext.StorageLocations.AnyAsync(x => x.WarehouseId == command.WarehouseId && x.Code == code, ct))
         {
-            return OperationError.Conflict("В выбранной зоне уже есть позиция с таким кодом.");
+            return OperationError.Conflict("На этом складе уже есть позиция с таким адресом.");
         }
 
         OperationResult<StorageLocation> locationResult = StorageLocation.Create(
@@ -38,7 +40,6 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
             command.WarehouseId,
             command.ZoneId,
             command.ParentId,
-            command.Number,
             code,
             command.Details);
 
@@ -49,8 +50,8 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
 
         StorageLocation location = locationResult.Value!;
         dbContext.StorageLocations.Add(location);
-        await dbContext.SaveChangesAsync(ct);
-        return location;
+        OperationResult saved = await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
+        return saved.IsSuccess ? location : saved.Error!;
     }
 
     public async Task<OperationResult> UpdateAsync(
@@ -77,6 +78,12 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
             return OperationError.Invalid("Использованную складскую позицию нельзя преобразовать в группу.");
         }
 
+        if (location.IsFolder && !details.IsFolder
+            && await dbContext.StorageLocations.AnyAsync(x => x.ParentId == id, ct))
+        {
+            return OperationError.Invalid("Группу с дочерними позициями нельзя преобразовать в место хранения.");
+        }
+
         OperationResult updateResult = location.UpdateDetails(details);
         if (!updateResult.IsSuccess)
         {
@@ -84,46 +91,6 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
         }
 
         return await ApplicationPersistence.SaveChangesAsync(dbContext, ct);
-    }
-
-    public async Task<OperationResult<IReadOnlyList<StorageLocation>>> GenerateChildrenAsync(
-        GenerateStorageLocationsCommand command,
-        CancellationToken ct = default)
-    {
-        OperationResult commandValidation = command.Validate();
-        if (!commandValidation.IsSuccess)
-        {
-            return commandValidation.Error!;
-        }
-
-        await using ApplicationDbContext dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        OperationResult<StorageLocation?> contextResult = await ValidateContextAsync(dbContext, command.WarehouseId, command.ZoneId, command.ParentId, ct);
-        if (!contextResult.IsSuccess)
-        {
-            return contextResult.Error!;
-        }
-
-        OperationResult<IReadOnlyList<StorageLocation>> locationsResult = BuildLocations(command, contextResult.Value);
-        if (!locationsResult.IsSuccess)
-        {
-            return locationsResult.Error!;
-        }
-
-        IReadOnlyList<StorageLocation> locations = locationsResult.Value!;
-        var codes = locations.Select(location => location.Code!).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var hasCodeConflict = codes.Count != locations.Count
-            || await dbContext.StorageLocations.AnyAsync(
-                location => location.ZoneId == command.ZoneId && codes.Contains(location.Code!),
-                ct);
-
-        if (hasCodeConflict)
-        {
-            return OperationError.Conflict("Один или несколько создаваемых кодов уже используются.");
-        }
-
-        dbContext.StorageLocations.AddRange(locations);
-        await dbContext.SaveChangesAsync(ct);
-        return OperationResult<IReadOnlyList<StorageLocation>>.Success(locations);
     }
 
     public async Task<OperationResult> MarkDeleteAsync(Guid id, CancellationToken ct = default)
@@ -170,11 +137,11 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
 
         if (location.Warehouse is null
             || location.Warehouse.DeletionMark
-            || location.Zone is null
-            || location.Zone.DeletionMark)
+            || (!location.IsFolder && (location.Zone is null || location.Zone.DeletionMark))
+            || (location.Zone is not null && location.Zone.DeletionMark))
         {
             return OperationError.Invalid(
-                "Складскую позицию можно активировать только в активной зоне активного склада.");
+                "Складскую позицию можно активировать только в активном складе и, если это ячейка, в активной зоне.");
         }
 
         if (location.ParentId is Guid parentId
@@ -190,20 +157,23 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
     private static async Task<OperationResult<StorageLocation?>> ValidateContextAsync(
         ApplicationDbContext dbContext,
         Guid warehouseId,
-        Guid zoneId,
+        Guid? zoneId,
         Guid? parentId,
+        bool isFolder,
         CancellationToken ct)
     {
-        if (!await dbContext.Zones.AnyAsync(
-            x => x.Id == zoneId
-                && x.WarehouseId == warehouseId
-                && !x.DeletionMark
-                && x.Warehouse != null
-                && !x.Warehouse.DeletionMark,
+        if (!await dbContext.Warehouses.AnyAsync(x => x.Id == warehouseId && !x.DeletionMark, ct))
+            return OperationError.Invalid("Выберите активный склад.");
+
+        if (!isFolder && zoneId is null)
+            return OperationError.Invalid("Для места хранения выберите функциональную зону.");
+
+        if (zoneId is Guid selectedZoneId && !await dbContext.Zones.AnyAsync(
+            x => x.Id == selectedZoneId && x.WarehouseId == warehouseId && !x.DeletionMark,
             ct))
         {
             return OperationError.Invalid(
-                "Зона и выбранный склад должны быть активны, а зона должна принадлежать этому складу.");
+                "Зона должна быть активна и принадлежать выбранному складу.");
         }
 
         if (parentId is null)
@@ -217,109 +187,13 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
             return OperationError.NotFound($"Родительская складская позиция '{parentId}' не найдена.");
         }
 
-        if (parent.DeletionMark || parent.WarehouseId != warehouseId || parent.ZoneId != zoneId)
+        if (parent.DeletionMark || parent.WarehouseId != warehouseId || !parent.IsFolder)
         {
-            return OperationError.Invalid("Родитель должен быть активен и находиться в той же зоне.");
+            return OperationError.Invalid("Родитель должен быть активной группой того же склада.");
         }
 
         return parent;
     }
-
-    private static OperationResult<string> BuildCode(StorageLocation? parent, int number, int segmentWidth)
-    {
-        return StorageLocation.BuildCode(
-            parent?.Code,
-            number,
-            segmentWidth,
-            DefaultConfiguration.Code);
-    }
-
-    private static OperationResult<IReadOnlyList<StorageLocation>> BuildLocations(
-        GenerateStorageLocationsCommand command,
-        StorageLocation? parent)
-    {
-        var locations = new List<StorageLocation>(command.Count);
-
-        for (var index = 0; index < command.Count; index++)
-        {
-            var number = command.StartNumber + (index * command.NumberStep);
-            OperationResult<string> codeResult = StorageLocation.BuildCode(
-                parent?.Code,
-                number,
-                command.SegmentWidth,
-                DefaultConfiguration.Code);
-            if (!codeResult.IsSuccess)
-            {
-                return codeResult.Error!;
-            }
-
-            OperationResult<LocationCoordinates> coordinatesResult = BuildCoordinates(command, index);
-            if (!coordinatesResult.IsSuccess)
-            {
-                return coordinatesResult.Error!;
-            }
-
-            OperationResult<StorageLocationDetails> detailsResult = StorageLocationDetails.Create(
-                $"{command.NamePrefix.Trim()} {number}",
-                command.IsFolder,
-                command.Dimensions,
-                coordinatesResult.Value,
-                BuildPickSequence(command, index));
-            if (!detailsResult.IsSuccess)
-            {
-                return detailsResult.Error!;
-            }
-
-            OperationResult<StorageLocation> locationResult = StorageLocation.Create(
-                Guid.NewGuid(),
-                command.WarehouseId,
-                command.ZoneId,
-                command.ParentId,
-                number,
-                codeResult.Value!,
-                detailsResult.Value!);
-            if (!locationResult.IsSuccess)
-            {
-                return locationResult.Error!;
-            }
-
-            locations.Add(locationResult.Value!);
-        }
-
-        return OperationResult<IReadOnlyList<StorageLocation>>.Success(locations);
-    }
-
-    private static OperationResult<LocationCoordinates> BuildCoordinates(
-        GenerateStorageLocationsCommand command,
-        int index)
-    {
-        return LocationCoordinates.Create(
-            OffsetCoordinate(
-                command.StartCoordinates.X,
-                command.CoordinateAxis == CoordinateAxis.X,
-                command.CoordinateStep,
-                index),
-            OffsetCoordinate(
-                command.StartCoordinates.Y,
-                command.CoordinateAxis == CoordinateAxis.Y,
-                command.CoordinateStep,
-                index),
-            OffsetCoordinate(
-                command.StartCoordinates.Z,
-                command.CoordinateAxis == CoordinateAxis.Z,
-                command.CoordinateStep,
-                index));
-    }
-
-    private static long? BuildPickSequence(GenerateStorageLocationsCommand command, int index)
-    {
-        return command.StartPickSequence.HasValue
-            ? (long)((decimal)command.StartPickSequence.Value + (index * (decimal)command.PickSequenceStep))
-            : null;
-    }
-
-    private static double? OffsetCoordinate(double? start, bool selected, double step, int index) =>
-        start is null ? null : start + (selected ? step * index : 0);
 
     private static async Task<bool> HasBeenUsedAsync(ApplicationDbContext dbContext, Guid id, CancellationToken ct) =>
         await dbContext.InventoryBalances.AnyAsync(x => x.StorageLocationId == id, ct)

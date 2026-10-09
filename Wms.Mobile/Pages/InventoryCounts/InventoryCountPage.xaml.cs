@@ -109,8 +109,8 @@ public partial class InventoryCountPage : ContentPage
         _pendingBarcode = null;
         StepLabel.Text = SelectedWarehouse is null ? "Выберите склад" : "Ячейка";
         InstructionLabel.Text = SelectedWarehouse is null
-            ? "После выбора склада отсканируйте QR ячейки хранения."
-            : "Отсканируйте QR ячейки. Свободная ячейка будет заблокирована для пересчёта.";
+            ? "После выбора склада отсканируйте штрихкод ячейки хранения."
+            : "Отсканируйте штрихкод ячейки. Свободная ячейка будет заблокирована для пересчёта.";
         await LoadDraftsAsync();
         await UpdateCameraAsync();
     }

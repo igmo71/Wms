@@ -133,5 +133,5 @@ public partial class ReceivingOrderContents
         ?? "—";
 
     private static string Destination(LicensePlateNumberPutaway putaway) =>
-        $"{putaway.DestinationStorageLocation.Zone.Code}-{putaway.DestinationStorageLocation.Code}";
+        putaway.DestinationStorageLocation.DisplayAddress;
 }

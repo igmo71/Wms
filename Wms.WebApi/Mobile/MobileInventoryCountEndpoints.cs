@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Wms.Application.Commands;
 using Wms.Application.Inventory.Counts;
+using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
 using Wms.Domain;
@@ -70,14 +71,18 @@ internal static class MobileInventoryCountEndpoints
         MobileStartInventoryCountRequest request,
         ClaimsPrincipal principal,
         InventoryCountQueryService queryService,
+        StorageLocationQueryService storageLocationQueryService,
         InventoryCountCommandService commandService,
         CancellationToken ct)
     {
         var userId = GetUserId(principal);
         if (userId is null)
             return TypedResults.Unauthorized();
-        if (!StorageLocation.TryParseBarcode(request.StorageLocationBarcode, out var locationId))
-            return MobileEndpointResults.CommandProblem(OperationError.Invalid("Некорректный QR-код ячейки."));
+        var location = await storageLocationQueryService.ResolveBarcodeAsync(
+            request.StorageLocationBarcode, request.WarehouseId, ZoneType.Storage, ct);
+        if (!location.IsSuccess)
+            return MobileEndpointResults.CommandProblem(location.Error!);
+        var locationId = location.Value!.Id;
 
         var result = await commandService.StartAsync(
             new StartInventoryCountCommand(request.WarehouseId, locationId),
@@ -271,7 +276,7 @@ internal static class MobileInventoryCountEndpoints
             new MobileStorageLocationResponse(
                 location.Id,
                 location.Name,
-                $"{zone.Code}-{location.Code}",
+                location.DisplayAddress,
                 count.WarehouseId,
                 count.Warehouse?.Name ?? string.Empty,
                 zone.Id,

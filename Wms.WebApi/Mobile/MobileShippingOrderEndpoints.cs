@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Wms.Application.Commands;
+using Wms.Application.StorageLocations;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
@@ -157,6 +158,7 @@ internal static class MobileShippingOrderEndpoints
         MobileStartShippingOrderPickingRequest request,
         ClaimsPrincipal principal,
         MobileShippingOrderQueryService queryService,
+        StorageLocationQueryService storageLocationQueryService,
         ShippingOrderCommandService commandService,
         CancellationToken ct)
     {
@@ -166,11 +168,14 @@ internal static class MobileShippingOrderEndpoints
             return TypedResults.Unauthorized();
         }
 
-        if (!StorageLocation.TryParseBarcode(request.ShippingLocationBarcode, out var shippingLocationId))
-        {
-            return MobileEndpointResults.CommandProblem(
-                OperationError.Invalid("Некорректный QR-код ячейки."));
-        }
+        var order = await queryService.GetDetailsAsync(orderId, ct);
+        if (!order.IsSuccess)
+            return MobileEndpointResults.CommandProblem(order.Error!);
+        var location = await storageLocationQueryService.ResolveBarcodeAsync(
+            request.ShippingLocationBarcode, order.Value!.Order.WarehouseId, ZoneType.Shipping, ct);
+        if (!location.IsSuccess)
+            return MobileEndpointResults.CommandProblem(location.Error!);
+        var shippingLocationId = location.Value!.Id;
 
         var result = await commandService.StartPickingAsync(
             new StartPickingCommand(orderId, shippingLocationId),
@@ -184,6 +189,7 @@ internal static class MobileShippingOrderEndpoints
         MobileAddShippingOrderPickingMovementRequest request,
         ClaimsPrincipal principal,
         MobileShippingOrderQueryService queryService,
+        StorageLocationQueryService storageLocationQueryService,
         PickingCommandService commandService,
         CancellationToken ct)
     {
@@ -193,8 +199,14 @@ internal static class MobileShippingOrderEndpoints
             return TypedResults.Unauthorized();
         }
 
-        if (!StorageLocation.TryParseBarcode(request.SourceStorageLocationBarcode, out var sourceStorageLocationId))
-            return MobileEndpointResults.CommandProblem(OperationError.Invalid("Некорректный QR-код ячейки."));
+        var order = await queryService.GetDetailsAsync(orderId, ct);
+        if (!order.IsSuccess)
+            return MobileEndpointResults.CommandProblem(order.Error!);
+        var location = await storageLocationQueryService.ResolveBarcodeAsync(
+            request.SourceStorageLocationBarcode, order.Value!.Order.WarehouseId, ZoneType.Storage, ct);
+        if (!location.IsSuccess)
+            return MobileEndpointResults.CommandProblem(location.Error!);
+        var sourceStorageLocationId = location.Value!.Id;
 
         var result = await commandService.AddPickingMovementAsync(
             new AddPickingMovementCommand(orderId, request.LineNumber, sourceStorageLocationId, request.Quantity),

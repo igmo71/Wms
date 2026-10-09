@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Wms.Application.Commands;
 using Wms.Application.LicensePlateNumbers;
+using Wms.Application.StorageLocations;
 using Wms.Contracts.Mobile.V1;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApi.Mobile;
 
@@ -69,16 +71,20 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
         MobilePutawayLicensePlateNumberRequest request,
         ClaimsPrincipal principal,
         LicensePlateNumberPutawayService service,
+        StorageLocationQueryService storageLocationQueryService,
         CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
             return TypedResults.Unauthorized();
-        if (!StorageLocation.TryParseBarcode(
-                request.DestinationStorageLocationBarcode,
-                out var destinationStorageLocationId))
-            return MobileEndpointResults.CommandProblem(
-                Wms.Common.OperationError.Invalid("Штрихкод позиции назначения не распознан."));
+        var lpn = await service.GetAsync(lpnId, ct);
+        if (!lpn.IsSuccess)
+            return MobileEndpointResults.CommandProblem(lpn.Error!);
+        var location = await storageLocationQueryService.ResolveBarcodeAsync(
+            request.DestinationStorageLocationBarcode, lpn.Value!.WarehouseId, ZoneType.Storage, ct);
+        if (!location.IsSuccess)
+            return MobileEndpointResults.CommandProblem(location.Error!);
+        var destinationStorageLocationId = location.Value!.Id;
 
         var result = await service.PutawayAsync(
             new PutawayLicensePlateNumberCommand(

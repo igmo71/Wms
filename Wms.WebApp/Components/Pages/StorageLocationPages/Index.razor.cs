@@ -5,7 +5,6 @@ using System.Security.Claims;
 using Wms.Application.StorageLocations;
 using Wms.Application.Users;
 using Wms.Application.Warehouses;
-using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -20,13 +19,14 @@ public partial class Index
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private ZoneQueryService ZoneQueryService { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
 
     private Warehouse? _warehouse;
-    private Zone? _zone;
     private StorageLocation? _selectedLocation;
     private IReadOnlyList<StorageLocation> _locations = [];
+    private IReadOnlyList<StorageLocation> _rootLocations = [];
+    private IReadOnlyDictionary<Guid, IReadOnlyList<StorageLocation>> _childrenByParent =
+        new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
     private bool _includeDeleted;
     private bool _isLoading;
     private bool _isChangingLock;
@@ -38,8 +38,19 @@ public partial class Index
         ? "—"
         : $"X: {Format(_selectedLocation.Coordinates.X)}, Y: {Format(_selectedLocation.Coordinates.Y)}, Z: {Format(_selectedLocation.Coordinates.Z)}";
 
-    private IEnumerable<StorageLocation> GetChildren(Guid? parentId) =>
-        _locations.Where(x => x.ParentId == parentId).OrderBy(x => x.Code);
+    private bool CanPrintChildren
+    {
+        get
+        {
+            if (_selectedLocation is not { IsFolder: true, DeletionMark: false } folder
+                || !_childrenByParent.TryGetValue(folder.Id, out var children))
+                return false;
+            var printable = children.Where(x => !x.IsFolder && !x.DeletionMark).ToArray();
+            return printable.Length is > 0 and <= 120
+                && printable.All(x => x.Zone is { DeletionMark: false }
+                    && StorageLocationAddress.Format(x.Code) != x.Code);
+        }
+    }
 
     private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
     {
@@ -52,33 +63,11 @@ public partial class Index
         return result.Items;
     }
 
-    private async Task<IEnumerable<Zone>> SearchZonesAsync(string? searchText, CancellationToken ct)
-    {
-        var result = await ZoneQueryService.ListAsync(new ZoneListQuery
-        {
-            SearchString = searchText,
-            WarehouseId = _warehouse?.Id,
-            SortBy = "Name",
-            Take = 50
-        }, ct);
-        return result.Items;
-    }
-
     private async Task OnWarehouseChangedAsync(Warehouse? warehouse)
     {
         _warehouse = warehouse;
-        _zone = null;
         _selectedLocation = null;
         _locations = [];
-        await Task.CompletedTask;
-    }
-
-    private async Task OnZoneChangedAsync(Zone? zone)
-    {
-        _zone = zone;
-        _selectedLocation = null;
-        if (zone?.Warehouse is not null)
-            _warehouse = zone.Warehouse;
         await LoadTreeAsync();
     }
 
@@ -99,52 +88,54 @@ public partial class Index
     private Task CreateChildAsync() => ShowLocationDialogAsync(null, _selectedLocation);
     private Task EditSelectedAsync() => ShowLocationDialogAsync(_selectedLocation, null);
 
-    private async Task ShowLabelAsync()
+    private async Task GenerateChildrenAsync()
     {
-        if (_warehouse is null || _zone is null || _selectedLocation is null)
+        if (_warehouse is null || _selectedLocation is not { IsFolder: true, DeletionMark: false } parent)
             return;
-
-        var parameters = new DialogParameters<StorageLocationLabelDialog>
+        Zone? suggestedZone = null;
+        if (_childrenByParent.TryGetValue(parent.Id, out var children))
+            suggestedZone = children.FirstOrDefault(x => !x.IsFolder && !x.DeletionMark)?.Zone;
+        var parameters = new DialogParameters<GenerateStorageLocationsDialog>
         {
             { x => x.Warehouse, _warehouse },
-            { x => x.Zone, _zone },
-            { x => x.StorageLocation, _selectedLocation }
-        };
-
-        await DialogService.ShowAsync<StorageLocationLabelDialog>("Этикетка ячейки", parameters);
-    }
-
-    private async Task ShowLocationDialogAsync(StorageLocation? location, StorageLocation? parent)
-    {
-        if (_warehouse is null || _zone is null)
-            return;
-
-        var parameters = new DialogParameters<StorageLocationDialog>
-        {
-            { x => x.Warehouse, _warehouse },
-            { x => x.Zone, _zone },
             { x => x.Parent, parent },
-            { x => x.StorageLocation, location }
+            { x => x.SuggestedZone, suggestedZone }
         };
-        var dialog = await DialogService.ShowAsync<StorageLocationDialog>(
-            location is null ? "Создать складскую позицию" : "Изменить складскую позицию", parameters);
+        var dialog = await DialogService.ShowAsync<GenerateStorageLocationsDialog>(
+            "Создать диапазон ячеек", parameters);
         var result = await dialog.Result;
         if (result is not null && !result.Canceled)
             await LoadTreeAsync();
     }
 
-    private async Task GenerateChildrenAsync()
+    private async Task ImportMapsAsync()
     {
-        if (_warehouse is null || _zone is null)
+        if (_warehouse is null)
             return;
 
-        var parameters = new DialogParameters<GenerateStorageLocationsDialog>
+        var parameters = new DialogParameters<StorageMapImportDialog>
+        {
+            { x => x.Warehouse, _warehouse }
+        };
+        var dialog = await DialogService.ShowAsync<StorageMapImportDialog>("Импорт карт 1С", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+            await LoadTreeAsync();
+    }
+
+    private async Task ShowLocationDialogAsync(StorageLocation? location, StorageLocation? parent)
+    {
+        if (_warehouse is null)
+            return;
+
+        var parameters = new DialogParameters<StorageLocationDialog>
         {
             { x => x.Warehouse, _warehouse },
-            { x => x.Zone, _zone },
-            { x => x.Parent, _selectedLocation }
+            { x => x.Parent, parent },
+            { x => x.StorageLocation, location }
         };
-        var dialog = await DialogService.ShowAsync<GenerateStorageLocationsDialog>("Пакетное создание", parameters);
+        var dialog = await DialogService.ShowAsync<StorageLocationDialog>(
+            location is null ? "Создать складскую позицию" : "Изменить складскую позицию", parameters);
         var result = await dialog.Result;
         if (result is not null && !result.Canceled)
             await LoadTreeAsync();
@@ -199,7 +190,7 @@ public partial class Index
 
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Разблокировать ячейку",
-            $"Разблокировать ячейку {_zone?.Code}-{_selectedLocation.Code}?",
+            $"Разблокировать ячейку {_selectedLocation.DisplayAddress}?",
             yesText: "Разблокировать",
             cancelText: "Отмена");
         if (confirmed != true)
@@ -239,9 +230,11 @@ public partial class Index
     {
         _errorMessage = null;
         var selectedLocationId = _selectedLocation?.Id;
-        if (_zone is null)
+        if (_warehouse is null)
         {
             _locations = [];
+            _rootLocations = [];
+            _childrenByParent = new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
             _selectedLocation = null;
             return;
         }
@@ -249,7 +242,12 @@ public partial class Index
         _isLoading = true;
         try
         {
-            _locations = await StorageLocationQueryService.GetTreeAsync(_zone.Id, _includeDeleted);
+            _locations = await StorageLocationQueryService.GetTreeAsync(_warehouse.Id, _includeDeleted);
+            _rootLocations = _locations.Where(x => x.ParentId is null).OrderBy(x => x.Code).ToArray();
+            _childrenByParent = _locations.Where(x => x.ParentId is not null)
+                .GroupBy(x => x.ParentId!.Value)
+                .ToDictionary(x => x.Key,
+                    x => (IReadOnlyList<StorageLocation>)x.OrderBy(y => y.Code).ToArray());
             _selectedLocation = selectedLocationId is Guid id
                 ? _locations.SingleOrDefault(x => x.Id == id)
                 : null;
@@ -263,6 +261,8 @@ public partial class Index
         catch
         {
             _locations = [];
+            _rootLocations = [];
+            _childrenByParent = new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
             _errorMessage = "Не удалось загрузить дерево складских позиций.";
         }
         finally
@@ -272,8 +272,6 @@ public partial class Index
     }
 
     private static string Format(double? value) => value?.ToString("0.###") ?? "—";
-    private static string ZoneText(Zone? zone) => zone is null ? string.Empty : $"{zone.Code} · {zone.Name}";
-
     private string GetLockOwnerText(StorageLocationLock locationLock)
     {
         var userName = _lockUserNames.TryGetValue(locationLock.LockedBy, out var value)

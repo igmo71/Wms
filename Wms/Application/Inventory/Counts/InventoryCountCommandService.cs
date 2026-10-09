@@ -520,5 +520,5 @@ public sealed class InventoryCountCommandService(
     }
 
     private static string GetAddress(StorageLocation location) =>
-        location.Zone is null ? location.Code : $"{location.Zone.Code}-{location.Code}";
+        location.DisplayAddress;
 }

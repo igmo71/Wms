@@ -8,24 +8,72 @@ namespace Wms.Application.StorageLocations;
 
 public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<OperationResult<IReadOnlyList<string>>> GetForPrintAsync(
+        Guid id,
+        bool batch,
+        CancellationToken ct = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        var selected = await db.StorageLocations.AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.Zone)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (selected is null)
+            return OperationError.NotFound("Складская позиция не найдена.");
+        if (selected.DeletionMark || selected.Warehouse?.DeletionMark != false)
+            return OperationError.Invalid("Складская позиция недоступна для печати.");
+
+        if (!batch)
+        {
+            if (selected.IsFolder || selected.Zone?.DeletionMark != false
+                || StorageLocationAddress.Format(selected.Code) == selected.Code)
+                return OperationError.Invalid("Выберите активную ячейку с адресом из пяти сегментов.");
+            return OperationResult<IReadOnlyList<string>>.Success(new[] { selected.Code });
+        }
+
+        if (!selected.IsFolder)
+            return OperationError.Invalid("Для печати набора выберите папку.");
+        var codes = await db.StorageLocations.AsNoTracking()
+            .Where(x => x.ParentId == id && !x.DeletionMark && !x.IsFolder
+                && x.Zone != null && !x.Zone.DeletionMark)
+            .OrderBy(x => x.Code)
+            .Select(x => x.Code)
+            .ToListAsync(ct);
+        if (codes.Count == 0)
+            return OperationError.Invalid("В папке нет активных ячеек для печати.");
+        if (codes.Count > 120)
+            return OperationError.Invalid("Для печати выберите папку не более чем со 120 ячейками.");
+        if (codes.Any(x => StorageLocationAddress.Format(x) == x))
+            return OperationError.Invalid("В папке есть ячейки без пятисегментного адреса. Выберите отдельные ячейки.");
+        return OperationResult<IReadOnlyList<string>>.Success(codes);
+    }
+
     public async Task<OperationResult<StorageLocation>> ResolveBarcodeAsync(
         string? barcode,
         Guid? expectedWarehouseId,
         ZoneType? expectedZoneType,
         CancellationToken ct = default)
     {
-        if (!StorageLocation.TryParseBarcode(barcode, out var locationId))
-        {
-            return OperationError.Invalid("Некорректный QR-код ячейки.");
-        }
+        OperationResult<string> address = StorageLocationAddress.Normalize(barcode);
+        if (!address.IsSuccess)
+            return OperationError.Invalid("Штрихкод ячейки не распознан.");
 
+        var code = address.Value!;
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        var location = await dbContext.StorageLocations
+        var locations = await dbContext.StorageLocations
             .AsNoTracking()
             .Include(x => x.Warehouse)
             .Include(x => x.Zone)
             .Include(x => x.ActiveLock)
-            .SingleOrDefaultAsync(x => x.Id == locationId, ct);
+            .Where(x => x.Code == code
+                && (expectedWarehouseId == null || x.WarehouseId == expectedWarehouseId))
+            .Take(2)
+            .ToListAsync(ct);
+
+        if (locations.Count > 1)
+            return OperationError.Conflict("Этот адрес есть на нескольких складах. Выберите склад.");
+
+        var location = locations.SingleOrDefault();
 
         if (location is null)
         {
@@ -67,7 +115,7 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
     }
 
     public async Task<IReadOnlyList<StorageLocation>> GetTreeAsync(
-        Guid zoneId,
+        Guid warehouseId,
         bool includeDeleted,
         CancellationToken ct = default)
     {
@@ -77,7 +125,7 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
             .Include(x => x.Warehouse)
             .Include(x => x.Zone)
             .Include(x => x.ActiveLock)
-            .Where(x => x.ZoneId == zoneId);
+            .Where(x => x.WarehouseId == warehouseId);
 
         if (!includeDeleted)
         {

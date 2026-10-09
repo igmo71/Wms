@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
@@ -31,6 +32,7 @@
     <PackageReference Include="SerilogTracing.Expressions" Version="2.4.0" />
     <PackageReference Include="SerilogTracing.Instrumentation.AspNetCore" Version="2.4.0" />
     <PackageReference Include="SerilogTracing.Instrumentation.SqlClient" Version="2.4.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

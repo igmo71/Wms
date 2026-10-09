@@ -27,9 +27,10 @@ Before reading specifications, consult [the specification registry](specs/README
 - Minimize tool calls. Read only required file sections, batch independent reads,
   keep command output bounded, and do not expand verification after sufficient
   evidence is available.
-- The developer runs builds and automated tests. Do not run them unless the user
-  explicitly asks; at the verification checkpoint provide exact, minimal commands
-  for the affected build and focused tests, then wait for the reported result.
+- The developer runs operational commands: builds, automated tests, application
+  launches, and migration creation and application. Do not run them unless the
+  user explicitly asks. Provide exact, minimal commands, wait for the reported
+  result, and inspect developer-created migration files before continuing.
 - Leave UI, device, and print verification as developer instructions unless the
   user explicitly requests automated UI control.
 - Add automated tests only for material regression risks such as concurrency,
