@@ -32,7 +32,6 @@
     <PackageReference Include="SerilogTracing.Expressions" Version="2.4.0" />
     <PackageReference Include="SerilogTracing.Instrumentation.AspNetCore" Version="2.4.0" />
     <PackageReference Include="SerilogTracing.Instrumentation.SqlClient" Version="2.4.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.0" />
   </ItemGroup>
 
 </Project>
