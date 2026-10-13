@@ -1,0 +1,3 @@
+adb devices
+adb reverse tcp:7249 tcp:7249
+adb reverse --list
