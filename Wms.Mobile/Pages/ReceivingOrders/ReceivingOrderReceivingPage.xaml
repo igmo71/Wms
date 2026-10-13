@@ -40,6 +40,8 @@
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
+                    <Label x:Name="AcceptedLinesEmptyLabel" IsVisible="False" Padding="8"
+                           Text="Все позиции приняты. При необходимости покажите их кнопкой ниже." />
                     <VerticalStackLayout x:Name="LpnPanel" BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" IsVisible="False" Spacing="4">
                         <BindableLayout.EmptyView>
                             <Label Padding="8" Text="Палет пока нет. Отсканируйте свободную этикетку LPN." />
@@ -66,6 +68,8 @@
             </ScrollView>
         </RefreshView>
         <VerticalStackLayout Grid.Row="3" Spacing="5">
+            <Button x:Name="AcceptedLinesButton" Clicked="OnAcceptedLinesClicked" FontSize="13"
+                    HeightRequest="38" IsVisible="False" Padding="6" />
             <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
                 <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
                 <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />

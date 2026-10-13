@@ -277,8 +277,12 @@ edits leave it open.
 No quantity field is focused by navigation or scanning. The order SKU table is
 read-only: unchecked fact is a red question mark, a mismatch is highlighted
 yellow, and an exact match green. Tapping an order SKU opens its aggregate plan
-and fact plus only the LPNs that contain that SKU, with quantity per LPN. An LPN
-page lists only its retained item rows, not every planned order SKU. Pallet
+and fact plus only the LPNs that contain that SKU, with quantity per LPN. The order
+list initially hides exact-match green SKU cards; its fixed bottom area
+shows how many are hidden and lets the operator show or hide them. White unchecked
+and yellow mismatch cards remain visible, and the choice survives order refresh
+and return from a pallet page. An LPN page lists only its retained item rows,
+not every planned order SKU. Pallet
 actions remain visible below the scrolling composition; closing always returns
 to the order's nomenclature tab, and an empty pallet uses a compact cancel
 action. Cancelled LPNs are hidden from operational Mobile lists but remain

@@ -20,6 +20,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private bool _busy;
     private bool _awaitingReceivingLocation;
     private bool _lpnTabActive;
+    private bool _showAcceptedLines;
+    private int _acceptedLineCount;
     private bool _hasAppeared;
 
     public ReceivingOrderReceivingPage(
@@ -308,12 +310,21 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void OnProductsTabClicked(object? sender, EventArgs e) => SetLpnTab(false);
     private void OnLpnTabClicked(object? sender, EventArgs e) => SetLpnTab(true);
 
+    private void OnAcceptedLinesClicked(object? sender, EventArgs e)
+    {
+        _showAcceptedLines = !_showAcceptedLines;
+        UpdateProductLines();
+    }
+
     private void SetLpnTab(bool active)
     {
         if (active && LicensePlateNumbers.Count == 0)
             return;
         _lpnTabActive = active;
         ProductLinesPanel.IsVisible = !active;
+        AcceptedLinesEmptyLabel.IsVisible = !active && !_showAcceptedLines
+            && _acceptedLineCount > 0 && LineRows.Count == 0;
+        AcceptedLinesButton.IsVisible = !active && _acceptedLineCount > 0;
         LpnPanel.IsVisible = active;
         ProductsTabButton.Opacity = active ? 0.65 : 1;
         LpnTabButton.Opacity = active ? 1 : 0.65;
@@ -366,13 +377,13 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         };
         CheckedLabel.Text = $"Проверено: {details.Order.Progress.ConfirmedLineCount} из {details.Order.Progress.TotalLineCount}";
         ScanPalletHintLabel.IsVisible = CanUseLicensePlateNumbers;
-        LineRows = details.Lines.Select(ReceivingOrderLineRow.From).ToArray();
+        _acceptedLineCount = details.Lines.Count(ReceivingOrderLineRow.IsFullyAccepted);
+        UpdateProductLines();
         LicensePlateNumbers = details.LicensePlateNumbers
             .Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
             .Select(x => new ReceivingOrderLpnRow(
                 x.Id, x.Code, x.StatusName, x.ResponsibleUserName, x.CanCancel))
             .ToArray();
-        OnPropertyChanged(nameof(LineRows));
         OnPropertyChanged(nameof(LicensePlateNumbers));
         LpnTabButton.IsEnabled = LicensePlateNumbers.Count > 0;
         if (_lpnTabActive && LicensePlateNumbers.Count == 0)
@@ -388,6 +399,20 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
         UpdateRecoveryControls();
         UpdateGuidance();
+    }
+
+    private void UpdateProductLines()
+    {
+        LineRows = Details.Lines
+            .Where(line => _showAcceptedLines || !ReceivingOrderLineRow.IsFullyAccepted(line))
+            .Select(ReceivingOrderLineRow.From)
+            .ToArray();
+        OnPropertyChanged(nameof(LineRows));
+        AcceptedLinesButton.Text = _showAcceptedLines
+            ? $"Скрыть принятые ({_acceptedLineCount})"
+            : $"Показать принятые ({_acceptedLineCount})";
+        AcceptedLinesEmptyLabel.IsVisible = !_lpnTabActive && !_showAcceptedLines
+            && _acceptedLineCount > 0 && LineRows.Count == 0;
     }
 
 
@@ -547,12 +572,15 @@ public sealed record ReceivingOrderLineRow(
     Color BackgroundColor,
     Color FactColor)
 {
+    public static bool IsFullyAccepted(MobileReceivingOrderLineResponse line) =>
+        line.FactQuantity is decimal fact && fact == line.PlanQuantity;
+
     public static ReceivingOrderLineRow From(MobileReceivingOrderLineResponse line)
     {
         var unit = string.IsNullOrWhiteSpace(line.UnitOfMeasure) ? " —" : $" {line.UnitOfMeasure}";
         var background = !line.FactQuantity.HasValue
             ? Colors.White
-            : line.FactQuantity.Value == line.PlanQuantity
+            : IsFullyAccepted(line)
                 ? Color.FromArgb("#E8F5E9")
                 : Color.FromArgb("#FFF4CC");
         return new ReceivingOrderLineRow(
