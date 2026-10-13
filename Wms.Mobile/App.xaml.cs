@@ -7,6 +7,7 @@ public partial class App : Application
     public App(AppShell appShell)
     {
         InitializeComponent();
+        UserAppTheme = AppTheme.Light;
         _appShell = appShell;
     }
 
