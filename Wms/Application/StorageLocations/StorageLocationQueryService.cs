@@ -25,9 +25,8 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
 
         if (!batch)
         {
-            if (selected.IsFolder || selected.Zone?.DeletionMark != false
-                || StorageLocationAddress.Format(selected.Code) == selected.Code)
-                return OperationError.Invalid("Выберите активную ячейку с адресом из пяти сегментов.");
+            if (selected.IsFolder || selected.Zone?.DeletionMark != false)
+                return OperationError.Invalid("Выберите активную ячейку.");
             return OperationResult<IReadOnlyList<string>>.Success(new[] { selected.Code });
         }
 
@@ -43,8 +42,6 @@ public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext>
             return OperationError.Invalid("В папке нет активных ячеек для печати.");
         if (codes.Count > 120)
             return OperationError.Invalid("Для печати выберите папку не более чем со 120 ячейками.");
-        if (codes.Any(x => StorageLocationAddress.Format(x) == x))
-            return OperationError.Invalid("В папке есть ячейки без пятисегментного адреса. Выберите отдельные ячейки.");
         return OperationResult<IReadOnlyList<string>>.Success(codes);
     }
 

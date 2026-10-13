@@ -47,8 +47,7 @@ public partial class Index
                 return false;
             var printable = children.Where(x => !x.IsFolder && !x.DeletionMark).ToArray();
             return printable.Length is > 0 and <= 120
-                && printable.All(x => x.Zone is { DeletionMark: false }
-                    && StorageLocationAddress.Format(x.Code) != x.Code);
+                && printable.All(x => x.Zone is { DeletionMark: false });
         }
     }
 

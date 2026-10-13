@@ -119,8 +119,9 @@ warehouse.
   level ranges, checks warehouse-wide code conflicts, and blocks creation when
   an imported folder's physical path disagrees with the generated address.
   Creation saves the accepted batch atomically and does not make nested folders.
-- The A4 location-label preview prints active five-segment addresses with
-  middle-dot separators above a Code 39 barcode carrying the compact address.
+- The A4 location-label preview prints active operational addresses above a
+  Code 39 barcode carrying the compact address. Five-segment addresses use
+  middle-dot separators in the printed text; other addresses print as stored.
   One label or up to 120 direct child locations of a folder can be printed; labels
   are approximately 40 mm high. Exact adhesive-stock dimensions remain open.
 

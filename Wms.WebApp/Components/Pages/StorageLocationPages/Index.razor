@@ -141,8 +141,7 @@ else
                                 <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="DeactivateSelectedAsync">Деактивировать</MudButton>
                             }
                             @if (!_selectedLocation.DeletionMark && !_selectedLocation.IsFolder
-                                && _selectedLocation.Zone is { DeletionMark: false }
-                                && StorageLocationAddress.Format(_selectedLocation.Code) != _selectedLocation.Code)
+                                && _selectedLocation.Zone is { DeletionMark: false })
                             {
                                 <MudButton Href="@($"storage-locations/print/{_selectedLocation.Id}")" Target="_blank" Rel="noopener"
                                            Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Print">Этикетка A4</MudButton>
