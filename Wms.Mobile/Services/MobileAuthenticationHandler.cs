@@ -122,7 +122,7 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
     private static bool IsAnonymousRoute(Uri? uri) =>
         uri?.AbsolutePath is MobileApiRoutes.Login or MobileApiRoutes.Refresh;
 
-    private static HttpMessageHandler CreateInnerHandler()
+    internal static HttpClientHandler CreateInnerHandler()
     {
         var handler = new HttpClientHandler();
 

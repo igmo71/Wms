@@ -8,7 +8,9 @@ public partial class MainPage : ContentPage
     private readonly MobileIdentityClient _identityClient;
     private readonly IMobileSessionStore _sessionStore;
     private readonly MobileWarehouseSelection _warehouseSelection;
+    private readonly MobileConnectionDiagnostics _connectionDiagnostics;
     private readonly IServiceProvider _services;
+    private string? _connectionDiagnosticsReport;
     private bool _checkingSession;
     private bool _currentUserLoaded;
 
@@ -20,6 +22,7 @@ public partial class MainPage : ContentPage
         _identityClient = identityClient;
         _sessionStore = services.GetRequiredService<IMobileSessionStore>();
         _warehouseSelection = services.GetRequiredService<MobileWarehouseSelection>();
+        _connectionDiagnostics = services.GetRequiredService<MobileConnectionDiagnostics>();
         _services = services;
     }
 
@@ -69,8 +72,9 @@ public partial class MainPage : ContentPage
             ShowLoggedOut();
             StatusLabel.Text = exception.Message;
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            _connectionDiagnostics.RecordFailure("Вход", exception);
             ShowLoggedOut();
             StatusLabel.Text = "Сервер WMS недоступен.";
         }
@@ -105,6 +109,40 @@ public partial class MainPage : ContentPage
     private async void OnScannerDiagnosticsClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ScannerDiagnosticsPage>());
 
+    private async void OnConnectionDiagnosticsClicked(object? sender, EventArgs e)
+    {
+        ConnectionDiagnosticsButton.IsEnabled = false;
+        CopyConnectionDiagnosticsButton.IsVisible = false;
+        _connectionDiagnosticsReport = null;
+        ConnectionDiagnosticsLabel.IsVisible = true;
+        ConnectionDiagnosticsLabel.Text = "Проверка подключения…";
+
+        try
+        {
+            _connectionDiagnosticsReport = await _connectionDiagnostics.RunAsync();
+            ConnectionDiagnosticsLabel.Text = _connectionDiagnosticsReport;
+            CopyConnectionDiagnosticsButton.IsVisible = true;
+        }
+        catch (Exception exception)
+        {
+            ConnectionDiagnosticsLabel.Text =
+                $"Не удалось завершить диагностику: {exception.GetType().FullName}: {exception.Message}";
+        }
+        finally
+        {
+            ConnectionDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnCopyConnectionDiagnosticsClicked(object? sender, EventArgs e)
+    {
+        if (_connectionDiagnosticsReport is not null)
+        {
+            await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default
+                .SetTextAsync(_connectionDiagnosticsReport);
+        }
+    }
+
     private async Task RestoreCurrentUserAsync()
     {
         SetBusy(true);
@@ -122,8 +160,9 @@ public partial class MainPage : ContentPage
                 StatusLabel.Text = exception.Message;
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            _connectionDiagnostics.RecordFailure("Восстановление сессии", exception);
             ShowSessionUnavailable();
         }
         finally

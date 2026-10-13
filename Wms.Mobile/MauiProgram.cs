@@ -68,6 +68,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<MobileWarehouseSelection>();
         builder.Services.AddSingleton<MobileAuthenticationHandler>();
         builder.Services.AddSingleton(MobileApiSettings.Load());
+        builder.Services.AddSingleton<MobileConnectionDiagnostics>();
         builder.Services.AddSingleton(serviceProvider => new HttpClient(
             serviceProvider.GetRequiredService<MobileAuthenticationHandler>())
         {

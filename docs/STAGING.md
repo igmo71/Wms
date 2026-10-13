@@ -15,6 +15,9 @@ WebApp and standalone Mobile use HTTPS through Caddy.
 | test | WebApp | `8307` | `8317` |
 
 The Mobile Release build uses `https://vm-xms-dev:8316/`.
+Warehouse Wi-Fi must supply the `dobroga.local` DNS search domain so Android
+resolves the single-label host `vm-xms-dev`. Without it, Mobile cannot reach
+Caddy even when the same DNS server addresses are configured.
 
 ## First deployment
 
@@ -178,13 +181,20 @@ Caddy and its CA remain untouched during an ordinary update.
 
 When Mobile cannot reach WMS, check in this order:
 
-1. The device browser receives `401` from the Mobile `/me` URL without a
+1. On the Mobile start page, run **Проверить подключение**. The report appears
+   on the screen and can be photographed or copied to the device clipboard.
+   It records the last sign-in/session transport error, the device's active
+   network interface, IP addresses, DNS servers and search domain, DNS lookup
+   of the configured host, and an unauthenticated HTTPS request to `/me`.
+   `401` means the request reached WebApi; the probe sends no credentials or
+   token.
+2. The device browser receives `401` from the Mobile `/me` URL without a
    certificate warning.
-2. The root appears in Android's user-installed CA list.
-3. `wms-webapi-test` and `wms-caddy` are running on `xms-network`.
-4. `docker logs wms-caddy --since 10m` shows the request.
-5. The installed package is the Release ARM64 artifact above.
-6. If Caddy logs an empty TLS `ServerName`, retain `default_sni vm-xms-dev`.
+3. The root appears in Android's user-installed CA list.
+4. `wms-webapi-test` and `wms-caddy` are running on `xms-network`.
+5. `docker logs wms-caddy --since 10m` shows the request.
+6. The installed package is the Release ARM64 artifact above.
+7. If Caddy logs an empty TLS `ServerName`, retain `default_sni vm-xms-dev`.
 
 Clearing application data is not a network diagnostic.
 
