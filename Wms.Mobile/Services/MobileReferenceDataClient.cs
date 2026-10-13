@@ -29,6 +29,22 @@ public sealed class MobileReferenceDataClient
                 "Сервер вернул некорректные сведения о ячейке.");
     }
 
+    public async Task<MobileStorageLocationSearchResponse> FindReceivingLocationsAsync(
+        Guid warehouseId,
+        string? search = null,
+        CancellationToken ct = default)
+    {
+        var route = $"{MobileApiRoutes.ReceivingStorageLocations}?warehouseId={warehouseId:D}";
+        if (!string.IsNullOrWhiteSpace(search))
+            route += $"&search={Uri.EscapeDataString(search.Trim())}";
+        using HttpResponseMessage response = await _transport.GetAsync(route, ct);
+        return await response.Content.ReadFromJsonAsync<MobileStorageLocationSearchResponse>(ct)
+            ?? throw new MobileApiException(
+                response.StatusCode,
+                "invalid_receiving_locations_response",
+                "Сервер вернул некорректный список ячеек приёмки.");
+    }
+
     public async Task<MobileSkuResponse> ResolveSkuAsync(
         string barcode,
         CancellationToken ct = default)

@@ -7,6 +7,7 @@ public static class MobileApiRoutes
     public const string Refresh = Base + "/auth/refresh";
     public const string Me = Base + "/me";
     public const string ResolveStorageLocation = Base + "/barcodes/storage-location/resolve";
+    public const string ReceivingStorageLocations = Base + "/storage-locations/receiving";
     public const string ResolveSku = Base + "/barcodes/sku/resolve";
     public const string Warehouses = Base + "/warehouses";
     public const string InventoryTransfers = Base + "/inventory-transfers";

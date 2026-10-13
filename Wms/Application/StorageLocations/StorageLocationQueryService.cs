@@ -8,6 +8,32 @@ namespace Wms.Application.StorageLocations;
 
 public class StorageLocationQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<IReadOnlyList<StorageLocation>> FindAvailableReceivingAsync(
+        Guid warehouseId,
+        string? search,
+        CancellationToken ct = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        var locations = db.StorageLocations.AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.Zone)
+            .Where(x => x.WarehouseId == warehouseId
+                && !x.DeletionMark && !x.IsFolder && x.ActiveLock == null
+                && x.Warehouse != null && !x.Warehouse.DeletionMark
+                && x.Zone != null && !x.Zone.DeletionMark
+                && x.Zone.Type == ZoneType.Receiving);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            var normalizedCode = StorageLocationAddress.Normalize(term);
+            var codeTerm = normalizedCode.IsSuccess ? normalizedCode.Value! : term;
+            locations = locations.Where(x => x.Code.Contains(codeTerm) || x.Name.Contains(term));
+        }
+
+        return await locations.OrderBy(x => x.Code).Take(51).ToListAsync(ct);
+    }
+
     public async Task<OperationResult<IReadOnlyList<string>>> GetForPrintAsync(
         Guid id,
         bool batch,

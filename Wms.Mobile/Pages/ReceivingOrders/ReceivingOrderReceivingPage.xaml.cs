@@ -19,6 +19,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private bool _scannerSubscribed;
     private bool _busy;
     private bool _awaitingReceivingLocation;
+    private bool _showReceivingLocations;
+    private int _locationSearchVersion;
     private bool _lpnTabActive;
     private bool _showAcceptedLines;
     private int _acceptedLineCount;
@@ -47,6 +49,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
 
     public IReadOnlyList<ReceivingOrderLineRow> LineRows { get; private set; } = [];
     public IReadOnlyList<ReceivingOrderLpnRow> LicensePlateNumbers { get; private set; } = [];
+    public IReadOnlyList<ReceivingLocationRow> ReceivingLocationRows { get; private set; } = [];
 
     private MobileReceivingOrderDetailsResponse Details =>
         _details ?? throw new InvalidOperationException("Приходный ордер не загружен.");
@@ -130,10 +133,90 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             return;
         _awaitingReceivingLocation = true;
         ErrorLabel.Text = string.Empty;
-        SynchronizationDetailsLabel.Text = "Отсканируйте позицию зоны приёмки.";
-        SynchronizationPanel.IsVisible = true;
         StartReceivingButton.IsVisible = false;
+        UpdateLocationSelectionDisplay();
+        UpdateGuidance();
         await UpdateCameraAsync();
+    }
+
+    private async void OnChooseLocationClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || !_awaitingReceivingLocation)
+            return;
+
+        if (_showReceivingLocations)
+        {
+            _showReceivingLocations = false;
+            ++_locationSearchVersion;
+            LocationSearch.Unfocus();
+            UpdateLocationSelectionDisplay();
+            UpdateGuidance();
+            await UpdateCameraAsync();
+            return;
+        }
+
+        LocationSearch.Text = string.Empty;
+        _showReceivingLocations = true;
+        var version = ++_locationSearchVersion;
+        UpdateLocationSelectionDisplay();
+        UpdateGuidance();
+        await UpdateCameraAsync();
+        await OrderScrollView.ScrollToAsync(0, 0, false);
+        await LoadReceivingLocationsAsync(version);
+    }
+
+    private async void OnLocationSearchChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (!_showReceivingLocations)
+            return;
+        var version = ++_locationSearchVersion;
+        await Task.Delay(300);
+        if (version == _locationSearchVersion && _showReceivingLocations)
+            await LoadReceivingLocationsAsync(version);
+    }
+
+    private async Task LoadReceivingLocationsAsync(int version)
+    {
+        if (_details is null || !_showReceivingLocations || version != _locationSearchVersion)
+            return;
+
+        LocationSearchHint.Text = "Загрузка ячеек…";
+        ReceivingLocationRows = [];
+        OnPropertyChanged(nameof(ReceivingLocationRows));
+        try
+        {
+            var result = await _referenceDataClient.FindReceivingLocationsAsync(
+                Details.Order.WarehouseId, LocationSearch.Text);
+            if (!_showReceivingLocations || version != _locationSearchVersion)
+                return;
+            ReceivingLocationRows = result.Locations.Select(location => new ReceivingLocationRow(
+                location.Address, location.Name, location.ZoneName)).ToArray();
+            OnPropertyChanged(nameof(ReceivingLocationRows));
+            LocationSearchHint.Text = result.HasMore
+                ? "Показаны первые 50 ячеек. Уточните поиск."
+                : ReceivingLocationRows.Count == 0
+                    ? "Доступные ячейки приёмки не найдены."
+                    : string.Empty;
+        }
+        catch (MobileApiException exception)
+        {
+            if (version == _locationSearchVersion)
+                LocationSearchHint.Text = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            if (version == _locationSearchVersion)
+                LocationSearchHint.Text = "Сервер WMS недоступен. Повторите поиск.";
+        }
+    }
+
+    private async void OnLocationTapped(object? sender, TappedEventArgs e)
+    {
+        if (_busy || !_awaitingReceivingLocation || _process.HasPendingCommand
+            || e.Parameter is not string barcode)
+            return;
+        LocationSearch.Unfocus();
+        await ResolveReceivingLocationAsync(barcode);
     }
 
     private async Task ResolveReceivingLocationAsync(string barcode)
@@ -149,12 +232,14 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             if (!confirmed)
             {
                 _awaitingReceivingLocation = false;
+                _showReceivingLocations = false;
                 ApplyDetails(Details);
                 return;
             }
 
             var response = await _process.StartAsync(Details.Order.Id, barcode);
             _awaitingReceivingLocation = false;
+            _showReceivingLocations = false;
             ApplyDetails(response.Details);
         }
         catch (MobileApiException exception)
@@ -321,13 +406,25 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         if (active && LicensePlateNumbers.Count == 0)
             return;
         _lpnTabActive = active;
-        ProductLinesPanel.IsVisible = !active;
-        AcceptedLinesEmptyLabel.IsVisible = !active && !_showAcceptedLines
-            && _acceptedLineCount > 0 && LineRows.Count == 0;
-        AcceptedLinesButton.IsVisible = !active && _acceptedLineCount > 0;
-        LpnPanel.IsVisible = active;
         ProductsTabButton.Opacity = active ? 0.65 : 1;
         LpnTabButton.Opacity = active ? 1 : 0.65;
+        UpdateLocationSelectionDisplay();
+    }
+
+    private void UpdateLocationSelectionDisplay()
+    {
+        var selecting = _showReceivingLocations && _awaitingReceivingLocation
+            && !_process.HasPendingCommand;
+        ManualLocationPanel.IsVisible = selecting;
+        ProductLinesPanel.IsVisible = !selecting && !_lpnTabActive;
+        LpnPanel.IsVisible = !selecting && _lpnTabActive;
+        AcceptedLinesEmptyLabel.IsVisible = !selecting && !_lpnTabActive
+            && !_showAcceptedLines && _acceptedLineCount > 0 && LineRows.Count == 0;
+        AcceptedLinesButton.IsVisible = !selecting && !_lpnTabActive && _acceptedLineCount > 0;
+        TabsGrid.IsVisible = !selecting;
+        ChooseLocationButton.IsVisible = _awaitingReceivingLocation && !_process.HasPendingCommand;
+        ChooseLocationButton.IsEnabled = !_busy;
+        ChooseLocationButton.Text = selecting ? "Скрыть список ячеек" : "Выбрать ячейку из списка";
     }
 
     private async void OnOrderRefreshing(object? sender, EventArgs e) =>
@@ -346,6 +443,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         try
         {
             ApplyDetails(await _orderClient.GetAsync(Details.Order.Id));
+            if (_showReceivingLocations)
+                await LoadReceivingLocationsAsync(++_locationSearchVersion);
         }
         catch (MobileApiException exception)
         {
@@ -365,6 +464,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void ApplyDetails(MobileReceivingOrderDetailsResponse details)
     {
         _details = details;
+        if (details.Order.Status != MobileReceivingOrderStatus.ReadyForReceiving)
+        {
+            _awaitingReceivingLocation = false;
+            _showReceivingLocations = false;
+            ++_locationSearchVersion;
+        }
         _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
             _synchronization, details.Order.Synchronization);
         NumberLabel.Text = details.Order.Number;
@@ -412,7 +517,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             ? $"Скрыть принятые ({_acceptedLineCount})"
             : $"Показать принятые ({_acceptedLineCount})";
         AcceptedLinesEmptyLabel.IsVisible = !_lpnTabActive && !_showAcceptedLines
-            && _acceptedLineCount > 0 && LineRows.Count == 0;
+            && !_showReceivingLocations && _acceptedLineCount > 0 && LineRows.Count == 0;
     }
 
 
@@ -457,6 +562,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             StartReceivingButton.IsVisible = false;
             CompleteReceivingButton.IsVisible = false;
         }
+        UpdateLocationSelectionDisplay();
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
@@ -465,6 +571,23 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         if (_busy || _process.HasPendingCommand)
         {
             ErrorLabel.Text = "Сначала получите результат текущей команды.";
+            return true;
+        }
+        if (_showReceivingLocations)
+        {
+            _showReceivingLocations = false;
+            ++_locationSearchVersion;
+            LocationSearch.Unfocus();
+            UpdateLocationSelectionDisplay();
+            UpdateGuidance();
+            _ = UpdateCameraAsync();
+            return true;
+        }
+        if (_awaitingReceivingLocation)
+        {
+            _awaitingReceivingLocation = false;
+            ApplyDetails(Details);
+            _ = UpdateCameraAsync();
             return true;
         }
         return base.OnBackButtonPressed();
@@ -502,7 +625,9 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void UpdateGuidance()
     {
         var message = _awaitingReceivingLocation
-            ? "Отсканируйте позицию зоны приёмки."
+            ? _showReceivingLocations
+                ? "Выберите ячейку зоны приёмки из списка."
+                : "Отсканируйте позицию зоны приёмки или выберите её из списка."
             : _details?.Order.Status == MobileReceivingOrderStatus.InReceiving
                 ? GetCompletionHint()
                 : _synchronization is not null && OrderSynchronizationPresentation.HasIssue(_synchronization)
@@ -539,7 +664,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
 
     private async Task UpdateCameraAsync()
     {
-        if (_isVisible && !_busy && !_process.HasPendingCommand && _scanner.ActiveSource == BarcodeScanSource.Camera
+        if (_isVisible && !_busy && !_showReceivingLocations && !_process.HasPendingCommand
+            && _scanner.ActiveSource == BarcodeScanSource.Camera
             && (_awaitingReceivingLocation || CanUseLicensePlateNumbers))
             await CameraScannerView.StartAsync();
         else
@@ -561,6 +687,11 @@ public sealed record ReceivingOrderLpnRow(
     string StatusName,
     string ResponsibleUserName,
     bool CanCancel);
+
+public sealed record ReceivingLocationRow(
+    string Address,
+    string Name,
+    string ZoneName);
 
 public sealed record ReceivingOrderLineRow(
     int LineNumber,

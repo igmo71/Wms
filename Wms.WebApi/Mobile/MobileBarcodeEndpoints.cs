@@ -29,6 +29,12 @@ internal static class MobileBarcodeEndpoints
             .Produces<MobileProblemResponse>(StatusCodes.Status409Conflict)
             .Produces<MobileProblemResponse>(StatusCodes.Status422UnprocessableEntity);
 
+        endpoints.MapGet(MobileApiRoutes.ReceivingStorageLocations, FindReceivingLocationsAsync)
+            .WithTags("Mobile Storage Locations")
+            .RequireAuthorization(MobileAuthorization.WarehouseOperatorPolicy)
+            .Produces<MobileStorageLocationSearchResponse>()
+            .Produces<MobileProblemResponse>(StatusCodes.Status400BadRequest);
+
         return endpoints;
     }
 
@@ -85,6 +91,30 @@ internal static class MobileBarcodeEndpoints
             sku.Code ?? string.Empty,
             sku.Name ?? string.Empty,
             sku.BaseUnitOfMeasure?.Name));
+    }
+
+    private static async Task<IResult> FindReceivingLocationsAsync(
+        Guid warehouseId,
+        string? search,
+        StorageLocationQueryService queryService,
+        CancellationToken ct)
+    {
+        if (warehouseId == Guid.Empty || search?.Length > 100)
+            return Problem(StatusCodes.Status400BadRequest, "invalid_location_search",
+                "Укажите склад и запрос не длиннее 100 символов.");
+
+        var locations = await queryService.FindAvailableReceivingAsync(warehouseId, search, ct);
+        return TypedResults.Ok(new MobileStorageLocationSearchResponse(
+            locations.Take(50).Select(location => new MobileStorageLocationResponse(
+                location.Id,
+                location.Name,
+                location.DisplayAddress,
+                location.WarehouseId,
+                location.Warehouse!.Name,
+                location.ZoneId!.Value,
+                location.Zone!.Name,
+                MobileStorageLocationContext.Receiving)).ToArray(),
+            locations.Count > 50));
     }
 
     private static IResult ResolutionProblem(string subject, OperationError error)

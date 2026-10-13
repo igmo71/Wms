@@ -232,8 +232,10 @@ Receiving participation is stored in `ReceivingOrderParticipant`, unique by
 order and Identity user. The Mobile queue lists the current user's active orders
 for the selected warehouse; scanning an available order can join the user.
 Opening or scanning an already joined order reads it. The first participant
-must scan an active unlocked
-Receiving location for the order warehouse. Starting the local lifecycle,
+selects an active unlocked Receiving location for the order warehouse by
+scanning its barcode or searching the available locations by address or name.
+Manual selection uses the same confirmation and server-side eligibility check as
+scanning. Starting the local lifecycle,
 assigning that shared location, adding the participant, and the command receipt
 commit together. Later participants reuse the location. Concurrent first entry
 uses the order operational revision; a losing caller reloads and joins the

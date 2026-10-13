@@ -24,6 +24,10 @@ public sealed record MobileStorageLocationResponse(
     string ZoneName,
     MobileStorageLocationContext ZoneType);
 
+public sealed record MobileStorageLocationSearchResponse(
+    IReadOnlyList<MobileStorageLocationResponse> Locations,
+    bool HasMore);
+
 public sealed record MobileResolveSkuRequest(string Barcode);
 
 public sealed record MobileSkuResponse(

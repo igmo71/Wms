@@ -17,9 +17,31 @@
             <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
         </Border>
         <RefreshView x:Name="OrderRefreshView" Grid.Row="2" Refreshing="OnOrderRefreshing">
-            <ScrollView>
+            <ScrollView x:Name="OrderScrollView">
                 <VerticalStackLayout Spacing="4">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <VerticalStackLayout x:Name="ManualLocationPanel" IsVisible="False" Spacing="5">
+                        <Label FontAttributes="Bold" FontSize="14" Text="Выбор ячейки приёмки" />
+                        <SearchBar x:Name="LocationSearch" Placeholder="Адрес или название ячейки"
+                                   TextChanged="OnLocationSearchChanged" />
+                        <Label x:Name="LocationSearchHint" FontSize="12" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ReceivingLocationRows, Source={x:Reference Page}}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="local:ReceivingLocationRow">
+                                    <Border Padding="9,7" BackgroundColor="#F3F3F3" Stroke="#D4D4D4" StrokeThickness="1">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer CommandParameter="{Binding Address}" Tapped="OnLocationTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label FontAttributes="Bold" FontSize="14" Text="{Binding Address}" />
+                                            <Label FontSize="12" Text="{Binding Name}" />
+                                            <Label FontSize="11" Text="{Binding ZoneName}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
                     <VerticalStackLayout x:Name="ProductLinesPanel" BindableLayout.ItemsSource="{Binding LineRows, Source={x:Reference Page}}" Spacing="3">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingOrderLineRow">
@@ -70,7 +92,7 @@
         <VerticalStackLayout Grid.Row="3" Spacing="5">
             <Button x:Name="AcceptedLinesButton" Clicked="OnAcceptedLinesClicked" FontSize="13"
                     HeightRequest="38" IsVisible="False" Padding="6" />
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+            <Grid x:Name="TabsGrid" ColumnDefinitions="*,*" ColumnSpacing="6">
                 <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
                 <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />
             </Grid>
@@ -79,6 +101,8 @@
             <Grid ColumnDefinitions="*">
                 <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
                 <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
+                <Button x:Name="ChooseLocationButton" Clicked="OnChooseLocationClicked" HeightRequest="46"
+                        IsVisible="False" Text="Выбрать ячейку из списка" />
                 <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
             </Grid>
         </VerticalStackLayout>
