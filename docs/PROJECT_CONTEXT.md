@@ -1,5 +1,12 @@
 # WMS project context
 
+This document describes implemented behavior. The planned replacement of
+receiving, mutable 1C plans, and expiration-dated inventory is specified in
+[`specs/001-receiving-stock-lifecycle/spec.md`](../specs/001-receiving-stock-lifecycle/spec.md).
+Its target rules do not describe the current code until the relevant increment
+is delivered. Lasting engineering principles live in the
+[`WMS Constitution`](../.specify/memory/constitution.md).
+
 ## Product boundary
 
 WMS is a warehouse-management MVP. 1C owns catalogs and source receiving and
@@ -15,6 +22,13 @@ The supported interactive clients are `Wms.WebApp` and Android `Wms.Mobile`.
 `Wms.WebApi` exposes authenticated Mobile V1 plus separate 1C integration
 endpoints.
 
+Domain types are extracted into `Wms.Domain`. The existing EF context,
+configurations, Identity data types and migration history reside in
+`Wms.Infrastructure`; existing application services and 1C integration still
+run in the legacy `Wms` project. `Wms.Application` and `Wms.Integration` are
+empty project boundaries for the planned replacement. The currently implemented
+receiving rules below remain in force until that replacement is delivered.
+
 Warehouse quantities retain at most three decimal places. Read-only Web
 quantity tables show three places; compact TSD displays show up to three.
 Each SKU quantity group shows its base unit once, with an unknown unit shown
@@ -25,7 +39,7 @@ TSD receiving and shipping show progress by line count instead. TSD picking
 requires discrepancy confirmation when any shipping line differs from its plan;
 differences on separate SKUs cannot cancel each other.
 
-This file owns current product boundaries and lasting business rules.
+This file owns current product boundaries and implemented business rules.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) owns engineering conventions,
 [`ROADMAP.md`](ROADMAP.md) owns unfinished work, and frozen specifications keep
 decision history. Code and migrations remain the implementation source of

@@ -59,8 +59,8 @@ The initial migrations are `CreateIdentitySchema` and
 migrations. Run it separately for empty dev and test databases:
 
 ```powershell
-dotnet ef database update --project Wms/Wms.csproj --startup-project Wms.WebApp/Wms.WebApp.csproj --connection "<dev connection string>"
-dotnet ef database update --project Wms/Wms.csproj --startup-project Wms.WebApp/Wms.WebApp.csproj --connection "<test connection string>"
+dotnet ef database update --project Wms.Infrastructure/Wms.Infrastructure.csproj --startup-project Wms.WebApp/Wms.WebApp.csproj --connection "<dev connection string>"
+dotnet ef database update --project Wms.Infrastructure/Wms.Infrastructure.csproj --startup-project Wms.WebApp/Wms.WebApp.csproj --connection "<test connection string>"
 ```
 
 After baseline deployment, migrations are append-only and applied normally.

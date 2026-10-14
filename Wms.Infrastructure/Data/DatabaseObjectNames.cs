@@ -1,6 +1,6 @@
 namespace Wms.Data;
 
-internal static class DatabaseObjectNames
+public static class DatabaseObjectNames
 {
     public const string InventoryBalancesBusinessKeyIndex =
         "UX_InventoryBalances_BusinessKey";

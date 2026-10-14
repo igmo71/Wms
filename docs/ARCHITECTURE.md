@@ -1,5 +1,36 @@
 # WMS architecture
 
+This document describes the implemented code and its detailed engineering
+conventions. The proposed receiving redesign belongs to the active
+[feature plan](../specs/001-receiving-stock-lifecycle/plan.md) until those
+business changes are implemented. Project-wide principles live in the
+[WMS Constitution](../.specify/memory/constitution.md).
+
+## Current project map
+
+| Project | Current responsibility |
+|---|---|
+| `Wms` | Legacy application services and 1C adapter; consumes Infrastructure persistence. |
+| `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
+| `Wms.Application` | Empty project reserved for new use cases; references Domain. |
+| `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
+| `Wms.Integration` | Empty project reserved for new integration adapters; references Application. |
+| `Wms.Contracts` | Shared transport contracts. |
+| `Wms.WebApi` | Authenticated Mobile API and 1C integration endpoints. |
+| `Wms.WebApp` | Manager and warehouse Web interface. |
+| `Wms.Mobile` | Android operator workflows. |
+| `Wms.Tests` | Risk-based automated checks. |
+
+The new project references point inward: Application references Domain;
+Infrastructure and Integration reference Application. The legacy `Wms` project
+also references Domain and Infrastructure. New projects do not reference `Wms`.
+WebApi and WebApp still use the legacy project; `Wms.Mobile` uses
+`Wms.Contracts`. In the current
+receiving flow, closing an LPN changes its state while completing the order
+posts receipt movements.
+The target flow moves that posting point to LPN closure. A delivery increment
+must remove the former path when the new one becomes callable.
+
 ## Direction
 
 Prefer a direct feature-oriented implementation:
@@ -58,13 +89,16 @@ Inventory facts have controlled creation and immutable posted history.
 
 ### Persistence and integration
 
-EF configuration describes persistence, not business policy.
+EF configuration describes persistence, not business policy. The single
+`ApplicationDbContext` and its existing migration chain belong to
+`Wms.Infrastructure`; their `Wms.Data` namespaces remain stable during this
+project move. Legacy application services still use that context directly.
 `Integration.OneS` owns OData DTOs, metadata names, protocol statuses,
 notification parsing, and HTTP mechanics. Its implementations use 1C names;
 application ports use WMS terminology.
 
-Application services use `ApplicationDbContext` directly, and one operation
-normally has one explicit save boundary.
+One legacy operation normally has one explicit save boundary. The new
+application project has no services or persistence contract yet.
 
 Warehouse mutations in Web/Mobile enter shared application commands through
 `CommandExecutor`: LPN issuance/counting/putaway, receiving participation and
