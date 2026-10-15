@@ -60,6 +60,7 @@ public class Program
 
         // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddReceivingSourceReader(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
         builder.Services.AddNotificationServices();
 

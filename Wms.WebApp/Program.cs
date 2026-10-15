@@ -59,6 +59,7 @@ public class Program
         builder.Services.AddApplicationDbContext(builder.Configuration);
         // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
+        builder.Services.AddReceivingSourceReader(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
 
         var app = builder.Build();

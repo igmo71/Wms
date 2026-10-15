@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using Wms.Application.Receiving;
 using Wms.Application.ReceivingOrders;
 using Wms.Common;
 using Wms.Domain;
@@ -8,20 +10,30 @@ using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрде
 namespace Wms.Integration.OneS.Services;
 
 internal sealed class Document_ПриходныйОрдерНаТовары_InboundService(
-    OneCClient oneCClient,
+    IReceivingSourceReader sourceReader,
     ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger) : IReceivingOrderSource
 {
     public async Task<OperationResult<ReceivingOrderImportSnapshot>> GetSnapshotAsync(
         Guid orderId,
         CancellationToken ct = default)
     {
-        OperationResult<RootObject<Document>?> fetchResult = await oneCClient
-            .GetValueAsync<RootObject<Document>>(Document.GetUri(orderId.ToString()), ct);
-        if (!fetchResult.IsSuccess)
-            return fetchResult.Error!;
+        var readResult = await sourceReader.ReadAsync(orderId, ct);
+        if (!readResult.IsSuccess)
+            return readResult.Error!;
 
-        IReadOnlyList<Document>? documents = fetchResult.Value?.Value;
-        if (documents is null || documents.Count != 1)
+        RootObject<Document>? response;
+        try
+        {
+            response = JsonSerializer.Deserialize<RootObject<Document>>(readResult.Value!.RawResponseJson);
+        }
+        catch (JsonException exception)
+        {
+            logger.LogWarning(exception, "1С вернула нечитаемый приходный документ {RefKey}", orderId);
+            return OperationError.Failure("1С вернула некорректный JSON приходного документа.");
+        }
+
+        IReadOnlyList<Document>? documents = response?.Value;
+        if (documents is null || documents.Count != 1 || documents[0].Ref_Key != orderId)
             return OperationError.Failure(
                 "1С вернула некорректный ответ: ожидался один приходный ордер.");
 

@@ -42,12 +42,6 @@ internal class Document_ПриходныйОрдерНаТовары
         $"&$skip={page * BatchSize}" +
         $"&$top={BatchSize}";
 
-    public static string GetUri(string refKey) =>
-        $"Document_ПриходныйОрдерНаТовары" +
-        $"?$format=json" +
-        $"&$select={select}" +
-        $"&$filter=Ref_Key eq guid'{refKey}'";
-
     public static ReceivingOrderImportSnapshot MapToImportSnapshot(
         Document_ПриходныйОрдерНаТовары fetchedDocument)
     {

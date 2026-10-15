@@ -10,11 +10,11 @@ business changes are implemented. Project-wide principles live in the
 
 | Project | Current responsibility |
 |---|---|
-| `Wms` | Legacy application services and 1C adapter; consumes Infrastructure persistence. |
+| `Wms` | Legacy application services and 1C mapping adapter; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
 | `Wms.Application` | New command execution orchestration and contracts for new use cases; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
-| `Wms.Integration` | Empty project reserved for new integration adapters; references Application. |
+| `Wms.Integration` | New raw receiving source reader for 1C; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
 | `Wms.WebApi` | Authenticated Mobile API and 1C integration endpoints. |
 | `Wms.WebApp` | Manager and warehouse Web interface. |
@@ -23,13 +23,13 @@ business changes are implemented. Project-wide principles live in the
 
 The new project references point inward: Application references Domain;
 Infrastructure and Integration reference Application. The legacy `Wms` project
-also references Domain and Infrastructure. New projects do not reference `Wms`.
+also references Domain, Application, and Infrastructure. New projects do not reference `Wms`.
 Application owns the explicit Manager permission check; Infrastructure resolves
 membership from Identity storage for command execution.
 WebApi and WebApp directly reference Application, Infrastructure, and Integration
 as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
-Integration has no services to register yet. `Wms.Mobile` uses
+Integration registers the receiving source HTTP reader in both hosts. `Wms.Mobile` uses
 `Wms.Contracts`. In the current
 receiving flow, closing an LPN changes its state while completing the order
 posts receipt movements.

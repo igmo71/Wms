@@ -7,6 +7,11 @@ Manual catalog imports are available from the WebApp catalog lists and the
 [identity.md](identity.md); notification endpoints and background imports remain
 the automatic integration path.
 
+The receiving source reader fetches the current 1C document by `Ref_Key` and
+returns the unchanged JSON response to the Application contract. It is registered
+in WebApi and WebApp. The legacy receiving synchronization maps that response
+through its old adapter; the new source-version persistence is not connected yet.
+
 Before warehouse work starts, an admissible source document remains owned by
 1C. While WMS and 1C remain in matching initial states, synchronization replaces
 source-owned metadata and the complete plan. Deletion marks, posting changes,

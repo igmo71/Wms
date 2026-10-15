@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Wms\Wms.csproj" />
+    <ProjectReference Include="..\Wms.Integration\Wms.Integration.csproj" />
     <ProjectReference Include="..\Wms.Contracts\Wms.Contracts.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
