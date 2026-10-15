@@ -14,6 +14,9 @@ public class ReceivingOrderItem
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
     public decimal PlanQuantity { get; private set; }
+    // New source projection keeps unknown distinct from a known zero. The legacy
+    // PlanQuantity remains until its callers are replaced.
+    public decimal? CurrentPlanQuantity { get; private set; }
     public decimal? FactQuantity { get; private set; }
     public string? Comment { get; private set; }
 
@@ -24,6 +27,29 @@ public class ReceivingOrderItem
         ? WeightCalculation.CalculateKg(factQuantity, StockKeepingUnit)
         : null;
     public bool IsFactConfirmed => FactQuantity.HasValue;
+
+    public static OperationResult<ReceivingOrderItem> CreateForSku(
+        Guid receivingOrderId, Guid stockKeepingUnitId, decimal? currentPlanQuantity)
+    {
+        if (receivingOrderId == Guid.Empty || stockKeepingUnitId == Guid.Empty
+            || currentPlanQuantity is decimal plan && !WarehouseQuantity.IsNonNegative(plan))
+            return OperationError.Invalid("Ордер, SKU или плановое количество недопустимы.");
+
+        return new ReceivingOrderItem
+        {
+            ReceivingOrderId = receivingOrderId,
+            StockKeepingUnitId = stockKeepingUnitId,
+            CurrentPlanQuantity = currentPlanQuantity
+        };
+    }
+
+    public OperationResult SetCurrentPlan(decimal? currentPlanQuantity)
+    {
+        if (currentPlanQuantity is decimal plan && !WarehouseQuantity.IsNonNegative(plan))
+            return OperationError.Invalid("Плановое количество недопустимо.");
+        CurrentPlanQuantity = currentPlanQuantity;
+        return OperationResult.Success();
+    }
 
     internal static OperationResult<ReceivingOrderItem> Create(
         Guid receivingOrderId,
@@ -40,7 +66,8 @@ public class ReceivingOrderItem
             ReceivingOrderId = receivingOrderId,
             LineNumber = snapshot.LineNumber,
             StockKeepingUnitId = snapshot.StockKeepingUnitId,
-            PlanQuantity = snapshot.PlanQuantity
+            PlanQuantity = snapshot.PlanQuantity,
+            CurrentPlanQuantity = snapshot.PlanQuantity
         };
     }
 
@@ -60,6 +87,7 @@ public class ReceivingOrderItem
 
         StockKeepingUnitId = snapshot.StockKeepingUnitId;
         PlanQuantity = snapshot.PlanQuantity;
+        CurrentPlanQuantity = snapshot.PlanQuantity;
         return OperationResult.Success();
     }
 

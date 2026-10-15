@@ -8,12 +8,15 @@ public class ReceivingOrder
     private readonly List<ReceivingOrderItem> _items = [];
     private readonly List<ReceivingOrderParticipant> _participants = [];
     private readonly List<LicensePlateNumber> _licensePlateNumbers = [];
+    private readonly List<ReceivingOrderSourceLink> _sourceLinks = [];
+    private readonly List<ReceivingCycle> _cycles = [];
 
     private ReceivingOrder()
     {
     }
 
     public Guid Id { get; private set; }
+    public int? ActiveCycleNumber { get; private set; }
     public long OperationalRevision { get; private set; }
     public bool DeletionMark { get; private set; }
     public bool Posted { get; private set; }
@@ -56,6 +59,25 @@ public class ReceivingOrder
     public IReadOnlyCollection<ReceivingOrderItem> Items => _items;
     public IReadOnlyCollection<ReceivingOrderParticipant> Participants => _participants;
     public IReadOnlyCollection<LicensePlateNumber> LicensePlateNumbers => _licensePlateNumbers;
+    public IReadOnlyCollection<ReceivingOrderSourceLink> SourceLinks => _sourceLinks;
+    public IReadOnlyCollection<ReceivingCycle> Cycles => _cycles;
+
+    public static OperationResult<ReceivingOrder> CreateNew(Guid warehouseId, DateTimeOffset createdAtUtc)
+    {
+        if (warehouseId == Guid.Empty || createdAtUtc == default)
+            return OperationError.Invalid("Склад и время создания приходного ордера обязательны.");
+
+        var order = new ReceivingOrder
+        {
+            Id = Guid.NewGuid(),
+            WarehouseId = warehouseId,
+            CreatedAtUtc = createdAtUtc,
+            Status = ReceivingOrderStatus.ReadyForReceiving,
+            ActiveCycleNumber = 1
+        };
+        order._cycles.Add(ReceivingCycle.Create(order.Id, 1));
+        return order;
+    }
 
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
     public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is decimal factQuantity

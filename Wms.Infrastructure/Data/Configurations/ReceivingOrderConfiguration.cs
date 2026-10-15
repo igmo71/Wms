@@ -47,5 +47,13 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
         builder.Navigation(x => x.LicensePlateNumbers)
             .HasField("_licensePlateNumbers")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.SourceLinks)
+            .HasField("_sourceLinks")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.Cycles)
+            .HasField("_cycles")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

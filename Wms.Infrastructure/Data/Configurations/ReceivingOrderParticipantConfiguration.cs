@@ -11,10 +11,15 @@ internal sealed class ReceivingOrderParticipantConfiguration
     {
         builder.HasKey(x => x.Id);
         builder.Property(x => x.UserId).HasMaxLength(450).IsRequired();
-        builder.HasIndex(x => new { x.ReceivingOrderId, x.UserId }).IsUnique();
+        builder.HasIndex(x => new { x.ReceivingCycleId, x.UserId })
+            .IsUnique()
+            .HasFilter("[ReceivingCycleId] IS NOT NULL");
         builder.HasOne(x => x.ReceivingOrder)
             .WithMany(x => x.Participants)
             .HasForeignKey(x => x.ReceivingOrderId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.ReceivingCycle).WithMany()
+            .HasForeignKey(x => x.ReceivingCycleId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
