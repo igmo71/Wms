@@ -15,6 +15,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<InventoryTurnover> InventoryTurnovers => Set<InventoryTurnover>();
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
+    public DbSet<WarehouseAuditEvent> WarehouseAuditEvents => Set<WarehouseAuditEvent>();
     public DbSet<LicensePlateNumber> LicensePlateNumbers => Set<LicensePlateNumber>();
     public DbSet<LicensePlateNumberItem> LicensePlateNumberItems => Set<LicensePlateNumberItem>();
     public DbSet<LicensePlateNumberPutaway> LicensePlateNumberPutaways => Set<LicensePlateNumberPutaway>();

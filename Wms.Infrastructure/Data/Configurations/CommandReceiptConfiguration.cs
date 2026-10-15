@@ -25,5 +25,9 @@ internal sealed class CommandReceiptConfiguration
             .HasMaxLength(64)
             .IsFixedLength()
             .IsRequired();
+
+        builder.Navigation(x => x.AuditEvents)
+            .HasField("_auditEvents")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
