@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
 
 namespace Wms.Data;
 
@@ -22,6 +23,8 @@ public static class DependencyInjection
         services.AddDatabaseDeveloperPageExceptionFilter();
         services.AddScoped<ICommandExecutionStore, CommandExecutionStore>();
         services.AddScoped<CommandExecutor>();
+        services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
+        services.AddScoped<PostInventoryMovement.Handler>();
 
         return services;
     }

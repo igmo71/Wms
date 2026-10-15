@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Wms.Application.CommandExecution;
 using Wms.Domain;
 
@@ -21,11 +22,13 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
     public async Task<ICommandExecutionSession> OpenSessionAsync(CancellationToken ct) =>
         new Session(await dbContextFactory.CreateDbContextAsync(ct));
 
-    private sealed class Session(ApplicationDbContext db) : ICommandExecutionSession
+    internal sealed class Session(ApplicationDbContext db) : ICommandExecutionSession
     {
+        internal ApplicationDbContext Db => db;
+
         public void Stage<TEntity>(TEntity entity) where TEntity : class => db.Add(entity);
 
-        public Task CommitAsync(
+        public async Task CommitAsync(
             CommandReceiptSnapshot receipt,
             IReadOnlyCollection<WarehouseAuditEvent> auditEvents,
             CancellationToken ct)
@@ -41,9 +44,36 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
             });
             db.WarehouseAuditEvents.AddRange(auditEvents);
             // SaveChanges uses one database transaction for the staged effect, audit and receipt.
-            return db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException exception) when (IsStockConflict(exception))
+            {
+                throw new CommandCommitConflictException(
+                    "Складское состояние изменилось. Обновите данные и повторите операцию.", exception);
+            }
         }
 
         public ValueTask DisposeAsync() => db.DisposeAsync();
+
+        private static bool IsStockConflict(DbUpdateException exception)
+        {
+            if (exception is DbUpdateConcurrencyException concurrency)
+                return concurrency.Entries.Any(x => x.Entity is InventoryBalance
+                    or StorageLocation or LicensePlateNumber);
+
+            for (Exception? current = exception; current is not null; current = current.InnerException)
+            {
+                if (current is SqlException { Number: 2601 or 2627 } sql
+                    && (sql.Message.Contains(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsReversedMovementIndex,
+                            StringComparison.Ordinal)))
+                    return true;
+            }
+
+            return false;
+        }
     }
 }

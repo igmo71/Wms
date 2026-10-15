@@ -16,6 +16,9 @@ public sealed record CommandExecutionResult(
     Guid ResourceId,
     IReadOnlyCollection<WarehouseAuditEvent> AuditEvents);
 
+public sealed class CommandCommitConflictException(string message, Exception innerException)
+    : Exception(message, innerException);
+
 public interface ICommandExecutionContext
 {
     void Stage<TEntity>(TEntity entity) where TEntity : class;
@@ -84,6 +87,8 @@ public sealed class CommandExecutor(ICommandExecutionStore store)
             var winner = await store.FindReceiptAsync(userId, commandType, requestId, ct);
             if (winner is not null)
                 return ResolveReceipt(winner, requestHash);
+            if (exception is CommandCommitConflictException)
+                return OperationError.Conflict(exception.Message);
             throw;
         }
     }

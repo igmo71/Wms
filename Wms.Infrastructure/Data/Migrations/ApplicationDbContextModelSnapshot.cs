@@ -519,6 +519,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateOnly?>("ExpirationDate")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("LicensePlateNumberId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset?>("PostedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -553,6 +556,8 @@ namespace Wms.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DestinationStorageLocationId");
+
+                    b.HasIndex("LicensePlateNumberId");
 
                     b.HasIndex("ReversedMovementId")
                         .IsUnique()
@@ -2009,6 +2014,11 @@ namespace Wms.Data.Migrations
                         .HasForeignKey("DestinationStorageLocationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Wms.Domain.LicensePlateNumber", "LicensePlateNumber")
+                        .WithMany()
+                        .HasForeignKey("LicensePlateNumberId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.InventoryMovement", "ReversedMovement")
                         .WithMany()
                         .HasForeignKey("ReversedMovementId")
@@ -2032,6 +2042,8 @@ namespace Wms.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("DestinationStorageLocation");
+
+                    b.Navigation("LicensePlateNumber");
 
                     b.Navigation("ReversedMovement");
 

@@ -16,6 +16,11 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
         builder.Property(x => x.ExpirationDate).HasColumnType("date");
         builder.Property(x => x.ConfirmedBy).HasMaxLength(DefaultConfiguration.Guid);
 
+        builder.HasOne(x => x.LicensePlateNumber).WithMany()
+            .HasForeignKey(x => x.LicensePlateNumberId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.LicensePlateNumberId);
+
         builder.HasOne(x => x.ReversedMovement).WithMany()
             .HasForeignKey(x => x.ReversedMovementId)
             .OnDelete(DeleteBehavior.Restrict);

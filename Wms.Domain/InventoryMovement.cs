@@ -18,6 +18,8 @@ public class InventoryMovement
     public StorageLocation? DestinationStorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public Guid? LicensePlateNumberId { get; private set; }
+    public LicensePlateNumber? LicensePlateNumber { get; private set; }
     public DateOnly? ExpirationDate { get; private set; }
     public decimal Quantity { get; private set; }
     public Guid? ReversedMovementId { get; private set; }
@@ -43,7 +45,8 @@ public class InventoryMovement
         Guid? recorderId,
         int? recorderLineNumber,
         string? confirmedBy = null,
-        DateOnly? expirationDate = null)
+        DateOnly? expirationDate = null,
+        Guid? licensePlateNumberId = null)
     {
         if (id == Guid.Empty)
         {
@@ -58,6 +61,11 @@ public class InventoryMovement
         if (stockKeepingUnitId == Guid.Empty)
         {
             return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
+        }
+
+        if (licensePlateNumberId == Guid.Empty)
+        {
+            return OperationError.Invalid("Идентификатор LPN не может быть пустым.");
         }
 
         var stateResult = ValidateState(sourceStorageLocationId, destinationStorageLocationId, quantity);
@@ -89,6 +97,7 @@ public class InventoryMovement
             SourceStorageLocationId = sourceStorageLocationId,
             DestinationStorageLocationId = destinationStorageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
+            LicensePlateNumberId = licensePlateNumberId,
             ExpirationDate = expirationDate,
             Quantity = quantity,
             CreatedAtUtc = createdAtUtc,
@@ -108,6 +117,11 @@ public class InventoryMovement
         int? recorderLineNumber,
         string? confirmedBy = null)
     {
+        if (original is null || original.ReversedMovementId is not null)
+        {
+            return OperationError.Invalid("Можно обратить только исходное движение.");
+        }
+
         if (original.PostedAtUtc is null)
         {
             return OperationError.Invalid("Можно обратить только проведённое движение.");
@@ -117,7 +131,7 @@ public class InventoryMovement
             original.DestinationStorageLocationId, original.SourceStorageLocationId,
             original.StockKeepingUnitId, original.Quantity, createdAtUtc,
             recorderType, recorderId, recorderLineNumber, confirmedBy,
-            original.ExpirationDate);
+            original.ExpirationDate, original.LicensePlateNumberId);
         if (!result.IsSuccess)
         {
             return result.Error!;

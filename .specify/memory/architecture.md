@@ -105,6 +105,10 @@ the Application command executor and its Infrastructure store: receipt lookup
 precedes the operation, and one EF save commits staged business state, audit
 events, and receipt. The legacy executor remains for existing callers until
 their replacement. The two executors have distinct namespaces.
+The new inventory posting handler loads tracked locations and four-dimensional
+balances through an Infrastructure store bound to that command session. It
+stages the movement, balance changes and turnovers for the executor's single
+commit; no receiving or putaway endpoint calls it yet.
 
 Existing warehouse mutations in Web/Mobile enter legacy application commands through
 `CommandExecutor`: LPN issuance/counting/putaway, receiving participation and
@@ -146,7 +150,10 @@ Use optimistic concurrency only where a stale save threatens a documented
 invariant. Shared-resource coordination may use a targeted operational revision.
 Only recognized concurrency failures and named constraint violations become
 business conflicts; other persistence failures remain exceptions. Their shared
-classification belongs under `Wms.Application.Persistence`.
+legacy classification belongs under `Wms.Application.Persistence`. The new
+Infrastructure command store classifies stock write conflicts before the
+Application executor maps them to command conflicts; Application has no EF
+dependency.
 
 ## Commands, validation, and outcomes
 
