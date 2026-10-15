@@ -349,6 +349,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
@@ -377,7 +380,7 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("StorageLocationId");
 
-                    b.HasIndex("WarehouseId", "StorageLocationId", "StockKeepingUnitId")
+                    b.HasIndex("WarehouseId", "StorageLocationId", "StockKeepingUnitId", "ExpirationDate")
                         .IsUnique()
                         .HasDatabaseName("UX_InventoryBalances_BusinessKey");
 
@@ -513,6 +516,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("DestinationStorageLocationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<DateTimeOffset?>("PostedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -529,6 +535,9 @@ namespace Wms.Data.Migrations
                     b.Property<int>("RecorderType")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("ReversedMovementId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("SourceStorageLocationId")
                         .HasColumnType("uniqueidentifier");
 
@@ -544,6 +553,11 @@ namespace Wms.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DestinationStorageLocationId");
+
+                    b.HasIndex("ReversedMovementId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InventoryMovements_ReversedMovementId")
+                        .HasFilter("[ReversedMovementId] IS NOT NULL");
 
                     b.HasIndex("SourceStorageLocationId");
 
@@ -644,6 +658,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<Guid>("InventoryMovementId")
                         .HasColumnType("uniqueidentifier");
 
@@ -715,6 +732,12 @@ namespace Wms.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("OriginalReceivingLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReceivingCycleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
 
@@ -739,7 +762,11 @@ namespace Wms.Data.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("OriginalReceivingLocationId");
+
                     b.HasIndex("ReceivingOrderId");
+
+                    b.HasIndex("ReceivingCycleId", "ReceivingOrderId");
 
                     b.ToTable("LicensePlateNumbers");
                 });
@@ -786,6 +813,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<Guid>("LicensePlateNumberId")
                         .HasColumnType("uniqueidentifier");
 
@@ -805,12 +835,12 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("StockKeepingUnitId");
-
-                    b.HasIndex("LicensePlateNumberId", "StockKeepingUnitId")
+                    b.HasIndex("LicensePlateNumberId")
                         .IsUnique()
-                        .HasDatabaseName("UX_LicensePlateNumberItems_ActiveSku")
+                        .HasDatabaseName("UX_LicensePlateNumberItems_ActiveReceivingItem")
                         .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.HasIndex("StockKeepingUnitId");
 
                     b.ToTable("LicensePlateNumberItems");
                 });
@@ -832,6 +862,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("DestinationStorageLocationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<Guid>("InventoryMovementId")
                         .HasColumnType("uniqueidentifier");
 
@@ -844,6 +877,9 @@ namespace Wms.Data.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
+
+                    b.Property<Guid>("SourceStorageLocationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
@@ -858,6 +894,8 @@ namespace Wms.Data.Migrations
                     b.HasIndex("LicensePlateNumberId");
 
                     b.HasIndex("LicensePlateNumberItemId");
+
+                    b.HasIndex("SourceStorageLocationId");
 
                     b.HasIndex("StockKeepingUnitId");
 
@@ -914,11 +952,78 @@ namespace Wms.Data.Migrations
                     b.ToTable("Partners");
                 });
 
+            modelBuilder.Entity("Wms.Domain.ReceivingCycle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CompletedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("FactSnapshotJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PlanSnapshotJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ReceivingLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReceivingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("SourceCheckFailed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivingLocationId");
+
+                    b.HasIndex("ReceivingOrderId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("ReceivingCycles");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingCycleSourceVersion", b =>
+                {
+                    b.Property<Guid>("ReceivingCycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReceivingSourceDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReceivingSourceVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ReceivingCycleId", "ReceivingSourceDocumentId");
+
+                    b.HasIndex("ReceivingSourceDocumentId");
+
+                    b.HasIndex("ReceivingSourceVersionId", "ReceivingSourceDocumentId");
+
+                    b.ToTable("ReceivingCycleSourceVersions");
+                });
+
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("ActiveCycleNumber")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("BaseOrderId")
                         .HasColumnType("uniqueidentifier");
@@ -1053,25 +1158,29 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("LineNumber")
-                        .HasColumnType("int");
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Comment")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<decimal?>("CurrentPlanQuantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
                     b.Property<decimal?>("FactQuantity")
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("PlanQuantity")
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
-                    b.Property<Guid>("StockKeepingUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("ReceivingOrderId", "LineNumber");
+                    b.HasKey("ReceivingOrderId", "StockKeepingUnitId");
 
                     b.HasIndex("StockKeepingUnitId");
 
@@ -1087,6 +1196,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("JoinedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("ReceivingCycleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1097,10 +1209,141 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ReceivingOrderId", "UserId")
-                        .IsUnique();
+                    b.HasIndex("ReceivingOrderId");
+
+                    b.HasIndex("ReceivingCycleId", "UserId")
+                        .IsUnique()
+                        .HasFilter("[ReceivingCycleId] IS NOT NULL");
 
                     b.ToTable("ReceivingOrderParticipants");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingOrderSourceLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AttachedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DetachedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ReceivingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReceivingSourceDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivingOrderId");
+
+                    b.HasIndex("ReceivingSourceDocumentId")
+                        .IsUnique()
+                        .HasFilter("[DetachedAtUtc] IS NULL");
+
+                    b.ToTable("ReceivingOrderSourceLinks");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastAttemptError")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("LastSuccessfulCheckAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("LastSuccessfulVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RefKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastSuccessfulVersionId");
+
+                    b.HasIndex("RefKey")
+                        .IsUnique();
+
+                    b.ToTable("ReceivingSourceDocuments", t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivingSourceDocuments_RefKey_NotEmpty", "[RefKey] <> '00000000-0000-0000-0000-000000000000'");
+                        });
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceLineProjection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProjectionError")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.Property<string>("RawQuantity")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ReceivingSourceVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceSkuRefKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.HasIndex("ReceivingSourceVersionId", "LineNumber");
+
+                    b.ToTable("ReceivingSourceLineProjections");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("ReceivedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ReceivingSourceDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivingSourceDocumentId", "ReceivedAtUtc");
+
+                    b.ToTable("ReceivingSourceVersions");
                 });
 
             modelBuilder.Entity("Wms.Domain.ShippingOrder", b =>
@@ -1316,6 +1559,9 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<bool>("TracksExpirationDate")
+                        .HasColumnType("bit");
+
                     b.Property<double?>("VolumeM3")
                         .HasColumnType("float");
 
@@ -1468,6 +1714,82 @@ namespace Wms.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Warehouses");
+                });
+
+            modelBuilder.Entity("Wms.Domain.WarehouseAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActionSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("AfterValuesJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("BeforeValuesJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("CommandType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CommandUserId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("LicensePlateNumberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MovementIdsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReceivingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReceivingSourceDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceVersionIdsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LicensePlateNumberId", "OccurredAtUtc");
+
+                    b.HasIndex("ReceivingOrderId", "OccurredAtUtc");
+
+                    b.HasIndex("ReceivingSourceDocumentId", "OccurredAtUtc");
+
+                    b.HasIndex("StockKeepingUnitId", "OccurredAtUtc");
+
+                    b.HasIndex("CommandUserId", "CommandType", "RequestId");
+
+                    b.ToTable("WarehouseAuditEvents");
                 });
 
             modelBuilder.Entity("Wms.Domain.Zone", b =>
@@ -1687,6 +2009,11 @@ namespace Wms.Data.Migrations
                         .HasForeignKey("DestinationStorageLocationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Wms.Domain.InventoryMovement", "ReversedMovement")
+                        .WithMany()
+                        .HasForeignKey("ReversedMovementId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.StorageLocation", "SourceStorageLocation")
                         .WithMany()
                         .HasForeignKey("SourceStorageLocationId")
@@ -1705,6 +2032,8 @@ namespace Wms.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("DestinationStorageLocation");
+
+                    b.Navigation("ReversedMovement");
 
                     b.Navigation("SourceStorageLocation");
 
@@ -1774,12 +2103,27 @@ namespace Wms.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Wms.Domain.StorageLocation", "OriginalReceivingLocation")
+                        .WithMany()
+                        .HasForeignKey("OriginalReceivingLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
                         .WithMany("LicensePlateNumbers")
                         .HasForeignKey("ReceivingOrderId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Wms.Domain.ReceivingCycle", "ReceivingCycle")
+                        .WithMany()
+                        .HasForeignKey("ReceivingCycleId", "ReceivingOrderId")
+                        .HasPrincipalKey("Id", "ReceivingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Batch");
+
+                    b.Navigation("OriginalReceivingLocation");
+
+                    b.Navigation("ReceivingCycle");
 
                     b.Navigation("ReceivingOrder");
                 });
@@ -1829,6 +2173,12 @@ namespace Wms.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Wms.Domain.StorageLocation", "SourceStorageLocation")
+                        .WithMany()
+                        .HasForeignKey("SourceStorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
                         .WithMany()
                         .HasForeignKey("StockKeepingUnitId")
@@ -1843,7 +2193,55 @@ namespace Wms.Data.Migrations
 
                     b.Navigation("LicensePlateNumberItem");
 
+                    b.Navigation("SourceStorageLocation");
+
                     b.Navigation("StockKeepingUnit");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingCycle", b =>
+                {
+                    b.HasOne("Wms.Domain.StorageLocation", "ReceivingLocation")
+                        .WithMany()
+                        .HasForeignKey("ReceivingLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
+                        .WithMany("Cycles")
+                        .HasForeignKey("ReceivingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReceivingLocation");
+
+                    b.Navigation("ReceivingOrder");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingCycleSourceVersion", b =>
+                {
+                    b.HasOne("Wms.Domain.ReceivingCycle", "ReceivingCycle")
+                        .WithMany("SourceVersions")
+                        .HasForeignKey("ReceivingCycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ReceivingSourceDocument", "ReceivingSourceDocument")
+                        .WithMany()
+                        .HasForeignKey("ReceivingSourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ReceivingSourceVersion", "ReceivingSourceVersion")
+                        .WithMany()
+                        .HasForeignKey("ReceivingSourceVersionId", "ReceivingSourceDocumentId")
+                        .HasPrincipalKey("Id", "ReceivingSourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReceivingCycle");
+
+                    b.Navigation("ReceivingSourceDocument");
+
+                    b.Navigation("ReceivingSourceVersion");
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
@@ -1885,13 +2283,68 @@ namespace Wms.Data.Migrations
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrderParticipant", b =>
                 {
+                    b.HasOne("Wms.Domain.ReceivingCycle", "ReceivingCycle")
+                        .WithMany()
+                        .HasForeignKey("ReceivingCycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
                         .WithMany("Participants")
                         .HasForeignKey("ReceivingOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("ReceivingCycle");
+
                     b.Navigation("ReceivingOrder");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingOrderSourceLink", b =>
+                {
+                    b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
+                        .WithMany("SourceLinks")
+                        .HasForeignKey("ReceivingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ReceivingSourceDocument", "ReceivingSourceDocument")
+                        .WithMany()
+                        .HasForeignKey("ReceivingSourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReceivingOrder");
+
+                    b.Navigation("ReceivingSourceDocument");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceLineProjection", b =>
+                {
+                    b.HasOne("Wms.Domain.ReceivingSourceVersion", "ReceivingSourceVersion")
+                        .WithMany("Lines")
+                        .HasForeignKey("ReceivingSourceVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReceivingSourceVersion");
+
+                    b.Navigation("StockKeepingUnit");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceVersion", b =>
+                {
+                    b.HasOne("Wms.Domain.ReceivingSourceDocument", "ReceivingSourceDocument")
+                        .WithMany()
+                        .HasForeignKey("ReceivingSourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReceivingSourceDocument");
                 });
 
             modelBuilder.Entity("Wms.Domain.ShippingOrder", b =>
@@ -2073,6 +2526,34 @@ namespace Wms.Data.Migrations
                     b.Navigation("StorageLocation");
                 });
 
+            modelBuilder.Entity("Wms.Domain.WarehouseAuditEvent", b =>
+                {
+                    b.HasOne("Wms.Domain.LicensePlateNumber", null)
+                        .WithMany()
+                        .HasForeignKey("LicensePlateNumberId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.ReceivingOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.ReceivingSourceDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivingSourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", null)
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Data.CommandReceipt", null)
+                        .WithMany("AuditEvents")
+                        .HasForeignKey("CommandUserId", "CommandType", "RequestId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Wms.Domain.Zone", b =>
                 {
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
@@ -2082,6 +2563,11 @@ namespace Wms.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Wms.Data.CommandReceipt", b =>
+                {
+                    b.Navigation("AuditEvents");
                 });
 
             modelBuilder.Entity("Wms.Domain.InventoryCount", b =>
@@ -2101,13 +2587,27 @@ namespace Wms.Data.Migrations
                     b.Navigation("Labels");
                 });
 
+            modelBuilder.Entity("Wms.Domain.ReceivingCycle", b =>
+                {
+                    b.Navigation("SourceVersions");
+                });
+
             modelBuilder.Entity("Wms.Domain.ReceivingOrder", b =>
                 {
+                    b.Navigation("Cycles");
+
                     b.Navigation("Items");
 
                     b.Navigation("LicensePlateNumbers");
 
                     b.Navigation("Participants");
+
+                    b.Navigation("SourceLinks");
+                });
+
+            modelBuilder.Entity("Wms.Domain.ReceivingSourceVersion", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Wms.Domain.ShippingOrder", b =>
