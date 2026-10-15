@@ -1,11 +1,65 @@
+using Microsoft.EntityFrameworkCore;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Tests.Infrastructure;
 using static Wms.Tests.Infrastructure.TestSupport;
 
 namespace Wms.Tests.Receiving;
 
-public sealed class ReceivingSynchronizationTests
+[Collection(SqlDatabaseCollection.Name)]
+public sealed class ReceivingSynchronizationTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task Sql_source_projection_keeps_known_sku_plans_when_other_lines_are_unresolved()
+    {
+        var refKey = Guid.NewGuid();
+        var source = Value(ReceivingSourceDocument.Create(refKey));
+        var version = Value(ReceivingSourceVersion.Create(
+            source.Id, DateTimeOffset.UtcNow, new string('A', 64), "{}"));
+        var repeatedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Repeated SKU" };
+        var unresolvedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Unresolved quantity" };
+        var independentSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Independent SKU" };
+        var lines = new[]
+        {
+            Value(ReceivingSourceLineProjection.Create(version.Id, 1, Guid.NewGuid(), repeatedSku.Id, "2", 2m, null)),
+            Value(ReceivingSourceLineProjection.Create(version.Id, 2, Guid.NewGuid(), repeatedSku.Id, "3", 3m, null)),
+            Value(ReceivingSourceLineProjection.Create(version.Id, 3, Guid.NewGuid(), unresolvedSku.Id,
+                "unsupported", null, "Количество 1С не поддерживается")),
+            Value(ReceivingSourceLineProjection.Create(version.Id, 4, Guid.NewGuid(), unresolvedSku.Id, "4", 4m, null)),
+            Value(ReceivingSourceLineProjection.Create(version.Id, 5, Guid.NewGuid(), null,
+                "9", 9m, "SKU 1С не найден")),
+            Value(ReceivingSourceLineProjection.Create(version.Id, 6, Guid.NewGuid(), independentSku.Id, "7", 7m, null))
+        };
+
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(source, version, repeatedSku, unresolvedSku, independentSku);
+            seed.AddRange(lines);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var duplicate = database.CreateDbContext())
+        {
+            duplicate.Add(Value(ReceivingSourceDocument.Create(refKey)));
+            await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
+        }
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(1, await verify.ReceivingSourceDocuments.CountAsync(x => x.RefKey == refKey));
+        var storedVersion = await verify.ReceivingSourceVersions
+            .Include(x => x.Lines)
+            .SingleAsync(x => x.Id == version.Id);
+        Assert.Equal(6, storedVersion.Lines.Count);
+        Assert.Equal(2, storedVersion.Lines.Count(x => x.StockKeepingUnitId == repeatedSku.Id));
+
+        var plan = storedVersion.CalculatePlan();
+        Assert.Equal(5m, plan.QuantityFor(repeatedSku.Id));
+        Assert.Null(plan.QuantityFor(unresolvedSku.Id));
+        Assert.Equal(7m, plan.QuantityFor(independentSku.Id));
+        Assert.Equal(0m, plan.QuantityFor(Guid.NewGuid()));
+        Assert.True(plan.HasUnknownSku);
+    }
+
     [Fact]
     public void Comments_do_not_change_the_checkpoint_but_quantity_differences_block()
     {

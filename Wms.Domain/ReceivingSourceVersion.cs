@@ -16,6 +16,48 @@ public sealed class ReceivingSourceVersion
     public string SnapshotJson { get; private set; } = null!;
     public IReadOnlyCollection<ReceivingSourceLineProjection> Lines => _lines;
 
+    public ReceivingSourcePlan CalculatePlan()
+    {
+        var quantitiesBySku = new Dictionary<Guid, decimal?>();
+        var hasUnknownSku = false;
+
+        foreach (var line in _lines)
+        {
+            if (line.StockKeepingUnitId is not Guid skuId)
+            {
+                hasUnknownSku = true;
+                continue;
+            }
+
+            if (line.Quantity is not decimal quantity || line.ProjectionError is not null)
+            {
+                quantitiesBySku[skuId] = null;
+                continue;
+            }
+
+            if (!quantitiesBySku.TryGetValue(skuId, out var previous))
+            {
+                quantitiesBySku[skuId] = quantity;
+                continue;
+            }
+
+            if (previous is null)
+                continue;
+
+            try
+            {
+                var sum = previous.Value + quantity;
+                quantitiesBySku[skuId] = WarehouseQuantity.IsNonNegative(sum) ? sum : null;
+            }
+            catch (OverflowException)
+            {
+                quantitiesBySku[skuId] = null;
+            }
+        }
+
+        return new ReceivingSourcePlan(quantitiesBySku, hasUnknownSku);
+    }
+
     public static OperationResult<ReceivingSourceVersion> Create(
         Guid sourceId, DateTimeOffset receivedAtUtc, string fingerprint, string snapshotJson)
     {
@@ -33,6 +75,14 @@ public sealed class ReceivingSourceVersion
             SnapshotJson = snapshotJson
         };
     }
+}
+
+public sealed record ReceivingSourcePlan(
+    IReadOnlyDictionary<Guid, decimal?> QuantitiesBySku,
+    bool HasUnknownSku)
+{
+    public decimal? QuantityFor(Guid skuId) =>
+        QuantitiesBySku.TryGetValue(skuId, out var quantity) ? quantity : 0m;
 }
 
 public sealed class ReceivingSourceLineProjection
