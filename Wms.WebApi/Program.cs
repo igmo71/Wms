@@ -30,6 +30,7 @@ public class Program
 
         builder.Services.AddProblemDetails();
 
+        // The shared EF context lives in Wms.Infrastructure; new use cases use this registration.
         builder.Services.AddApplicationDbContext(builder.Configuration);
 
         builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -57,6 +58,7 @@ public class Program
                 MobileAuthorization.WarehouseOperatorPolicy,
                 policy => policy.RequireRole(ApplicationRoles.All));
 
+        // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
         builder.Services.AddNotificationServices();

@@ -24,7 +24,10 @@ business changes are implemented. Project-wide principles live in the
 The new project references point inward: Application references Domain;
 Infrastructure and Integration reference Application. The legacy `Wms` project
 also references Domain and Infrastructure. New projects do not reference `Wms`.
-WebApi and WebApp still use the legacy project; `Wms.Mobile` uses
+WebApi and WebApp directly reference Application, Infrastructure, and Integration
+as composition roots, while retaining the legacy project for existing services.
+Their shared EF context registration comes from Infrastructure; new Application
+and Integration projects have no services to register yet. `Wms.Mobile` uses
 `Wms.Contracts`. In the current
 receiving flow, closing an LPN changes its state while completing the order
 posts receipt movements.

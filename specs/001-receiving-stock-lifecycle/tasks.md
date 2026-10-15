@@ -23,7 +23,7 @@
 **Цель**: подключить новые проекты к точкам композиции без зависимости новых
 сборок от легаси `Wms`.
 
-- [ ] T001 Подключить `Wms.Application`, `Wms.Infrastructure` и `Wms.Integration` к новым сценариям в `Wms.WebApi/Wms.WebApi.csproj`, `Wms.WebApp/Wms.WebApp.csproj`, `Wms.WebApi/Program.cs` и `Wms.WebApp/Program.cs`; сохранить направление зависимостей из `plan.md`.
+- [x] T001 Подключить `Wms.Application`, `Wms.Infrastructure` и `Wms.Integration` к новым сценариям в `Wms.WebApi/Wms.WebApi.csproj`, `Wms.WebApp/Wms.WebApp.csproj`, `Wms.WebApi/Program.cs` и `Wms.WebApp/Program.cs`; сохранить направление зависимостей из `plan.md`.
 
 ## Phase 2: Foundation
 

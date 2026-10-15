@@ -14,6 +14,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Wms.Contracts\Wms.Contracts.csproj" />
+    <ProjectReference Include="..\Wms.Application\Wms.Application.csproj" />
+    <ProjectReference Include="..\Wms.Infrastructure\Wms.Infrastructure.csproj" />
+    <ProjectReference Include="..\Wms.Integration\Wms.Integration.csproj" />
     <ProjectReference Include="..\Wms\Wms.csproj" />
   </ItemGroup>
 

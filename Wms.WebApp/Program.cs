@@ -55,7 +55,9 @@ public class Program
         builder.Services.Configure<IdentityBootstrapOptions>(
             builder.Configuration.GetSection(IdentityBootstrapOptions.SectionName));
 
+        // The shared EF context lives in Wms.Infrastructure; new use cases use this registration.
         builder.Services.AddApplicationDbContext(builder.Configuration);
+        // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
 
