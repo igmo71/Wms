@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Wms.Data;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
 
@@ -16,7 +17,8 @@ internal static class Catalog_УпаковкиЕдиницыИзмерения_E
             .ProducesValidationProblem();
 
         group.MapGet("/Catalog_УпаковкиЕдиницыИзмерения/import", Import)
-            .WithName("Catalog_УпаковкиЕдиницыИзмерения.Import");
+            .WithName("Catalog_УпаковкиЕдиницыИзмерения.Import")
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Manager));
         group.MapPost("/Catalog_УпаковкиЕдиницыИзмерения/notify", Notify)
             .WithName("Catalog_УпаковкиЕдиницыИзмерения.Notify");
 

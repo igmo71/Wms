@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Wms.Data;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
 
@@ -17,7 +18,8 @@ internal static class Catalog_ФизическиеЛица_Endpoints
             .ProducesValidationProblem();
 
         group.MapGet("/Catalog_ФизическиеЛица/import", Import)
-            .WithName("Catalog_ФизическиеЛица.Import");
+            .WithName("Catalog_ФизическиеЛица.Import")
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Manager));
         group.MapPost("/Catalog_ФизическиеЛица/notify", Notify)
             .WithName("Catalog_ФизическиеЛица.Notify");
 

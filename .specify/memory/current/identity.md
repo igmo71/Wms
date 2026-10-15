@@ -4,9 +4,13 @@
 
 WebApp uses ASP.NET Core Identity with three roles. `Operator` runs warehouse
 operations and reports; `Manager` can also correct and reopen receiving LPNs and
-approve quantity differences; `Administrator` manages configuration and users
-and can perform warehouse operations and LPN corrections. Approval still requires
-explicit `Manager` membership, including for an administrator. Public
+approve quantity differences; `Administrator` manages configuration and users.
+Legacy warehouse workflows still allow some operations and LPN corrections with
+`Administrator`, pending their replacement. New receiving manager actions require
+explicit `Manager` membership, including for an administrator. Imported catalog
+lists are visible to `Manager` and `Administrator`; manual synchronization from
+WebApp or the catalog import API requires `Manager` at execution. Zones and
+storage locations remain administrator-only configuration. Public
 self-registration is not offered; administrator-created accounts are confirmed
 local accounts with one or more WMS roles whose rights combine. An administrator
 may change their other roles but cannot block themselves or remove their own

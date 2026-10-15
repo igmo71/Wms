@@ -1,4 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Wms.Application.Authorization;
 using Wms.Application.DeliveryDirections;
 using Wms.Domain;
 using Wms.Integration.OneS.Services;
@@ -7,6 +10,9 @@ namespace Wms.WebApp.Components.Pages.DeliveryDirectionPages;
 
 public partial class Index
 {
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] private WarehousePermission PermissionService { get; set; } = null!;
+
     [Inject] private DeliveryDirectionService DeliveryDirectionService { get; set; } = null!;
     [Inject] private Catalog_ЗоныДоставки_Service CatalogImportService { get; set; } = null!;
     private List<DeliveryDirection> _items = [];
@@ -33,6 +39,17 @@ public partial class Index
 
     private async Task RefreshFromOneCAsync()
     {
+        var actorId = (await AuthenticationStateProvider.GetAuthenticationStateAsync())
+            .User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var permission = await PermissionService.RequireManagerAsync(actorId);
+        if (!permission.IsSuccess)
+        {
+            _importFailed = true;
+            _importSucceeded = false;
+            _importMessage = permission.Error!.Message;
+            return;
+        }
+
         _isImporting = true;
         _importFailed = false;
         _importSucceeded = false;

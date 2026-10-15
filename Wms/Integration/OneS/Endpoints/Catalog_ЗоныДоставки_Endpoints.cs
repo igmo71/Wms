@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Wms.Data;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
 
@@ -17,7 +18,8 @@ internal static class Catalog_ЗоныДоставки_Endpoints
             .ProducesValidationProblem();
 
         group.MapGet("/Catalog_ЗоныДоставки_Endpoints/import", Import)
-            .WithName("Catalog_ЗоныДоставки.Import");
+            .WithName("Catalog_ЗоныДоставки.Import")
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Manager));
         group.MapPost("/Catalog_ЗоныДоставки_Endpoints/notify", Notify)
             .WithName("Catalog_ЗоныДоставки.Notify");
 

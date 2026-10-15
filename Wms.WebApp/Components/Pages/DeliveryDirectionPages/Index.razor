@@ -1,14 +1,16 @@
 @page "/delivery-directions"
-@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
+@attribute [Authorize(Roles = ApplicationRoles.ManagerOrAdministrator)]
 @using Wms.Domain
 
 <PageTitle>Направления доставки</PageTitle>
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h5">Направления доставки</MudText>
     <MudSpacer />
-    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">
-        @(_isImporting ? "Обновление..." : "Обновить из 1С")
-    </MudButton>
+    <AuthorizeView Roles="@ApplicationRoles.Manager">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">
+            @(_isImporting ? "Обновление..." : "Обновить из 1С")
+        </MudButton>
+    </AuthorizeView>
 </MudStack>
 @if (_isImporting)
 {

@@ -24,6 +24,8 @@ business changes are implemented. Project-wide principles live in the
 The new project references point inward: Application references Domain;
 Infrastructure and Integration reference Application. The legacy `Wms` project
 also references Domain and Infrastructure. New projects do not reference `Wms`.
+Application owns the explicit Manager permission check; Infrastructure resolves
+membership from Identity storage for command execution.
 WebApi and WebApp directly reference Application, Infrastructure, and Integration
 as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;

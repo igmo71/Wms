@@ -1,4 +1,7 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Wms.Application.Authorization;
 using MudBlazor;
 using Wms.Application.StockKeepingUnits;
 using Wms.Common;
@@ -9,6 +12,9 @@ namespace Wms.WebApp.Components.Pages.StockKeepingUnitPages;
 
 public partial class Index
 {
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+    [Inject] private WarehousePermission PermissionService { get; set; } = null!;
+
     [Inject] private StockKeepingUnitService StockKeepingUnitService { get; set; } = null!;
     [Inject] private Catalog_Номенклатура_Service CatalogImportService { get; set; } = null!;
     private MudDataGrid<StockKeepingUnit> _dataGrid = null!;
@@ -32,6 +38,19 @@ public partial class Index
 
     private async Task RefreshFromOneCAsync()
     {
+        var actorId = (await AuthenticationStateProvider.GetAuthenticationStateAsync())
+            .User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var permission = await PermissionService.RequireManagerAsync(actorId);
+        if (!permission.IsSuccess)
+        {
+            _importFailed = true;
+            _importSucceeded = false;
+            _importMessage = permission.Error!.Message;
+            return;
+        }
+
+        _importWarning = false;
+
         _isImporting = true;
         _importFailed = false;
         _importSucceeded = false;

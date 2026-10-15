@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
 
@@ -21,6 +22,8 @@ public static class DependencyInjection
         });
 
         services.AddDatabaseDeveloperPageExceptionFilter();
+        services.AddScoped<IWarehousePermissionStore, WarehousePermissionStore>();
+        services.AddScoped<WarehousePermission>();
         services.AddScoped<ICommandExecutionStore, CommandExecutionStore>();
         services.AddScoped<CommandExecutor>();
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();

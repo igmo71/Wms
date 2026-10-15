@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Wms.Data;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
 
@@ -16,7 +17,8 @@ internal static class InformationRegister_ШтрихкодыНоменклату
             .WithTags("InformationRegister_ШтрихкодыНоменклатуры")
             .ProducesValidationProblem();
 
-        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", Import);
+        group.MapGet("/InformationRegister_ШтрихкодыНоменклатуры/import", Import)
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Manager));
         group.MapPost("/InformationRegister_ШтрихкодыНоменклатуры/notify", Notify);
 
         return routeBuilder;

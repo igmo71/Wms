@@ -2,6 +2,11 @@
 
 ## 1C synchronization
 
+Manual catalog imports are available from the WebApp catalog lists and the
+`GET /api/1c/.../import` endpoints. Their role rule is owned by
+[identity.md](identity.md); notification endpoints and background imports remain
+the automatic integration path.
+
 Before warehouse work starts, an admissible source document remains owned by
 1C. While WMS and 1C remain in matching initial states, synchronization replaces
 source-owned metadata and the complete plan. Deletion marks, posting changes,
