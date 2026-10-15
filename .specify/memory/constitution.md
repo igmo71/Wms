@@ -1,12 +1,3 @@
-<!--
-Sync Impact Report
-- Version: 1.0.0 -> 1.0.1; clarified the implemented project dependency direction.
-- Principles: warehouse-owned inventory, single posting path, 1C boundary,
-  feature-oriented implementation, risk-based verification.
-- Added sections: Documentation Ownership; Delivery Workflow.
-- Templates: no changes required; plan-template.md reads the constitution at runtime.
-- Follow-up: detailed receiving design remains in the active feature specification.
--->
 # WMS Constitution
 
 ## Core Principles
@@ -52,23 +43,28 @@ cycles and duplicate operational paths are not acceptable.
 Add automated tests when existing tests do not protect a material risk such as
 duplicate stock, data loss, non-atomic posting, unsafe replay or concurrency.
 Routine edits do not require new tests. Apply the detailed policy in
-[`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md#testing-strategy).
+[`architecture.md`](architecture.md#testing-strategy).
 Execution ownership for builds, tests, launches and EF migrations is defined
 in [`AGENTS.md`](../../AGENTS.md).
 
 ## Documentation Ownership
 
 `AGENTS.md` owns instructions for Codex. This constitution owns lasting
-engineering principles. `docs/PROJECT_CONTEXT.md` and `docs/ARCHITECTURE.md`
-describe the implemented product and its current technical arrangement.
-`docs/ROADMAP.md` contains deferred work. An active `spec.md` describes the
+engineering principles. `current/` describes implemented behavior by
+subcontext, and `architecture.md` describes current technical structure and
+engineering conventions. `backlog.md` contains deferred work; operational
+runbooks belong in `.specify/runbooks/`. An active `spec.md` describes the
 intended business outcome; `plan.md` explains its implementation; `tasks.md`
 records bounded increments. Keep each detailed rule in one owning document and
 link to it elsewhere. A planned change MUST NOT be presented as implemented.
+Use lowercase file names for project documentation; keep the conventional
+Spec Kit names `constitution.md`, `spec.md`, `plan.md`, and `tasks.md`.
 
 Completed feature directories remain historical records. New requirements get
-a new feature specification; lasting accepted rules move into current
-documentation as the corresponding implementation becomes real.
+a new feature specification; lasting accepted rules move into the relevant
+current-state subcontext as the corresponding implementation becomes real.
+Top-level `archive/legacy-specs/` preserves older material but is not a source
+for current decisions.
 
 ## Delivery Workflow
 
@@ -88,4 +84,4 @@ change. Increment MAJOR for incompatible governance changes, MINOR for new or
 materially expanded rules, and PATCH for clarification. User instructions take
 precedence over this document.
 
-**Version**: 1.0.1 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-14
+**Version**: 1.1.0 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-15

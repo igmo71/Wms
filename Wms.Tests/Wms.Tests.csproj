@@ -30,7 +30,7 @@
   <ItemGroup>
     <Content Include="..\scripts\clear-wms-operational-data.sql" Link="scripts\clear-wms-operational-data.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\scripts\clear-database-except-identity.sql" Link="scripts\clear-database-except-identity.sql" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\specs\archive\2026-10-08-storage-addressing\source-maps\(1) Фронтальные стеллажи - Ярус - 1.xls"
+    <Content Include="Fixtures\StorageMaps\(1) Фронтальные стеллажи - Ярус - 1.xls"
              Link="StorageMaps\(1) Фронтальные стеллажи - Ярус - 1.xls" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

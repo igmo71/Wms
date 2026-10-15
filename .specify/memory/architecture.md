@@ -2,9 +2,9 @@
 
 This document describes the implemented code and its detailed engineering
 conventions. The proposed receiving redesign belongs to the active
-[feature plan](../specs/001-receiving-stock-lifecycle/plan.md) until those
+[feature plan](../../specs/001-receiving-stock-lifecycle/plan.md) until those
 business changes are implemented. Project-wide principles live in the
-[WMS Constitution](../.specify/memory/constitution.md).
+[WMS Constitution](constitution.md).
 
 ## Current project map
 
@@ -244,5 +244,5 @@ a new test when existing protection is sufficient. Do not expand test helpers
 or infrastructure unless the necessary test requires it.
 
 Execution ownership and verification checkpoints are specified in
-[`AGENTS.md`](../AGENTS.md). Local setup and commands belong in
-[`Wms.Tests/README.md`](../Wms.Tests/README.md).
+[`AGENTS.md`](../../AGENTS.md). Local setup and commands belong in
+[`Wms.Tests/README.md`](../../Wms.Tests/README.md).

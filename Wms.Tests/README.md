@@ -1,7 +1,7 @@
 # Wms.Tests
 
 `Wms.Tests` is the only automated test project and uses xUnit.
-The [testing policy](../docs/ARCHITECTURE.md#testing-strategy) defines when a
+The [testing policy](../.specify/memory/architecture.md#testing-strategy) defines when a
 test is necessary and how to keep verification minimal.
 
 Run commands from the repository root on Windows with the project's .NET SDK
