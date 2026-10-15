@@ -12,6 +12,7 @@ internal sealed class LicensePlateNumberPutawayConfiguration : IEntityTypeConfig
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Quantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.ExpirationDate).HasColumnType("date");
         builder.Property(x => x.CreatedBy).HasMaxLength(450).IsRequired();
         builder.HasIndex(x => x.LicensePlateNumberId);
         builder.HasIndex(x => x.LicensePlateNumberItemId);
@@ -24,6 +25,8 @@ internal sealed class LicensePlateNumberPutawayConfiguration : IEntityTypeConfig
             .HasForeignKey(x => x.LicensePlateNumberItemId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.StockKeepingUnit).WithMany()
             .HasForeignKey(x => x.StockKeepingUnitId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.SourceStorageLocation).WithMany()
+            .HasForeignKey(x => x.SourceStorageLocationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.DestinationStorageLocation).WithMany()
             .HasForeignKey(x => x.DestinationStorageLocationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.InventoryMovement).WithOne()

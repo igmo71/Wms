@@ -16,6 +16,10 @@ public sealed class LicensePlateNumber
     public LicensePlateNumberBatch Batch { get; private set; } = null!;
     public Guid? ReceivingOrderId { get; private set; }
     public ReceivingOrder? ReceivingOrder { get; private set; }
+    public Guid? ReceivingCycleId { get; private set; }
+    public ReceivingCycle? ReceivingCycle { get; private set; }
+    public Guid? OriginalReceivingLocationId { get; private set; }
+    public StorageLocation? OriginalReceivingLocation { get; private set; }
     public LicensePlateNumberStatus Status { get; private set; }
     public string? CreatedBy { get; private set; }
     public string? ResponsibleUserId { get; private set; }
@@ -29,6 +33,22 @@ public sealed class LicensePlateNumber
     public long OperationalRevision { get; private set; }
     public IReadOnlyCollection<LicensePlateNumberItem> Items => _items;
     public IReadOnlyCollection<LicensePlateNumberPutaway> Putaways => _putaways;
+
+    public OperationResult AssignReceiving(
+        ReceivingCycle cycle, string userId, DateTimeOffset createdAtUtc)
+    {
+        if (cycle is null || cycle.StartedAtUtc is null || cycle.CompletedAtUtc is not null
+            || cycle.ReceivingLocationId is null)
+            return OperationError.Invalid("Для LPN нужен действующий цикл с местом приёмки.");
+
+        var result = Assign(cycle.ReceivingOrderId, userId, createdAtUtc);
+        if (!result.IsSuccess)
+            return result;
+
+        ReceivingCycleId = cycle.Id;
+        OriginalReceivingLocationId = cycle.ReceivingLocationId;
+        return OperationResult.Success();
+    }
 
     internal OperationResult Assign(Guid receivingOrderId, string userId, DateTimeOffset createdAtUtc)
     {
@@ -68,6 +88,61 @@ public sealed class LicensePlateNumber
         return OperationResult.Success();
     }
 
+    public OperationResult CancelOpen(string userId, DateTimeOffset cancelledAtUtc, bool canManage)
+    {
+        if (Status != LicensePlateNumberStatus.Open)
+            return OperationError.Invalid("Отменить можно только открытую LPN.");
+        if (string.IsNullOrWhiteSpace(userId) || cancelledAtUtc == default)
+            return OperationError.Invalid("Для отмены LPN обязательны пользователь и время.");
+        if (!canManage && !string.Equals(ResponsibleUserId, userId, StringComparison.Ordinal))
+            return OperationError.Conflict("Отменить LPN может ответственный сотрудник или менеджер.");
+
+        Status = LicensePlateNumberStatus.Cancelled;
+        CancelledBy = userId.Trim();
+        CancelledAtUtc = cancelledAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult SetReceivingItem(
+        Guid stockKeepingUnitId, DateOnly? expirationDate, decimal quantity,
+        string userId, DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (stockKeepingUnitId == Guid.Empty)
+            return OperationError.Invalid("SKU для позиции LPN обязателен.");
+        var validation = LicensePlateNumberItem.Validate(quantity, occurredAtUtc, userId);
+        if (!validation.IsSuccess)
+            return validation;
+
+        var activeItems = _items.Where(x => !x.IsDeleted).Take(2).ToList();
+        if (activeItems.Count > 1)
+            return OperationError.Conflict("Приёмная LPN содержит несколько активных позиций.");
+        var active = activeItems.SingleOrDefault();
+        if (active is not null && active.StockKeepingUnitId != stockKeepingUnitId)
+        {
+            var deletion = active.Delete(occurredAtUtc, userId);
+            if (!deletion.IsSuccess)
+                return deletion;
+            active = null;
+        }
+
+        if (active is null)
+            _items.Add(new LicensePlateNumberItem(
+                Id, stockKeepingUnitId, expirationDate, quantity, occurredAtUtc, userId.Trim()));
+        else
+        {
+            var update = active.SetQuantityAndExpiration(quantity, expirationDate, occurredAtUtc, userId);
+            if (!update.IsSuccess)
+                return update;
+        }
+
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
     internal OperationResult SetItemQuantity(
         Guid stockKeepingUnitId,
         decimal quantity,
@@ -88,8 +163,10 @@ public sealed class LicensePlateNumber
             x.StockKeepingUnitId == stockKeepingUnitId && !x.IsDeleted);
         if (item is null)
         {
+            if (ReceivingCycleId is not null && _items.Any(x => !x.IsDeleted))
+                return OperationError.Conflict("Приёмная LPN может содержать только один SKU.");
             _items.Add(new LicensePlateNumberItem(
-                Id, stockKeepingUnitId, quantity, occurredAtUtc, userId.Trim()));
+                Id, stockKeepingUnitId, null, quantity, occurredAtUtc, userId.Trim()));
         }
         else
         {
@@ -129,6 +206,10 @@ public sealed class LicensePlateNumber
             return access;
         if (closedAtUtc == default)
             return OperationError.Invalid("Время закрытия LPN обязательно.");
+        if (ReceivingCycleId is not null
+            && (_items.Count(x => !x.IsDeleted) != 1
+                || !_items.Any(x => !x.IsDeleted && WarehouseQuantity.IsPositive(x.Quantity))))
+            return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
 
         Status = LicensePlateNumberStatus.Closed;
         ClosedBy = userId.Trim();
@@ -137,8 +218,23 @@ public sealed class LicensePlateNumber
         return OperationResult.Success();
     }
 
+    public OperationResult CloseReceiving(string userId, DateTimeOffset closedAtUtc, bool canManage)
+    {
+        if (ReceivingCycleId is null || OriginalReceivingLocationId is null)
+            return OperationError.Invalid("Цикл и исходное место приёмки LPN обязательны.");
+        var activeItems = _items.Where(x => !x.IsDeleted).Take(2).ToList();
+        if (activeItems.Count > 1)
+            return OperationError.Conflict("Приёмная LPN содержит несколько активных позиций.");
+        var active = activeItems.SingleOrDefault();
+        if (active is null || !WarehouseQuantity.IsPositive(active.Quantity))
+            return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
+        return Close(userId, closedAtUtc, canManage);
+    }
+
     internal OperationResult Reopen(string userId, DateTimeOffset reopenedAtUtc, bool canManage)
     {
+        if (ReceivingCycleId is not null)
+            return OperationError.Conflict("Закрытую приёмную LPN нельзя возобновить.");
         if (!canManage)
             return OperationError.Conflict("Возобновить закрытый LPN может только менеджер.");
         if (Status != LicensePlateNumberStatus.Closed)
@@ -160,9 +256,34 @@ public sealed class LicensePlateNumber
         Guid inventoryMovementId,
         string userId,
         DateTimeOffset createdAtUtc)
+        => CreatePutawayCore(
+            itemId, ReceivingOrder?.ReceivingLocationId, destinationStorageLocationId,
+            quantity, inventoryMovementId, userId, createdAtUtc);
+
+    public OperationResult<LicensePlateNumberPutaway> CreateReceivingPutaway(
+        Guid itemId,
+        Guid destinationStorageLocationId,
+        decimal quantity,
+        Guid inventoryMovementId,
+        string userId,
+        DateTimeOffset createdAtUtc)
+        => CreatePutawayCore(
+            itemId, OriginalReceivingLocationId, destinationStorageLocationId,
+            quantity, inventoryMovementId, userId, createdAtUtc);
+
+    private OperationResult<LicensePlateNumberPutaway> CreatePutawayCore(
+        Guid itemId,
+        Guid? sourceStorageLocationId,
+        Guid destinationStorageLocationId,
+        decimal quantity,
+        Guid inventoryMovementId,
+        string userId,
+        DateTimeOffset createdAtUtc)
     {
         if (Status != LicensePlateNumberStatus.Closed)
             return OperationError.Invalid("Размещать можно только закрытый LPN.");
+        if (sourceStorageLocationId is not Guid sourceLocationId)
+            return OperationError.Invalid("Исходное место приёмки LPN не сохранено.");
 
         var item = _items.SingleOrDefault(x => x.Id == itemId && !x.IsDeleted);
         if (item is null)
@@ -178,7 +299,8 @@ public sealed class LicensePlateNumber
 
         var putawayResult = LicensePlateNumberPutaway.Create(
             Guid.NewGuid(), Id, item.Id, item.StockKeepingUnitId,
-            destinationStorageLocationId, quantity, inventoryMovementId,
+            item.ExpirationDate, sourceLocationId, destinationStorageLocationId,
+            quantity, inventoryMovementId,
             userId, createdAtUtc);
         if (!putawayResult.IsSuccess)
             return putawayResult.Error!;

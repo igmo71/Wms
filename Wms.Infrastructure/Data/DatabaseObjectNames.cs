@@ -12,6 +12,6 @@ public static class DatabaseObjectNames
         "IX_InventoryTransfers_TransitStorageLocationId";
     public const string StorageLocationLocksPrimaryKey =
         "PK_StorageLocationLocks";
-    public const string LicensePlateNumberItemsActiveSkuIndex =
-        "UX_LicensePlateNumberItems_ActiveSku";
+    public const string LicensePlateNumberItemsActiveItemIndex =
+        "UX_LicensePlateNumberItems_ActiveReceivingItem";
 }

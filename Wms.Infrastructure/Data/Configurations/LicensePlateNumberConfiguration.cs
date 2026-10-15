@@ -22,6 +22,13 @@ public sealed class LicensePlateNumberConfiguration : IEntityTypeConfiguration<L
         builder.HasOne(x => x.Batch).WithMany(x => x.Labels).HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.LicensePlateNumbers)
             .HasForeignKey(x => x.ReceivingOrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.ReceivingCycle).WithMany()
+            .HasForeignKey(x => new { x.ReceivingCycleId, x.ReceivingOrderId })
+            .HasPrincipalKey(x => new { x.Id, x.ReceivingOrderId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.OriginalReceivingLocation).WithMany()
+            .HasForeignKey(x => x.OriginalReceivingLocationId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Navigation(x => x.Items)
             .HasField("_items")
             .UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -9,6 +9,7 @@ internal sealed class ReceivingCycleConfiguration : IEntityTypeConfiguration<Rec
     public void Configure(EntityTypeBuilder<ReceivingCycle> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.HasAlternateKey(x => new { x.Id, x.ReceivingOrderId });
         builder.HasIndex(x => new { x.ReceivingOrderId, x.Number }).IsUnique();
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.HasOne(x => x.ReceivingOrder).WithMany(x => x.Cycles)

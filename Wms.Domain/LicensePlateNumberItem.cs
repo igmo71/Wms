@@ -9,6 +9,7 @@ public sealed class LicensePlateNumberItem
     internal LicensePlateNumberItem(
         Guid licensePlateNumberId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
         decimal quantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
@@ -16,6 +17,7 @@ public sealed class LicensePlateNumberItem
         Id = Guid.NewGuid();
         LicensePlateNumberId = licensePlateNumberId;
         StockKeepingUnitId = stockKeepingUnitId;
+        ExpirationDate = expirationDate;
         Quantity = quantity;
         CreatedAtUtc = createdAtUtc;
         CreatedBy = createdBy;
@@ -26,6 +28,7 @@ public sealed class LicensePlateNumberItem
     public LicensePlateNumber LicensePlateNumber { get; private set; } = null!;
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit StockKeepingUnit { get; private set; } = null!;
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal Quantity { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string CreatedBy { get; private set; } = null!;
@@ -35,13 +38,18 @@ public sealed class LicensePlateNumberItem
     public string? DeletedBy { get; private set; }
     public bool IsDeleted => DeletedAtUtc.HasValue;
 
-    internal OperationResult SetQuantity(decimal quantity, DateTimeOffset updatedAtUtc, string updatedBy)
+    internal OperationResult SetQuantity(decimal quantity, DateTimeOffset updatedAtUtc, string updatedBy) =>
+        SetQuantityAndExpiration(quantity, ExpirationDate, updatedAtUtc, updatedBy);
+
+    internal OperationResult SetQuantityAndExpiration(
+        decimal quantity, DateOnly? expirationDate, DateTimeOffset updatedAtUtc, string updatedBy)
     {
         var validation = Validate(quantity, updatedAtUtc, updatedBy);
         if (!validation.IsSuccess)
             return validation;
 
         Quantity = quantity;
+        ExpirationDate = expirationDate;
         UpdatedAtUtc = updatedAtUtc;
         UpdatedBy = updatedBy.Trim();
         DeletedAtUtc = null;

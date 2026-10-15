@@ -13,7 +13,10 @@ public sealed class LicensePlateNumberPutaway
     public LicensePlateNumberItem LicensePlateNumberItem { get; private set; } = null!;
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit StockKeepingUnit { get; private set; } = null!;
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal Quantity { get; private set; }
+    public Guid SourceStorageLocationId { get; private set; }
+    public StorageLocation SourceStorageLocation { get; private set; } = null!;
     public Guid DestinationStorageLocationId { get; private set; }
     public StorageLocation DestinationStorageLocation { get; private set; } = null!;
     public Guid InventoryMovementId { get; private set; }
@@ -26,6 +29,8 @@ public sealed class LicensePlateNumberPutaway
         Guid licensePlateNumberId,
         Guid licensePlateNumberItemId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
+        Guid sourceStorageLocationId,
         Guid destinationStorageLocationId,
         decimal quantity,
         Guid inventoryMovementId,
@@ -34,7 +39,8 @@ public sealed class LicensePlateNumberPutaway
     {
         if (id == Guid.Empty || licensePlateNumberId == Guid.Empty
             || licensePlateNumberItemId == Guid.Empty || stockKeepingUnitId == Guid.Empty
-            || destinationStorageLocationId == Guid.Empty || inventoryMovementId == Guid.Empty)
+            || sourceStorageLocationId == Guid.Empty || destinationStorageLocationId == Guid.Empty
+            || inventoryMovementId == Guid.Empty)
             return OperationError.Invalid("Идентификаторы размещения LPN обязательны.");
         if (!WarehouseQuantity.IsPositive(quantity))
             return OperationError.Invalid("Количество размещения должно быть больше нуля.");
@@ -47,6 +53,8 @@ public sealed class LicensePlateNumberPutaway
             LicensePlateNumberId = licensePlateNumberId,
             LicensePlateNumberItemId = licensePlateNumberItemId,
             StockKeepingUnitId = stockKeepingUnitId,
+            ExpirationDate = expirationDate,
+            SourceStorageLocationId = sourceStorageLocationId,
             DestinationStorageLocationId = destinationStorageLocationId,
             Quantity = quantity,
             InventoryMovementId = inventoryMovementId,

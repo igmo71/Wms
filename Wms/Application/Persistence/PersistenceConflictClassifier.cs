@@ -157,7 +157,7 @@ internal static class PersistenceConflictClassifier
             }
 
             if (sqlException.Message.Contains(
-                    DatabaseObjectNames.LicensePlateNumberItemsActiveSkuIndex,
+                    DatabaseObjectNames.LicensePlateNumberItemsActiveItemIndex,
                     StringComparison.Ordinal))
             {
                 error = LicensePlateNumberConflict;
