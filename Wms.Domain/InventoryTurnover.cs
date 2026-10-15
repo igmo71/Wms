@@ -15,6 +15,7 @@ public class InventoryTurnover
     public StorageLocation? StorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal QuantityDelta { get; private set; }
     public decimal BalanceBefore { get; private set; }
     public decimal BalanceAfter { get; private set; }
@@ -32,7 +33,8 @@ public class InventoryTurnover
         Guid stockKeepingUnitId,
         InventoryBalanceChange change,
         DateTimeOffset createdAtUtc,
-        Guid inventoryMovementId)
+        Guid inventoryMovementId,
+        DateOnly? expirationDate = null)
     {
         if (id == Guid.Empty
             || warehouseId == Guid.Empty
@@ -43,12 +45,10 @@ public class InventoryTurnover
             return OperationError.Invalid("Идентификаторы оборота обязательны.");
         }
 
-        if (!WarehouseQuantity.IsNonNegative(change.BalanceBefore)
+        if (!WarehouseQuantity.IsSupported(change.BalanceBefore)
             || !WarehouseQuantity.IsSupported(change.QuantityDelta)
-            || !WarehouseQuantity.IsNonNegative(change.BalanceAfter)
+            || !WarehouseQuantity.IsSupported(change.BalanceAfter)
             || change.QuantityDelta == 0
-            || change.BalanceBefore < 0
-            || change.BalanceAfter < 0
             || change.BalanceBefore + change.QuantityDelta != change.BalanceAfter)
         {
             return OperationError.Invalid("Изменение остатка в обороте некорректно.");
@@ -65,6 +65,7 @@ public class InventoryTurnover
             WarehouseId = warehouseId,
             StorageLocationId = storageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
+            ExpirationDate = expirationDate,
             QuantityDelta = change.QuantityDelta,
             BalanceBefore = change.BalanceBefore,
             BalanceAfter = change.BalanceAfter,

@@ -15,6 +15,7 @@ public class InventoryBalance
     public StorageLocation? StorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal Quantity { get; private set; }
     public double? WeightKg => WeightCalculation.CalculateKg(Quantity, StockKeepingUnit);
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -27,7 +28,9 @@ public class InventoryBalance
         Guid storageLocationId,
         Guid stockKeepingUnitId,
         decimal quantity,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        DateOnly? expirationDate = null,
+        bool allowNegative = false)
     {
         if (id == Guid.Empty
             || warehouseId == Guid.Empty
@@ -37,10 +40,11 @@ public class InventoryBalance
             return OperationError.Invalid("Идентификаторы складского остатка обязательны.");
         }
 
-        if (!WarehouseQuantity.IsNonNegative(quantity))
+        if (!WarehouseQuantity.IsSupported(quantity)
+            || (!allowNegative && quantity < 0))
         {
             return OperationError.Invalid(
-                "Количество остатка должно быть конечным неотрицательным числом.");
+                "Количество остатка недопустимо для этой операции.");
         }
 
         if (createdAtUtc == default)
@@ -54,6 +58,7 @@ public class InventoryBalance
             WarehouseId = warehouseId,
             StorageLocationId = storageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
+            ExpirationDate = expirationDate,
             Quantity = quantity,
             CreatedAtUtc = createdAtUtc
         };
@@ -61,7 +66,8 @@ public class InventoryBalance
 
     public OperationResult<InventoryBalanceChange> Adjust(
         decimal quantityDelta,
-        DateTimeOffset updatedAtUtc)
+        DateTimeOffset updatedAtUtc,
+        bool allowNegative = false)
     {
         if (!WarehouseQuantity.IsSupported(quantityDelta) || quantityDelta == 0)
         {
@@ -76,7 +82,12 @@ public class InventoryBalance
         }
 
         var balanceAfter = Quantity + quantityDelta;
-        if (!WarehouseQuantity.IsNonNegative(balanceAfter))
+        if (!WarehouseQuantity.IsSupported(balanceAfter))
+        {
+            return OperationError.Invalid("Количество остатка выходит за допустимый диапазон.");
+        }
+
+        if (!allowNegative && balanceAfter < 0)
         {
             return OperationError.Invalid("Складской остаток не может быть отрицательным.");
         }

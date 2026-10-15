@@ -10,6 +10,7 @@ internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<Inventor
     public void Configure(EntityTypeBuilder<InventoryBalance> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.ExpirationDate).HasColumnType("date");
 
         builder.HasOne(x => x.StockKeepingUnit)
             .WithMany()
@@ -30,10 +31,13 @@ internal class InventoryBalanceConfiguration : IEntityTypeConfiguration<Inventor
         {
             x.WarehouseId,
             x.StorageLocationId,
-            x.StockKeepingUnitId
+            x.StockKeepingUnitId,
+            x.ExpirationDate
         })
         .IsUnique()
-        .HasDatabaseName(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex);
+        .HasDatabaseName(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex)
+        // SQL Server's EF convention filters nullable unique keys; null is a real stock group.
+        .HasFilter(null);
 
         builder.Property(x => x.Quantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);

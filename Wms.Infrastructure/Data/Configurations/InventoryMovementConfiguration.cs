@@ -13,7 +13,16 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Quantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.ExpirationDate).HasColumnType("date");
         builder.Property(x => x.ConfirmedBy).HasMaxLength(DefaultConfiguration.Guid);
+
+        builder.HasOne(x => x.ReversedMovement).WithMany()
+            .HasForeignKey(x => x.ReversedMovementId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.ReversedMovementId)
+            .IsUnique()
+            .HasDatabaseName(DatabaseObjectNames.InventoryMovementsReversedMovementIndex)
+            .HasFilter("[ReversedMovementId] IS NOT NULL");
 
         builder.HasOne(x => x.Warehouse)
             .WithMany()

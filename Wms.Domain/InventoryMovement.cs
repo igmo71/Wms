@@ -18,7 +18,10 @@ public class InventoryMovement
     public StorageLocation? DestinationStorageLocation { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal Quantity { get; private set; }
+    public Guid? ReversedMovementId { get; private set; }
+    public InventoryMovement? ReversedMovement { get; private set; }
     public double? WeightKg => WeightCalculation.CalculateKg(Quantity, StockKeepingUnit);
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
@@ -39,7 +42,8 @@ public class InventoryMovement
         RecorderType recorderType,
         Guid? recorderId,
         int? recorderLineNumber,
-        string? confirmedBy = null)
+        string? confirmedBy = null,
+        DateOnly? expirationDate = null)
     {
         if (id == Guid.Empty)
         {
@@ -85,6 +89,7 @@ public class InventoryMovement
             SourceStorageLocationId = sourceStorageLocationId,
             DestinationStorageLocationId = destinationStorageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
+            ExpirationDate = expirationDate,
             Quantity = quantity,
             CreatedAtUtc = createdAtUtc,
             ConfirmedBy = confirmedBy?.Trim(),
@@ -94,17 +99,51 @@ public class InventoryMovement
         };
     }
 
+    public static OperationResult<InventoryMovement> CreateReversal(
+        Guid id,
+        InventoryMovement original,
+        DateTimeOffset createdAtUtc,
+        RecorderType recorderType,
+        Guid? recorderId,
+        int? recorderLineNumber,
+        string? confirmedBy = null)
+    {
+        if (original.PostedAtUtc is null)
+        {
+            return OperationError.Invalid("Можно обратить только проведённое движение.");
+        }
+
+        var result = Create(id, original.WarehouseId,
+            original.DestinationStorageLocationId, original.SourceStorageLocationId,
+            original.StockKeepingUnitId, original.Quantity, createdAtUtc,
+            recorderType, recorderId, recorderLineNumber, confirmedBy,
+            original.ExpirationDate);
+        if (!result.IsSuccess)
+        {
+            return result.Error!;
+        }
+
+        result.Value!.ReversedMovementId = original.Id;
+        return result;
+    }
+
     public OperationResult UpdateDraft(
         Guid? sourceStorageLocationId,
         Guid? destinationStorageLocationId,
         Guid stockKeepingUnitId,
         decimal quantity,
-        DateTimeOffset updatedAtUtc)
+        DateTimeOffset updatedAtUtc,
+        DateOnly? expirationDate = null)
     {
         var draftResult = ValidateDraft();
         if (!draftResult.IsSuccess)
         {
             return draftResult;
+        }
+
+        if (ReversedMovementId is not null)
+        {
+            return OperationError.Invalid("Обратное движение нельзя изменить.");
         }
 
         if (stockKeepingUnitId == Guid.Empty)
@@ -127,6 +166,7 @@ public class InventoryMovement
         SourceStorageLocationId = sourceStorageLocationId;
         DestinationStorageLocationId = destinationStorageLocationId;
         StockKeepingUnitId = stockKeepingUnitId;
+        ExpirationDate = expirationDate;
         Quantity = quantity;
         UpdatedAtUtc = updatedAtUtc;
         return OperationResult.Success();

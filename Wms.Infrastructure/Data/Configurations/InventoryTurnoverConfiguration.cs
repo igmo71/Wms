@@ -16,6 +16,7 @@ internal class InventoryTurnoverConfiguration : IEntityTypeConfiguration<Invento
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
         builder.Property(x => x.BalanceAfter)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+        builder.Property(x => x.ExpirationDate).HasColumnType("date");
 
         builder.HasOne(x => x.StockKeepingUnit)
             .WithMany()

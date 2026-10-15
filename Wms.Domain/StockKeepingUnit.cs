@@ -8,6 +8,7 @@ public class StockKeepingUnit
     public string? Name { get; set; }
     public string? Code { get; set; }
     public bool DeletionMark { get; set; }
+    public bool TracksExpirationDate { get; private set; }
 
     public Guid? BaseUnitOfMeasureId { get; set; }
     public UnitOfMeasure? BaseUnitOfMeasure { get; set; }
@@ -16,4 +17,6 @@ public class StockKeepingUnit
     public double? VolumeM3 { get; set; }
 
     public IReadOnlyCollection<SkuBarcode> Barcodes => _barcodes;
+
+    public void SetExpirationTracking(bool enabled) => TracksExpirationDate = enabled;
 }
