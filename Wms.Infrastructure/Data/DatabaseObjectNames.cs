@@ -17,4 +17,6 @@ public static class DatabaseObjectNames
     public const string LicensePlateNumberItemsActiveItemIndex =
         "UX_LicensePlateNumberItems_ActiveReceivingItem";
     public const string ReceivingOrderItemsPrimaryKey = "PK_ReceivingOrderItems";
+    public const string ReceivingCycleParticipantIndex =
+        "IX_ReceivingOrderParticipants_ReceivingCycleId_UserId";
 }

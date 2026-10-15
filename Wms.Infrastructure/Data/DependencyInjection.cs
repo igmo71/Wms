@@ -37,6 +37,12 @@ public static class DependencyInjection
         services.AddScoped<IReceivingSkuStore, ReceivingSkuStore>();
         services.AddScoped<SearchReceivingSku>();
         services.AddScoped<AddReceivingOrderSku>();
+        services.AddScoped<IReceivingWorkStore, ReceivingWorkStore>();
+        services.AddScoped<JoinReceivingCycle>();
+        services.AddScoped<OpenReceivingLpn>();
+        services.AddScoped<EditReceivingLpn>();
+        services.AddScoped<CancelReceivingLpn>();
+        services.AddScoped<ConfirmZeroReceived>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

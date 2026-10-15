@@ -8,8 +8,9 @@ approve quantity differences; `Administrator` manages configuration and users.
 Legacy warehouse workflows still allow some operations and LPN corrections with
 `Administrator`, pending their replacement. New receiving manager actions require
 explicit `Manager` membership, including for an administrator. SKU selection
-in the new receiving use case accepts `Operator` or `Manager`; `Administrator`
-alone does not grant that command. Imported catalog
+and cycle/LPN work in the new receiving use cases accept `Operator` or
+`Manager`; `Administrator` alone grants none of those commands. A `Manager`
+may edit or cancel another user's open receiving LPN. Imported catalog
 lists are visible to `Manager` and `Administrator`; manual synchronization from
 WebApp or the catalog import API requires `Manager` at execution. Zones and
 storage locations remain administrator-only configuration. Public

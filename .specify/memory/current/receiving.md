@@ -22,6 +22,17 @@ catalog SKU to an order; the unique row starts with known plan `0` and unchecked
 fact. Repeating the command does not add a second row. The addition, command
 receipt and compact audit event are saved together.
 
+The new cycle use case refreshes linked sources before joining and checks their
+posting, deletion mark and warehouse. The first participant selects an active,
+unlocked receiving location for the order warehouse; later participants join
+the same cycle and location. A participant can bind an issued label to an open
+receiving LPN and edit one SKU, quantity and optional expiration date while it
+is open. The responsible user can cancel that LPN, including after editing;
+a `Manager` can edit or cancel another user's open LPN. These drafts do not
+post inventory. A current-cycle participant can confirm a SKU as checked zero
+when no active LPN contains it; the audit and command receipt are saved with
+the fact update. The legacy receiving UI is still active until replacement.
+
 ## LPN issuance
 
 The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an

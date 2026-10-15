@@ -61,7 +61,7 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
         {
             if (exception is DbUpdateConcurrencyException concurrency)
                 return concurrency.Entries.Any(x => x.Entity is InventoryBalance
-                    or StorageLocation or LicensePlateNumber);
+                    or StorageLocation or LicensePlateNumber or ReceivingOrder);
 
             for (Exception? current = exception; current is not null; current = current.InnerException)
             {
@@ -71,6 +71,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                         || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsReversedMovementIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingOrderItemsPrimaryKey,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ReceivingCycleParticipantIndex,
                             StringComparison.Ordinal)))
                     return true;
             }

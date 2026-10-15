@@ -79,6 +79,139 @@ public class ReceivingOrder
         return order;
     }
 
+    public OperationResult<ReceivingJoinOutcome> JoinCurrentCycle(
+        Guid? receivingLocationId, string userId, DateTimeOffset joinedAtUtc)
+    {
+        if (Status is not (ReceivingOrderStatus.ReadyForReceiving or ReceivingOrderStatus.InReceiving)
+            || ActiveCycleNumber is not int number)
+            return OperationError.Conflict("У ордера нет действующего цикла приёмки.");
+        if (string.IsNullOrWhiteSpace(userId) || joinedAtUtc == default)
+            return OperationError.Invalid("Для вступления нужны пользователь и время.");
+
+        var cycle = _cycles.SingleOrDefault(x => x.Number == number);
+        if (cycle is null || cycle.CompletedAtUtc is not null)
+            return OperationError.Conflict("Действующий цикл приёмки не найден.");
+
+        var started = Status == ReceivingOrderStatus.ReadyForReceiving;
+        if (started)
+        {
+            if (receivingLocationId is not Guid locationId || locationId == Guid.Empty)
+                return OperationError.Invalid("Первый участник должен выбрать место приёмки.");
+            if (joinedAtUtc < CreatedAtUtc)
+                return OperationError.Invalid("Время вступления предшествует созданию ордера.");
+            var start = cycle.Start(locationId, joinedAtUtc);
+            if (!start.IsSuccess)
+                return start.Error!;
+            ReceivingLocationId = locationId;
+            Status = ReceivingOrderStatus.InReceiving;
+            StartedAtUtc = joinedAtUtc;
+            StartedBy = userId.Trim();
+        }
+        else if (cycle.ReceivingLocationId is not Guid currentLocationId
+            || receivingLocationId is Guid selectedLocationId && selectedLocationId != currentLocationId)
+            return OperationError.Conflict("Место приёмки текущего цикла изменилось.");
+
+        var location = cycle.ReceivingLocationId!.Value;
+        if (_participants.Any(x => x.ReceivingCycleId == cycle.Id && x.UserId == userId.Trim()))
+            return new ReceivingJoinOutcome(cycle.Id, location, started, false);
+
+        var participant = ReceivingOrderParticipant.CreateForCycle(cycle, userId, joinedAtUtc);
+        if (!participant.IsSuccess)
+            return participant.Error!;
+        _participants.Add(participant.Value!);
+        AdvanceOperationalRevision();
+        return new ReceivingJoinOutcome(cycle.Id, location, started, true);
+    }
+
+    public OperationResult<bool> OpenReceivingLpn(
+        LicensePlateNumber lpn, string userId, DateTimeOffset createdAtUtc)
+    {
+        var cycle = ActiveReceivingCycle();
+        if (cycle is null)
+            return OperationError.Conflict("Ордер не находится в действующем цикле приёмки.");
+        if (!HasCurrentParticipant(userId, cycle.Id))
+            return OperationError.Conflict("Сначала присоединитесь к текущему циклу приёмки.");
+        if (lpn.Status != LicensePlateNumberStatus.Available)
+            return lpn.ReceivingOrderId == Id
+                ? false
+                : OperationError.Conflict("Этикетка уже относится к другому ордеру.");
+
+        var assigned = lpn.AssignReceiving(cycle, userId, createdAtUtc);
+        if (!assigned.IsSuccess)
+            return assigned.Error!;
+        if (!_licensePlateNumbers.Contains(lpn))
+            _licensePlateNumbers.Add(lpn);
+        AdvanceOperationalRevision();
+        return true;
+    }
+
+    public OperationResult EditReceivingLpn(
+        LicensePlateNumber lpn, Guid skuId, DateOnly? expirationDate, decimal quantity,
+        string userId, DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateCurrentLpn(lpn, userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (_items.All(x => x.StockKeepingUnitId != skuId))
+            return OperationError.NotFound("SKU отсутствует в составе ордера.");
+        var changed = lpn.SetReceivingItem(
+            skuId, expirationDate, quantity, userId, occurredAtUtc, canManage);
+        if (changed.IsSuccess)
+            AdvanceOperationalRevision();
+        return changed;
+    }
+
+    public OperationResult CancelReceivingLpn(
+        LicensePlateNumber lpn, string userId, DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateCurrentLpn(lpn, userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        var cancelled = lpn.CancelOpen(userId, occurredAtUtc, canManage);
+        if (cancelled.IsSuccess)
+            AdvanceOperationalRevision();
+        return cancelled;
+    }
+
+    public OperationResult<bool> ConfirmZeroReceived(Guid skuId, string userId)
+    {
+        var cycle = ActiveReceivingCycle();
+        if (cycle is null || !HasCurrentParticipant(userId, cycle.Id))
+            return OperationError.Conflict("Подтверждать отсутствие может участник текущего цикла.");
+        var item = _items.SingleOrDefault(x => x.StockKeepingUnitId == skuId);
+        if (item is null)
+            return OperationError.NotFound("SKU отсутствует в составе ордера.");
+        if (_licensePlateNumbers.Any(lpn =>
+                (lpn.Status is LicensePlateNumberStatus.Open or LicensePlateNumberStatus.Closed)
+                && lpn.Items.Any(x => !x.IsDeleted && x.StockKeepingUnitId == skuId)))
+            return OperationError.Conflict("Для SKU уже есть действующая LPN.");
+        if (item.FactQuantity == 0m)
+            return false;
+        item.SetAggregatedLpnFact(0m);
+        AdvanceOperationalRevision();
+        return true;
+    }
+
+    private ReceivingCycle? ActiveReceivingCycle() =>
+        Status == ReceivingOrderStatus.InReceiving && ActiveCycleNumber is int number
+            ? _cycles.SingleOrDefault(x => x.Number == number && x.CompletedAtUtc == null
+                && x.StartedAtUtc != null)
+            : null;
+
+    private bool HasCurrentParticipant(string userId, Guid cycleId) =>
+        _participants.Any(x => x.ReceivingCycleId == cycleId && x.UserId == userId?.Trim());
+
+    private OperationResult ValidateCurrentLpn(
+        LicensePlateNumber lpn, string userId, bool canManage)
+    {
+        var cycle = ActiveReceivingCycle();
+        if (cycle is null || lpn.ReceivingOrderId != Id || lpn.ReceivingCycleId != cycle.Id)
+            return OperationError.Conflict("LPN не относится к текущему циклу приёмки.");
+        return canManage || HasCurrentParticipant(userId, cycle.Id)
+            ? OperationResult.Success()
+            : OperationError.Conflict("Сначала присоединитесь к текущему циклу приёмки.");
+    }
+
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
     public bool IsFactWeightComplete => _items.All(x => x.FactQuantity is decimal factQuantity
         && (factQuantity == 0 || x.FactWeightKg.HasValue));
@@ -789,3 +922,6 @@ public class ReceivingOrder
             : OperationResult.Success();
     }
 }
+
+public sealed record ReceivingJoinOutcome(
+    Guid CycleId, Guid ReceivingLocationId, bool Started, bool Joined);
