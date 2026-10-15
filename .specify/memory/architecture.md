@@ -12,7 +12,7 @@ business changes are implemented. Project-wide principles live in the
 |---|---|
 | `Wms` | Legacy application services and 1C adapter; consumes Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
-| `Wms.Application` | Empty project reserved for new use cases; references Domain. |
+| `Wms.Application` | New command execution orchestration and contracts for new use cases; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
 | `Wms.Integration` | Empty project reserved for new integration adapters; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
@@ -26,8 +26,8 @@ Infrastructure and Integration reference Application. The legacy `Wms` project
 also references Domain and Infrastructure. New projects do not reference `Wms`.
 WebApi and WebApp directly reference Application, Infrastructure, and Integration
 as composition roots, while retaining the legacy project for existing services.
-Their shared EF context registration comes from Infrastructure; new Application
-and Integration projects have no services to register yet. `Wms.Mobile` uses
+Their shared EF context and new command execution store registration come from Infrastructure;
+Integration has no services to register yet. `Wms.Mobile` uses
 `Wms.Contracts`. In the current
 receiving flow, closing an LPN changes its state while completing the order
 posts receipt movements.
@@ -100,10 +100,13 @@ project move. Legacy application services still use that context directly.
 notification parsing, and HTTP mechanics. Its implementations use 1C names;
 application ports use WMS terminology.
 
-One legacy operation normally has one explicit save boundary. The new
-application project has no services or persistence contract yet.
+One legacy operation normally has one explicit save boundary. New commands use
+the Application command executor and its Infrastructure store: receipt lookup
+precedes the operation, and one EF save commits staged business state, audit
+events, and receipt. The legacy executor remains for existing callers until
+their replacement. The two executors have distinct namespaces.
 
-Warehouse mutations in Web/Mobile enter shared application commands through
+Existing warehouse mutations in Web/Mobile enter legacy application commands through
 `CommandExecutor`: LPN issuance/counting/putaway, receiving participation and
 completion, picking, shipping/rollback, transfers and inventory counts.
 The executor owns receipt lookup before mutable validation and external access,

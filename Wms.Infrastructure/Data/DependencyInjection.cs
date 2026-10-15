@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Wms.Application.CommandExecution;
 
 namespace Wms.Data;
 
@@ -19,6 +20,8 @@ public static class DependencyInjection
         });
 
         services.AddDatabaseDeveloperPageExceptionFilter();
+        services.AddScoped<ICommandExecutionStore, CommandExecutionStore>();
+        services.AddScoped<CommandExecutor>();
 
         return services;
     }

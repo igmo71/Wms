@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Wms.Application.Commands;
+using Wms.Application.CommandExecution;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -22,18 +22,21 @@ public sealed class CommandExecutorTests(SqlDatabase database)
     [Fact]
     public async Task Replay_returns_the_original_result_and_changed_payload_conflicts()
     {
-        var executor = new CommandExecutor(database);
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
         var request = Command("command-replay");
         var firstHash = CommandExecutor.ComputeHash("payload-a");
         var changedHash = CommandExecutor.ComputeHash("payload-b");
         var calls = 0;
         var resourceId = Guid.NewGuid();
 
-        Task<OperationResult<Guid>> Operation(ApplicationDbContext db, CancellationToken _)
+        Task<OperationResult<CommandExecutionResult>> Operation(ICommandExecutionContext session, CancellationToken _)
         {
             calls++;
-            db.Warehouses.Add(new Warehouse { Id = resourceId, Name = "Replay effect" });
-            return Task.FromResult<OperationResult<Guid>>(resourceId);
+            var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Replay audit target" };
+            session.Stage(new Warehouse { Id = resourceId, Name = "Replay effect" });
+            session.Stage(sku);
+            return Task.FromResult<OperationResult<CommandExecutionResult>>(new CommandExecutionResult(
+                resourceId, [Audit("test.command", request.UserId, request.RequestId, sku.Id)]));
         }
 
         var first = await executor.ExecuteAsync("test.command", request.RequestId, firstHash, request.UserId, Operation, default);
@@ -52,14 +55,17 @@ public sealed class CommandExecutorTests(SqlDatabase database)
         const string marker = "Command race ";
         var request = Command("command-race");
         var requestHash = CommandExecutor.ComputeHash("same payload");
-        var executor = new CommandExecutor(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var executor = new CommandExecutor(new CommandExecutionStore(database.WithInterceptor(new ReceiptSaveBarrier())));
 
-        async Task<OperationResult<Guid>> Operation(ApplicationDbContext db, CancellationToken ct)
+        async Task<OperationResult<CommandExecutionResult>> Operation(ICommandExecutionContext session, CancellationToken ct)
         {
             var id = Guid.NewGuid();
-            db.Warehouses.Add(new Warehouse { Id = id, Name = marker + id });
+            var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Race audit " + id };
+            session.Stage(new Warehouse { Id = id, Name = marker + id });
+            session.Stage(sku);
             await Task.Yield();
-            return id;
+            return new CommandExecutionResult(id,
+                [Audit("test.concurrent", request.UserId, request.RequestId, sku.Id)]);
         }
 
         var results = await Task.WhenAll(
@@ -71,6 +77,8 @@ public sealed class CommandExecutorTests(SqlDatabase database)
         Assert.Equal(1, await verify.Warehouses.CountAsync(x => x.Name != null && x.Name.StartsWith(marker)));
         Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
             x.UserId == request.UserId && x.CommandType == "test.concurrent" && x.RequestId == request.RequestId));
+        Assert.Equal(1, await verify.WarehouseAuditEvents.CountAsync(x =>
+            x.CommandUserId == request.UserId && x.CommandType == "test.concurrent" && x.RequestId == request.RequestId));
     }
 
     [Fact]
@@ -89,11 +97,11 @@ public sealed class CommandExecutorTests(SqlDatabase database)
             await seed.SaveChangesAsync();
         }
 
-        var executor = new CommandExecutor(database);
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
         var calls = 0;
         var failAudit = true;
 
-        Task<OperationResult<Guid>> Operation(ApplicationDbContext db, CancellationToken _)
+        Task<OperationResult<CommandExecutionResult>> Operation(ICommandExecutionContext session, CancellationToken _)
         {
             calls++;
             var now = DateTimeOffset.UtcNow;
@@ -112,8 +120,11 @@ public sealed class CommandExecutorTests(SqlDatabase database)
                 "{\"quantity\":\"0\"}", "{\"quantity\":\"5\"}",
                 [movement.Id], commandUserId: request.UserId,
                 commandType: commandType, requestId: request.RequestId));
-            db.AddRange(movement, balance, turnover, audit);
-            return Task.FromResult<OperationResult<Guid>>(movement.Id);
+            session.Stage(movement);
+            session.Stage(balance);
+            session.Stage(turnover);
+            return Task.FromResult<OperationResult<CommandExecutionResult>>(
+                new CommandExecutionResult(movement.Id, [audit]));
         }
 
         await Assert.ThrowsAsync<DbUpdateException>(() => executor.ExecuteAsync(
@@ -146,4 +157,11 @@ public sealed class CommandExecutorTests(SqlDatabase database)
         var receipt = await verify.CommandReceipts.SingleAsync(x => x.RequestId == request.RequestId);
         Assert.Equal(postedId, receipt.ResultResourceId);
     }
+
+    private static WarehouseAuditEvent Audit(
+        string commandType, string userId, Guid requestId, Guid skuId) =>
+        Value(WarehouseAuditEvent.Create(
+            commandType, DateTimeOffset.UtcNow, userId, null,
+            null, null, skuId, null, null, null,
+            commandUserId: userId, commandType: commandType, requestId: requestId));
 }
