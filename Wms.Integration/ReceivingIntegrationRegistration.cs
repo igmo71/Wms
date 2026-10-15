@@ -29,6 +29,7 @@ public static class ReceivingIntegrationRegistration
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue(MediaTypeNames.Application.Json));
         });
+        services.AddSingleton<IReceivingSourceParser, ReceivingSourceParser>();
 
         return services;
     }

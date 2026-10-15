@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Receiving;
 
 namespace Wms.Data;
 
@@ -28,6 +29,9 @@ public static class DependencyInjection
         services.AddScoped<CommandExecutor>();
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<PostInventoryMovement.Handler>();
+        services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
+        services.AddScoped<SynchronizeReceivingSource>();
+        services.AddSingleton(TimeProvider.System);
 
         return services;
     }

@@ -8,9 +8,14 @@ Manual catalog imports are available from the WebApp catalog lists and the
 the automatic integration path.
 
 The receiving source reader fetches the current 1C document by `Ref_Key` and
-returns the unchanged JSON response to the Application contract. It is registered
-in WebApi and WebApp. The legacy receiving synchronization maps that response
-through its old adapter; the new source-version persistence is not connected yet.
+returns the unchanged JSON response. The new synchronization use case stores a
+successful response as a source version only when its content changes. It also
+updates the last successful check time on an unchanged response and rebuilds the
+derived line projection after catalog changes. Source lines remain separate;
+unsupported quantities and unknown SKU retain reasons without hiding valid
+quantities of other SKU. A failed read or unreadable response records the last
+attempt error without replacing the successful version. The notification path
+uses this synchronization before the legacy receiving adapter maps the response.
 
 Before warehouse work starts, an admissible source document remains owned by
 1C. While WMS and 1C remain in matching initial states, synchronization replaces

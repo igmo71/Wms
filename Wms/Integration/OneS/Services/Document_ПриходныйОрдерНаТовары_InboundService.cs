@@ -10,21 +10,22 @@ using Document = Wms.Integration.OneS.Models.Document_ПриходныйОрде
 namespace Wms.Integration.OneS.Services;
 
 internal sealed class Document_ПриходныйОрдерНаТовары_InboundService(
-    IReceivingSourceReader sourceReader,
+    SynchronizeReceivingSource synchronizeSource,
     ILogger<Document_ПриходныйОрдерНаТовары_InboundService> logger) : IReceivingOrderSource
 {
     public async Task<OperationResult<ReceivingOrderImportSnapshot>> GetSnapshotAsync(
         Guid orderId,
         CancellationToken ct = default)
     {
-        var readResult = await sourceReader.ReadAsync(orderId, ct);
-        if (!readResult.IsSuccess)
-            return readResult.Error!;
+        var synchronization = await synchronizeSource.ExecuteAsync(orderId, ct);
+        if (!synchronization.IsSuccess)
+            return synchronization.Error!;
 
         RootObject<Document>? response;
         try
         {
-            response = JsonSerializer.Deserialize<RootObject<Document>>(readResult.Value!.RawResponseJson);
+            response = JsonSerializer.Deserialize<RootObject<Document>>(
+                synchronization.Value!.SnapshotJson);
         }
         catch (JsonException exception)
         {
