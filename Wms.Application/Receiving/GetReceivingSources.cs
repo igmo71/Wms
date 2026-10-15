@@ -1,0 +1,78 @@
+using Wms.Common;
+using Wms.Domain;
+
+namespace Wms.Application.Receiving;
+
+public sealed record ReceivingSourceState(
+    ReceivingSourceDocument Source, ReceivingSourceVersion? Version);
+
+public sealed record ReceivingSourceView(
+    Guid RefKey, Guid? WarehouseId, string? Number,
+    bool? Posted, bool? DeletionMark, Guid? VersionId,
+    DateTimeOffset? LastSuccessfulCheckAtUtc, DateTimeOffset? LastAttemptAtUtc,
+    string? LastAttemptError, IReadOnlyDictionary<Guid, decimal?> PlanBySku,
+    bool HasUnknownSku, IReadOnlyList<ReceivingSourceLineView> Lines);
+
+public sealed record ReceivingSourceLineView(
+    int LineNumber, Guid? SourceSkuRefKey, Guid? StockKeepingUnitId,
+    string? RawQuantity, decimal? Quantity, string? Error);
+
+public interface IReceivingOrderStore
+{
+    Task<IReadOnlyList<ReceivingSourceState>> LoadSourcesAsync(
+        IReadOnlyCollection<Guid> refKeys, CancellationToken ct);
+
+    Task<IReadOnlyList<ReceivingSourceState>> ListUnlinkedSourcesAsync(CancellationToken ct);
+
+    Task<OperationResult<Guid>> CreateAsync(
+        ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
+        IReadOnlyList<ReceivingOrderItem> items,
+        IReadOnlyList<ReceivingSourceExpectation> expectedSources,
+        CancellationToken ct);
+}
+
+public sealed record ReceivingSourceExpectation(
+    Guid SourceId, Guid VersionId, DateTimeOffset CheckedAtUtc);
+
+public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSourceParser parser)
+{
+    public async Task<IReadOnlyList<ReceivingSourceView>> ListUnlinkedAsync(
+        CancellationToken ct = default)
+    {
+        var states = await store.ListUnlinkedSourcesAsync(ct);
+        var results = new List<ReceivingSourceView>(states.Count);
+        foreach (var state in states)
+        {
+            ParsedReceivingSource? parsed = null;
+            if (state.Version is not null)
+            {
+                var parse = parser.Parse(state.Source.RefKey, state.Version.SnapshotJson);
+                if (parse.IsSuccess)
+                    parsed = parse.Value;
+            }
+
+            var active = parsed?.Posted == true && parsed.DeletionMark == false;
+            var plan = state.Version?.CalculatePlan();
+            var metadataKnown = parsed?.WarehouseId is not null
+                && parsed.Posted is not null && parsed.DeletionMark is not null;
+            var quantities = active && plan is not null
+                ? plan.QuantitiesBySku
+                : plan?.QuantitiesBySku.ToDictionary(x => x.Key,
+                    x => metadataKnown ? (decimal?)0 : null)
+                    ?? new Dictionary<Guid, decimal?>();
+            var lines = state.Version?.Lines
+                .OrderBy(x => x.LineNumber)
+                .Select(x => new ReceivingSourceLineView(
+                    x.LineNumber, x.SourceSkuRefKey, x.StockKeepingUnitId,
+                    x.RawQuantity, x.Quantity, x.ProjectionError))
+                .ToArray() ?? [];
+            results.Add(new ReceivingSourceView(
+                state.Source.RefKey, parsed?.WarehouseId, parsed?.Number,
+                parsed?.Posted, parsed?.DeletionMark, state.Version?.Id,
+                state.Source.LastSuccessfulCheckAtUtc, state.Source.LastAttemptAtUtc,
+                state.Source.LastAttemptError, quantities,
+                !metadataKnown || active && plan?.HasUnknownSku == true, lines));
+        }
+        return results;
+    }
+}

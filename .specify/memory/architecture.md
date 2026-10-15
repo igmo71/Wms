@@ -12,7 +12,7 @@ business changes are implemented. Project-wide principles live in the
 |---|---|
 | `Wms` | Legacy application services and 1C mapping adapter; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
-| `Wms.Application` | New command execution orchestration and contracts for new use cases; references Domain. |
+| `Wms.Application` | New command execution, receiving source and order use cases and contracts; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
 | `Wms.Integration` | Receiving source HTTP reader and OData parser; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
@@ -30,7 +30,7 @@ WebApi and WebApp directly reference Application, Infrastructure, and Integratio
 as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
 Integration registers the receiving source HTTP reader and parser in both hosts;
-Infrastructure registers the source store and synchronization use case. `Wms.Mobile` uses
+Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
 `Wms.Contracts`. In the current
 receiving flow, closing an LPN changes its state while completing the order
 posts receipt movements.

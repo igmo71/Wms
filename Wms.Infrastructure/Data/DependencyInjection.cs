@@ -31,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<PostInventoryMovement.Handler>();
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
         services.AddScoped<SynchronizeReceivingSource>();
+        services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();
+        services.AddScoped<CreateReceivingOrder>();
+        services.AddScoped<GetReceivingSources>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

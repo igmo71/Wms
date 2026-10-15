@@ -2,6 +2,19 @@
 
 These are implemented legacy rules. The replacement is specified in [the active feature](../../../specs/001-receiving-stock-lifecycle/spec.md).
 
+## New source-based order foundation
+
+The new Application use cases can list unlinked 1C receiving sources and create
+one WMS receiving order from several already synchronized `Ref_Key` values.
+Creation gives the order its own ID, fixes its warehouse, attaches each distinct
+source once, and stores one row per known SKU. Repeated SKU lines and source
+contributions are summed; an unresolved contribution leaves only its SKU plan
+unknown. Unposted or deletion-marked sources contribute zero. The order fact
+starts unchecked. The source versions and active links are checked again in the
+save transaction; repeating the same complete source selection returns the
+existing order. The replacement UI and receiving posting path are not connected
+yet.
+
 ## LPN issuance
 
 The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an

@@ -9,7 +9,9 @@ public sealed record ReceivingSourceLine(
     int LineNumber, Guid? SkuRefKey, string? RawQuantity,
     decimal? Quantity, string? Error);
 
-public sealed record ParsedReceivingSource(Guid RefKey, IReadOnlyList<ReceivingSourceLine> Lines);
+public sealed record ParsedReceivingSource(
+    Guid RefKey, Guid? WarehouseId, bool? Posted, bool? DeletionMark,
+    string? Number, IReadOnlyList<ReceivingSourceLine> Lines);
 
 public interface IReceivingSourceParser
 {

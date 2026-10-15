@@ -97,7 +97,23 @@ public sealed class ReceivingSourceParser : IReceivingSourceParser
                     rawQuantity, quantity, error));
             }
 
-            return new ParsedReceivingSource(refKey, lines);
+            Guid? warehouseId = null;
+            if (document.TryGetProperty("Склад_Key", out var warehouse)
+                && TryGuid(warehouse, out var warehouseKey)
+                && warehouseKey != Guid.Empty)
+                warehouseId = warehouseKey;
+            bool? posted = document.TryGetProperty("Posted", out var sourcePosted)
+                && sourcePosted.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? sourcePosted.GetBoolean() : null;
+            bool? deletionMark = document.TryGetProperty("DeletionMark", out var sourceDeletion)
+                && sourceDeletion.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? sourceDeletion.GetBoolean() : null;
+            var number = document.TryGetProperty("Number", out var sourceNumber)
+                && sourceNumber.ValueKind == JsonValueKind.String
+                ? sourceNumber.GetString() : null;
+
+            return new ParsedReceivingSource(
+                refKey, warehouseId, posted, deletionMark, number, lines);
         }
         catch (JsonException)
         {
