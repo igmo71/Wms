@@ -69,6 +69,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                     && (sql.Message.Contains(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsReversedMovementIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ReceivingOrderItemsPrimaryKey,
                             StringComparison.Ordinal)))
                     return true;
             }

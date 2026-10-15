@@ -23,8 +23,8 @@ Domain types are extracted into `Wms.Domain`. The existing EF context,
 configurations, Identity data types and migration history reside in
 `Wms.Infrastructure`; existing application services and 1C integration still
 run in the legacy `Wms` project. `Wms.Application` contains the new command
-execution and inventory-posting foundation, while `Wms.Integration` is still an
-empty project boundary. The currently implemented
+execution, inventory-posting and receiving-source/order foundation;
+`Wms.Integration` contains the 1C receiving reader and parser. The currently implemented
 [receiving rules](receiving.md) remain in force until that replacement is delivered.
 
 Warehouse quantities retain at most three decimal places. Read-only Web

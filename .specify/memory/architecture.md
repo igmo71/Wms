@@ -83,6 +83,13 @@ services only when they are distinct public responsibilities; reads needed by a
 command remain with that command. Add a type or folder for a distinct
 responsibility rather than for each method.
 
+An application use case may be an injectable class. Pass simple inputs as method
+parameters; use an immutable command or query for a related set of inputs or
+when required by the execution mechanism. Use a separate result type when it
+conveys more than one ID or value. Return `OperationResult` for expected errors;
+let unexpected failures surface as exceptions. Existing working use cases do
+not need a structural rewrite for naming or type layout alone.
+
 ### Domain
 
 Domain operations own local invariants and transitions, accept time and user

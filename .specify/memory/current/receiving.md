@@ -15,6 +15,13 @@ save transaction; repeating the same complete source selection returns the
 existing order. The replacement UI and receiving posting path are not connected
 yet.
 
+The new SKU query searches either the order composition or the synchronized
+catalog by name, code or barcode. Barcode resolution always uses the entire
+catalog, including SKU outside the order. An `Operator` or `Manager` can add a
+catalog SKU to an order; the unique row starts with known plan `0` and unchecked
+fact. Repeating the command does not add a second row. The addition, command
+receipt and compact audit event are saved together.
+
 ## LPN issuance
 
 The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an

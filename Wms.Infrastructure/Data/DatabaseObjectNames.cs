@@ -16,4 +16,5 @@ public static class DatabaseObjectNames
         "PK_StorageLocationLocks";
     public const string LicensePlateNumberItemsActiveItemIndex =
         "UX_LicensePlateNumberItems_ActiveReceivingItem";
+    public const string ReceivingOrderItemsPrimaryKey = "PK_ReceivingOrderItems";
 }
