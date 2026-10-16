@@ -56,6 +56,11 @@ movement, retains independent stock operations, marks the LPN `Deleted`,
 recalculates the order fact and commits audit and command receipt atomically.
 With no other closed LPN for the SKU, the fact returns to checked zero only if
 the SKU had an earlier explicit zero confirmation; otherwise it is unchecked.
+In the Web order card, a Manager can correct a closed LPN only before its first
+putaway. Deletion shows the historical reversal route and forecast balances,
+requires explicit confirmation for a negative forecast, and refreshes the
+forecast after a conflict. Deleted LPNs remain visible with their former
+composition, putaways and linked reversal history.
 
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire

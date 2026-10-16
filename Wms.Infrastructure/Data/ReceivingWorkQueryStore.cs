@@ -59,6 +59,30 @@ public sealed class ReceivingWorkQueryStore(
             : MapLpn(lpn, lpn.ReceivingOrder.WarehouseId);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>>
+        GetDeletionHistoryAsync(Guid orderId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var reversals = await db.InventoryMovements.AsNoTracking()
+            .Include(x => x.SourceStorageLocation)
+            .Include(x => x.DestinationStorageLocation)
+            .Where(x => x.RecorderType == RecorderType.ReceivingOrder
+                && x.RecorderId == orderId && x.LicensePlateNumberId != null
+                && x.ReversedMovementId != null)
+            .OrderBy(x => x.PostedAtUtc).ThenBy(x => x.Id)
+            .ToArrayAsync(ct);
+        return reversals.GroupBy(x => x.LicensePlateNumberId!.Value)
+            .ToDictionary(x => x.Key, x => (IReadOnlyList<ReceivingLpnReversalHistoryView>)
+                x.Select(movement => new ReceivingLpnReversalHistoryView(
+                    movement.LicensePlateNumberId!.Value, movement.Id,
+                    movement.ReversedMovementId!.Value,
+                    movement.SourceStorageLocation?.DisplayAddress,
+                    movement.DestinationStorageLocation?.DisplayAddress,
+                    movement.StockKeepingUnitId, movement.ExpirationDate,
+                    movement.Quantity, movement.PostedAtUtc,
+                    movement.ConfirmedBy)).ToArray());
+    }
+
     public async Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
         GetPutawayRecommendationsAsync(
             Guid warehouseId, Guid skuId, CancellationToken ct)

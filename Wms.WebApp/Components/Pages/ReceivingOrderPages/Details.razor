@@ -130,15 +130,30 @@ else
                         {
                             <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="() => PrepareClose(lpn.Id)">Закрыть LPN</MudButton>
                         }
+                        @if (_canManage && lpn.Status == LicensePlateNumberStatus.Closed)
+                        {
+                            @if (lpn.Putaways.Count == 0 && lpn.Items.Count == 1)
+                            {
+                                <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="() => PrepareCorrection(lpn)">Исправить количество</MudButton>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="_busy" OnClick="() => PreviewDeletionAsync(lpn.Id)">Предпросмотр удаления</MudButton>
+                        }
                     </MudStack>
                     @foreach (var item in lpn.Items)
                     {
+                        @if (lpn.Status == LicensePlateNumberStatus.Deleted)
+                        {
+                            <MudText Typo="Typo.caption">Состав до удаления</MudText>
+                        }
                         <MudText>@(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · Срок годности: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudText>
-                        <MudText Typo="Typo.caption">Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</MudText>
+                        @if (lpn.Status != LicensePlateNumberStatus.Deleted)
+                        {
+                            <MudText Typo="Typo.caption">Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</MudText>
+                        }
                     }
                     @foreach (var putaway in lpn.Putaways)
                     {
-                        <MudText Typo="Typo.caption">Размещено @Format(putaway.Quantity) → @putaway.DestinationStorageLocationId · @putaway.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.caption">@(lpn.Status == LicensePlateNumberStatus.Deleted ? "Историческое размещение" : "Размещено") @Format(putaway.Quantity) → @putaway.DestinationStorageLocationId · @putaway.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
                     }
                     @if (_closeLpnId == lpn.Id)
                     {
@@ -147,6 +162,92 @@ else
                         <label><input type="checkbox" @bind="_confirmExpired" /> Подтверждаю закрытие LPN с прошедшей датой, если она есть</label>
                         <MudTextField T="string" @bind-Value="_managerReason" Label="Причина менеджера (необязательно)" />
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CloseLpnAsync">Подтвердить закрытие</MudButton>
+                    }
+                    @if (_correctionLpnId == lpn.Id)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudText>Поправка количества проводится в исходном месте приёмки. SKU и срок годности сохраняются.</MudText>
+                        <MudNumericField T="decimal?" @bind-Value="_correctionQuantity" Label="Новое количество" Min="0" HideSpinButtons="true" />
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                                   Disabled="@(_busy || _correctionQuantity is null || _correctionQuantity < 0)"
+                                   OnClick="CorrectLpnAsync">Провести поправку</MudButton>
+                    }
+                    @if (_deletionLpnId == lpn.Id && _deletionPreview is { } preview)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2">Обратные движения по исходным адресам</MudText>
+                        <table class="mud-table mud-table-dense w-100">
+                            <thead><tr><th>Откуда</th><th>Куда</th><th>SKU</th><th>Срок годности</th><th>Количество</th></tr></thead>
+                            <tbody>
+                            @foreach (var movement in preview.Reversals)
+                            {
+                                <tr>
+                                    <td>@(movement.SourceAddress ?? "Вне склада")</td>
+                                    <td>@(movement.DestinationAddress ?? "Вне склада")</td>
+                                    <td>@SkuName(movement.StockKeepingUnitId)</td>
+                                    <td>@(movement.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
+                                    <td>@Format(movement.Quantity)</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                        <MudText Typo="Typo.subtitle2" Class="mt-2">Прогноз остатков после удаления</MudText>
+                        <table class="mud-table mud-table-dense w-100">
+                            <thead><tr><th>Ячейка</th><th>SKU</th><th>Срок годности</th><th>Сейчас</th><th>После</th></tr></thead>
+                            <tbody>
+                            @foreach (var balance in preview.Balances)
+                            {
+                                <tr>
+                                    <td>@balance.Address</td>
+                                    <td>@SkuName(balance.StockKeepingUnitId)</td>
+                                    <td>@(balance.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
+                                    <td>@Format(balance.Before)</td>
+                                    <td>
+                                        @if (balance.After < 0)
+                                        {
+                                            <MudText Color="Color.Error">@Format(balance.After)</MudText>
+                                        }
+                                        else
+                                        {
+                                            @Format(balance.After)
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                        @if (preview.RequiresNegativeConfirmation)
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mt-2">После удаления появятся отрицательные остатки.</MudAlert>
+                            <label><input type="checkbox" @bind="_confirmNegative" /> Подтверждаю отрицательные остатки по указанным ячейкам</label>
+                        }
+                        <MudButton Class="mt-2" Color="Color.Error" Variant="Variant.Filled"
+                                   Disabled="@(_busy || preview.RequiresNegativeConfirmation && !_confirmNegative)"
+                                   OnClick="DeleteLpnAsync">Подтвердить удаление LPN</MudButton>
+                    }
+                    @if (_canManage && lpn.Status == LicensePlateNumberStatus.Deleted
+                        && _deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2">История удаления · обратные движения</MudText>
+                        <table class="mud-table mud-table-dense w-100">
+                            <thead><tr><th>Время</th><th>Пользователь</th><th>Откуда</th><th>Куда</th><th>SKU</th><th>Срок годности</th><th>Количество</th><th>Исходное движение</th></tr></thead>
+                            <tbody>
+                            @foreach (var movement in history)
+                            {
+                                <tr>
+                                    <td>@(movement.PostedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
+                                    <td>@movement.ConfirmedBy</td>
+                                    <td>@(movement.SourceAddress ?? "Вне склада")</td>
+                                    <td>@(movement.DestinationAddress ?? "Вне склада")</td>
+                                    <td>@SkuName(movement.SkuId)</td>
+                                    <td>@(movement.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
+                                    <td>@Format(movement.Quantity)</td>
+                                    <td>@movement.OriginalMovementId</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
                     }
                 </MudPaper>
             }

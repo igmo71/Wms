@@ -22,6 +22,12 @@ public sealed record ReceivingWorkLpnView(
     IReadOnlyList<ReceivingWorkLpnItemView> Items,
     IReadOnlyList<ReceivingWorkPutawayView> Putaways);
 
+public sealed record ReceivingLpnReversalHistoryView(
+    Guid LpnId, Guid MovementId, Guid OriginalMovementId,
+    string? SourceAddress, string? DestinationAddress,
+    Guid SkuId, DateOnly? ExpirationDate, decimal Quantity,
+    DateTimeOffset? PostedAtUtc, string? ConfirmedBy);
+
 public sealed record ReceivingWorkOrderView(
     Guid Id, string? Number, Guid WarehouseId, ReceivingOrderStatus Status,
     int? ActiveCycleNumber, Guid? ReceivingLocationId, bool IsParticipant,
@@ -43,6 +49,8 @@ public interface IReceivingWorkQueryStore
         Guid refKey, string userId, CancellationToken ct);
     Task<ReceivingWorkLpnView?> GetLpnAsync(
         Guid? lpnId, string? code, CancellationToken ct);
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>>
+        GetDeletionHistoryAsync(Guid orderId, CancellationToken ct);
     Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
         GetPutawayRecommendationsAsync(
             Guid warehouseId, Guid skuId, CancellationToken ct);
