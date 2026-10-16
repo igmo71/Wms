@@ -80,6 +80,95 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Receiving_dates_remain_separate_at_one_destination_and_null_has_one_sql_key()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var dates = new[] { new DateOnly(2027, 1, 10), new DateOnly(2027, 2, 10) };
+        var batch = Value(LicensePlateNumberBatch.Issue(2, "close-test", DateTimeOffset.UtcNow));
+        var datedLpnIds = batch.Labels.Select(x => x.Id).ToArray();
+        var storageZone = Zone(state.WarehouseId, "DT", ZoneType.Storage);
+        var destination = Location(state.WarehouseId, storageZone, 2);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(batch, storageZone, destination);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var prepare = database.CreateDbContext())
+        {
+            var order = await prepare.ReceivingOrders
+                .Include(x => x.Cycles).Include(x => x.Participants)
+                .Include(x => x.Items).Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items).SingleAsync(x => x.Id == state.OrderId);
+            for (var index = 0; index < dates.Length; index++)
+            {
+                var lpn = await prepare.LicensePlateNumbers.Include(x => x.Items)
+                    .SingleAsync(x => x.Id == datedLpnIds[index]);
+                Assert.True(Value(order.OpenReceivingLpn(lpn, "close-test", DateTimeOffset.UtcNow)));
+                Success(order.EditReceivingLpn(lpn, state.SkuId, dates[index], 1m,
+                    "close-test", DateTimeOffset.UtcNow, false));
+                prepare.LicensePlateNumberItems.Add(Assert.Single(lpn.Items));
+            }
+            await prepare.SaveChangesAsync();
+        }
+
+        Guid[] lpnIds = [state.LpnId, .. datedLpnIds];
+        foreach (var lpnId in lpnIds)
+            Value(await CloseThroughFoundationAsync(database, state with { LpnId = lpnId }, Guid.NewGuid()));
+
+        var putaway = new PutAwayReceivingLpn(
+            new NewCommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingWorkStore(database),
+            new NewPostInventoryMovement.Handler(new InventoryPostingStore()),
+            new WarehousePermission(new PutawayPermission()), TimeProvider.System);
+        var undatedItemId = Guid.Empty;
+        foreach (var lpnId in lpnIds)
+        {
+            Guid itemId;
+            await using (var lookup = database.CreateDbContext())
+                itemId = await lookup.LicensePlateNumberItems
+                    .Where(x => x.LicensePlateNumberId == lpnId)
+                    .Select(x => x.Id).SingleAsync();
+            if (lpnId == state.LpnId) undatedItemId = itemId;
+            Value(await putaway.ExecuteAsync(new PutAwayReceivingLpnCommand(
+                Guid.NewGuid(), lpnId, itemId, destination.Id, 1m, "close-test")));
+        }
+        Value(await putaway.ExecuteAsync(new PutAwayReceivingLpnCommand(
+            Guid.NewGuid(), state.LpnId, undatedItemId, destination.Id, 1m, "close-test")));
+
+        await using (var verify = database.CreateDbContext())
+        {
+            var balances = await verify.InventoryBalances.Where(x =>
+                x.WarehouseId == state.WarehouseId
+                && x.StorageLocationId == destination.Id
+                && x.StockKeepingUnitId == state.SkuId).ToListAsync();
+            Assert.Equal(3, balances.Count);
+            Assert.Equal(2m, Assert.Single(balances, x => x.ExpirationDate is null).Quantity);
+            foreach (var date in dates)
+                Assert.Equal(1m, Assert.Single(balances, x => x.ExpirationDate == date).Quantity);
+
+            for (var index = 0; index < dates.Length; index++)
+            {
+                var movements = await verify.InventoryMovements.Where(x =>
+                    x.LicensePlateNumberId == datedLpnIds[index]).ToListAsync();
+                Assert.Equal(2, movements.Count);
+                Assert.All(movements, x => Assert.Equal(dates[index], x.ExpirationDate));
+                var movementIds = movements.Select(x => x.Id).ToArray();
+                var turnovers = await verify.InventoryTurnovers.Where(x =>
+                    movementIds.Contains(x.InventoryMovementId)).ToListAsync();
+                Assert.Equal(3, turnovers.Count);
+                Assert.All(turnovers, x => Assert.Equal(dates[index], x.ExpirationDate));
+            }
+        }
+
+        await using var duplicate = database.CreateDbContext();
+        duplicate.InventoryBalances.Add(Value(InventoryBalance.Create(Guid.NewGuid(),
+            state.WarehouseId, destination.Id, state.SkuId, 1m,
+            DateTimeOffset.UtcNow, null)));
+        await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task New_receiving_close_replay_commits_one_complete_stock_and_audit_set()
     {
         var state = await SeedNewOpenReceivingLpnAsync();
