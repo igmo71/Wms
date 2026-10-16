@@ -20,10 +20,15 @@ receipt. It uses the current version plan on success or the last numeric order
 plan, marked unconfirmed, on failure. Closing a positive single-SKU LPN posts
 one movement to its original receiving location, updates the checked order
 fact, and saves audit and command receipt atomically. Plan excess or an unknown
-plan requires `Manager`; a past expiration date requires explicit confirmation.
+plan requires `Manager`.
 Concurrent changes to the plan, SKU expiration flag, source version, order or
 LPN reject the staged close. A Web Manager or responsible Mobile participant can
 close an open receiving LPN through this use case.
+An open LPN may retain quantity while its date is still unset; closing a
+positive LPN with the current SKU flag enabled requires the date. A date before
+the UTC calendar day of closing requires explicit confirmation by the closing
+user, without a higher role; today's date does not. The chosen date and any
+confirmation are retained in the receipt movement and close audit.
 
 The new Application putaway use case moves a positive part of a closed receiving
 LPN from its original receiving location to a Storage location, even while the

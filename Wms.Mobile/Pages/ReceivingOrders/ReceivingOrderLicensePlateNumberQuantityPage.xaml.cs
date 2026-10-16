@@ -53,9 +53,14 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
             UnitLabel.Text = sku.UnitOfMeasure ?? "—";
             QuantityEntry.Text = item?.Quantity.ToString("0.###", CultureInfo.InvariantCulture);
             ExpirationPanel.IsVisible = sku.TracksExpirationDate || item?.ExpirationDate is not null;
+            ExpirationHintLabel.Text = sku.TracksExpirationDate
+                ? "Для закрытия LPN с положительным количеством укажите срок годности."
+                : "Сохранённый срок годности не удаляется при выключении его учёта.";
             ExpirationSwitch.IsToggled = item?.ExpirationDate is not null;
             if (item?.ExpirationDate is DateOnly date)
                 ExpirationPicker.Date = date.ToDateTime(TimeOnly.MinValue);
+            else
+                ExpirationPicker.Date = DateTime.Today;
             ExpirationPicker.IsVisible = ExpirationSwitch.IsToggled;
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
@@ -130,6 +135,9 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
     {
         _busy = busy;
         ProgressIndicator.IsVisible = busy;
+        QuantityEntry.IsEnabled = !busy && !_process.HasPendingCommand;
+        ExpirationSwitch.IsEnabled = QuantityEntry.IsEnabled;
+        ExpirationPicker.IsEnabled = QuantityEntry.IsEnabled;
         ApplyButton.IsEnabled = !busy && !_process.HasPendingCommand;
         RetryCommandButton.IsVisible = _process.HasPendingCommand;
         RetryCommandButton.IsEnabled = !busy;

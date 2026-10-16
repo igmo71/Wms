@@ -218,11 +218,12 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn || _busy) return;
         if (lpn.Items.Count == 0 || lpn.Items.All(x => x.Quantity <= 0)) return;
         var expired = lpn.Items.Any(x => x.ExpirationDate is DateOnly date
-            && date < DateOnly.FromDateTime(DateTime.Today));
+            && date < DateOnly.FromDateTime(DateTime.UtcNow));
         if (expired && !await DisplayAlertAsync("Прошедший срок",
                 "Срок годности прошёл. Подтвердить закрытие LPN?", "Подтвердить", "Назад")) return;
         if (!await DisplayAlertAsync("Провести приход", $"Закрыть {lpn.Code} и провести количество?", "Да", "Нет")) return;
-        await ExecuteAsync(async () => Apply(await _process.CloseLpnAsync(_orderId, _lpnId, expired, null)));
+        await ExecuteAsync(async () => Apply(await _process.CloseLpnAsync(_orderId, _lpnId, expired, null)),
+            refreshOnConflict: true);
         if (_process.HasPendingCommand || _process.LastCloseResult is null) return;
         var result = _process.LastCloseResult;
         if (!result.SourceCheckSucceeded)
@@ -247,13 +248,24 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         await Navigation.PushAsync(page);
     }
 
-    private async Task ExecuteAsync(Func<Task> action)
+    private async Task ExecuteAsync(Func<Task> action, bool refreshOnConflict = false)
     {
         if (_busy || _process.HasPendingCommand) return;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try { await action(); }
-        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; _pendingSkuId = null; }
+        catch (MobileApiException ex)
+        {
+            _pendingSkuId = null;
+            if (refreshOnConflict && ex.Code == "request_conflict")
+            {
+                try { Apply(await _orders.GetAsync(_orderId)); }
+                catch (MobileApiException) { }
+                catch (HttpRequestException) { }
+                ErrorLabel.Text = $"{ex.Message} Проверьте актуальные данные SKU и дату срока перед повтором.";
+            }
+            else ErrorLabel.Text = ex.Message;
+        }
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         catch (InvalidOperationException ex) { ErrorLabel.Text = ex.Message; }
         finally { SetBusy(false); UpdateRecovery(); await UpdateCameraAsync(); }

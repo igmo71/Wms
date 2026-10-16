@@ -87,6 +87,51 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Current_expiration_flag_blocks_undated_close_and_past_date_needs_confirmation()
+    {
+        var state = await SeedAsync(5m, 3m);
+        await using (var update = database.CreateDbContext())
+        {
+            var sku = await update.StockKeepingUnits.SingleAsync(x => x.Id == state.SkuId);
+            sku.SetExpirationTracking(true);
+            await update.SaveChangesAsync();
+        }
+
+        var close = Handler(state.Reader);
+        var missingDate = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
+        var missing = await close.ExecuteAsync(missingDate);
+        Error(missing, OperationErrorType.Conflict);
+        Assert.Contains("укажите дату", missing.Error!.Message, StringComparison.OrdinalIgnoreCase);
+
+        var expiredDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+        var edit = new EditReceivingLpn(
+            new CommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingWorkStore(database),
+            new WarehousePermission(new ReceivingPermission()), TimeProvider.System);
+        Value(await edit.ExecuteAsync(new EditReceivingLpnRequest(
+            Guid.NewGuid(), state.OrderId, state.LpnId,
+            state.SkuId, 3m, expiredDate, "operator-test")));
+
+        var noConfirmation = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
+        Error(await close.ExecuteAsync(noConfirmation), OperationErrorType.Conflict);
+        var confirmed = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test", ConfirmExpiredDate: true);
+        Assert.True(Value(await close.ExecuteAsync(confirmed)).ExpiredDateConfirmed);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(expiredDate, (await verify.InventoryMovements.SingleAsync(x =>
+            x.LicensePlateNumberId == state.LpnId)).ExpirationDate);
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.RequestId == missingDate.RequestId || x.RequestId == noConfirmation.RequestId));
+        var audit = await verify.WarehouseAuditEvents.SingleAsync(x =>
+            x.RequestId == confirmed.RequestId && x.CommandType == "receiving.lpn.close");
+        using var values = JsonDocument.Parse(audit.AfterValuesJson!);
+        Assert.True(values.RootElement.GetProperty("ExpiredDateConfirmed").GetBoolean());
+    }
+
+    [Fact]
     public async Task Source_version_change_before_commit_rejects_every_close_effect()
     {
         var state = await SeedAsync(5m, 3m);

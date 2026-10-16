@@ -94,7 +94,8 @@ public sealed class CloseReceivingLpn(
 
                 var now = clock.GetUtcNow();
                 if (sku.TracksExpirationDate && item.ExpirationDate is null)
-                    return OperationError.Conflict("Для этого SKU требуется дата срока годности.");
+                    return OperationError.Conflict(
+                        "Учёт срока годности SKU включён. Обновите LPN и укажите дату перед закрытием.");
                 var expired = item.ExpirationDate is DateOnly date
                     && date < DateOnly.FromDateTime(now.UtcDateTime);
                 if (expired && !command.ConfirmExpiredDate)

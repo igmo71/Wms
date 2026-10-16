@@ -25,6 +25,11 @@ sources create one WMS order. A participant scans an issued LPN, selects or
 globally scans its SKU, enters a positive quantity and may close it. The order
 page offers zero checking and direct putaway of closed LPNs before order
 completion. Closing and putaway use separate retry-safe commands.
+The Mobile quantity page shows the date field when the current SKU flag is on
+or a date was already saved on the open LPN. It retains and displays that saved
+date after the flag is turned off. If closing is rejected after the flag or
+another closing input changes, the LPN page refreshes its server view and
+prompts the user to check the date before retrying.
 
 Web `/receiving-orders` lists unlinked 1C sources separately from WMS orders.
 Operators and Managers can select several sources of one warehouse, inspect
