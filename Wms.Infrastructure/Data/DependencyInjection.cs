@@ -36,6 +36,9 @@ public static class DependencyInjection
         services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();
         services.AddScoped<CreateReceivingOrder>();
         services.AddScoped<GetReceivingSources>();
+        services.AddScoped<IReceivingOrderSourceChangeStore, ReceivingOrderSourceChangeStore>();
+        services.AddScoped<ChangeReceivingOrderSources>();
+        services.AddScoped<ResynchronizeReceivingOrder>();
         services.AddScoped<IReceivingSkuStore, ReceivingSkuStore>();
         services.AddScoped<SearchReceivingSku>();
         services.AddScoped<AddReceivingOrderSku>();

@@ -22,11 +22,13 @@ public interface IReceivingSourceStore
 {
     Task<OperationResult<ReceivingSourceVersion>> SaveSuccessfulAsync(
         ParsedReceivingSource source, string snapshotJson, string fingerprint,
-        DateTimeOffset checkedAtUtc, CancellationToken ct);
+        DateTimeOffset checkedAtUtc, ReceivingSourceCheckAudit? audit, CancellationToken ct);
 
     Task RecordFailureAsync(Guid refKey, string error, DateTimeOffset attemptedAtUtc,
-        CancellationToken ct);
+        ReceivingSourceCheckAudit? audit, CancellationToken ct);
 }
+
+public sealed record ReceivingSourceCheckAudit(Guid OrderId, string UserId);
 
 public sealed class SynchronizeReceivingSource(
     IReceivingSourceReader reader,
@@ -35,34 +37,38 @@ public sealed class SynchronizeReceivingSource(
     TimeProvider clock)
 {
     public async Task<OperationResult<ReceivingSourceVersion>> ExecuteAsync(
-        Guid refKey, CancellationToken ct = default)
+        Guid refKey, CancellationToken ct = default) =>
+        await ExecuteAsync(refKey, null, ct);
+
+    public async Task<OperationResult<ReceivingSourceVersion>> ExecuteAsync(
+        Guid refKey, ReceivingSourceCheckAudit? audit, CancellationToken ct = default)
     {
         if (refKey == Guid.Empty)
             return OperationError.Invalid("Ref_Key приходного документа 1С обязателен.");
 
         var read = await reader.ReadAsync(refKey, ct);
         if (!read.IsSuccess)
-            return await FailAsync(refKey, read.Error!, ct);
+            return await FailAsync(refKey, read.Error!, audit, ct);
 
         var response = read.Value!;
         if (response.RefKey != refKey)
             return await FailAsync(refKey,
-                OperationError.Failure("1С вернула другой приходный документ."), ct);
+                OperationError.Failure("1С вернула другой приходный документ."), audit, ct);
 
         var parsed = parser.Parse(refKey, response.RawResponseJson);
         if (!parsed.IsSuccess)
-            return await FailAsync(refKey, parsed.Error!, ct);
+            return await FailAsync(refKey, parsed.Error!, audit, ct);
 
         var fingerprint = Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes(response.RawResponseJson)));
         return await store.SaveSuccessfulAsync(parsed.Value!, response.RawResponseJson, fingerprint,
-            clock.GetUtcNow(), ct);
+            clock.GetUtcNow(), audit, ct);
     }
 
     private async Task<OperationResult<ReceivingSourceVersion>> FailAsync(
-        Guid refKey, OperationError error, CancellationToken ct)
+        Guid refKey, OperationError error, ReceivingSourceCheckAudit? audit, CancellationToken ct)
     {
-        await store.RecordFailureAsync(refKey, error.Message, clock.GetUtcNow(), ct);
+        await store.RecordFailureAsync(refKey, error.Message, clock.GetUtcNow(), audit, ct);
         return error;
     }
 }

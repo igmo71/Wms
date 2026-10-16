@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Receiving;
 using Wms.Common;
@@ -13,7 +14,7 @@ public sealed class ReceivingSourceStore(
 {
     public async Task<OperationResult<ReceivingSourceVersion>> SaveSuccessfulAsync(
         ParsedReceivingSource parsed, string snapshotJson, string fingerprint,
-        DateTimeOffset checkedAtUtc, CancellationToken ct)
+        DateTimeOffset checkedAtUtc, ReceivingSourceCheckAudit? audit, CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         await using var transaction = await context.Database.BeginTransactionAsync(
@@ -24,6 +25,9 @@ public sealed class ReceivingSourceStore(
             return source.Error!;
 
         var document = source.Value!;
+        if (audit is not null && !await IsLinkedToOrderAsync(
+                context, document.Id, audit.OrderId, ct))
+            return OperationError.Conflict("Состав источников ордера изменился во время сверки.");
         var version = document.LastSuccessfulVersionId is Guid versionId
             ? await context.ReceivingSourceVersions.Include(x => x.Lines)
                 .SingleAsync(x => x.Id == versionId, ct)
@@ -75,6 +79,10 @@ public sealed class ReceivingSourceStore(
             context, document, parsed, projections, ct);
         if (!planUpdate.IsSuccess)
             return planUpdate.Error!;
+
+        if (audit is not null)
+            context.WarehouseAuditEvents.Add(CreateCheckAudit(document, checkedAtUtc,
+                audit, true, null, version.Id));
 
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -135,7 +143,8 @@ public sealed class ReceivingSourceStore(
     }
 
     public async Task RecordFailureAsync(
-        Guid refKey, string error, DateTimeOffset attemptedAtUtc, CancellationToken ct)
+        Guid refKey, string error, DateTimeOffset attemptedAtUtc,
+        ReceivingSourceCheckAudit? audit, CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         await using var transaction = await context.Database.BeginTransactionAsync(
@@ -146,9 +155,36 @@ public sealed class ReceivingSourceStore(
         var recorded = source.Value!.RecordFailedCheck(attemptedAtUtc, error);
         if (!recorded.IsSuccess)
             throw new InvalidOperationException(recorded.Error!.Message);
+        if (audit is not null)
+            context.WarehouseAuditEvents.Add(CreateCheckAudit(source.Value!, attemptedAtUtc,
+                audit, false, error, null));
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
     }
+
+    private static WarehouseAuditEvent CreateCheckAudit(
+        ReceivingSourceDocument source, DateTimeOffset atUtc,
+        ReceivingSourceCheckAudit audit, bool succeeded, string? error, Guid? versionId)
+    {
+        var created = WarehouseAuditEvent.Create(
+            "receiving.order.source-manual-check", atUtc, audit.UserId, null,
+            audit.OrderId, null, null, source.Id, null,
+            JsonSerializer.Serialize(new
+            {
+                succeeded,
+                error = error is { Length: > 1000 } ? error[..1000] : error,
+                source.LastSuccessfulCheckAtUtc
+            }),
+            sourceVersionIds: versionId is Guid id ? [id] : null);
+        return created.IsSuccess ? created.Value!
+            : throw new InvalidOperationException(created.Error!.Message);
+    }
+
+    private static Task<bool> IsLinkedToOrderAsync(
+        ApplicationDbContext context, Guid sourceId, Guid orderId, CancellationToken ct) =>
+        context.ReceivingOrderSourceLinks.AnyAsync(x =>
+            x.ReceivingSourceDocumentId == sourceId && x.ReceivingOrderId == orderId
+            && x.DetachedAtUtc == null, ct);
 
     private static async Task<OperationResult<ReceivingSourceDocument>> GetOrCreateAsync(
         ApplicationDbContext context, Guid refKey, CancellationToken ct)

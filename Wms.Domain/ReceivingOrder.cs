@@ -62,6 +62,8 @@ public class ReceivingOrder
     public IReadOnlyCollection<ReceivingOrderSourceLink> SourceLinks => _sourceLinks;
     public IReadOnlyCollection<ReceivingCycle> Cycles => _cycles;
 
+    public void RecordSourceCompositionChange() => AdvanceOperationalRevision();
+
     public OperationResult<IReadOnlyList<ReceivingOrderItem>> ApplyCurrentSourcePlan(
         IReadOnlyDictionary<Guid, decimal?> planBySku)
     {

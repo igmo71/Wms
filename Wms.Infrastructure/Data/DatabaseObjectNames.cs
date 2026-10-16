@@ -19,4 +19,6 @@ public static class DatabaseObjectNames
     public const string ReceivingOrderItemsPrimaryKey = "PK_ReceivingOrderItems";
     public const string ReceivingCycleParticipantIndex =
         "IX_ReceivingOrderParticipants_ReceivingCycleId_UserId";
+    public const string ReceivingSourceActiveLinkIndex =
+        "IX_ReceivingOrderSourceLinks_ReceivingSourceDocumentId";
 }

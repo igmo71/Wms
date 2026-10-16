@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Authorization;
+using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
 using Wms.Common;
 using Wms.Data;
@@ -12,6 +14,71 @@ namespace Wms.Tests.Receiving;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class ReceivingOrderCreationTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task Changing_sources_rebuilds_plan_and_last_detach_keeps_order_visible()
+    {
+        var warehouseId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var firstKey = Guid.NewGuid();
+        var secondKey = Guid.NewGuid();
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.Warehouses.Add(new Warehouse { Id = warehouseId, Name = "Changing sources" });
+            seed.StockKeepingUnits.Add(new StockKeepingUnit { Id = skuId, Name = "Source SKU" });
+            await seed.SaveChangesAsync();
+        }
+
+        var responses = new Dictionary<Guid, string>
+        {
+            [firstKey] = Source(firstKey, warehouseId, $$"""
+                [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":2}]
+                """),
+            [secondKey] = Source(secondKey, warehouseId, $$"""
+                [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":3}]
+                """)
+        };
+        var parser = new ReceivingSourceParser();
+        var synchronization = new SynchronizeReceivingSource(
+            new StubReader(responses), parser,
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
+        Assert.True((await synchronization.ExecuteAsync(firstKey)).IsSuccess);
+        var orderId = Value(await new CreateReceivingOrder(
+            new ReceivingOrderStore(database), parser, TimeProvider.System)
+            .ExecuteAsync([firstKey]));
+        var query = new ReceivingWorkQueryStore(database);
+        var change = new ChangeReceivingOrderSources(
+            new CommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingOrderSourceChangeStore(), query, parser, synchronization,
+            new WarehousePermission(new ManagerPermission()), TimeProvider.System);
+
+        async Task ChangeAsync(Guid key, ReceivingSourceChangeKind kind)
+        {
+            var result = await change.ExecuteAsync(new ChangeReceivingOrderSourcesRequest(
+                Guid.NewGuid(), orderId, key, "manager", kind,
+                ReceivingSourceChangeChannel.Web));
+            Assert.Equal(orderId, Value(result));
+        }
+
+        await ChangeAsync(secondKey, ReceivingSourceChangeKind.Attach);
+        await using (var attached = database.CreateDbContext())
+            Assert.Equal(5m, (await attached.ReceivingOrderItems.SingleAsync(x =>
+                x.ReceivingOrderId == orderId && x.StockKeepingUnitId == skuId))
+                .CurrentPlanQuantity);
+
+        await ChangeAsync(firstKey, ReceivingSourceChangeKind.Detach);
+        await ChangeAsync(secondKey, ReceivingSourceChangeKind.Detach);
+        await using var verify = database.CreateDbContext();
+        var item = await verify.ReceivingOrderItems.SingleAsync(x =>
+            x.ReceivingOrderId == orderId && x.StockKeepingUnitId == skuId);
+        Assert.Equal(0m, item.CurrentPlanQuantity);
+        Assert.Null(item.FactQuantity);
+        Assert.Empty((await query.GetOrderAsync(orderId, "manager", default))!.SourceRefKeys);
+        Assert.Equal(3, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "receiving.order.change-sources"));
+        Assert.Equal(3, await verify.WarehouseAuditEvents.CountAsync(x =>
+            x.ReceivingOrderId == orderId && x.CommandType == "receiving.order.change-sources"));
+    }
+
     [Fact]
     public async Task Several_sources_create_one_order_with_distinct_links_and_aggregated_sku_plan()
     {
@@ -120,5 +187,14 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         public Task<OperationResult<ReceivingSourceRead>> ReadAsync(Guid refKey, CancellationToken ct) =>
             Task.FromResult<OperationResult<ReceivingSourceRead>>(
                 new ReceivingSourceRead(refKey, responses[refKey]));
+    }
+
+    private sealed class ManagerPermission : IWarehousePermissionStore
+    {
+        public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(true);
+
+        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(true);
     }
 }

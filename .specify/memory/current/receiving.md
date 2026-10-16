@@ -25,6 +25,24 @@ revision. A failed check retains the last successful plan and records the
 attempt error. Source changes do not rewrite the WMS warehouse, fact, LPNs,
 movements or order status.
 
+The new Application use case permits an Operator or Manager to attach a freshly
+checked 1C source to an unfinished order when its warehouse matches the fixed
+WMS warehouse. An Operator may detach a source before the first posted receiving
+LPN; later, and after order completion, the use case requires a Manager and a
+Web caller. Each
+change retains the link history and recomputes the aggregate plan in the same
+command as audit and receipt. It leaves received quantities, movements and
+order status intact. Detaching the last source keeps known SKU rows with zero
+plan; the order remains visible with an empty active source list.
+
+The new Application use case supports a Manager's fresh check of every linked
+source, including on a completed order. The result distinguishes an order with
+no active sources and
+reports each source's last successful check and latest attempt error. A failed
+check retains the last successful plan; manual attempts are audited with their
+source updates. Client actions for changing links and manually refreshing an
+order are still to be connected.
+
 The new Application close use case refreshes every linked 1C source before
 receipt. It uses the current version plan on success or the last numeric order
 plan, marked unconfirmed, on failure. Closing a positive single-SKU LPN posts

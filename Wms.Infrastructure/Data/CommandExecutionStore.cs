@@ -74,6 +74,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingOrderItemsPrimaryKey,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingCycleParticipantIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ReceivingSourceActiveLinkIndex,
                             StringComparison.Ordinal)))
                     return true;
             }
