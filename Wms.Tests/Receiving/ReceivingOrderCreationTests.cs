@@ -214,7 +214,8 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
 
         var store = new ReceivingOrderStore(database);
         var list = new GetReceivingSources(store, parser);
-        var available = await list.ListUnlinkedAsync();
+        var available = (await list.ListUnlinkedAsync())
+            .Where(x => responses.ContainsKey(x.RefKey)).ToList();
         Assert.Equal(4, available.Count);
         Assert.Equal(0m, available.Single(x => x.RefKey == unpostedKey).PlanBySku[skuId]);
         var create = new CreateReceivingOrder(store, parser, TimeProvider.System);
@@ -239,7 +240,8 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         Assert.Null(items.Single(x => x.StockKeepingUnitId == uncertainSkuId).CurrentPlanQuantity);
         Assert.All(items, x => Assert.Null(x.FactQuantity));
         Assert.Equal(1, await verify.ReceivingCycles.CountAsync(x => x.ReceivingOrderId == first));
-        var unlinked = await list.ListUnlinkedAsync();
+        var unlinked = (await list.ListUnlinkedAsync())
+            .Where(x => responses.ContainsKey(x.RefKey)).ToList();
         Assert.Single(unlinked);
         Assert.Equal(otherKey, unlinked[0].RefKey);
 

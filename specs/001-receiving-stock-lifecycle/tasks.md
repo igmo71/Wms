@@ -117,7 +117,7 @@
 
 - [x] T037 Удалить оставшийся невызваемый код прежнего проведения при завершении ордера и возобновления закрытой LPN из `Wms/Application/ReceivingOrders/ReceivingOrderCommandService.cs`, `Wms/Application/ReceivingOrders/ReceivingCommands.cs`, `Wms/Application/LicensePlateNumbers/LicensePlateNumberService.cs` и `Wms/Application/LicensePlateNumbers/LicensePlateNumberPutawayService.cs`; удалить устаревшие элементы из `Wms.Contracts/Mobile/V1/MobileReceivingOrderContracts.cs` и `Wms.WebApp/Components/Pages/ReceivingOrderPages/ReceivingInProgressView.razor`, сохраняя методы, которые еще нужны другим устаревшим процессам.
 - [x] T038 Сверить итоговый код с `spec.md` и `quickstart.md`, актуализировать только реализованные правила в `.specify/memory/current/receiving.md`, `.specify/memory/current/inventory.md`, `.specify/memory/current/integration.md` и `.specify/memory/architecture.md`, а оставшиеся зависимости отбора, отгрузки, перемещений и инвентаризации оставить в `.specify/memory/backlog.md`; не объявлять готовым промышленное использование старых процессов.
-- [ ] T039 Передать разработчику минимальные команды адресных тестов и сборки для `Wms.Tests/Wms.Tests.csproj` и `Wms.slnx`, инструкции ручной проверки Mobile/Web/1С из `specs/001-receiving-stock-lifecycle/quickstart.md`; проверить сообщенные результаты и исправить только выявленные дефекты.
+- [x] T039 Передать разработчику минимальные команды адресных тестов и сборки для `Wms.Tests/Wms.Tests.csproj` и `Wms.slnx`, инструкции ручной проверки Mobile/Web/1С из `specs/001-receiving-stock-lifecycle/quickstart.md`; проверить сообщенные результаты и исправить только выявленные дефекты.
 
 ## Dependencies
 
