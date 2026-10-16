@@ -145,7 +145,8 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
         {
             state.Reader.Quantity = 2m;
             var sync = new SynchronizeReceivingSource(state.Reader,
-                new ReceivingSourceParser(), new ReceivingSourceStore(database), TimeProvider.System);
+                new ReceivingSourceParser(),
+                new ReceivingSourceStore(database, new ReceivingSourceParser()), TimeProvider.System);
             Assert.True((await sync.ExecuteAsync(state.SourceKey)).IsSuccess);
         }
         finally
@@ -176,7 +177,7 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
             new CommandExecutor(new CommandExecutionStore(factory)),
             new ReceivingWorkStore(factory),
             new SynchronizeReceivingSource(reader, new ReceivingSourceParser(),
-                new ReceivingSourceStore(database), TimeProvider.System),
+                new ReceivingSourceStore(database, new ReceivingSourceParser()), TimeProvider.System),
             new ReceivingSourceParser(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
             new WarehousePermission(new ReceivingPermission()), TimeProvider.System);
@@ -199,7 +200,7 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
         }
         var parser = new ReceivingSourceParser();
         var sync = new SynchronizeReceivingSource(reader, parser,
-            new ReceivingSourceStore(database), TimeProvider.System);
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
         Assert.True((await sync.ExecuteAsync(sourceKey)).IsSuccess);
         var orderId = Value(await new CreateReceivingOrder(
             new ReceivingOrderStore(database), parser, TimeProvider.System)

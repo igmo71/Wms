@@ -18,6 +18,9 @@ unsupported quantities and unknown SKU retain reasons without hiding valid
 quantities of other SKU. A failed read or unreadable response records the last
 attempt error without replacing the successful version. The notification path
 uses this synchronization before the legacy receiving adapter maps the response.
+For linked new WMS orders, successful source checks also update the current plan
+as described in [receiving.md](receiving.md). The synchronization assessment and
+protected-plan rules below describe the legacy 1C-backed order path.
 
 Before warehouse work starts, an admissible source document remains owned by
 1C. While WMS and 1C remain in matching initial states, synchronization replaces

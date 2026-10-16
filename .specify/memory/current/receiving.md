@@ -15,6 +15,16 @@ starts unchecked. The source versions and active links are checked again in the
 save transaction; repeating the same complete source selection returns the
 existing order. Web can now create the order from several unlinked sources.
 
+Each successful later source check recomputes the linked WMS order's current
+plan from all active source links in the same transaction as the source version.
+An unposted, deletion-marked or different-warehouse source contributes zero;
+unknown source metadata or quantity makes only affected known SKU plans unknown.
+Former SKU rows remain with zero when their contribution disappears, and newly
+known SKU rows are added. Repeated identical checks do not advance the order
+revision. A failed check retains the last successful plan and records the
+attempt error. Source changes do not rewrite the WMS warehouse, fact, LPNs,
+movements or order status.
+
 The new Application close use case refreshes every linked 1C source before
 receipt. It uses the current version plan on success or the last numeric order
 plan, marked unconfirmed, on failure. Closing a positive single-SKU LPN posts

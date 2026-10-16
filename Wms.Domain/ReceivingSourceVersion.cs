@@ -16,12 +16,15 @@ public sealed class ReceivingSourceVersion
     public string SnapshotJson { get; private set; } = null!;
     public IReadOnlyCollection<ReceivingSourceLineProjection> Lines => _lines;
 
-    public ReceivingSourcePlan CalculatePlan()
+    public ReceivingSourcePlan CalculatePlan() => CalculatePlan(_lines);
+
+    public static ReceivingSourcePlan CalculatePlan(
+        IEnumerable<ReceivingSourceLineProjection> lines)
     {
         var quantitiesBySku = new Dictionary<Guid, decimal?>();
         var hasUnknownSku = false;
 
-        foreach (var line in _lines)
+        foreach (var line in lines)
         {
             if (line.StockKeepingUnitId is not Guid skuId)
             {

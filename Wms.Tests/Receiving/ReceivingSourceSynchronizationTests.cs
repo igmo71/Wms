@@ -33,7 +33,8 @@ public sealed class ReceivingSourceSynchronizationTests(SqlDatabase database)
 
         var reader = new StubReader(refKey, response);
         var useCase = new SynchronizeReceivingSource(
-            reader, new ReceivingSourceParser(), new ReceivingSourceStore(database), TimeProvider.System);
+            reader, new ReceivingSourceParser(),
+            new ReceivingSourceStore(database, new ReceivingSourceParser()), TimeProvider.System);
         Assert.True((await useCase.ExecuteAsync(refKey)).IsSuccess);
 
         await using (var first = database.CreateDbContext())

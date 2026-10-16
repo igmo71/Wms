@@ -21,9 +21,8 @@ public interface IReceivingSourceParser
 public interface IReceivingSourceStore
 {
     Task<OperationResult<ReceivingSourceVersion>> SaveSuccessfulAsync(
-        Guid refKey, string snapshotJson, string fingerprint,
-        IReadOnlyList<ReceivingSourceLine> lines, DateTimeOffset checkedAtUtc,
-        CancellationToken ct);
+        ParsedReceivingSource source, string snapshotJson, string fingerprint,
+        DateTimeOffset checkedAtUtc, CancellationToken ct);
 
     Task RecordFailureAsync(Guid refKey, string error, DateTimeOffset attemptedAtUtc,
         CancellationToken ct);
@@ -56,8 +55,8 @@ public sealed class SynchronizeReceivingSource(
 
         var fingerprint = Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes(response.RawResponseJson)));
-        return await store.SaveSuccessfulAsync(refKey, response.RawResponseJson, fingerprint,
-            parsed.Value!.Lines, clock.GetUtcNow(), ct);
+        return await store.SaveSuccessfulAsync(parsed.Value!, response.RawResponseJson, fingerprint,
+            clock.GetUtcNow(), ct);
     }
 
     private async Task<OperationResult<ReceivingSourceVersion>> FailAsync(
@@ -65,5 +64,46 @@ public sealed class SynchronizeReceivingSource(
     {
         await store.RecordFailureAsync(refKey, error.Message, clock.GetUtcNow(), ct);
         return error;
+    }
+}
+
+public static class ReceivingOrderPlanProjection
+{
+    public static IReadOnlyDictionary<Guid, decimal?> Sum(
+        Guid orderWarehouseId,
+        IEnumerable<(ParsedReceivingSource Source, ReceivingSourcePlan Plan)> sources)
+    {
+        var result = new Dictionary<Guid, decimal?>();
+        foreach (var (source, plan) in sources)
+        {
+            var inactive = source.Posted == false || source.DeletionMark == true
+                || source.WarehouseId is Guid warehouseId && warehouseId != orderWarehouseId;
+            var uncertain = !inactive && (source.Posted is null
+                || source.DeletionMark is null || source.WarehouseId is null);
+            foreach (var (skuId, quantity) in plan.QuantitiesBySku)
+            {
+                var contribution = inactive ? 0m : uncertain ? (decimal?)null : quantity;
+                if (!result.TryGetValue(skuId, out var previous))
+                {
+                    result[skuId] = contribution;
+                    continue;
+                }
+                if (previous is null || contribution is null)
+                {
+                    result[skuId] = null;
+                    continue;
+                }
+                try
+                {
+                    var sum = checked(previous.Value + contribution.Value);
+                    result[skuId] = WarehouseQuantity.IsNonNegative(sum) ? sum : null;
+                }
+                catch (OverflowException)
+                {
+                    result[skuId] = null;
+                }
+            }
+        }
+        return result;
     }
 }

@@ -62,6 +62,41 @@ public class ReceivingOrder
     public IReadOnlyCollection<ReceivingOrderSourceLink> SourceLinks => _sourceLinks;
     public IReadOnlyCollection<ReceivingCycle> Cycles => _cycles;
 
+    public OperationResult<IReadOnlyList<ReceivingOrderItem>> ApplyCurrentSourcePlan(
+        IReadOnlyDictionary<Guid, decimal?> planBySku)
+    {
+        if (planBySku is null || planBySku.Any(x => x.Key == Guid.Empty
+            || x.Value is decimal quantity && !WarehouseQuantity.IsNonNegative(quantity)))
+            return OperationError.Invalid("Текущий план источников содержит недопустимое количество.");
+
+        var changed = false;
+        foreach (var item in _items)
+        {
+            var quantity = planBySku.GetValueOrDefault(item.StockKeepingUnitId, 0m);
+            if (item.CurrentPlanQuantity == quantity)
+                continue;
+            var update = item.SetCurrentPlan(quantity);
+            if (!update.IsSuccess)
+                return update.Error!;
+            changed = true;
+        }
+
+        var added = new List<ReceivingOrderItem>();
+        foreach (var (skuId, quantity) in planBySku.Where(x =>
+            _items.All(item => item.StockKeepingUnitId != x.Key)))
+        {
+            var item = ReceivingOrderItem.CreateForSku(Id, skuId, quantity);
+            if (!item.IsSuccess)
+                return item.Error!;
+            _items.Add(item.Value!);
+            added.Add(item.Value!);
+            changed = true;
+        }
+        if (changed)
+            AdvanceOperationalRevision();
+        return added;
+    }
+
     public static OperationResult<ReceivingOrder> CreateNew(Guid warehouseId, DateTimeOffset createdAtUtc)
     {
         if (warehouseId == Guid.Empty || createdAtUtc == default)

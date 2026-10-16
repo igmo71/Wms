@@ -52,7 +52,7 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         };
         var parser = new ReceivingSourceParser();
         var synchronization = new SynchronizeReceivingSource(
-            new StubReader(responses), parser, new ReceivingSourceStore(database), TimeProvider.System);
+            new StubReader(responses), parser, new ReceivingSourceStore(database, parser), TimeProvider.System);
         foreach (var key in responses.Keys)
             Assert.True((await synchronization.ExecuteAsync(key)).IsSuccess);
 
@@ -86,6 +86,28 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         var unlinked = await list.ListUnlinkedAsync();
         Assert.Single(unlinked);
         Assert.Equal(otherKey, unlinked[0].RefKey);
+
+        var revision = (await verify.ReceivingOrders.SingleAsync(x => x.Id == first))
+            .OperationalRevision;
+        var firstSourceId = await verify.ReceivingSourceDocuments
+            .Where(x => x.RefKey == firstKey).Select(x => x.Id).SingleAsync();
+        responses[firstKey] = Source(firstKey, warehouseId, $$"""
+            [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":6},
+             {"LineNumber":"2","Номенклатура_Key":"{{uncertainSkuId}}","Количество":"unsupported"}]
+            """);
+        Assert.True((await synchronization.ExecuteAsync(firstKey)).IsSuccess);
+        Assert.True((await synchronization.ExecuteAsync(firstKey)).IsSuccess);
+        await using var updated = database.CreateDbContext();
+        Assert.Equal(2, await updated.ReceivingSourceVersions.CountAsync(x =>
+            x.ReceivingSourceDocumentId == firstSourceId));
+        var current = await updated.ReceivingOrderItems
+            .Where(x => x.ReceivingOrderId == first).ToListAsync();
+        Assert.Equal(10m, current.Single(x => x.StockKeepingUnitId == skuId).CurrentPlanQuantity);
+        Assert.Null(current.Single(x => x.StockKeepingUnitId == uncertainSkuId).CurrentPlanQuantity);
+        Assert.All(current, x => Assert.Null(x.FactQuantity));
+        Assert.Equal(revision + 1, (await updated.ReceivingOrders.SingleAsync(x =>
+            x.Id == first)).OperationalRevision);
+        Assert.False(await updated.InventoryMovements.AnyAsync(x => x.RecorderId == first));
     }
 
     private static string Source(Guid refKey, Guid warehouseId, string items, bool posted = true) => $$"""

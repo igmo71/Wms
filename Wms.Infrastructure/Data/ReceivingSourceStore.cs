@@ -6,19 +6,20 @@ using Wms.Domain;
 
 namespace Wms.Data;
 
-public sealed class ReceivingSourceStore(IDbContextFactory<ApplicationDbContext> contextFactory)
+public sealed class ReceivingSourceStore(
+    IDbContextFactory<ApplicationDbContext> contextFactory,
+    IReceivingSourceParser parser)
     : IReceivingSourceStore
 {
     public async Task<OperationResult<ReceivingSourceVersion>> SaveSuccessfulAsync(
-        Guid refKey, string snapshotJson, string fingerprint,
-        IReadOnlyList<ReceivingSourceLine> lines, DateTimeOffset checkedAtUtc,
-        CancellationToken ct)
+        ParsedReceivingSource parsed, string snapshotJson, string fingerprint,
+        DateTimeOffset checkedAtUtc, CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
 
-        var source = await GetOrCreateAsync(context, refKey, ct);
+        var source = await GetOrCreateAsync(context, parsed.RefKey, ct);
         if (!source.IsSuccess)
             return source.Error!;
 
@@ -39,6 +40,7 @@ public sealed class ReceivingSourceStore(IDbContextFactory<ApplicationDbContext>
             context.ReceivingSourceVersions.Add(version);
         }
 
+        var lines = parsed.Lines;
         var skuKeys = lines.Select(x => x.SkuRefKey).OfType<Guid>().Distinct().ToArray();
         var knownSkus = await context.StockKeepingUnits
             .Where(x => skuKeys.Contains(x.Id))
@@ -69,9 +71,67 @@ public sealed class ReceivingSourceStore(IDbContextFactory<ApplicationDbContext>
         if (!recorded.IsSuccess)
             return recorded.Error!;
 
+        var planUpdate = await UpdateLinkedOrderPlanAsync(
+            context, document, parsed, projections, ct);
+        if (!planUpdate.IsSuccess)
+            return planUpdate.Error!;
+
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return version;
+    }
+
+    private async Task<OperationResult> UpdateLinkedOrderPlanAsync(
+        ApplicationDbContext context, ReceivingSourceDocument currentDocument,
+        ParsedReceivingSource currentSource,
+        IReadOnlyList<ReceivingSourceLineProjection> currentLines, CancellationToken ct)
+    {
+        var orderId = await context.ReceivingOrderSourceLinks.AsNoTracking()
+            .Where(x => x.ReceivingSourceDocumentId == currentDocument.Id
+                && x.DetachedAtUtc == null)
+            .Select(x => (Guid?)x.ReceivingOrderId).SingleOrDefaultAsync(ct);
+        if (orderId is not Guid id)
+            return OperationResult.Success();
+
+        var order = await context.ReceivingOrders.Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (order is null)
+            return OperationError.Conflict("Связанный приходный ордер не найден.");
+        var otherIds = await context.ReceivingOrderSourceLinks.AsNoTracking()
+            .Where(x => x.ReceivingOrderId == id && x.DetachedAtUtc == null
+                && x.ReceivingSourceDocumentId != currentDocument.Id)
+            .Select(x => x.ReceivingSourceDocumentId).ToArrayAsync(ct);
+        var otherDocuments = await context.ReceivingSourceDocuments.AsNoTracking()
+            .Where(x => otherIds.Contains(x.Id)).ToArrayAsync(ct);
+        if (otherDocuments.Length != otherIds.Length
+            || otherDocuments.Any(x => x.LastSuccessfulVersionId is null))
+            return OperationError.Conflict("Версия связанного источника не найдена.");
+        var versionIds = otherDocuments.Select(x => x.LastSuccessfulVersionId!.Value).ToArray();
+        var otherVersions = await context.ReceivingSourceVersions.AsNoTracking()
+            .Include(x => x.Lines).Where(x => versionIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var sources = new List<(ParsedReceivingSource Source, ReceivingSourcePlan Plan)>
+        {
+            (currentSource, ReceivingSourceVersion.CalculatePlan(currentLines))
+        };
+        foreach (var document in otherDocuments)
+        {
+            if (!otherVersions.TryGetValue(document.LastSuccessfulVersionId!.Value,
+                    out var version))
+                return OperationError.Conflict("Версия связанного источника не найдена.");
+            var parsed = parser.Parse(document.RefKey, version.SnapshotJson);
+            if (!parsed.IsSuccess)
+                return parsed.Error!;
+            sources.Add((parsed.Value!, version.CalculatePlan()));
+        }
+
+        var plan = ReceivingOrderPlanProjection.Sum(order.WarehouseId, sources);
+        var applied = order.ApplyCurrentSourcePlan(plan);
+        if (!applied.IsSuccess)
+            return applied.Error!;
+        context.ReceivingOrderItems.AddRange(applied.Value!);
+        return OperationResult.Success();
     }
 
     public async Task RecordFailureAsync(
