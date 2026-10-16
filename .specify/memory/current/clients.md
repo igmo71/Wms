@@ -8,6 +8,12 @@ embedded scanner when available. Manual SKU search, where present, uses name,
 code, or barcode and rejoins the same operation as scanning. Decimal 1C GUID
 barcodes accept and normalize leading zeroes.
 
+The Mobile receiving and LPN putaway endpoint groups are temporarily unmapped.
+Replacement contracts and handlers use the new Application commands and read
+projections; they will be connected with the replacement Mobile screens. Their
+route policy requires `Operator` or `Manager`; `Administrator` alone does not
+grant receiving access.
+
 The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
 only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
 can activate a focused UI action after the Intent scan has already navigated.

@@ -56,7 +56,11 @@ public class Program
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy(
                 MobileAuthorization.WarehouseOperatorPolicy,
-                policy => policy.RequireRole(ApplicationRoles.All));
+                policy => policy.RequireRole(ApplicationRoles.All))
+            .AddPolicy(
+                MobileAuthorization.ReceivingWorkerPolicy,
+                policy => policy.RequireRole(
+                    ApplicationRoles.Operator, ApplicationRoles.Manager));
 
         // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
@@ -87,8 +91,6 @@ public class Program
         app.MapMobileBarcodeEndpoints();
         app.MapMobileInventoryTransferEndpoints();
         app.MapMobileInventoryCountEndpoints();
-        app.MapMobileReceivingOrderEndpoints();
-        app.MapMobileLicensePlateNumberPutawayEndpoints();
         app.MapMobileShippingOrderEndpoints();
         app.MapOneCEndpoints();
 

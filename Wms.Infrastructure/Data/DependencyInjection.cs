@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<SearchReceivingSku>();
         services.AddScoped<AddReceivingOrderSku>();
         services.AddScoped<IReceivingWorkStore, ReceivingWorkStore>();
+        services.AddScoped<IReceivingWorkQueryStore, ReceivingWorkQueryStore>();
         services.AddScoped<JoinReceivingCycle>();
         services.AddScoped<OpenReceivingLpn>();
         services.AddScoped<EditReceivingLpn>();
