@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Receiving;
 using Wms.Domain;
@@ -125,7 +126,8 @@ public sealed class ReceivingWorkQueryStore(
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit)
                 .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.Participants)
-            .Include(x => x.Cycles)
+            .Include(x => x.Cycles).ThenInclude(x => x.SourceVersions)
+                .ThenInclude(x => x.ReceivingSourceDocument)
             .Include(x => x.SourceLinks).ThenInclude(x => x.ReceivingSourceDocument)
             .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
@@ -155,8 +157,33 @@ public sealed class ReceivingWorkQueryStore(
                     x.CurrentPlanQuantity, x.FactQuantity)).ToArray(),
             order.LicensePlateNumbers.Where(x => x.ReceivingCycleId is not null)
                 .OrderByDescending(x => x.CreatedAtUtc)
-                .Select(x => MapLpn(x, order.WarehouseId)).ToArray());
+                .Select(x => MapLpn(x, order.WarehouseId)).ToArray(),
+            order.Cycles.OrderByDescending(x => x.Number)
+                .Select(MapCycle).ToArray());
     }
+
+    private sealed record SnapshotQuantity(Guid SkuId, decimal? Quantity);
+
+    private static ReceivingWorkCycleView MapCycle(ReceivingCycle cycle)
+    {
+        var plans = ReadSnapshot(cycle.PlanSnapshotJson);
+        var facts = ReadSnapshot(cycle.FactSnapshotJson);
+        var items = plans.Keys.Union(facts.Keys).Order().Select(skuId =>
+            new ReceivingWorkCycleItemView(skuId,
+                plans.GetValueOrDefault(skuId), facts.GetValueOrDefault(skuId))).ToArray();
+        return new ReceivingWorkCycleView(cycle.Number, cycle.ReceivingLocationId,
+            cycle.StartedAtUtc, cycle.CompletedAtUtc, cycle.CompletedBy,
+            cycle.SourceCheckFailed, items,
+            cycle.SourceVersions.Select(x => new ReceivingWorkCycleSourceView(
+                x.ReceivingSourceDocument?.RefKey ?? Guid.Empty,
+                x.ReceivingSourceVersionId)).ToArray());
+    }
+
+    private static IReadOnlyDictionary<Guid, decimal?> ReadSnapshot(string? json) =>
+        string.IsNullOrWhiteSpace(json)
+            ? new Dictionary<Guid, decimal?>()
+            : (JsonSerializer.Deserialize<SnapshotQuantity[]>(json) ?? [])
+                .ToDictionary(x => x.SkuId, x => x.Quantity);
 
     private static ReceivingWorkLpnView MapLpn(
         LicensePlateNumber lpn, Guid warehouseId)

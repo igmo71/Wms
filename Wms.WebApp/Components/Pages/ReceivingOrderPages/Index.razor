@@ -86,7 +86,7 @@
         else
         {
             <table class="mud-table mud-table-dense w-100">
-                <thead><tr><th>Ордер</th><th>Склад</th><th>Статус</th><th>Источников</th><th>Строк</th><th>Расхождений</th></tr></thead>
+                <thead><tr><th>Ордер</th><th>Склад</th><th>Статус</th><th>Источников</th><th>Строк</th><th>Расхождения и непроверенные SKU</th></tr></thead>
                 <tbody>
                 @foreach (var order in FilteredOrders)
                 {
@@ -96,7 +96,13 @@
                         <td>@order.Status.GetDisplayName()</td>
                         <td>@order.SourceRefKeys.Count</td>
                         <td>@order.Items.Count</td>
-                        <td>@order.Items.Count(x => x.FactQuantity is decimal fact && x.PlanQuantity != fact)</td>
+                        <td>
+                            @order.CurrentDiscrepancyCount
+                            @if (order.HasNewDiscrepancyAfterCompletion)
+                            {
+                                <MudText Color="Color.Warning">Новое после завершения</MudText>
+                            }
+                        </td>
                     </tr>
                 }
                 </tbody>

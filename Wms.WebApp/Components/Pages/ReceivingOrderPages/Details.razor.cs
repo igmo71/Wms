@@ -14,6 +14,7 @@ public partial class Details
 
     [Inject] private IReceivingWorkQueryStore Orders { get; set; } = null!;
     [Inject] private GetReceivingSources Sources { get; set; } = null!;
+    [Inject] private ResynchronizeReceivingOrder RefreshSources { get; set; } = null!;
     [Inject] private SearchReceivingSku SearchSku { get; set; } = null!;
     [Inject] private AddReceivingOrderSku AddSku { get; set; } = null!;
     [Inject] private CloseReceivingLpn CloseLpn { get; set; } = null!;
@@ -32,6 +33,7 @@ public partial class Details
     private string? _skuSearch;
     private string? _managerReason;
     private CloseReceivingLpnResult? _closeResult;
+    private ReceivingOrderRefreshResult? _refreshResult;
     private (Guid SkuId, Guid RequestId)? _pendingAdd;
     private (Guid LpnId, Guid RequestId, bool ConfirmExpired, string? Reason)? _pendingClose;
     private (Guid LpnId, decimal Quantity, Guid RequestId)? _pendingCorrection;
@@ -49,6 +51,7 @@ public partial class Details
 
     protected override async Task OnParametersSetAsync()
     {
+        _refreshResult = null;
         _closeLpnId = null;
         _pendingClose = null;
         _pendingAdd = null;
@@ -60,10 +63,33 @@ public partial class Details
         await ReloadAsync();
     }
 
+    private async Task RefreshSourcesAsync()
+    {
+        if (!_canManage || _busy || _userId is null)
+            return;
+        _busy = true;
+        _error = null;
+        _refreshResult = null;
+        try
+        {
+            var result = await RefreshSources.ExecuteAsync(Id, _userId);
+            if (!result.IsSuccess)
+            {
+                _error = result.Error!.Message;
+                return;
+            }
+            await ReloadAsync();
+            _refreshResult = result.Value;
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
     private async Task ReloadAsync()
     {
         _loading = true;
         _error = null;
+        _refreshResult = null;
         try
         {
             var user = (await Authentication.GetAuthenticationStateAsync()).User;

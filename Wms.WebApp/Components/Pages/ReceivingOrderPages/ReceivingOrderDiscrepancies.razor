@@ -1,0 +1,68 @@
+@using Wms.Application.Receiving
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-2">Текущий план и факт</MudText>
+    @if (Order.HasNewDiscrepancyAfterCompletion)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            После последнего завершения появилось новое расхождение. Прежнее решение показано в истории циклов ниже.
+        </MudAlert>
+    }
+    @if (Sources.Any(x => x.LastAttemptError is not null))
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            Свежая сверка не всех источников подтверждена. Текущий план основан на последних успешных версиях.
+        </MudAlert>
+    }
+    <table class="mud-table mud-table-dense w-100">
+        <thead><tr><th>SKU</th><th>Код</th><th>План</th><th>Факт</th><th>Текущее расхождение</th></tr></thead>
+        <tbody>
+        @foreach (var item in Order.Items)
+        {
+            <tr>
+                <td>@(item.SkuName ?? item.SkuId.ToString())</td>
+                <td>@item.SkuCode</td>
+                <td>@Format(item.PlanQuantity) @item.UnitOfMeasure</td>
+                <td>@(item.FactQuantity is null ? "Не проверено" : Format(item.FactQuantity) + " " + item.UnitOfMeasure)</td>
+                <td>@Difference(item)</td>
+            </tr>
+            @if (item.PlanQuantity is null)
+            {
+                var reasons = Sources.Where(source => source.Posted == true
+                    && source.DeletionMark == false
+                    && source.WarehouseId == Order.WarehouseId)
+                    .SelectMany(source => source.Lines
+                    .Where(line => (line.StockKeepingUnitId == item.SkuId
+                        || line.SourceSkuRefKey == item.SkuId) && line.Error is not null)
+                    .Select(line => $"{source.Number ?? source.RefKey.ToString()}, строка {line.LineNumber}: {line.Error}"))
+                    .ToArray();
+                <tr><td colspan="5">
+                    План SKU неизвестен.
+                    @if (reasons.Length > 0)
+                    {
+                        @(string.Join("; ", reasons))
+                    }
+                    else
+                    {
+                        <span>Проверьте состояние источников и допустимость суммы количеств.</span>
+                    }
+                </td></tr>
+            }
+        }
+        </tbody>
+    </table>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
+
+    private static string Format(decimal? quantity) =>
+        quantity?.ToString("0.###") ?? "Неизвестно";
+
+    private static string Difference(ReceivingWorkItemView item) =>
+        item.PlanQuantity is null ? "План неизвестен"
+        : item.FactQuantity is null ? "Факт не проверен"
+        : item.FactQuantity == item.PlanQuantity ? "Нет"
+        : $"{item.FactQuantity - item.PlanQuantity:0.###} {item.UnitOfMeasure}";
+}

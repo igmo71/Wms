@@ -40,8 +40,13 @@ date or "Не указан" without a separate item-state label.
 Unchecked fact is textual; different SKU quantities are not totaled together.
 A Web Manager can add a synchronized catalog SKU and close an open LPN, including
 explicit past-date confirmation and an optional reason. Web no longer calls
-the old order-completion command. The replacement completion and later manager
-correction actions are not yet exposed.
+the old order-completion command. Manager LPN quantity correction and deletion
+are exposed; replacement completion and reopening are not yet exposed.
+The order card separates current plan/fact discrepancies from immutable cycle
+completion snapshots and shows source check failures and unknown-plan reasons.
+A Manager can manually recheck every linked source from the card. The order
+list highlights completed orders whose current discrepancy differs from their
+latest completion snapshot.
 
 The API address is packaged per build configuration and is not editable by the
 operator.

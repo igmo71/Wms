@@ -43,54 +43,9 @@ else
             <MudText Typo="Typo.caption">Завершение ордера не проводит товар. Приход возникает при закрытии каждой LPN.</MudText>
         </MudPaper>
 
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-2">Источники 1С</MudText>
-            @if (_sources.Count == 0)
-            {
-                <MudText>Действующих источников нет.</MudText>
-            }
-            else
-            {
-                <table class="mud-table mud-table-dense w-100">
-                    <thead><tr><th>Документ</th><th>Склад 1С</th><th>Версия</th><th>Последняя успешная сверка</th><th>Последняя попытка</th></tr></thead>
-                    <tbody>
-                    @foreach (var source in _sources)
-                    {
-                        <tr>
-                            <td>@(source.Number ?? source.RefKey.ToString())</td>
-                            <td>@source.WarehouseId</td>
-                            <td>@(source.VersionId?.ToString() ?? "нет")</td>
-                            <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
-                            <td>@(source.LastAttemptError ?? "Успешно")</td>
-                        </tr>
-                        @foreach (var line in source.Lines.Where(x => x.Error is not null))
-                        {
-                            <tr><td colspan="5">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>
-                        }
-                    }
-                    </tbody>
-                </table>
-            }
-        </MudPaper>
-
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-2">Текущий план и факт</MudText>
-            <table class="mud-table mud-table-dense w-100">
-                <thead><tr><th>SKU</th><th>Код</th><th>План</th><th>Факт</th><th>Расхождение</th></tr></thead>
-                <tbody>
-                @foreach (var item in _order.Items)
-                {
-                    <tr>
-                        <td>@(item.SkuName ?? item.SkuId.ToString())</td>
-                        <td>@item.SkuCode</td>
-                        <td>@Format(item.PlanQuantity) @item.UnitOfMeasure</td>
-                        <td>@(item.FactQuantity is null ? "не проверено" : Format(item.FactQuantity) + " " + item.UnitOfMeasure)</td>
-                        <td>@(item.PlanQuantity is decimal plan && item.FactQuantity is decimal fact ? Format(fact - plan) + " " + item.UnitOfMeasure : "—")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </MudPaper>
+        <ReceivingOrderDetailsView Order="_order" Sources="_sources"
+                                   CanManage="_canManage" Busy="_busy"
+                                   RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync" />
 
         @if (_canManage)
         {

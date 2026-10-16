@@ -28,12 +28,49 @@ public sealed record ReceivingLpnReversalHistoryView(
     Guid SkuId, DateOnly? ExpirationDate, decimal Quantity,
     DateTimeOffset? PostedAtUtc, string? ConfirmedBy);
 
+public sealed record ReceivingWorkCycleItemView(
+    Guid SkuId, decimal? PlanQuantity, decimal? FactQuantity);
+
+public sealed record ReceivingWorkCycleSourceView(Guid RefKey, Guid VersionId);
+
+public sealed record ReceivingWorkCycleView(
+    int Number, Guid? ReceivingLocationId, DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? CompletedAtUtc, string? CompletedBy, bool SourceCheckFailed,
+    IReadOnlyList<ReceivingWorkCycleItemView> Items,
+    IReadOnlyList<ReceivingWorkCycleSourceView> Sources);
+
 public sealed record ReceivingWorkOrderView(
     Guid Id, string? Number, Guid WarehouseId, ReceivingOrderStatus Status,
     int? ActiveCycleNumber, Guid? ReceivingLocationId, bool IsParticipant,
     long Revision, IReadOnlyList<Guid> SourceRefKeys,
     IReadOnlyList<ReceivingWorkItemView> Items,
-    IReadOnlyList<ReceivingWorkLpnView> Lpns);
+    IReadOnlyList<ReceivingWorkLpnView> Lpns,
+    IReadOnlyList<ReceivingWorkCycleView> Cycles)
+{
+    public int CurrentDiscrepancyCount => Items.Count(x =>
+        x.PlanQuantity is null || x.FactQuantity is null
+        || x.PlanQuantity != x.FactQuantity);
+
+    public bool HasNewDiscrepancyAfterCompletion
+    {
+        get
+        {
+            if (Status != ReceivingOrderStatus.Received)
+                return false;
+            var last = Cycles.Where(x => x.CompletedAtUtc is not null)
+                .MaxBy(x => x.Number);
+            if (last is null)
+                return false;
+            var old = last.Items.ToDictionary(x => x.SkuId);
+            return Items.Any(item =>
+                (item.PlanQuantity is null || item.FactQuantity is null
+                    || item.PlanQuantity != item.FactQuantity)
+                && (!old.TryGetValue(item.SkuId, out var snapshot)
+                    || snapshot.PlanQuantity != item.PlanQuantity
+                    || snapshot.FactQuantity != item.FactQuantity));
+        }
+    }
+}
 
 public sealed record ReceivingPutawayRecommendationView(
     Guid StorageLocationId, string Address, string Name,

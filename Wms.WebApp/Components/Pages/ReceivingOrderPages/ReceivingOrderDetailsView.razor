@@ -1,0 +1,130 @@
+@using Wms.Application.Receiving
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudText Typo="Typo.h6">Источники 1С</MudText>
+        <MudSpacer />
+        @if (CanManage)
+        {
+            <MudButton Variant="Variant.Outlined" Disabled="Busy" OnClick="() => OnRefresh.InvokeAsync()">
+                Повторить сверку всех источников
+            </MudButton>
+        }
+    </MudStack>
+    @if (Sources.Count == 0)
+    {
+        <MudAlert Severity="Severity.Warning">Действующих источников нет. Текущий план известных SKU равен нулю.</MudAlert>
+    }
+    @if (RefreshResult is { } result)
+    {
+        <MudAlert Severity="@(result.AllSucceeded ? Severity.Success : Severity.Warning)" Class="mb-2">
+            @if (!result.HasSources)
+            {
+                <span>Сверять нечего: у ордера нет действующих источников.</span>
+            }
+            else if (result.AllSucceeded)
+            {
+                <span>Все источники успешно сверены.</span>
+            }
+            else
+            {
+                <span>Сверка завершена с ошибками. Последний успешный план сохранён.</span>
+            }
+        </MudAlert>
+    }
+    @if (Sources.Count > 0)
+    {
+        <table class="mud-table mud-table-dense w-100">
+            <thead><tr><th>Документ</th><th>Склад 1С</th><th>Версия</th><th>Последняя успешная сверка</th><th>Состояние</th></tr></thead>
+            <tbody>
+            @foreach (var source in Sources)
+            {
+                <tr>
+                    <td>@(source.Number ?? source.RefKey.ToString())</td>
+                    <td>@source.WarehouseId</td>
+                    <td>@(source.VersionId?.ToString() ?? "Нет")</td>
+                    <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</td>
+                    <td>@SourceState(source)</td>
+                </tr>
+                @foreach (var line in source.Lines.Where(x => x.Error is not null))
+                {
+                    <tr><td colspan="5">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>
+                }
+            }
+            </tbody>
+        </table>
+    }
+</MudPaper>
+
+<ReceivingOrderDiscrepancies Order="Order" Sources="Sources" />
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-2">История циклов и снимки решений</MudText>
+    @foreach (var cycle in Order.Cycles)
+    {
+        <MudPaper Class="pa-3 mb-2" Outlined="true">
+            <MudText Typo="Typo.subtitle1">
+                Цикл @cycle.Number · @(cycle.CompletedAtUtc is null ? "Не завершён" : $"Завершён {cycle.CompletedAtUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}")
+            </MudText>
+            <MudText Typo="Typo.caption">Место приёмки: @(cycle.ReceivingLocationId?.ToString() ?? "не выбрано") · Завершил: @(cycle.CompletedBy ?? "—")</MudText>
+            @if (cycle.CompletedAtUtc is not null)
+            {
+                @if (cycle.SourceCheckFailed)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-2">При завершении свежая сверка источников не удалась.</MudAlert>
+                }
+                <table class="mud-table mud-table-dense w-100 mt-2">
+                    <thead><tr><th>SKU</th><th>План на момент завершения</th><th>Факт на момент завершения</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in cycle.Items)
+                    {
+                        <tr>
+                            <td>@SkuName(item.SkuId)</td>
+                            <td>@Format(item.PlanQuantity)</td>
+                            <td>@(item.FactQuantity?.ToString("0.###") ?? "Не проверено")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <MudText Typo="Typo.caption" Class="mt-2">Версии источников:</MudText>
+                @if (cycle.Sources.Count == 0)
+                {
+                    <MudText Typo="Typo.caption">Источников не было.</MudText>
+                }
+                @foreach (var source in cycle.Sources)
+                {
+                    <MudText Typo="Typo.caption">@source.RefKey · версия @source.VersionId</MudText>
+                }
+            }
+        </MudPaper>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public ReceivingOrderRefreshResult? RefreshResult { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private string SkuName(Guid skuId) =>
+        Order.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();
+
+    private static string Format(decimal? quantity) =>
+        quantity?.ToString("0.###") ?? "Неизвестно";
+
+    private string SourceState(ReceivingSourceView source)
+    {
+        var state = source.Posted == false ? "Не проведён; вклад в план равен нулю"
+            : source.DeletionMark == true ? "Помечен удалённым; вклад в план равен нулю"
+            : source.WarehouseId is Guid warehouseId && warehouseId != Order.WarehouseId
+                ? "Склад источника отличается от склада WMS; вклад в план равен нулю"
+            : source.WarehouseId is null || source.Posted is null
+                || source.DeletionMark is null
+                ? "Реквизиты источника неизвестны; план не подтверждён"
+            : "Актуален";
+        return source.LastAttemptError is null ? state
+            : $"Сверка {source.LastAttemptAtUtc?.ToLocalTime():dd.MM.yyyy HH:mm} не удалась: {source.LastAttemptError}. {state}";
+    }
+}
