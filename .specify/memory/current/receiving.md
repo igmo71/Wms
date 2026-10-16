@@ -43,6 +43,17 @@ check retains the last successful plan; manual attempts are audited with their
 source updates. Client actions for changing links and manually refreshing an
 order are still to be connected.
 
+The new Application completion use case allows a current-cycle participant or
+Manager to finish an order once no receiving LPN is open. It attempts to check
+all linked sources and stores the cycle's plan, fact, source versions and check
+failure flag as an immutable decision snapshot. A discrepancy or unchecked SKU
+does not add a manager approval requirement, and completion posts no stock.
+A Manager may reopen the completed order from Web: the next cycle starts ready
+for receiving with no selected location or inherited participants. Earlier
+cycle snapshots, participants and closed LPNs remain in history; current plan
+and fact continue changing independently. Client actions for these operations
+are still to be connected.
+
 The new Application close use case refreshes every linked 1C source before
 receipt. It uses the current version plan on success or the last numeric order
 plan, marked unconfirmed, on failure. Closing a positive single-SKU LPN posts

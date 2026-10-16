@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS;
 using Wms.Tests.Infrastructure;
 using static Wms.Tests.Infrastructure.TestSupport;
@@ -14,6 +16,93 @@ namespace Wms.Tests.Receiving;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class ReceivingOrderCreationTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task Completing_and_reopening_keeps_old_cycle_snapshot_and_posts_no_stock()
+    {
+        var warehouseId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var sourceKey = Guid.NewGuid();
+        var zone = Zone(warehouseId, "RC", ZoneType.Receiving);
+        var firstLocation = Location(warehouseId, zone, 1);
+        var secondLocation = Location(warehouseId, zone, 2);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.Warehouses.Add(new Warehouse { Id = warehouseId, Name = "Receiving cycles" });
+            seed.Zones.Add(zone);
+            seed.StorageLocations.AddRange(firstLocation, secondLocation);
+            seed.StockKeepingUnits.Add(new StockKeepingUnit { Id = skuId, Name = "Cycle SKU" });
+            await seed.SaveChangesAsync();
+        }
+
+        var responses = new Dictionary<Guid, string>
+        {
+            [sourceKey] = Source(sourceKey, warehouseId, $$"""
+                [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":2}]
+                """)
+        };
+        var parser = new ReceivingSourceParser();
+        var synchronize = new SynchronizeReceivingSource(
+            new StubReader(responses), parser,
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
+        Assert.True((await synchronize.ExecuteAsync(sourceKey)).IsSuccess);
+        var orderId = Value(await new CreateReceivingOrder(
+            new ReceivingOrderStore(database), parser, TimeProvider.System)
+            .ExecuteAsync([sourceKey]));
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
+        var store = new ReceivingWorkStore(database);
+        var permission = new WarehousePermission(new ManagerPermission());
+        var join = new JoinReceivingCycle(
+            executor, store, synchronize, parser, permission, TimeProvider.System);
+        var zero = new ConfirmZeroReceived(executor, store, permission, TimeProvider.System);
+        var complete = new CompleteReceivingOrder(
+            executor, store, synchronize, permission, TimeProvider.System);
+        var reopen = new ReopenReceivingOrder(
+            executor, store, permission, TimeProvider.System);
+
+        Assert.Equal(orderId, Value(await join.ExecuteAsync(new JoinReceivingCycleRequest(
+            Guid.NewGuid(), orderId, firstLocation.Id, "manager"))));
+        Assert.Equal(skuId, Value(await zero.ExecuteAsync(new ConfirmZeroReceivedRequest(
+            Guid.NewGuid(), orderId, skuId, "manager"))));
+        var firstComplete = new CompleteReceivingOrderRequest(
+            Guid.NewGuid(), orderId, "manager");
+        Assert.Equal(orderId, Value(await complete.ExecuteAsync(firstComplete)));
+
+        responses[sourceKey] = Source(sourceKey, warehouseId, $$"""
+            [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":3}]
+            """);
+        Assert.True((await synchronize.ExecuteAsync(sourceKey)).IsSuccess);
+        var reopenRequest = new ReopenReceivingOrderRequest(
+            Guid.NewGuid(), orderId, "manager", true);
+        Assert.Equal(orderId, Value(await reopen.ExecuteAsync(reopenRequest)));
+        Assert.Equal(orderId, Value(await reopen.ExecuteAsync(reopenRequest)));
+        Assert.Equal(orderId, Value(await join.ExecuteAsync(new JoinReceivingCycleRequest(
+            Guid.NewGuid(), orderId, secondLocation.Id, "manager"))));
+        Assert.Equal(orderId, Value(await complete.ExecuteAsync(new CompleteReceivingOrderRequest(
+            Guid.NewGuid(), orderId, "manager"))));
+        Assert.Equal(orderId, Value(await complete.ExecuteAsync(firstComplete)));
+
+        await using var verify = database.CreateDbContext();
+        var cycles = await verify.ReceivingCycles.Include(x => x.SourceVersions)
+            .Where(x => x.ReceivingOrderId == orderId)
+            .OrderBy(x => x.Number).ToArrayAsync();
+        Assert.Equal(2, cycles.Length);
+        Assert.Equal(firstLocation.Id, cycles[0].ReceivingLocationId);
+        Assert.Equal(secondLocation.Id, cycles[1].ReceivingLocationId);
+        Assert.Equal(2m, JsonDocument.Parse(cycles[0].PlanSnapshotJson!)
+            .RootElement[0].GetProperty("Quantity").GetDecimal());
+        Assert.Equal(3m, JsonDocument.Parse(cycles[1].PlanSnapshotJson!)
+            .RootElement[0].GetProperty("Quantity").GetDecimal());
+        Assert.Equal(0m, JsonDocument.Parse(cycles[0].FactSnapshotJson!)
+            .RootElement[0].GetProperty("Quantity").GetDecimal());
+        Assert.Single(cycles[0].SourceVersions);
+        Assert.Single(cycles[1].SourceVersions);
+        Assert.NotEqual(cycles[0].SourceVersions.Single().ReceivingSourceVersionId,
+            cycles[1].SourceVersions.Single().ReceivingSourceVersionId);
+        Assert.Equal(2, await verify.ReceivingOrderParticipants.CountAsync(x =>
+            x.ReceivingOrderId == orderId));
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.RecorderId == orderId));
+    }
+
     [Fact]
     public async Task Changing_sources_rebuilds_plan_and_last_detach_keeps_order_visible()
     {

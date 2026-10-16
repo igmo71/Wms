@@ -64,6 +64,57 @@ public class ReceivingOrder
 
     public void RecordSourceCompositionChange() => AdvanceOperationalRevision();
 
+    public OperationResult<ReceivingCycle> CompleteCurrentCycle(
+        string userId, DateTimeOffset completedAtUtc, bool canManage,
+        string planSnapshotJson, string factSnapshotJson, bool sourceCheckFailed,
+        IReadOnlyCollection<(Guid SourceId, Guid VersionId)> sourceVersions)
+    {
+        if (Status != ReceivingOrderStatus.InReceiving || ActiveCycleNumber is not int number)
+            return OperationError.Conflict("Ордер не находится в активном цикле приёмки.");
+        var cycle = _cycles.SingleOrDefault(x => x.Number == number);
+        if (cycle is null || cycle.CompletedAtUtc is not null || cycle.StartedAtUtc is null)
+            return OperationError.Conflict("Активный цикл приёмки не найден.");
+        if (!canManage && !_participants.Any(x =>
+                x.ReceivingCycleId == cycle.Id && x.UserId == userId?.Trim()))
+            return OperationError.Conflict("Завершить приёмку может участник текущего цикла.");
+        if (_licensePlateNumbers.Any(x => x.Status == LicensePlateNumberStatus.Open))
+            return OperationError.Conflict("Перед завершением закройте или отмените открытые LPN.");
+
+        var completed = cycle.Complete(completedAtUtc, userId,
+            planSnapshotJson, factSnapshotJson, sourceCheckFailed, sourceVersions);
+        if (!completed.IsSuccess)
+            return completed.Error!;
+        Status = ReceivingOrderStatus.Received;
+        CompletedAtUtc = completedAtUtc;
+        CompletedBy = userId.Trim();
+        AdvanceOperationalRevision();
+        return cycle;
+    }
+
+    public OperationResult<ReceivingCycle> ReopenForNextCycle(
+        DateTimeOffset reopenedAtUtc)
+    {
+        if (Status != ReceivingOrderStatus.Received || ActiveCycleNumber is not int number
+            || number == int.MaxValue)
+            return OperationError.Conflict("Повторно открыть можно только завершённый ордер.");
+        var previous = _cycles.SingleOrDefault(x => x.Number == number);
+        if (previous?.CompletedAtUtc is null || reopenedAtUtc < previous.CompletedAtUtc
+            || _cycles.Any(x => x.Number == number + 1))
+            return OperationError.Conflict("Завершённый цикл изменился; обновите ордер.");
+
+        var next = ReceivingCycle.Create(Id, number + 1);
+        _cycles.Add(next);
+        ActiveCycleNumber = next.Number;
+        Status = ReceivingOrderStatus.ReadyForReceiving;
+        ReceivingLocationId = null;
+        StartedAtUtc = null;
+        StartedBy = null;
+        CompletedAtUtc = null;
+        CompletedBy = null;
+        AdvanceOperationalRevision();
+        return next;
+    }
+
     public OperationResult<IReadOnlyList<ReceivingOrderItem>> ApplyCurrentSourcePlan(
         IReadOnlyDictionary<Guid, decimal?> planBySku)
     {
