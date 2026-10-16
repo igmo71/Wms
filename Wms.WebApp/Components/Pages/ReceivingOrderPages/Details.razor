@@ -29,6 +29,10 @@ else
         {
             <MudAlert Severity="Severity.Success">@_lifecycleMessage</MudAlert>
         }
+        @if (!string.IsNullOrWhiteSpace(_sourceChangeMessage))
+        {
+            <MudAlert Severity="Severity.Success">@_sourceChangeMessage</MudAlert>
+        }
         @if (_closeResult is not null)
         {
             <MudAlert Severity="@(_closeResult.SourceCheckSucceeded ? Severity.Success : Severity.Warning)">
@@ -64,9 +68,11 @@ else
             }
         </MudPaper>
 
-        <ReceivingOrderDetailsView Order="_order" Sources="_sources"
-                                   CanManage="_canManage" Busy="_busy"
-                                   RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync" />
+        <ReceivingOrderDetailsView Order="_order" Sources="_sources" FreeSources="_freeSources"
+                                   CanManage="_canManage" CanChangeSources="CanChangeSources"
+                                   CanDetachSources="CanDetachSources" Busy="_busy"
+                                   RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
+                                   OnAttach="AttachSourceAsync" OnDetach="DetachSourceAsync" />
 
         @if (_canManage)
         {

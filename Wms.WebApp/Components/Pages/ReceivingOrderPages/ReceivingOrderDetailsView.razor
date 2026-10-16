@@ -35,7 +35,7 @@
     @if (Sources.Count > 0)
     {
         <table class="mud-table mud-table-dense w-100">
-            <thead><tr><th>Документ</th><th>Склад 1С</th><th>Версия</th><th>Последняя успешная сверка</th><th>Состояние</th></tr></thead>
+            <thead><tr><th>Документ</th><th>Склад 1С</th><th>Версия</th><th>Последняя успешная сверка</th><th>Состояние</th><th>Действие</th></tr></thead>
             <tbody>
             @foreach (var source in Sources)
             {
@@ -45,14 +45,57 @@
                     <td>@(source.VersionId?.ToString() ?? "Нет")</td>
                     <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</td>
                     <td>@SourceState(source)</td>
+                    <td>
+                        @if (CanDetachSources)
+                        {
+                            <MudButton Variant="Variant.Text" Disabled="Busy"
+                                       OnClick="() => OnDetach.InvokeAsync(source.RefKey)">Открепить</MudButton>
+                        }
+                    </td>
                 </tr>
                 @foreach (var line in source.Lines.Where(x => x.Error is not null))
                 {
-                    <tr><td colspan="5">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>
+                    <tr><td colspan="6">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>
                 }
             }
             </tbody>
         </table>
+    }
+    @if (CanChangeSources)
+    {
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.subtitle2">Добавить свободный источник</MudText>
+        <MudText Typo="Typo.caption">Перед добавлением WMS снова читает документ из 1С и проверяет его склад. Меняется текущий план, проведённый факт сохраняется.</MudText>
+        <MudTextField T="string" @bind-Value="_sourceSearch" Immediate="true"
+                      Label="Поиск по номеру или Ref_Key" Class="mt-2" />
+        @if (!MatchingFreeSources.Any())
+        {
+            <MudText Class="mt-2">Свободных документов по запросу нет.</MudText>
+        }
+        else
+        {
+            <table class="mud-table mud-table-dense w-100 mt-2">
+                <thead><tr><th>Документ</th><th>Склад 1С</th><th>Сверен</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var source in MatchingFreeSources)
+                {
+                    <tr>
+                        <td>@(source.Number ?? source.RefKey.ToString())</td>
+                        <td>@source.WarehouseId</td>
+                        <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</td>
+                        <td><MudButton Variant="Variant.Text" Disabled="Busy"
+                                       OnClick="() => OnAttach.InvokeAsync(source.RefKey)">Добавить</MudButton></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+        <MudTextField T="string" @bind-Value="_manualRefKey" Label="Или введите Ref_Key документа 1С" Class="mt-3" />
+        <MudButton Variant="Variant.Outlined" Disabled="Busy" OnClick="AttachByRefKeyAsync">Добавить по Ref_Key</MudButton>
+        @if (_manualError is not null)
+        {
+            <MudText Color="Color.Error">@_manualError</MudText>
+        }
     }
 </MudPaper>
 
@@ -103,10 +146,42 @@
 @code {
     [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> FreeSources { get; set; } = [];
     [Parameter] public bool CanManage { get; set; }
+    [Parameter] public bool CanChangeSources { get; set; }
+    [Parameter] public bool CanDetachSources { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public ReceivingOrderRefreshResult? RefreshResult { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback<Guid> OnAttach { get; set; }
+    [Parameter] public EventCallback<Guid> OnDetach { get; set; }
+
+    private string? _sourceSearch;
+    private string? _manualRefKey;
+    private string? _manualError;
+
+    private IEnumerable<ReceivingSourceView> MatchingFreeSources
+    {
+        get
+        {
+            var term = _sourceSearch?.Trim();
+            return FreeSources.Where(source => string.IsNullOrEmpty(term)
+                || source.RefKey.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+                || source.Number?.Contains(term, StringComparison.OrdinalIgnoreCase) == true)
+                .Take(20);
+        }
+    }
+
+    private async Task AttachByRefKeyAsync()
+    {
+        if (!Guid.TryParse(_manualRefKey?.Trim(), out var refKey) || refKey == Guid.Empty)
+        {
+            _manualError = "Укажите корректный Ref_Key документа 1С.";
+            return;
+        }
+        _manualError = null;
+        await OnAttach.InvokeAsync(refKey);
+    }
 
     private string SkuName(Guid skuId) =>
         Order.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();

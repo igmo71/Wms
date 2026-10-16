@@ -14,6 +14,7 @@ public partial class Details
 
     [Inject] private IReceivingWorkQueryStore Orders { get; set; } = null!;
     [Inject] private GetReceivingSources Sources { get; set; } = null!;
+    [Inject] private ChangeReceivingOrderSources ChangeSources { get; set; } = null!;
     [Inject] private ResynchronizeReceivingOrder RefreshSources { get; set; } = null!;
     [Inject] private CompleteReceivingOrder CompleteOrder { get; set; } = null!;
     [Inject] private ReopenReceivingOrder ReopenOrder { get; set; } = null!;
@@ -27,18 +28,21 @@ public partial class Details
 
     private ReceivingWorkOrderView? _order;
     private IReadOnlyList<ReceivingSourceView> _sources = [];
+    private IReadOnlyList<ReceivingSourceView> _freeSources = [];
     private IReadOnlyList<ReceivingSkuCandidate> _candidates = [];
     private IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>
         _deletionHistory = new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
     private string? _userId;
     private string? _error;
     private string? _lifecycleMessage;
+    private string? _sourceChangeMessage;
     private string? _skuSearch;
     private string? _managerReason;
     private CloseReceivingLpnResult? _closeResult;
     private ReceivingOrderRefreshResult? _refreshResult;
     private Guid? _pendingCompleteRequestId;
     private Guid? _pendingReopenRequestId;
+    private (ReceivingSourceChangeKind Kind, Guid RefKey, Guid RequestId)? _pendingSourceChange;
     private (Guid SkuId, Guid RequestId)? _pendingAdd;
     private (Guid LpnId, Guid RequestId, bool ConfirmExpired, string? Reason)? _pendingClose;
     private (Guid LpnId, decimal Quantity, Guid RequestId)? _pendingCorrection;
@@ -54,8 +58,19 @@ public partial class Details
     private bool _loading = true;
     private bool _busy;
 
+    private bool CanChangeSources =>
+        _order?.Status is ReceivingOrderStatus.ReadyForReceiving
+            or ReceivingOrderStatus.InReceiving
+        || (_order?.Status == ReceivingOrderStatus.Received && _canManage);
+
+    private bool CanDetachSources => CanChangeSources && (_canManage
+        || _order!.Lpns.All(x => x.Status is not (LicensePlateNumberStatus.Closed
+            or LicensePlateNumberStatus.Deleted)));
+
     protected override async Task OnParametersSetAsync()
     {
+        _pendingSourceChange = null;
+        _sourceChangeMessage = null;
         _pendingCompleteRequestId = null;
         _pendingReopenRequestId = null;
         _lifecycleMessage = null;
@@ -69,6 +84,51 @@ public partial class Details
         _deletionPreview = null;
         _pendingDelete = null;
         await ReloadAsync();
+    }
+
+    private Task AttachSourceAsync(Guid refKey) =>
+        ChangeSourceAsync(ReceivingSourceChangeKind.Attach, refKey);
+
+    private Task DetachSourceAsync(Guid refKey) =>
+        ChangeSourceAsync(ReceivingSourceChangeKind.Detach, refKey);
+
+    private async Task ChangeSourceAsync(ReceivingSourceChangeKind kind, Guid refKey)
+    {
+        if (_busy || _userId is null || _order is null || refKey == Guid.Empty
+            || _order.Status is not (ReceivingOrderStatus.ReadyForReceiving
+                or ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.Received)
+            || _order.Status == ReceivingOrderStatus.Received && !_canManage
+            || kind == ReceivingSourceChangeKind.Detach && !_canManage
+                && _order.Lpns.Any(x => x.Status is LicensePlateNumberStatus.Closed
+                    or LicensePlateNumberStatus.Deleted))
+            return;
+
+        _busy = true;
+        _error = null;
+        _sourceChangeMessage = null;
+        try
+        {
+            if (_pendingSourceChange is not { } pending
+                || pending.Kind != kind || pending.RefKey != refKey)
+                _pendingSourceChange = (kind, refKey, Guid.NewGuid());
+            var result = await ChangeSources.ExecuteAsync(new ChangeReceivingOrderSourcesRequest(
+                _pendingSourceChange.Value.RequestId, Id, refKey, _userId,
+                kind, ReceivingSourceChangeChannel.Web));
+            if (!result.IsSuccess)
+            {
+                _pendingSourceChange = null;
+                _error = result.Error!.Message;
+                return;
+            }
+            _pendingSourceChange = null;
+            await ReloadAsync();
+            if (_error is null)
+                _sourceChangeMessage = kind == ReceivingSourceChangeKind.Attach
+                    ? "Источник добавлен. Текущий план пересчитан; факт сохранён."
+                    : "Источник откреплён. Текущий план пересчитан; факт сохранён.";
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
     }
 
     private async Task CompleteOrderAsync()
@@ -157,6 +217,7 @@ public partial class Details
         _loading = true;
         _error = null;
         _lifecycleMessage = null;
+        _sourceChangeMessage = null;
         _refreshResult = null;
         try
         {
@@ -172,6 +233,7 @@ public partial class Details
             _order = await Orders.GetOrderAsync(Id, _userId, CancellationToken.None);
             _sources = _order is null ? [] : await Sources.GetByRefKeysAsync(
                 _order.SourceRefKeys);
+            _freeSources = CanChangeSources ? await Sources.ListUnlinkedAsync() : [];
             _deletionHistory = _canManage && _order?.Lpns.Any(x =>
                 x.Status == LicensePlateNumberStatus.Deleted) == true
                 ? await Orders.GetDeletionHistoryAsync(Id, CancellationToken.None)

@@ -40,8 +40,9 @@ source, including on a completed order. The result distinguishes an order with
 no active sources and
 reports each source's last successful check and latest attempt error. A failed
 check retains the last successful plan; manual attempts are audited with their
-source updates. Web exposes manual refresh to Managers; client actions for
-changing links are still to be connected.
+source updates. Web exposes manual refresh to Managers and source composition
+changes to Operators and Managers under the same posting and status rules.
+Mobile source composition actions are still to be connected.
 
 The new Application completion use case allows a current-cycle participant or
 Manager to finish an order once no receiving LPN is open. It attempts to check

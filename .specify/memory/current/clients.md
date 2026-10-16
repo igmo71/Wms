@@ -50,6 +50,11 @@ completion snapshots and shows source check failures and unknown-plan reasons.
 A Manager can manually recheck every linked source from the card. The order
 list highlights completed orders whose current discrepancy differs from their
 latest completion snapshot.
+Web users can search free 1C sources by number or `Ref_Key` and add one to an
+order; they may also enter a `Ref_Key` directly for a fresh 1C read. An Operator
+can detach a source before the first posted LPN; later or after completion,
+only a Manager can detach it in Web. The card reloads the aggregate plan after
+either change and retains the command ID for an uncertain response.
 
 The API address is packaged per build configuration and is not editable by the
 operator.
