@@ -25,6 +25,10 @@ else
         {
             <MudAlert Severity="Severity.Error">@_error</MudAlert>
         }
+        @if (!string.IsNullOrWhiteSpace(_lifecycleMessage))
+        {
+            <MudAlert Severity="Severity.Success">@_lifecycleMessage</MudAlert>
+        }
         @if (_closeResult is not null)
         {
             <MudAlert Severity="@(_closeResult.SourceCheckSucceeded ? Severity.Success : Severity.Warning)">
@@ -41,6 +45,23 @@ else
             <MudText>Склад: @_order.WarehouseId · Статус: @_order.Status.GetDisplayName()</MudText>
             <MudText>Цикл: @(_order.ActiveCycleNumber?.ToString() ?? "завершён") · Место приёмки: @(_order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText>
             <MudText Typo="Typo.caption">Завершение ордера не проводит товар. Приход возникает при закрытии каждой LPN.</MudText>
+            @if (_order.Status == ReceivingOrderStatus.InReceiving
+                && (_order.IsParticipant || _canManage))
+            {
+                @if (_order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
+                {
+                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN.</MudText>
+                }
+                <MudButton Class="mt-2" Color="Color.Primary" Variant="Variant.Filled"
+                           Disabled="@(_busy || _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))"
+                           OnClick="CompleteOrderAsync">Завершить ордер</MudButton>
+            }
+            @if (_order.Status == ReceivingOrderStatus.Received && _canManage)
+            {
+                <MudText Class="mt-2">Повторное открытие создаст новый цикл без места приёмки и участников. Прежний снимок сохранится.</MudText>
+                <MudButton Class="mt-2" Variant="Variant.Outlined" Disabled="_busy"
+                           OnClick="ReopenOrderAsync">Открыть новый цикл</MudButton>
+            }
         </MudPaper>
 
         <ReceivingOrderDetailsView Order="_order" Sources="_sources"

@@ -15,6 +15,8 @@ public partial class Details
     [Inject] private IReceivingWorkQueryStore Orders { get; set; } = null!;
     [Inject] private GetReceivingSources Sources { get; set; } = null!;
     [Inject] private ResynchronizeReceivingOrder RefreshSources { get; set; } = null!;
+    [Inject] private CompleteReceivingOrder CompleteOrder { get; set; } = null!;
+    [Inject] private ReopenReceivingOrder ReopenOrder { get; set; } = null!;
     [Inject] private SearchReceivingSku SearchSku { get; set; } = null!;
     [Inject] private AddReceivingOrderSku AddSku { get; set; } = null!;
     [Inject] private CloseReceivingLpn CloseLpn { get; set; } = null!;
@@ -30,10 +32,13 @@ public partial class Details
         _deletionHistory = new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
     private string? _userId;
     private string? _error;
+    private string? _lifecycleMessage;
     private string? _skuSearch;
     private string? _managerReason;
     private CloseReceivingLpnResult? _closeResult;
     private ReceivingOrderRefreshResult? _refreshResult;
+    private Guid? _pendingCompleteRequestId;
+    private Guid? _pendingReopenRequestId;
     private (Guid SkuId, Guid RequestId)? _pendingAdd;
     private (Guid LpnId, Guid RequestId, bool ConfirmExpired, string? Reason)? _pendingClose;
     private (Guid LpnId, decimal Quantity, Guid RequestId)? _pendingCorrection;
@@ -51,6 +56,9 @@ public partial class Details
 
     protected override async Task OnParametersSetAsync()
     {
+        _pendingCompleteRequestId = null;
+        _pendingReopenRequestId = null;
+        _lifecycleMessage = null;
         _refreshResult = null;
         _closeLpnId = null;
         _pendingClose = null;
@@ -61,6 +69,65 @@ public partial class Details
         _deletionPreview = null;
         _pendingDelete = null;
         await ReloadAsync();
+    }
+
+    private async Task CompleteOrderAsync()
+    {
+        if (_busy || _userId is null || _order is null
+            || _order.Status != ReceivingOrderStatus.InReceiving
+            || !_order.IsParticipant && !_canManage
+            || _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
+            return;
+
+        _busy = true;
+        _error = null;
+        _lifecycleMessage = null;
+        try
+        {
+            _pendingCompleteRequestId ??= Guid.NewGuid();
+            var result = await CompleteOrder.ExecuteAsync(new CompleteReceivingOrderRequest(
+                _pendingCompleteRequestId.Value, Id, _userId));
+            if (!result.IsSuccess)
+            {
+                _pendingCompleteRequestId = null;
+                _error = result.Error!.Message;
+                return;
+            }
+            _pendingCompleteRequestId = null;
+            await ReloadAsync();
+            if (_error is null)
+                _lifecycleMessage = "Ордер завершён. План, факт и версии источников сохранены в снимке цикла.";
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task ReopenOrderAsync()
+    {
+        if (_busy || !_canManage || _userId is null || _order?.Status != ReceivingOrderStatus.Received)
+            return;
+
+        _busy = true;
+        _error = null;
+        _lifecycleMessage = null;
+        try
+        {
+            _pendingReopenRequestId ??= Guid.NewGuid();
+            var result = await ReopenOrder.ExecuteAsync(new ReopenReceivingOrderRequest(
+                _pendingReopenRequestId.Value, Id, _userId, FromWeb: true));
+            if (!result.IsSuccess)
+            {
+                _pendingReopenRequestId = null;
+                _error = result.Error!.Message;
+                return;
+            }
+            _pendingReopenRequestId = null;
+            await ReloadAsync();
+            if (_error is null)
+                _lifecycleMessage = "Открыт новый цикл. Первый участник заново выбирает место приёмки.";
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
     }
 
     private async Task RefreshSourcesAsync()
@@ -89,6 +156,7 @@ public partial class Details
     {
         _loading = true;
         _error = null;
+        _lifecycleMessage = null;
         _refreshResult = null;
         try
         {

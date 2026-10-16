@@ -41,7 +41,10 @@ Unchecked fact is textual; different SKU quantities are not totaled together.
 A Web Manager can add a synchronized catalog SKU and close an open LPN, including
 explicit past-date confirmation and an optional reason. Web no longer calls
 the old order-completion command. Manager LPN quantity correction and deletion
-are exposed; replacement completion and reopening are not yet exposed.
+are exposed. A current-cycle participant or Manager can complete the order in
+Web; a Manager can reopen a completed order into a new cycle. The page retains
+the command ID for a retry after an uncertain response and reloads the saved
+status and cycle snapshots after success.
 The order card separates current plan/fact discrepancies from immutable cycle
 completion snapshots and shows source check failures and unknown-plan reasons.
 A Manager can manually recheck every linked source from the card. The order
