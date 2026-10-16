@@ -1,6 +1,14 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Authorization;
+using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
+using Wms.Application.Receiving;
+using Wms.Common;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS;
 using Wms.Tests.Infrastructure;
 using static Wms.Tests.Infrastructure.TestSupport;
 
@@ -9,6 +17,146 @@ namespace Wms.Tests.Receiving;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class ReceivingSynchronizationTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task Source_changes_and_failed_refresh_preserve_posted_fact_and_completed_cycle()
+    {
+        var warehouseId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var firstKey = Guid.NewGuid();
+        var secondKey = Guid.NewGuid();
+        var zone = Zone(warehouseId, "RC", ZoneType.Receiving);
+        var location = Location(warehouseId, zone, 1);
+        var batch = Value(LicensePlateNumberBatch.Issue(1, "manager", DateTimeOffset.UtcNow));
+        var lpnId = batch.Labels.Single().Id;
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(new Warehouse { Id = warehouseId, Name = "Source changes" },
+                new StockKeepingUnit { Id = skuId, Name = "Source SKU" },
+                zone, location, batch);
+            await seed.SaveChangesAsync();
+        }
+
+        string Source(Guid key, int quantity, bool posted = true,
+            bool deleted = false, bool hasLine = true)
+        {
+            var lines = hasLine
+                ? $$"""[{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":{{quantity}}}]"""
+                : "[]";
+            return $$"""
+                {"value":[{"Ref_Key":"{{key}}","Склад_Key":"{{warehouseId}}",
+                "Posted":{{posted.ToString().ToLowerInvariant()}},
+                "DeletionMark":{{deleted.ToString().ToLowerInvariant()}},
+                "Number":"Source", "Товары":{{lines}}}]}
+                """;
+        }
+        var responses = new Dictionary<Guid, string>
+        {
+            [firstKey] = Source(firstKey, 2),
+            [secondKey] = Source(secondKey, 3)
+        };
+        var reader = new MutableSourceReader(responses);
+        var parser = new ReceivingSourceParser();
+        var synchronize = new SynchronizeReceivingSource(reader, parser,
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        Assert.True((await synchronize.ExecuteAsync(secondKey)).IsSuccess);
+        var orderId = Value(await new CreateReceivingOrder(
+            new ReceivingOrderStore(database), parser, TimeProvider.System)
+            .ExecuteAsync([firstKey, secondKey]));
+
+        await using (var prepare = database.CreateDbContext())
+        {
+            var order = await prepare.ReceivingOrders
+                .Include(x => x.Cycles).Include(x => x.Participants)
+                .Include(x => x.Items).Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items).SingleAsync(x => x.Id == orderId);
+            var lpn = await prepare.LicensePlateNumbers.Include(x => x.Items)
+                .SingleAsync(x => x.Id == lpnId);
+            var now = DateTimeOffset.UtcNow;
+            Value(order.JoinCurrentCycle(location.Id, "manager", now));
+            prepare.ReceivingOrderParticipants.Add(Assert.Single(order.Participants));
+            Assert.True(Value(order.OpenReceivingLpn(lpn, "manager", now)));
+            Success(order.EditReceivingLpn(lpn, skuId, null, 1m, "manager", now, false));
+            prepare.LicensePlateNumberItems.Add(Assert.Single(lpn.Items));
+            await prepare.SaveChangesAsync();
+        }
+
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
+        var workStore = new ReceivingWorkStore(database);
+        var permission = new WarehousePermission(new ManagerPermission());
+        var close = new CloseReceivingLpn(executor, workStore, synchronize, parser,
+            new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            permission, TimeProvider.System);
+        var closeRequest = new CloseReceivingLpnCommand(Guid.NewGuid(), orderId, lpnId, "manager");
+        Assert.Equal(5m, Value(await close.ExecuteAsync(closeRequest)).UsedPlan);
+        var complete = new CompleteReceivingOrder(executor, workStore, synchronize,
+            permission, TimeProvider.System);
+        Assert.Equal(orderId, Value(await complete.ExecuteAsync(
+            new CompleteReceivingOrderRequest(Guid.NewGuid(), orderId, "manager"))));
+
+        async Task AssertCurrentPlanAsync(decimal expected)
+        {
+            await using var check = database.CreateDbContext();
+            var item = await check.ReceivingOrderItems.SingleAsync(x =>
+                x.ReceivingOrderId == orderId && x.StockKeepingUnitId == skuId);
+            Assert.Equal(expected, item.CurrentPlanQuantity);
+            Assert.Equal(1m, item.FactQuantity);
+        }
+
+        responses[firstKey] = Source(firstKey, 2, posted: false);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        await AssertCurrentPlanAsync(3m);
+        responses[firstKey] = Source(firstKey, 2);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        await AssertCurrentPlanAsync(5m);
+        responses[firstKey] = Source(firstKey, 2, deleted: true);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        await AssertCurrentPlanAsync(3m);
+        responses[firstKey] = Source(firstKey, 2);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        responses[firstKey] = Source(firstKey, 2, hasLine: false);
+        var lastGoodVersion = Value(await synchronize.ExecuteAsync(firstKey)).Id;
+        await AssertCurrentPlanAsync(3m);
+
+        reader.FailKey = firstKey;
+        Assert.False((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        await AssertCurrentPlanAsync(3m);
+        await using (var failedCheck = database.CreateDbContext())
+        {
+            var failedSource = await failedCheck.ReceivingSourceDocuments
+                .SingleAsync(x => x.RefKey == firstKey);
+            Assert.Equal("1С недоступна.", failedSource.LastAttemptError);
+            Assert.Equal(lastGoodVersion, failedSource.LastSuccessfulVersionId);
+        }
+        reader.FailKey = null;
+        var currentVersion = Value(await synchronize.ExecuteAsync(firstKey)).Id;
+        Assert.Equal(currentVersion, Value(await synchronize.ExecuteAsync(firstKey)).Id);
+        Assert.Equal(5m, Value(await close.ExecuteAsync(closeRequest)).UsedPlan);
+
+        await using var verify = database.CreateDbContext();
+        var source = await verify.ReceivingSourceDocuments.SingleAsync(x => x.RefKey == firstKey);
+        Assert.Equal(currentVersion, source.LastSuccessfulVersionId);
+        Assert.Null(source.LastAttemptError);
+        var item = await verify.ReceivingOrderItems.SingleAsync(x =>
+            x.ReceivingOrderId == orderId && x.StockKeepingUnitId == skuId);
+        Assert.Equal(3m, item.CurrentPlanQuantity);
+        Assert.Equal(1m, item.FactQuantity);
+        var cycle = await verify.ReceivingCycles.Include(x => x.SourceVersions)
+            .SingleAsync(x => x.ReceivingOrderId == orderId);
+        Assert.False(cycle.SourceCheckFailed);
+        Assert.Equal(5m, JsonDocument.Parse(cycle.PlanSnapshotJson!).RootElement[0]
+            .GetProperty("Quantity").GetDecimal());
+        Assert.Equal(1m, JsonDocument.Parse(cycle.FactSnapshotJson!).RootElement[0]
+            .GetProperty("Quantity").GetDecimal());
+        Assert.Equal(2, cycle.SourceVersions.Count);
+        Assert.DoesNotContain(cycle.SourceVersions, x => x.ReceivingSourceVersionId == currentVersion);
+        Assert.Equal(ReceivingOrderStatus.Received,
+            (await verify.ReceivingOrders.SingleAsync(x => x.Id == orderId)).Status);
+        Assert.Equal(1, await verify.InventoryMovements.CountAsync(x => x.LicensePlateNumberId == lpnId));
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "receiving.lpn.close"));
+    }
+
     [Fact]
     public async Task Sql_source_projection_keeps_known_sku_plans_when_other_lines_are_unresolved()
     {
@@ -95,5 +243,25 @@ public sealed class ReceivingSynchronizationTests(SqlDatabase database)
         Assert.Equal(baseline.Fingerprint, changedComment.Fingerprint);
         Assert.Equal(OrderSynchronizationLevel.Blocking, changedQuantity.Level);
         Assert.Contains(changedQuantity.Differences, difference => difference.FieldCode == "items[1].quantity");
+    }
+
+    private sealed class MutableSourceReader(IReadOnlyDictionary<Guid, string> responses)
+        : IReceivingSourceReader
+    {
+        public Guid? FailKey { get; set; }
+
+        public Task<OperationResult<ReceivingSourceRead>> ReadAsync(Guid refKey,
+            CancellationToken ct) => Task.FromResult<OperationResult<ReceivingSourceRead>>(
+            FailKey == refKey ? OperationError.Failure("1С недоступна.")
+                : new ReceivingSourceRead(refKey, responses[refKey]));
+    }
+
+    private sealed class ManagerPermission : IWarehousePermissionStore
+    {
+        public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(true);
+
+        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(true);
     }
 }
