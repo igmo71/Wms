@@ -9,11 +9,12 @@ public sealed class ReceivingWorkQueryStore(
     IDbContextFactory<ApplicationDbContext> contextFactory) : IReceivingWorkQueryStore
 {
     public async Task<IReadOnlyList<ReceivingWorkOrderView>> ListOrdersAsync(
-        Guid warehouseId, string userId, CancellationToken ct)
+        Guid? warehouseId, string userId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var orders = await OrderQuery(db)
-            .Where(x => x.WarehouseId == warehouseId && !x.DeletionMark
+            .Where(x => (warehouseId == null || x.WarehouseId == warehouseId)
+                && !x.DeletionMark
                 && x.Cycles.Any())
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(ct);
@@ -48,6 +49,7 @@ public sealed class ReceivingWorkQueryStore(
         var query = db.LicensePlateNumbers.AsNoTracking()
             .Include(x => x.ReceivingOrder)
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.Putaways).AsSplitQuery();
         var lpn = lpnId is Guid id
             ? await query.SingleOrDefaultAsync(x => x.Id == id, ct)
@@ -97,11 +99,13 @@ public sealed class ReceivingWorkQueryStore(
     private static IQueryable<ReceivingOrder> OrderQuery(ApplicationDbContext db) =>
         db.ReceivingOrders.AsNoTracking()
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit)
+                .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.Participants)
             .Include(x => x.Cycles)
             .Include(x => x.SourceLinks).ThenInclude(x => x.ReceivingSourceDocument)
             .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Items)
                 .ThenInclude(x => x.StockKeepingUnit)
+                    .ThenInclude(x => x.BaseUnitOfMeasure)
             .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Putaways)
             .AsSplitQuery();
 
@@ -122,6 +126,8 @@ public sealed class ReceivingWorkQueryStore(
                 new ReceivingWorkItemView(x.StockKeepingUnitId,
                     x.StockKeepingUnit?.Code, x.StockKeepingUnit?.Name,
                     x.StockKeepingUnit?.TracksExpirationDate == true,
+                    x.StockKeepingUnit?.BaseUnitOfMeasure?.Description
+                        ?? x.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation,
                     x.CurrentPlanQuantity, x.FactQuantity)).ToArray(),
             order.LicensePlateNumbers.Where(x => x.ReceivingCycleId is not null)
                 .OrderByDescending(x => x.CreatedAtUtc)
@@ -140,6 +146,8 @@ public sealed class ReceivingWorkQueryStore(
             lpn.Items.Where(x => !x.IsDeleted).Select(x =>
                 new ReceivingWorkLpnItemView(x.Id, x.StockKeepingUnitId,
                     x.StockKeepingUnit?.Code, x.StockKeepingUnit?.Name,
+                    x.StockKeepingUnit?.BaseUnitOfMeasure?.Description
+                        ?? x.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation,
                     x.Quantity, x.ExpirationDate,
                     placedByItem.GetValueOrDefault(x.Id))).ToArray(),
             lpn.Putaways.OrderByDescending(x => x.CreatedAtUtc).Select(x =>

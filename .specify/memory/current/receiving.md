@@ -12,7 +12,7 @@ contributions are summed; an unresolved contribution leaves only its SKU plan
 unknown. Unposted or deletion-marked sources contribute zero. The order fact
 starts unchecked. The source versions and active links are checked again in the
 save transaction; repeating the same complete source selection returns the
-existing order. The replacement UI is not connected yet.
+existing order. Web can now create the order from several unlinked sources.
 
 The new Application close use case refreshes every linked 1C source before
 receipt. It uses the current version plan on success or the last numeric order
@@ -21,7 +21,8 @@ one movement to its original receiving location, updates the checked order
 fact, and saves audit and command receipt atomically. Plan excess or an unknown
 plan requires `Manager`; a past expiration date requires explicit confirmation.
 Concurrent changes to the plan, SKU expiration flag, source version, order or
-LPN reject the staged close. No Web or Mobile entry point calls it yet.
+LPN reject the staged close. A Web Manager can close an open receiving LPN;
+Mobile does not call this use case yet.
 
 The new Application putaway use case moves a positive part of a closed receiving
 LPN from its original receiving location to a Storage location, even while the
@@ -36,7 +37,8 @@ catalog by name, code or barcode. Barcode resolution always uses the entire
 catalog, including SKU outside the order. An `Operator` or `Manager` can add a
 catalog SKU to an order; the unique row starts with known plan `0` and unchecked
 fact. Repeating the command does not add a second row. The addition, command
-receipt and compact audit event are saved together.
+receipt and compact audit event are saved together. A Web Manager can search
+the catalog and add a SKU to the order.
 
 The new cycle use case refreshes linked sources before joining and checks their
 posting, deletion mark and warehouse. The first participant selects an active,
@@ -47,7 +49,7 @@ is open. The responsible user can cancel that LPN, including after editing;
 a `Manager` can edit or cancel another user's open LPN. These drafts do not
 post inventory. A current-cycle participant can confirm a SKU as checked zero
 when no active LPN contains it; the audit and command receipt are saved with
-the fact update. The legacy receiving UI is still active until replacement.
+the fact update. Mobile receiving remains unmapped while its replacement is prepared.
 
 ## LPN issuance
 
@@ -129,8 +131,9 @@ Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
 be joined. The order view shows the source plan read-only and its LPN list.
 Participation still uses the legacy source synchronization assessment. The old
-Mobile and Web completion controls may remain visible, but the server rejects
-the old completion command. The replacement completion path is pending.
+Mobile completion control may remain visible, but its route is unmapped and the
+server rejects the old completion command. Web no longer exposes that command;
+the replacement completion path is pending.
 
 The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
 accepted from either tab and opens its separate pallet page; an SKU scan is

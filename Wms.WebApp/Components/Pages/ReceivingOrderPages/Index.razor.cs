@@ -1,167 +1,115 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Options;
-using MudBlazor;
-using Wms.Application.ReceivingOrders;
-using Wms.Application.Users;
-using Wms.Application.Warehouses;
-using Wms.Common;
-using Wms.Domain;
-using Wms.Domain.Enums;
+using Microsoft.AspNetCore.Components.Authorization;
+using Wms.Application.Receiving;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
-public partial class Index : IAsyncDisposable
+public partial class Index
 {
-    [Inject] private ReceivingOrderQueryService OrderQueryService { get; set; } = null!;
-    [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
-    [Inject] private WarehouseService WarehouseService { get; set; } = null!;
+    [Inject] private GetReceivingSources Sources { get; set; } = null!;
+    [Inject] private CreateReceivingOrder CreateOrder { get; set; } = null!;
+    [Inject] private IReceivingWorkQueryStore Orders { get; set; } = null!;
+    [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
 
-    [Inject] private IOptions<WmsSettings> Options { get; set; } = null!;
+    private IReadOnlyList<ReceivingSourceView> _sources = [];
+    private IReadOnlyList<ReceivingWorkOrderView> _orders = [];
+    private readonly HashSet<Guid> _selected = [];
+    private string? _orderFilter;
+    private string? _error;
+    private bool _busy;
 
-    private MudDataGrid<ReceivingOrder> _dataGrid = null!;
-    private string? _searchString;
-    private DateTime? _dateFrom;
-    private DateTime? _dateTo;
-    private ReceivingOrderStatus? _status;
-    private ReceivingOrderQueue? _queue;
-    private WarehouseOperation? _warehouseOperation;
-    private Warehouse? _warehouse;
-    private WmsSettings? _wmsSettings;
-    private readonly CancellationTokenSource _refreshCts = new();
-    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
+    private IEnumerable<ReceivingSourceView> SelectedSources =>
+        _sources.Where(x => _selected.Contains(x.RefKey));
 
-    private static string GetOrderHref(ReceivingOrder order) =>
-        $"receiving-orders/{order.Id}";
+    private bool CanCreate => _selected.Count > 0
+        && SelectedSources.All(x => x.WarehouseId is not null && x.VersionId is not null)
+        && SelectedSources.Select(x => x.WarehouseId).Distinct().Count() == 1;
 
-    private async Task<GridData<ReceivingOrder>> LoadServerDataAsync(GridState<ReceivingOrder> state, CancellationToken cancellationToken)
+    private IEnumerable<ReceivingWorkOrderView> FilteredOrders =>
+        string.IsNullOrWhiteSpace(_orderFilter) ? _orders
+            : _orders.Where(x => x.Id.ToString().Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase)
+                || x.Number?.Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase) == true);
+
+    private IReadOnlyList<(Guid SkuId, decimal? Quantity)> SelectedPlan
     {
-        var sortDefinition = state.SortDefinitions.FirstOrDefault();
-
-        var result = await OrderQueryService.ListOrdersAsync(new ReceivingOrderListQuery
+        get
         {
-            SearchString = _searchString,
-            DateFrom = _dateFrom,
-            DateTo = _dateTo,
-            WarehouseId = _warehouse?.Id,
-            Status = _status,
-            Queue = _queue,
-            WarehouseOperation = _warehouseOperation,
-            SortBy = sortDefinition?.SortBy,
-            SortDescending = sortDefinition?.Descending ?? true,
-            Skip = state.Page * state.PageSize,
-            Take = state.PageSize
-        }, cancellationToken);
-
-        _userNames = await ApplicationUserQueryService.GetUserNamesAsync(
-            result.Items.Select(x => x.CompletedBy),
-            cancellationToken);
-
-        return new GridData<ReceivingOrder>
-        {
-            Items = result.Items,
-            TotalItems = result.TotalItems
-        };
-    }
-
-    private string GetUserName(string? userId) => string.IsNullOrWhiteSpace(userId)
-        ? "—"
-        : _userNames.TryGetValue(userId, out var userName)
-            ? userName
-            : "Пользователь не найден";
-
-    private static string FormatCompletionTime(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—";
-
-    private Task OnSearchChangedAsync(string searchString)
-    {
-        _searchString = searchString;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnDateFromChangedAsync(DateTime? dateFrom)
-    {
-        _dateFrom = dateFrom;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnDateToChangedAsync(DateTime? dateTo)
-    {
-        _dateTo = dateTo;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnStatusChangedAsync(ReceivingOrderStatus? status)
-    {
-        _status = status;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnQueueChangedAsync(ReceivingOrderQueue? queue)
-    {
-        _queue = queue;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
-    {
-        var result = await WarehouseService.ListAsync(new ListQuery
-        {
-            SearchString = searchText,
-            SortBy = "Name",
-            Take = 10
-        }, ct);
-
-        return result.Items;
-    }
-
-    private Task OnWarehouseChangedAsync(Warehouse? warehouse)
-    {
-        _warehouse = warehouse;
-        return _dataGrid.ReloadServerData();
-    }
-
-    private Task OnWarehouseOperationChangedAsync(WarehouseOperation? warehouseOperation)
-    {
-        _warehouseOperation = warehouseOperation;
-        return _dataGrid.ReloadServerData();
-    }
-
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _wmsSettings = Options.Value;
-            _ = RefreshLoopAsync(_refreshCts.Token);
+            var sources = SelectedSources.ToArray();
+            var skuIds = sources.SelectMany(x => x.PlanBySku.Keys).Distinct().Order().ToArray();
+            return skuIds.Select(skuId =>
+            {
+                decimal? total = 0;
+                foreach (var source in sources)
+                {
+                    if (!source.PlanBySku.TryGetValue(skuId, out var part))
+                        continue;
+                    if (part is null || total is null)
+                    {
+                        total = null;
+                        continue;
+                    }
+                    try { total = checked(total.Value + part.Value); }
+                    catch (OverflowException) { total = null; }
+                }
+                return (skuId, total);
+            }).ToArray();
         }
-
-        return Task.CompletedTask;
     }
 
-    private async Task RefreshLoopAsync(CancellationToken ct)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_wmsSettings?.OrdersRefreshLoop ?? 5));
+    protected override Task OnInitializedAsync() => ReloadAsync();
 
+    private async Task ReloadAsync()
+    {
+        _busy = true;
+        _error = null;
         try
         {
-            while (await timer.WaitForNextTickAsync(ct))
+            var userId = (await Authentication.GetAuthenticationStateAsync()).User
+                .FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId is null)
             {
-                await InvokeAsync(async () =>
-                {
-                    if (_dataGrid is not null)
-                        await _dataGrid.ReloadServerData();
-                });
+                _error = "Не удалось определить пользователя.";
+                return;
             }
+            _sources = await Sources.ListUnlinkedAsync();
+            _orders = await Orders.ListOrdersAsync(null, userId, CancellationToken.None);
+            _selected.IntersectWith(_sources.Select(x => x.RefKey));
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception exception)
         {
+            _error = exception.Message;
         }
+        finally { _busy = false; }
     }
 
-    public ValueTask DisposeAsync()
+    private void ToggleSource(Guid refKey, ChangeEventArgs args)
     {
-        _refreshCts.Cancel();
-        _refreshCts.Dispose();
+        if (args.Value is true)
+            _selected.Add(refKey);
+        else
+            _selected.Remove(refKey);
+    }
 
-        return ValueTask.CompletedTask;
+    private async Task CreateAsync()
+    {
+        if (_busy || !CanCreate)
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await CreateOrder.ExecuteAsync(_selected.ToArray());
+            if (result.IsSuccess)
+                Navigation.NavigateTo($"receiving-orders/{result.Value}");
+            else
+                _error = result.Error!.Message;
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+        }
+        finally { _busy = false; }
     }
 }

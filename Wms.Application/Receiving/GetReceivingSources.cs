@@ -40,6 +40,20 @@ public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSo
         CancellationToken ct = default)
     {
         var states = await store.ListUnlinkedSourcesAsync(ct);
+        return Map(states);
+    }
+
+    public async Task<IReadOnlyList<ReceivingSourceView>> GetByRefKeysAsync(
+        IReadOnlyCollection<Guid> refKeys, CancellationToken ct = default)
+    {
+        if (refKeys is null || refKeys.Count == 0)
+            return [];
+        return Map(await store.LoadSourcesAsync(refKeys.Distinct().ToArray(), ct));
+    }
+
+    private IReadOnlyList<ReceivingSourceView> Map(
+        IReadOnlyList<ReceivingSourceState> states)
+    {
         var results = new List<ReceivingSourceView>(states.Count);
         foreach (var state in states)
         {

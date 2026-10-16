@@ -1,148 +1,106 @@
 @page "/receiving-orders"
-@using Wms.Domain
-@using Wms.Common
+@attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Domain.Enums
+@using Wms.Common
 
 <PageTitle>Приходные ордера</PageTitle>
 
-<MudText Typo="Typo.h5" GutterBottom="true">Приходные ордера</MudText>
-
-<MudPaper Class="pa-3 mb-4" Elevation="1">
-    <MudStack Row>
-        <MudTextField T="string"
-                      @bind-Value="_searchString"
-                      Label="Поиск по номеру"
-                      Immediate="true"
-                      DebounceInterval="300"
-                      OnDebounceIntervalElapsed="OnSearchChangedAsync"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Clearable="true" />
-        <MudDatePicker Label="Дата с"
-                       Date="_dateFrom"
-                       DateChanged="OnDateFromChangedAsync"
-                       Clearable="true"
-                       Class="ml-4" />
-        <MudDatePicker Label="Дата по"
-                       Date="_dateTo"
-                       DateChanged="OnDateToChangedAsync"
-                       Clearable="true"
-                       Class="ml-4" />
-        <MudAutocomplete T="Warehouse"
-                         Value="_warehouse"
-                         ValueChanged="OnWarehouseChangedAsync"
-                         SearchFunc="SearchWarehousesAsync"
-                         ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
-                         Label="Склад"
-                         Clearable="true"
-                         Class="ml-4" />
-        <MudSelect T="WarehouseOperation?"
-                   Label="Складская операция"
-                   Value="_warehouseOperation"
-                   ValueChanged="OnWarehouseOperationChangedAsync"
-                   Clearable="true"
-                   Class="ml-4">
-            @foreach (var warehouseOperation in Enum.GetValues<WarehouseOperation>())
-            {
-                <MudSelectItem T="WarehouseOperation?" Value="@((WarehouseOperation?)warehouseOperation)">
-                    @warehouseOperation.GetDisplayName()
-                </MudSelectItem>
-            }
-        </MudSelect>
-        <MudSelect T="ReceivingOrderStatus?"
-                   Label="Статус"
-                   Value="_status"
-                   ValueChanged="OnStatusChangedAsync"
-                   Clearable="true"
-                   Class="ml-4">
-            @foreach (var status in Enum.GetValues<ReceivingOrderStatus>())
-            {
-                <MudSelectItem T="ReceivingOrderStatus?" Value="@((ReceivingOrderStatus?)status)">
-                    @status.GetDisplayName()
-                </MudSelectItem>
-            }
-        </MudSelect>
-        <MudSelect T="ReceivingOrderQueue?"
-                   Label="Очередь"
-                   Value="_queue"
-                   ValueChanged="OnQueueChangedAsync"
-                   Clearable="true"
-                   Class="ml-4">
-            @foreach (var queue in Enum.GetValues<ReceivingOrderQueue>())
-            {
-                <MudSelectItem T="ReceivingOrderQueue?" Value="@((ReceivingOrderQueue?)queue)">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        <MudIcon Icon="@queue.GetIcon()" Size="Size.Small" />
-                        <MudText>@queue.GetDisplayName()</MudText>
-                    </MudStack>
-                </MudSelectItem>
-            }
-        </MudSelect>
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Приходные ордера WMS</MudText>
         <MudSpacer />
+        <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_busy">Обновить</MudButton>
     </MudStack>
-</MudPaper>
 
-<MudDataGrid T="ReceivingOrder"
-             @ref="_dataGrid"
-             ServerData="LoadServerDataAsync"
-             SortMode="SortMode.Single"
-             Filterable="false"
-             Hover="true"
-             Striped="true"
-             Dense="true"
-             RowsPerPage="25">
-    <Columns>
-        <TemplateColumn Title="Номер" SortBy="x => x.Number">
-            <CellTemplate>
-                <MudLink Href="@GetOrderHref(context.Item)">@context.Item.Number</MudLink>
-            </CellTemplate>
-        </TemplateColumn>
-        <PropertyColumn Property="x => x.Date" Title="Дата" Format="dd.MM.yyyy HH:mm" Sortable="true" />
-        <PropertyColumn Property="x => x.Warehouse == null ? string.Empty : x.Warehouse.Name" Title="Склад" />
-        <PropertyColumn Property="x => x.Status" Title="Статус">
-            <CellTemplate><MudChip T="string" Size="Size.Small" Color="@context.Item.Status.GetChipColor()">@context.Item.Status.GetDisplayName()</MudChip></CellTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="x => x.Queue" Title="Очередь">
-            <CellTemplate>
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                    <MudIcon Icon="@context.Item.Queue.GetIcon()" Size="Size.Small" />
-                    <MudText>@context.Item.Queue.GetDisplayName()</MudText>
-                </MudStack>
-            </CellTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="x => x.WarehouseOperation" Title="Складская операция" Sortable="true">
-            <CellTemplate>@context.Item.WarehouseOperation.GetDisplayName()</CellTemplate>
-        </PropertyColumn>
-        <TemplateColumn Title="Отправитель" Sortable="false">
-            <CellTemplate>@PartyDisplay.Format(context.Item.Shipper, context.Item.ShipperId, context.Item.ShipperType)</CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Сверка" Sortable="false">
-            <CellTemplate>
-                @if (context.Item.Status == ReceivingOrderStatus.Received
-                    && context.Item.CompletionApprovedAtUtc is not null
-                    && context.Item.SynchronizationLevel == OrderSynchronizationLevel.Synchronized)
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Создать ордер из документов 1С</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Выберите один или несколько свободных документов одного склада. План суммируется по SKU;
+            неизвестное количество остаётся неизвестным.
+        </MudText>
+        @if (_sources.Count == 0)
+        {
+            <MudText>Свободных документов нет.</MudText>
+        }
+        else
+        {
+            <table class="mud-table mud-table-dense w-100">
+                <thead><tr><th></th><th>Документ 1С</th><th>Склад</th><th>Проверен</th><th>План</th><th>Состояние</th></tr></thead>
+                <tbody>
+                @foreach (var source in _sources)
                 {
-                    <MudTooltip Text="Принят с расхождением; документ 1С синхронизирован.">
-                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
-                    </MudTooltip>
+                    <tr>
+                        <td><input type="checkbox" checked="@_selected.Contains(source.RefKey)"
+                                   @onchange="e => ToggleSource(source.RefKey, e)" /></td>
+                        <td>@(source.Number ?? source.RefKey.ToString())</td>
+                        <td>@source.WarehouseId</td>
+                        <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
+                        <td>@(source.HasUnknownSku ? "Есть неизвестные строки" : "Известен")</td>
+                        <td>@(source.LastAttemptError ?? (source.Posted == false ? "Не проведён" : source.DeletionMark == true ? "Помечен удалённым" : "Актуален"))</td>
+                    </tr>
                 }
-                else
+                </tbody>
+            </table>
+        }
+        @if (_selected.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3">Суммарный план выбранных документов</MudText>
+            @foreach (var plan in SelectedPlan)
+            {
+                <MudText>@plan.SkuId: @(plan.Quantity?.ToString("0.###") ?? "неизвестно")</MudText>
+            }
+            @if (SelectedSources.Any(x => x.HasUnknownSku))
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-2">
+                    В источниках есть строки без определённого SKU или количества. Их причины видны в карточке ордера.
+                </MudAlert>
+            }
+            @if (SelectedSources.Select(x => x.WarehouseId).Distinct().Count() != 1)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-2">Выбранные документы относятся к разным складам.</MudAlert>
+            }
+        }
+        <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@(_busy || !CanCreate)" OnClick="CreateAsync">
+            Создать ордер WMS
+        </MudButton>
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Ордера WMS</MudText>
+        <MudTextField T="string" @bind-Value="_orderFilter" Immediate="true"
+                      Label="Поиск по номеру или ID" Class="mb-3" />
+        @if (_busy)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (!FilteredOrders.Any())
+        {
+            <MudText>Ордеров нет.</MudText>
+        }
+        else
+        {
+            <table class="mud-table mud-table-dense w-100">
+                <thead><tr><th>Ордер</th><th>Склад</th><th>Статус</th><th>Источников</th><th>Строк</th><th>Расхождений</th></tr></thead>
+                <tbody>
+                @foreach (var order in FilteredOrders)
                 {
-                    <MudTooltip Text="@context.Item.SynchronizationLevel.GetDisplayText()">
-                        <MudIcon Icon="@context.Item.SynchronizationLevel.GetIcon()"
-                                 Color="@context.Item.SynchronizationLevel.GetColor()" />
-                    </MudTooltip>
+                    <tr>
+                        <td><MudLink Href="@($"receiving-orders/{order.Id}")">@(order.Number ?? order.Id.ToString())</MudLink></td>
+                        <td>@order.WarehouseId</td>
+                        <td>@order.Status.GetDisplayName()</td>
+                        <td>@order.SourceRefKeys.Count</td>
+                        <td>@order.Items.Count</td>
+                        <td>@order.Items.Count(x => x.FactQuantity is decimal fact && x.PlanQuantity != fact)</td>
+                    </tr>
                 }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Принято" SortBy="x => x.CompletedAtUtc">
-            <CellTemplate>
-                <MudText Typo="Typo.body2">@GetUserName(context.Item.CompletedBy)</MudText>
-                <MudText Typo="Typo.caption">@FormatCompletionTime(context.Item.CompletedAtUtc)</MudText>
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-    <PagerContent>
-        <MudDataGridPager T="ReceivingOrder" PageSizeOptions="new[] { 10, 25, 50 }" />
-    </PagerContent>
-</MudDataGrid>
+                </tbody>
+            </table>
+        }
+    </MudPaper>
+</MudStack>

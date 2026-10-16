@@ -27,23 +27,15 @@ available pallet adds it. Its nomenclature/pallet tabs and current action remain
 below the scrolling content; pallet actions and uncertain-command retry use the
 same fixed bottom area.
 
-Web uses one receiving-order page across ready, receiving and received states.
-The list distinguishes an accepted quantity difference from successful source
-synchronization. Completion and 1C reconciliation stay above the content tabs;
-an unavailable completion action gives a concise reason. Manager confirmation
-is available there for entry and later audit.
-
-The nomenclature tab shows aggregate order lines and each SKU's canonical unit.
-A ready order shows its stored plan. During receiving, equal WMS and 1C plans
-collapse to one column; any difference shows both plans for all lines. An absent
-1C value is not equal, and after acceptance the 1C plan comes from the saved
-completion snapshot. Web read-only quantities show three decimal places;
-unchecked fact remains textual. A SKU can show the active pallets containing it
-and each retained quantity. The pallet tab exposes each pallet's item audit and
-putaway history, including placed and remaining quantities. Cancelled pallets
-remain visible for audit, but deleted items are excluded from active totals.
-Quantities of different SKUs are never summed across units. Web does not edit
-the pallet composition.
+Web `/receiving-orders` lists unlinked 1C sources separately from WMS orders.
+Operators and Managers can select several sources of one warehouse, inspect
+their summed plan and create an order. The order page shows current plan, fact,
+source versions and errors, LPN quantities, expiration dates and putaway history.
+Unchecked fact is textual; different SKU quantities are not totaled together.
+A Web Manager can add a synchronized catalog SKU and close an open LPN, including
+explicit past-date confirmation and an optional reason. Web no longer calls
+the old order-completion command. The replacement completion and later manager
+correction actions are not yet exposed.
 
 The API address is packaged per build configuration and is not editable by the
 operator.

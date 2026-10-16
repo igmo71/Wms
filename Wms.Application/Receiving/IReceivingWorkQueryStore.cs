@@ -4,11 +4,12 @@ namespace Wms.Application.Receiving;
 
 public sealed record ReceivingWorkItemView(
     Guid SkuId, string? SkuCode, string? SkuName, bool TracksExpirationDate,
-    decimal? PlanQuantity, decimal? FactQuantity);
+    string? UnitOfMeasure, decimal? PlanQuantity, decimal? FactQuantity);
 
 public sealed record ReceivingWorkLpnItemView(
     Guid Id, Guid SkuId, string? SkuCode, string? SkuName,
-    decimal Quantity, DateOnly? ExpirationDate, decimal PlacedQuantity);
+    string? UnitOfMeasure, decimal Quantity, DateOnly? ExpirationDate,
+    decimal PlacedQuantity);
 
 public sealed record ReceivingWorkPutawayView(
     Guid Id, Guid ItemId, Guid DestinationStorageLocationId,
@@ -35,7 +36,7 @@ public sealed record ReceivingPutawayRecommendationView(
 public interface IReceivingWorkQueryStore
 {
     Task<IReadOnlyList<ReceivingWorkOrderView>> ListOrdersAsync(
-        Guid warehouseId, string userId, CancellationToken ct);
+        Guid? warehouseId, string userId, CancellationToken ct);
     Task<ReceivingWorkOrderView?> GetOrderAsync(
         Guid orderId, string userId, CancellationToken ct);
     Task<ReceivingWorkOrderView?> GetOrderBySourceAsync(
