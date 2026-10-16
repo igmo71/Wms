@@ -6,6 +6,11 @@ using Wms.Application.Inventory.Movements;
 using Wms.Application.Inventory.Transfers;
 using Wms.Application.LicensePlateNumbers;
 using Wms.Application.ReceivingOrders;
+using Wms.Application.Receiving;
+using Wms.Application.Inventory;
+using NewCommandExecutor = Wms.Application.CommandExecution.CommandExecutor;
+using NewCommandExecutionResult = Wms.Application.CommandExecution.CommandExecutionResult;
+using NewPostInventoryMovement = Wms.Application.Inventory.PostInventoryMovement;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -18,6 +23,85 @@ namespace Wms.Tests.Receiving;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class ReceivingSafetyTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task New_receiving_close_replay_commits_one_complete_stock_and_audit_set()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var requestId = Guid.NewGuid();
+        var first = await CloseThroughFoundationAsync(database, state, requestId);
+        Assert.Equal(state.LpnId, Value(first));
+        Assert.Equal(state.LpnId, Value(await CloseThroughFoundationAsync(
+            database, state, requestId)));
+        Error(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()),
+            OperationErrorType.Invalid);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(LicensePlateNumberStatus.Closed,
+            (await verify.LicensePlateNumbers.SingleAsync(x => x.Id == state.LpnId)).Status);
+        var movement = await verify.InventoryMovements.SingleAsync(x =>
+            x.LicensePlateNumberId == state.LpnId);
+        Assert.Equal(state.OrderId, movement.RecorderId);
+        Assert.Equal(3m, movement.Quantity);
+        Assert.Equal(3m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == state.LocationId && x.StockKeepingUnitId == state.SkuId)).Quantity);
+        Assert.Equal(1, await verify.InventoryTurnovers.CountAsync(x =>
+            x.InventoryMovementId == movement.Id));
+        var audit = await verify.WarehouseAuditEvents.SingleAsync(x =>
+            x.CommandType == "test.receiving-close" && x.LicensePlateNumberId == state.LpnId);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(new[] { movement.Id }),
+            audit.MovementIdsJson);
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "test.receiving-close" && x.RequestId == requestId));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task New_receiving_close_conflicts_when_plan_or_expiration_flag_changes_before_commit(
+        bool changeExpirationFlag)
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var requestId = Guid.NewGuid();
+        var barrier = new CompletionReceiptBarrier();
+        var pending = CloseThroughFoundationAsync(
+            database.WithInterceptor(barrier), state, requestId);
+        await barrier.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        try
+        {
+            await using var change = database.CreateDbContext();
+            if (changeExpirationFlag)
+            {
+                var sku = await change.StockKeepingUnits.SingleAsync(x => x.Id == state.SkuId);
+                sku.SetExpirationTracking(true);
+            }
+            else
+            {
+                var item = await change.ReceivingOrderItems.SingleAsync(x =>
+                    x.ReceivingOrderId == state.OrderId && x.StockKeepingUnitId == state.SkuId);
+                Success(item.SetCurrentPlan(2m));
+            }
+            await change.SaveChangesAsync();
+        }
+        finally
+        {
+            barrier.Release.TrySetResult();
+        }
+
+        Error(await pending, OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(LicensePlateNumberStatus.Open,
+            (await verify.LicensePlateNumbers.SingleAsync(x => x.Id == state.LpnId)).Status);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.LicensePlateNumberId == state.LpnId));
+        Assert.False(await verify.InventoryBalances.AnyAsync(x =>
+            x.StorageLocationId == state.LocationId && x.StockKeepingUnitId == state.SkuId));
+        Assert.False(await verify.InventoryTurnovers.AnyAsync(x =>
+            x.WarehouseId == state.WarehouseId && x.StockKeepingUnitId == state.SkuId));
+        Assert.False(await verify.WarehouseAuditEvents.AnyAsync(x =>
+            x.CommandType == "test.receiving-close" && x.LicensePlateNumberId == state.LpnId));
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.CommandType == "test.receiving-close" && x.RequestId == requestId));
+    }
+
     [Fact]
     public async Task Maintenance_cleanup_never_reissues_an_lpn_code()
     {
@@ -864,6 +948,98 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
                     ? snapshot
                     : OperationError.NotFound("Snapshot not found."));
         }
+    }
+
+    private sealed record NewCloseState(
+        Guid WarehouseId, Guid OrderId, Guid LocationId, Guid SkuId, Guid LpnId);
+
+    private async Task<NewCloseState> SeedNewOpenReceivingLpnAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "New close safety" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Close SKU" };
+        var zone = Zone(warehouse.Id, "NC", ZoneType.Receiving);
+        var location = Location(warehouse.Id, zone, 1);
+        var order = Value(ReceivingOrder.CreateNew(warehouse.Id, now));
+        var orderItem = Value(ReceivingOrderItem.CreateForSku(order.Id, sku.Id, 5m));
+        var batch = Value(LicensePlateNumberBatch.Issue(1, "close-test", now));
+        var lpnId = batch.Labels.Single().Id;
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, order, orderItem, batch);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var prepare = database.CreateDbContext())
+        {
+            var loadedOrder = await prepare.ReceivingOrders
+                .Include(x => x.Cycles).Include(x => x.Participants)
+                .Include(x => x.Items).Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items)
+                .SingleAsync(x => x.Id == order.Id);
+            var lpn = await prepare.LicensePlateNumbers.Include(x => x.Items)
+                .SingleAsync(x => x.Id == lpnId);
+            Value(loadedOrder.JoinCurrentCycle(location.Id, "close-test", now));
+            prepare.ReceivingOrderParticipants.Add(Assert.Single(loadedOrder.Participants));
+            Assert.True(Value(loadedOrder.OpenReceivingLpn(lpn, "close-test", now)));
+            Success(loadedOrder.EditReceivingLpn(
+                lpn, sku.Id, null, 3m, "close-test", now, false));
+            prepare.LicensePlateNumberItems.Add(Assert.Single(lpn.Items));
+            await prepare.SaveChangesAsync();
+        }
+
+        return new NewCloseState(warehouse.Id, order.Id, location.Id, sku.Id, lpnId);
+    }
+
+    private static Task<OperationResult<Guid>> CloseThroughFoundationAsync(
+        IDbContextFactory<ApplicationDbContext> factory, NewCloseState state, Guid requestId)
+    {
+        const string commandType = "test.receiving-close";
+        var executor = new NewCommandExecutor(new CommandExecutionStore(factory));
+        var store = new ReceivingWorkStore(factory);
+        var posting = new NewPostInventoryMovement.Handler(new InventoryPostingStore());
+        var hash = NewCommandExecutor.ComputeHash($"{state.OrderId:N}:{state.LpnId:N}");
+        return executor.ExecuteAsync(commandType, requestId, hash, "close-test",
+            async (session, ct) =>
+            {
+                var order = await store.LoadOrderAsync(session, state.OrderId, ct);
+                var lpn = await store.LoadLpnAsync(session, state.LpnId, ct);
+                if (order is null || lpn is null)
+                    return OperationError.NotFound("Ордер или LPN не найдены.");
+                var lpnItem = lpn.Items.Single(x => !x.IsDeleted);
+                var orderItem = order.Items.Single(x => x.StockKeepingUnitId == lpnItem.StockKeepingUnitId);
+                var sku = await store.LoadSkuAsync(session, lpnItem.StockKeepingUnitId, ct);
+                if (sku is null)
+                    return OperationError.NotFound("SKU не найден.");
+                if (sku.TracksExpirationDate && lpnItem.ExpirationDate is null)
+                    return OperationError.Conflict("Для SKU требуется дата срока годности.");
+                if (orderItem.CurrentPlanQuantity is not decimal plan || lpnItem.Quantity > plan)
+                    return OperationError.Conflict("Количество LPN превышает план.");
+
+                var now = DateTimeOffset.UtcNow;
+                var closed = lpn.CloseReceiving("close-test", now, false);
+                if (!closed.IsSuccess)
+                    return closed.Error!;
+                store.GuardClosingInputs(session, orderItem, sku);
+                var movement = InventoryMovement.Create(
+                    Guid.NewGuid(), state.WarehouseId, null, state.LocationId,
+                    state.SkuId, lpnItem.Quantity, now, RecorderType.ReceivingOrder,
+                    state.OrderId, 1, "close-test", lpnItem.ExpirationDate, lpn.Id);
+                if (!movement.IsSuccess)
+                    return movement.Error!;
+                var posted = await posting.HandleAsync(new(
+                    movement.Value!, InventoryPostingKind.Receipt, now), session, ct);
+                if (!posted.IsSuccess)
+                    return posted.Error!;
+                var audit = WarehouseAuditEvent.Create(commandType, now, "close-test", null,
+                    state.OrderId, lpn.Id, state.SkuId, null,
+                    "{\"status\":\"Open\"}", "{\"status\":\"Closed\"}",
+                    [movement.Value!.Id], commandUserId: "close-test",
+                    commandType: commandType, requestId: requestId);
+                if (!audit.IsSuccess)
+                    return audit.Error!;
+                return new NewCommandExecutionResult(lpn.Id, [audit.Value!]);
+            }, default);
     }
 
     private sealed class CompletionReceiptBarrier : SaveChangesInterceptor

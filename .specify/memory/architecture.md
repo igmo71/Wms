@@ -158,6 +158,10 @@ only for an explicit pre-production baseline reset of every affected database.
 
 Use optimistic concurrency only where a stale save threatens a documented
 invariant. Shared-resource coordination may use a targeted operational revision.
+The new receiving work store provides EF concurrency guards for the plan
+quantity of an order SKU row and the SKU expiration flag. A caller can mark
+both loaded properties for conditional update in its final save; a changed
+input then rejects every staged effect of that command.
 Only recognized concurrency failures and named constraint violations become
 business conflicts; other persistence failures remain exceptions. Their shared
 legacy classification belongs under `Wms.Application.Persistence`. The new

@@ -19,4 +19,8 @@ public interface IReceivingWorkStore
         ICommandExecutionContext session, string code, CancellationToken ct);
     Task<LicensePlateNumber?> LoadLpnAsync(
         ICommandExecutionContext session, Guid lpnId, CancellationToken ct);
+    Task<StockKeepingUnit?> LoadSkuAsync(
+        ICommandExecutionContext session, Guid skuId, CancellationToken ct);
+    void GuardClosingInputs(
+        ICommandExecutionContext session, ReceivingOrderItem item, StockKeepingUnit sku);
 }

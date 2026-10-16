@@ -80,6 +80,10 @@ public sealed class JoinReceivingCycle(
                 if (!joined.IsSuccess)
                     return joined.Error!;
                 var outcome = joined.Value!;
+                if (outcome.Joined)
+                    session.Stage(order.Participants.Single(x =>
+                        x.ReceivingCycleId == outcome.CycleId
+                        && x.UserId == request.UserId.Trim()));
                 var audit = ReceivingWorkAudit.Create(
                     outcome.Joined ? "receiving.cycle.joined" : "receiving.cycle.already-joined",
                     now, request.UserId, order.Id, null, null, null,

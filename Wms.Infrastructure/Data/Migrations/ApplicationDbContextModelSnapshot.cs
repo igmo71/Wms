@@ -1171,6 +1171,7 @@ namespace Wms.Data.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<decimal?>("CurrentPlanQuantity")
+                        .IsConcurrencyToken()
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
@@ -1565,6 +1566,7 @@ namespace Wms.Data.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<bool>("TracksExpirationDate")
+                        .IsConcurrencyToken()
                         .HasColumnType("bit");
 
                     b.Property<double?>("VolumeM3")

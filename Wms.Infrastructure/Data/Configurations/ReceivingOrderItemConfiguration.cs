@@ -15,7 +15,8 @@ internal class ReceivingOrderItemConfiguration : IEntityTypeConfiguration<Receiv
         builder.Property(x => x.PlanQuantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
         builder.Property(x => x.CurrentPlanQuantity)
-            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
+            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale)
+            .IsConcurrencyToken();
         builder.Property(x => x.FactQuantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
 

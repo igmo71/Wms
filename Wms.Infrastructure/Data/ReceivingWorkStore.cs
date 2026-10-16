@@ -59,6 +59,21 @@ public sealed class ReceivingWorkStore(IDbContextFactory<ApplicationDbContext> c
         Db(session).LicensePlateNumbers.Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == lpnId, ct);
 
+    public Task<StockKeepingUnit?> LoadSkuAsync(
+        ICommandExecutionContext session, Guid skuId, CancellationToken ct) =>
+        Db(session).StockKeepingUnits.SingleOrDefaultAsync(x => x.Id == skuId, ct);
+
+    public void GuardClosingInputs(
+        ICommandExecutionContext session, ReceivingOrderItem item, StockKeepingUnit sku)
+    {
+        var db = Db(session);
+        if (db.Entry(item).State == EntityState.Detached
+            || db.Entry(sku).State == EntityState.Detached)
+            throw new InvalidOperationException("План и признак SKU должны быть загружены в сессии команды.");
+        db.Entry(item).Property(x => x.CurrentPlanQuantity).IsModified = true;
+        db.Entry(sku).Property(x => x.TracksExpirationDate).IsModified = true;
+    }
+
     private static ApplicationDbContext Db(ICommandExecutionContext session) =>
         session is CommandExecutionStore.Session commandSession
             ? commandSession.Db
