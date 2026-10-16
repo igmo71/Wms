@@ -12,7 +12,8 @@ and cycle/LPN work in the new receiving use cases accept `Operator` or
 `Manager`; `Administrator` alone grants none of those commands. A `Manager`
 may edit or cancel another user's open receiving LPN. Imported catalog
 lists are visible to `Manager` and `Administrator`; manual synchronization from
-WebApp or the catalog import API requires `Manager` at execution. Zones and
+WebApp or the catalog import API requires `Manager` at execution. Changing the
+SKU expiration-tracking flag also requires `Manager` at execution. Zones and
 storage locations remain administrator-only configuration. Public
 self-registration is not offered; administrator-created accounts are confirmed
 local accounts with one or more WMS roles whose rights combine. An administrator

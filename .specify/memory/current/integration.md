@@ -6,6 +6,8 @@ Manual catalog imports are available from the WebApp catalog lists and the
 `GET /api/1c/.../import` endpoints. Their role rule is owned by
 [identity.md](identity.md); notification endpoints and background imports remain
 the automatic integration path.
+SKU imports preserve the WMS-owned expiration-tracking flag; its behavior is
+described in [receiving.md](receiving.md).
 
 The receiving source reader fetches the current 1C document by `Ref_Key` and
 returns the unchanged JSON response. The new synchronization use case stores a

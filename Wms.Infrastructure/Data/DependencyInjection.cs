@@ -5,6 +5,7 @@ using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
 using Wms.Application.Receiving;
+using Wms.Application.StockKeepingUnits;
 
 namespace Wms.Data;
 
@@ -46,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<ConfirmZeroReceived>();
         services.AddScoped<CloseReceivingLpn>();
         services.AddScoped<PutAwayReceivingLpn>();
+        services.AddScoped<IExpirationTrackingStore, ExpirationTrackingStore>();
+        services.AddScoped<SetExpirationTracking>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

@@ -53,6 +53,13 @@ post inventory. A current-cycle participant can confirm a SKU as checked zero
 when no active LPN contains it; the audit and command receipt are saved with
 the fact update. Mobile receiving now uses these scenarios.
 
+The SKU expiration-tracking flag belongs to WMS. A `Manager` can switch it on
+or off from the Web catalog; each actual switch records the previous and new
+value, actor and time in warehouse audit history. Repeating the same command
+does not add another switch. Catalog imports update only 1C-owned SKU fields
+and preserve the flag. Switching it off does not change dates already saved on
+LPNs, movements, turnovers or balances, and does not merge dated stock groups.
+
 ## LPN issuance
 
 The canonical issued-number entity is `LicensePlateNumber`; `lpn` is an

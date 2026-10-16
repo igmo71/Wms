@@ -60,12 +60,12 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var exists = await dbContext.StockKeepingUnits.AnyAsync(x => x.Id == item.Id, ct);
-
-        if (exists)
-            dbContext.StockKeepingUnits.Update(item);
-        else
+        var existing = await dbContext.StockKeepingUnits
+            .SingleOrDefaultAsync(x => x.Id == item.Id, ct);
+        if (existing is null)
             dbContext.StockKeepingUnits.Add(item);
+        else
+            CopyImportedFields(existing, item);
 
         await dbContext.SaveChangesAsync(ct);
     }
@@ -80,23 +80,29 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
 
         var incomingIds = items.Select(x => x.Id).ToList();
 
-        var existingIds = await dbContext.StockKeepingUnits
+        var existing = await dbContext.StockKeepingUnits
             .Where(x => incomingIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToHashSetAsync(ct);
+            .ToDictionaryAsync(x => x.Id, ct);
 
         foreach (var item in items)
         {
-            if (existingIds.Contains(item.Id))
-            {
-                dbContext.StockKeepingUnits.Update(item);
-            }
+            if (existing.TryGetValue(item.Id, out var current))
+                CopyImportedFields(current, item);
             else
-            {
                 dbContext.StockKeepingUnits.Add(item);
-            }
         }
         await dbContext.SaveChangesAsync(ct);
+    }
+
+    private static void CopyImportedFields(StockKeepingUnit target, StockKeepingUnit source)
+    {
+        target.Code = source.Code;
+        target.Name = source.Name;
+        target.DeletionMark = source.DeletionMark;
+        target.BaseUnitOfMeasureId = source.BaseUnitOfMeasureId;
+        target.WeightKg = source.WeightKg;
+        target.VolumeM3 = source.VolumeM3;
+        // TracksExpirationDate belongs to WMS and is never supplied by 1C.
     }
 
     public async Task<ListResult<StockKeepingUnit>> ListAsync(ListQuery listQuery, CancellationToken ct = default)

@@ -30,6 +30,16 @@ else if (_importWarning)
 {
     <MudAlert Severity="Severity.Warning" Class="mb-4">@_importMessage</MudAlert>
 }
+@if (_trackingMessage is not null)
+{
+    <MudAlert Severity="@(_trackingError ? Severity.Error : Severity.Success)" Class="mb-4">@_trackingMessage</MudAlert>
+}
+@if (_pendingTracking is not null)
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="_isChangingTracking" OnClick="RetryTrackingAsync" Class="mb-4">
+        Повторить изменение признака
+    </MudButton>
+}
 
 <MudPaper Class="pa-3 mb-4" Elevation="1">
     <MudStack Row="true" AlignItems="AlignItems.Center">
@@ -49,7 +59,43 @@ else if (_importWarning)
         <PropertyColumn Property="x => x.VolumeM3" Title="Объём, м³" Sortable="true">
             <CellTemplate>@(context.Item.VolumeM3 is double volume ? volume.ToString("0.######") : "—")</CellTemplate>
         </PropertyColumn>
+        <TemplateColumn Title="Учёт срока" Sortable="false">
+            <CellTemplate>
+                <AuthorizeView Roles="@ApplicationRoles.Manager" Context="authorization">
+                    <Authorized>
+                        <MudSwitch T="bool" Value="context.Item.TracksExpirationDate"
+                                   ValueChanged="enabled => ChangeTrackingAsync(context.Item, enabled)"
+                                   Disabled="@(_isChangingTracking || _pendingTracking is not null)"
+                                   Color="Color.Primary" />
+                    </Authorized>
+                    <NotAuthorized>@(context.Item.TracksExpirationDate ? "Включён" : "Выключен")</NotAuthorized>
+                </AuthorizeView>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="История срока" Sortable="false">
+            <CellTemplate>
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => ShowTrackingHistoryAsync(context.Item)" Disabled="_isChangingTracking">История</MudButton>
+            </CellTemplate>
+        </TemplateColumn>
         <TemplateColumn Title="Статус" Sortable="false"><CellTemplate><MudTooltip Text="@(context.Item.DeletionMark ? "Деактивирована" : "Активна")"><MudIcon Icon="@(context.Item.DeletionMark ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)" Color="@(context.Item.DeletionMark ? Color.Default : Color.Success)" /></MudTooltip></CellTemplate></TemplateColumn>
     </Columns>
     <PagerContent><MudDataGridPager T="StockKeepingUnit" PageSizeOptions="new[] { 10, 25, 50 }" /></PagerContent>
 </MudDataGrid>
+
+@if (_historySkuId is not null)
+{
+    <MudPaper Class="pa-3 mt-4" Elevation="1">
+        <MudText Typo="Typo.h6">История учёта срока: @_historySkuName</MudText>
+        @if (_trackingHistory.Count == 0)
+        {
+            <MudText>Переключений пока нет.</MudText>
+        }
+        else
+        {
+            @foreach (var change in _trackingHistory)
+            {
+                <MudText>@change.OccurredAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @change.ActorName: @(change.Before ? "Включён" : "Выключен") → @(change.After ? "Включён" : "Выключен")</MudText>
+            }
+        }
+    </MudPaper>
+}
