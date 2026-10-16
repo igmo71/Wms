@@ -294,7 +294,7 @@ public sealed class LicensePlateNumber
         var placedQuantity = _putaways
             .Where(x => x.LicensePlateNumberItemId == itemId)
             .Sum(x => x.Quantity);
-        if (placedQuantity + quantity > item.Quantity)
+        if (quantity > item.Quantity - placedQuantity)
             return OperationError.Conflict("Количество размещения превышает остаток выбранного LPN.");
 
         var putawayResult = LicensePlateNumberPutaway.Create(

@@ -23,6 +23,14 @@ plan requires `Manager`; a past expiration date requires explicit confirmation.
 Concurrent changes to the plan, SKU expiration flag, source version, order or
 LPN reject the staged close. No Web or Mobile entry point calls it yet.
 
+The new Application putaway use case moves a positive part of a closed receiving
+LPN from its original receiving location to a Storage location, even while the
+order is still in receiving. It takes the SKU and expiration date from that LPN,
+checks both its unplaced quantity and the physical source balance, and saves
+the LPN-linked movement, putaway history, audit and command receipt together.
+The LPN revision rejects a concurrent change to the same LPN.
+This use case is not connected to Web or Mobile yet.
+
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire
 catalog, including SKU outside the order. An `Operator` or `Manager` can add a
@@ -204,14 +212,11 @@ After conflict refresh, an insufficient remainder revokes confirmation; an
 unavailable SKU or LPN returns to the current selection/status. Success resets
 quantity confirmation before the next SKU selection.
 
-Putaway is blocked until the receiving order is completed. Each command checks
-both the physical source balance and the separate remaining limit of its LPN
-item. The LPN operational revision coordinates concurrent employees, while
-balance row versions independently protect shared physical stock. Movement,
-balances, turnover, LPN history and command receipt commit atomically. Receiving
+The legacy Mobile putaway command is disabled while its screen and read endpoints
+await replacement. Only the new Application command can post putaway. Receiving
 orders have no placement status or order-level putaway commands. A scanned
-destination need not be recommended; any scanned destination is
-validated at posting time.
+destination need not be recommended; the new command validates any selected
+destination when posting.
 
 The LPN quantity screen recommends active unlocked Storage locations in the
 order warehouse. Locations with positive current stock of the selected SKU come

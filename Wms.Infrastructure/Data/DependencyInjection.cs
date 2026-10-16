@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<CancelReceivingLpn>();
         services.AddScoped<ConfirmZeroReceived>();
         services.AddScoped<CloseReceivingLpn>();
+        services.AddScoped<PutAwayReceivingLpn>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

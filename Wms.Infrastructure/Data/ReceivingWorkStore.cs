@@ -79,6 +79,12 @@ public sealed class ReceivingWorkStore(IDbContextFactory<ApplicationDbContext> c
         Db(session).LicensePlateNumbers.Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == lpnId, ct);
 
+    public Task<LicensePlateNumber?> LoadLpnForPutawayAsync(
+        ICommandExecutionContext session, Guid lpnId, CancellationToken ct) =>
+        Db(session).LicensePlateNumbers.Include(x => x.Items)
+            .Include(x => x.Putaways).AsSplitQuery()
+            .SingleOrDefaultAsync(x => x.Id == lpnId, ct);
+
     public Task<StockKeepingUnit?> LoadSkuAsync(
         ICommandExecutionContext session, Guid skuId, CancellationToken ct) =>
         Db(session).StockKeepingUnits.SingleOrDefaultAsync(x => x.Id == skuId, ct);

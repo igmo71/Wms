@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
+using Wms.Application.Authorization;
 using Wms.Application.Commands;
 using Wms.Application.Inventory.Movements;
 using Wms.Application.LicensePlateNumbers;
@@ -22,6 +23,62 @@ namespace Wms.Tests.Receiving;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class ReceivingSafetyTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task New_putaway_posts_partial_lpn_before_order_completion_once_and_rejects_overspend()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var storageZone = Zone(state.WarehouseId, "PS", ZoneType.Storage);
+        var destination = Location(state.WarehouseId, storageZone, 2);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(storageZone, destination);
+            await seed.SaveChangesAsync();
+        }
+        Value(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()));
+        Guid itemId;
+        await using (var lookup = database.CreateDbContext())
+            itemId = await lookup.LicensePlateNumberItems
+                .Where(x => x.LicensePlateNumberId == state.LpnId)
+                .Select(x => x.Id).SingleAsync();
+
+        var putaway = new PutAwayReceivingLpn(
+            new NewCommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingWorkStore(database),
+            new NewPostInventoryMovement.Handler(new InventoryPostingStore()),
+            new WarehousePermission(new PutawayPermission()), TimeProvider.System);
+        var request = new PutAwayReceivingLpnCommand(
+            Guid.NewGuid(), state.LpnId, itemId, destination.Id, 2m, "close-test");
+        var putawayId = Value(await putaway.ExecuteAsync(request));
+        Assert.Equal(putawayId, Value(await putaway.ExecuteAsync(request)));
+        Error(await putaway.ExecuteAsync(new PutAwayReceivingLpnCommand(
+            Guid.NewGuid(), state.LpnId, itemId, destination.Id, 2m, "close-test")),
+            OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(ReceivingOrderStatus.InReceiving,
+            (await verify.ReceivingOrders.SingleAsync(x => x.Id == state.OrderId)).Status);
+        var placed = await verify.LicensePlateNumberPutaways.SingleAsync(x => x.Id == putawayId);
+        Assert.Equal(2m, placed.Quantity);
+        var movement = await verify.InventoryMovements.SingleAsync(x =>
+            x.Id == placed.InventoryMovementId);
+        Assert.Equal(state.LpnId, movement.LicensePlateNumberId);
+        Assert.Equal(state.LocationId, movement.SourceStorageLocationId);
+        Assert.Equal(destination.Id, movement.DestinationStorageLocationId);
+        Assert.Equal(2m, movement.Quantity);
+        Assert.Equal(1m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == state.LocationId && x.StockKeepingUnitId == state.SkuId)).Quantity);
+        Assert.Equal(2m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == destination.Id && x.StockKeepingUnitId == state.SkuId)).Quantity);
+        Assert.Equal(2, await verify.InventoryTurnovers.CountAsync(x =>
+            x.InventoryMovementId == movement.Id));
+        var audit = await verify.WarehouseAuditEvents.SingleAsync(x =>
+            x.CommandType == "receiving.lpn.putaway" && x.RequestId == request.RequestId);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(new[] { movement.Id }),
+            audit.MovementIdsJson);
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "receiving.lpn.putaway" && x.RequestId == request.RequestId));
+    }
+
     [Fact]
     public async Task New_receiving_close_replay_commits_one_complete_stock_and_audit_set()
     {
@@ -420,6 +477,15 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
 
     private sealed record NewCloseState(
         Guid WarehouseId, Guid OrderId, Guid LocationId, Guid SkuId, Guid LpnId);
+
+    private sealed class PutawayPermission : IWarehousePermissionStore
+    {
+        public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(false);
+
+        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(userId == "close-test");
+    }
 
     private async Task<NewCloseState> SeedNewOpenReceivingLpnAsync()
     {

@@ -21,6 +21,8 @@ public interface IReceivingWorkStore
         ICommandExecutionContext session, string code, CancellationToken ct);
     Task<LicensePlateNumber?> LoadLpnAsync(
         ICommandExecutionContext session, Guid lpnId, CancellationToken ct);
+    Task<LicensePlateNumber?> LoadLpnForPutawayAsync(
+        ICommandExecutionContext session, Guid lpnId, CancellationToken ct);
     Task<StockKeepingUnit?> LoadSkuAsync(
         ICommandExecutionContext session, Guid skuId, CancellationToken ct);
     void GuardClosingInputs(

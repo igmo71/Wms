@@ -1,8 +1,5 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Commands;
-using Wms.Application.Inventory.Movements;
-using Wms.Application.ReceivingOrders;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -11,12 +8,8 @@ using Wms.Domain.Enums;
 namespace Wms.Application.LicensePlateNumbers;
 
 public sealed class LicensePlateNumberPutawayService(
-    CommandExecutor commandExecutor,
-    IDbContextFactory<ApplicationDbContext> dbContextFactory,
-    InventoryPostingService inventoryPostingService)
+    IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    private const string PutawayCommandType = "lpn.putaway";
-
     public async Task<OperationResult<LicensePlateNumberPutawayDetails>> GetByCodeAsync(
         string code,
         CancellationToken ct = default)
@@ -95,77 +88,8 @@ public sealed class LicensePlateNumberPutawayService(
         PutawayLicensePlateNumberCommand command,
         CommandContext context,
         CancellationToken ct = default) =>
-        commandExecutor.ExecuteAsync(
-            PutawayCommandType,
-            context.RequestId,
-            CommandExecutor.ComputeHash(
-                $"{command.LicensePlateNumberId:N}|{command.LicensePlateNumberItemId:N}|{command.DestinationStorageLocationId:N}|{command.Quantity.ToString("G29", CultureInfo.InvariantCulture)}"),
-            context.UserId,
-            (db, token) => PutawayCoreAsync(db, command, context.UserId, token),
-            ct);
-
-    private async Task<OperationResult<Guid>> PutawayCoreAsync(
-        ApplicationDbContext dbContext,
-        PutawayLicensePlateNumberCommand command,
-        string userId,
-        CancellationToken ct)
-    {
-        var lpn = await LoadAsync(dbContext, x => x.Id == command.LicensePlateNumberId, false, ct);
-        if (lpn is null)
-            return OperationError.NotFound("Палета не найдена.");
-        if (lpn.ReceivingOrder is not { Status: ReceivingOrderStatus.Received } order)
-            return OperationError.Invalid("Размещение запрещено до завершения приходного ордера.");
-        if (order.ReceivingLocationId is null)
-            return OperationError.Invalid("Для приходного ордера не назначена позиция приёмки.");
-
-        var item = lpn.Items.SingleOrDefault(x => x.Id == command.LicensePlateNumberItemId && !x.IsDeleted);
-        if (item is null)
-            return OperationError.NotFound("Строка состава палеты не найдена.");
-        var orderItem = order.Items.SingleOrDefault(x => x.StockKeepingUnitId == item.StockKeepingUnitId);
-        if (orderItem is null)
-            return OperationError.Invalid("Товар палеты отсутствует в принятом ордере.");
-
-        var movementId = Guid.NewGuid();
-        var movementResult = InventoryMovement.Create(
-            movementId,
-            order.WarehouseId,
-            order.ReceivingLocationId,
-            command.DestinationStorageLocationId,
-            item.StockKeepingUnitId,
-            command.Quantity,
-            DateTimeOffset.UtcNow,
-            RecorderType.ReceivingOrder,
-            order.Id,
-            orderItem.LineNumber,
-            userId);
-        if (!movementResult.IsSuccess)
-            return movementResult.Error!;
-
-        var putawayResult = lpn.CreatePutaway(
-            item.Id,
-            command.DestinationStorageLocationId,
-            command.Quantity,
-            movementId,
-            userId,
-            DateTimeOffset.UtcNow);
-        if (!putawayResult.IsSuccess)
-            return putawayResult.Error!;
-
-        var movement = movementResult.Value!;
-        var routeResult = await ReceivingOrderLocationPolicy.ValidatePutawayRoutesAsync(
-            dbContext, order, [movement], ct);
-        if (!routeResult.IsSuccess)
-            return routeResult.Error!;
-
-        dbContext.InventoryMovements.Add(movement);
-        dbContext.LicensePlateNumberPutaways.Add(putawayResult.Value!);
-        var postingResult = await inventoryPostingService.PostInventoryMovementsAsync(
-            [movement], dbContext, ct);
-        if (!postingResult.IsSuccess)
-            return postingResult.Error!;
-
-        return putawayResult.Value!.Id;
-    }
+        Task.FromResult<OperationResult<Guid>>(
+            OperationError.Conflict("Старое размещение отключено. Обновите приложение."));
 
     private static Task<LicensePlateNumber?> LoadAsync(
         ApplicationDbContext dbContext,
