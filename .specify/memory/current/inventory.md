@@ -71,11 +71,15 @@ base unit is `упак`; the number in the name does not multiply its quantity.
 Refilling into another pack size is represented by a different SKU. Package
 keys and characteristics do not participate in SKU identity.
 
-`InventoryBalance` is current quantity at a location. Posted
-`InventoryMovement` records warehouse movement, and `InventoryTurnover` is its
-immutable before/delta/after history. Draft picking movements do not change
-inventory; LPN putaway posts each confirmed movement immediately. Zero balance
-rows are retained and support historical-location suggestions.
+`InventoryBalance` is current signed quantity by warehouse, location, SKU,
+and nullable expiration date. SQL Server keeps one balance key even when the
+date is `null`. Posted `InventoryMovement` records warehouse movement with
+its LPN provenance when applicable, and `InventoryTurnover` is its immutable
+before/delta/after history. Closing a receiving LPN posts the receipt at its
+original Receiving location. Each confirmed partial putaway posts immediately
+from there to Storage; order completion posts nothing. Draft picking movements
+do not change inventory. Zero balance rows are retained and support
+historical-location suggestions.
 The Web balance list shows one row per warehouse, location, SKU and expiration
 date, with an explicit "Не указан" for a balance without a date. Different dates
 remain separate even after the SKU's expiration-tracking flag is turned off.
@@ -84,9 +88,16 @@ balances without a date for SKUs whose local expiration flag is now enabled.
 It shows warehouse, location, SKU and signed quantity, including negative
 balances; zero rows and dated groups do not appear. The report only reads stock.
 
-Posting validates active topology, folder status, locks, the workflow-specific
-zone route, and physical balance in the caller's save. Posting and
-eligibility-changing topology or lock updates advance
+Posting validates active topology, folder status, locks, and the
+workflow-specific zone route in the caller's save. Putaway also requires
+enough physical balance at the source for the selected SKU and date.
+Receiving correction and reversal can leave a signed negative balance when
+their own rules permit it; the Web deletion preview makes this explicit.
+Posting and eligibility-changing topology or lock updates advance
 `StorageLocation.OperationalRevision`. Transfers additionally use transfer and
 balance concurrency tokens plus named database constraints. Only recognized
 inventory concurrency failures become business conflicts.
+
+Old picking, shipping, transfers, and inventory counts have not been adapted
+to every dated or negative group. Their replacement and count expansion are
+tracked in [the backlog](../backlog.md).

@@ -1,10 +1,9 @@
 # WMS architecture
 
 This document describes the implemented code and its detailed engineering
-conventions. The proposed receiving redesign belongs to the active
-[feature plan](../../specs/001-receiving-stock-lifecycle/plan.md) until those
-business changes are implemented. Project-wide principles live in the
-[WMS Constitution](constitution.md).
+conventions. The receiving implementation follows the
+[feature plan](../../specs/001-receiving-stock-lifecycle/plan.md).
+Project-wide principles live in the [WMS Constitution](constitution.md).
 
 ## Current project map
 
@@ -137,15 +136,17 @@ the `ClientRequestId` name; schema renames preserve existing receipt keys,
 types, hashes and results. Location barcode parsing may precede the application
 command at the API boundary; inventory-count barcode resolution follows receipt lookup.
 
-The former receiving-completion checkpoint is no longer called by an active
-receiving route. Shipping uses `PersistReadyForShipmentCheckpointAsync` and
-`PersistShippedCheckpointAsync`.
-These explicitly named operations run after receipt lookup and before final
-effects. Each is an independent synchronization commit and survives a failed
-final phase. Other
-intermediate saves require explicit documented application semantics. Business
-completion helpers do not save. SQL and 1C remain separate boundaries; receipt
-uniqueness does not prevent concurrent external calls before final persistence.
+The active receiving completion command checks linked source mirrors and saves
+an immutable cycle decision without posting stock or calling a legacy
+completion checkpoint. Receiving LPN close posts the receipt, and putaway posts
+each placement through the new executor. Shipping uses
+`PersistReadyForShipmentCheckpointAsync` and
+`PersistShippedCheckpointAsync` in its older workflow. These explicitly
+named checkpoints run after receipt lookup and before final effects. Each is
+an independent synchronization commit and survives a failed final phase.
+Other intermediate saves require explicit application semantics. SQL and 1C
+remain separate boundaries; receipt uniqueness does not prevent concurrent
+external calls before final persistence.
 
 Warehouse commands do not expose staging methods for Mobile receipt
 orchestration. Use business-named private helpers only where they clarify

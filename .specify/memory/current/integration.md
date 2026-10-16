@@ -1,69 +1,55 @@
 # Current 1C integration
 
-## 1C synchronization
+## Catalogs and receiving sources
 
 Manual catalog imports are available from the WebApp catalog lists and the
 `GET /api/1c/.../import` endpoints. Their role rule is owned by
-[identity.md](identity.md); notification endpoints and background imports remain
-the automatic integration path.
-SKU imports preserve the WMS-owned expiration-tracking flag; its behavior is
-described in [receiving.md](receiving.md).
+[identity.md](identity.md); notification endpoints and background imports
+remain the automatic integration path. SKU imports preserve the WMS-owned
+expiration-tracking flag described in [receiving.md](receiving.md).
 
-The receiving source reader fetches the current 1C document by `Ref_Key` and
-returns the unchanged JSON response. The new synchronization use case stores a
-successful response as a source version only when its content changes. It also
-updates the last successful check time on an unchanged response and rebuilds the
-derived line projection after catalog changes. Source lines remain separate;
-unsupported quantities and unknown SKU retain reasons without hiding valid
-quantities of other SKU. A failed read or unreadable response records the last
-attempt error without replacing the successful version. The notification path
-uses this synchronization before the legacy receiving adapter maps the response.
-For linked new WMS orders, successful source checks also update the current plan
-as described in [receiving.md](receiving.md). The synchronization assessment and
-protected-plan rules below describe the legacy 1C-backed order path.
-Manager-initiated checks of all sources in one WMS order record an audit event
-for each successful or failed source attempt alongside its mirror update.
+The receiving reader fetches the current 1C document by `Ref_Key` and returns
+its JSON response. A successful check stores a new immutable source version
+only when content changes. An unchanged response updates the last successful
+check time and rebuilds line projections after catalog changes. Source lines
+remain separate: unsupported quantities and unknown SKUs retain reasons
+without hiding valid quantities of other SKUs. A failed read or unreadable
+response records the attempt error without replacing the last successful
+version. For linked WMS orders, successful checks recalculate only the current
+plan as described in [receiving.md](receiving.md).
 
-Before warehouse work starts, an admissible source document remains owned by
-1C. While WMS and 1C remain in matching initial states, synchronization replaces
-source-owned metadata and the complete plan. Deletion marks, posting changes,
-unexpected source status, malformed plans, and unsupported line semantics are
-blocking. After work starts, synchronization never replaces the protected WMS
-plan or warehouse fact. A successful shipping rollback returns the order to the
-initial synchronization mode.
+The existing 1C notification adapter fetches the document through this source
+check before mapping it to its older import snapshot. That adapter may still
+maintain a legacy source-order record; it is not the active receiving or stock
+posting path. Web Managers may check all sources of one WMS order manually.
+Each attempt records its outcome and mirror update in audit.
 
-A document notification may create a missing source order. An explicit
-synchronization check requires that the local order already exist.
+New receiving and putaway do not write status, item tables, or comments to 1C.
+WMS owns its receiving location, facts, cycles, LPNs, movements, users, and
+timestamps. Current receiving has no direct line-comment command. Historical
+receiving comments remain WMS-owned annotations, not warehouse facts.
 
-Synchronization assessments are `Synchronized`,
-`RequiresOperatorDecision`, or `Blocking`. WebApp may acknowledge only an
-operator-decision assessment after a fresh fingerprint check; acknowledgement
-copies source-owned metadata only. Mobile shows the latest assessment but
-cannot acknowledge it.
+## Remaining older processes
 
-Mobile receiving, picking, and shipping screens support pull-to-refresh for a
-fresh synchronization check. A rejected completion conflict also refreshes the
-assessment; unresolved or failed verification disables completion. Refresh
-does not acknowledge source changes or replay pending commands.
+The synchronization assessment (`Synchronized`,
+`RequiresOperatorDecision`, or `Blocking`) and protected-plan behavior in
+the older import path still serve its existing consumers. They do not decide
+new receiving completion. Before older warehouse work starts, admissible
+source metadata and plan can be replaced while WMS and 1C are in matching
+initial states. After work starts, the older synchronization path protects
+local facts. A document notification may create a missing older source-order
+record; an explicit check requires one already present. Web may acknowledge a
+fresh operator-decision fingerprint; Mobile cannot acknowledge it.
 
-Mobile receiving omits the technical changed-field list from synchronization
-messages, retaining verification errors, blocking guidance and required actions.
-
-Starting work rejects a known unresolved assessment. Receiving completion,
-picking completion, and final shipping fetch and persist a fresh checkpoint
-before final effects. Receiving applies the LPN plan/fact and Manager-decision
-rules above and never writes to 1C. Shipping may continue on an exact source
-state or the exact repeat-safe outbound target; an unacknowledged decision
-stops that transition. Technical failure or a blocking assessment stops both.
-Repeated identical assessments do not advance the order revision.
+The older picking and shipping screens support pull-to-refresh of their source
+assessment. Picking completion and final shipping fetch a fresh checkpoint
+before effects. An unresolved decision, blocking assessment, or technical
+failure stops the affected transition. Shipping accepts an exact source state
+or repeat-safe outbound target. Its item-table target, status, and posting
+calls are repeatable.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
-WMS-to-1C multi-step transitions are not atomic across both systems; pilot
-operation therefore requires the recovery procedure tracked in the roadmap.
-Shipping completion treats an already-applied exact 1C item-table target as
-success, and its target status and posting calls are repeatable.
-
-Historical receiving line comments are retained as WMS-owned annotations, not
-warehouse facts. Current receiving has no direct line-comment command and does
-not send status, item updates or comments to 1C. Comment differences
-do not affect synchronization assessments or fingerprints and never block work.
+WMS-to-1C multi-step transitions are not atomic across systems; the shipping
+recovery procedure remains in [the backlog](../backlog.md). Replacement of
+picking, shipping, transfers, and expanded inventory is also deferred there;
+their old flows are not established as ready for production with dated stock.
