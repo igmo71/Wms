@@ -76,6 +76,9 @@ keys and characteristics do not participate in SKU identity.
 immutable before/delta/after history. Draft picking movements do not change
 inventory; LPN putaway posts each confirmed movement immediately. Zero balance
 rows are retained and support historical-location suggestions.
+The Web balance list shows one row per warehouse, location, SKU and expiration
+date, with an explicit "Не указан" for a balance without a date. Different dates
+remain separate even after the SKU's expiration-tracking flag is turned off.
 
 Posting validates active topology, folder status, locks, the workflow-specific
 zone route, and physical balance in the caller's save. Posting and

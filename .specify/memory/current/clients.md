@@ -35,6 +35,8 @@ Web `/receiving-orders` lists unlinked 1C sources separately from WMS orders.
 Operators and Managers can select several sources of one warehouse, inspect
 their summed plan and create an order. The order page shows current plan, fact,
 source versions and errors, LPN quantities, expiration dates and putaway history.
+Each receiving LPN shows its own status; its active SKU row shows the expiration
+date or "Не указан" without a separate item-state label.
 Unchecked fact is textual; different SKU quantities are not totaled together.
 A Web Manager can add a synchronized catalog SKU and close an open LPN, including
 explicit past-date confirmation and an optional reason. Web no longer calls

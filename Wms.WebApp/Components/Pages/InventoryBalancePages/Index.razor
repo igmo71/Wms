@@ -61,6 +61,9 @@
         </PropertyColumn>
         <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
         <PropertyColumn Property="x => x.StockKeepingUnit!.Code" Title="Код" Sortable="false" />
+        <PropertyColumn Property="x => x.ExpirationDate" Title="Срок годности" Sortable="true">
+            <CellTemplate>@(context.Item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</CellTemplate>
+        </PropertyColumn>
         <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
         <PropertyColumn Property="x => x.Quantity" Title="Количество" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightKg)</CellTemplate></TemplateColumn>

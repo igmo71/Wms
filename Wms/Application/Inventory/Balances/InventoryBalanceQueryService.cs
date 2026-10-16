@@ -85,6 +85,9 @@ public class InventoryBalanceQueryService(IDbContextFactory<ApplicationDbContext
             "StockKeepingUnit" or "StockKeepingUnit.Name" => sortDescending
                 ? query.OrderByDescending(x => x.StockKeepingUnit!.Name)
                 : query.OrderBy(x => x.StockKeepingUnit!.Name),
+            "ExpirationDate" => sortDescending
+                ? query.OrderByDescending(x => x.ExpirationDate).ThenBy(x => x.Id)
+                : query.OrderBy(x => x.ExpirationDate).ThenBy(x => x.Id),
             "Quantity" => sortDescending
                 ? query.OrderByDescending(x => x.Quantity)
                 : query.OrderBy(x => x.Quantity),
@@ -92,8 +95,13 @@ public class InventoryBalanceQueryService(IDbContextFactory<ApplicationDbContext
                 ? query.OrderByDescending(x => x.UpdatedAtUtc)
                 : query.OrderBy(x => x.UpdatedAtUtc),
             _ => query.OrderBy(x => x.Warehouse!.Name)
+                .ThenBy(x => x.WarehouseId)
                 .ThenBy(x => x.StorageLocation!.Name)
+                .ThenBy(x => x.StorageLocationId)
                 .ThenBy(x => x.StockKeepingUnit!.Name)
+                .ThenBy(x => x.StockKeepingUnitId)
+                .ThenBy(x => x.ExpirationDate)
+                .ThenBy(x => x.Id)
         };
     }
 }

@@ -133,7 +133,8 @@ else
                     </MudStack>
                     @foreach (var item in lpn.Items)
                     {
-                        <MudText>@(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · срок: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан") · размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</MudText>
+                        <MudText>@(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · Срок годности: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudText>
+                        <MudText Typo="Typo.caption">Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</MudText>
                     }
                     @foreach (var putaway in lpn.Putaways)
                     {
