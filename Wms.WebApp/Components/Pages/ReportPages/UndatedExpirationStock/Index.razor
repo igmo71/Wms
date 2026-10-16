@@ -1,0 +1,61 @@
+@page "/reports/undated-expiration-stock"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = ApplicationRoles.WmsUser)]
+@using Wms.Application.Reports
+@using Wms.Data
+@using Wms.Domain
+
+<PageTitle>Остатки без срока годности</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Остатки без срока годности</MudText>
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    SKU с включённым учётом срока и ненулевым остатком без даты. Отрицательные остатки также показаны.
+</MudAlert>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudAutocomplete T="Warehouse"
+                     Value="_warehouse"
+                     ValueChanged="OnWarehouseChangedAsync"
+                     SearchFunc="SearchWarehousesAsync"
+                     ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                     Label="Склад"
+                     Clearable="true" />
+</MudPaper>
+
+<MudDataGrid T="UndatedExpirationStockRow"
+             @ref="_dataGrid"
+             ServerData="LoadServerDataAsync"
+             Filterable="false"
+             Hover="true"
+             Striped="true"
+             Dense="true"
+             RowsPerPage="25">
+    <Columns>
+        <PropertyColumn Property="x => x.WarehouseName" Title="Склад" Sortable="false">
+            <CellTemplate>@(context.Item.WarehouseName ?? "—")</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.LocationCode" Title="Ячейка" Sortable="false">
+            <CellTemplate>@StorageLocationAddress.Format(context.Item.LocationCode)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.SkuName" Title="Номенклатура" Sortable="false">
+            <CellTemplate>@(context.Item.SkuName ?? context.Item.SkuId.ToString())</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.SkuCode" Title="Код" Sortable="false" />
+        <PropertyColumn Property="x => x.Quantity" Title="Количество" Sortable="false">
+            <CellTemplate>
+                <MudText Color="@(context.Item.Quantity < 0 ? Color.Error : Color.Default)">
+                    @context.Item.Quantity.ToString("N3")
+                </MudText>
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.UnitOfMeasure" Title="Ед. изм." Sortable="false">
+            <CellTemplate>@(context.Item.UnitOfMeasure ?? "—")</CellTemplate>
+        </PropertyColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="UndatedExpirationStockRow" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+    <NoRecordsContent>
+        <MudText Class="pa-4">Ненулевых остатков без даты для SKU с включённым учётом срока нет.</MudText>
+    </NoRecordsContent>
+</MudDataGrid>

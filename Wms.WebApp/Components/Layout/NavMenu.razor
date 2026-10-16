@@ -19,6 +19,7 @@
     </MudNavGroup>
     <MudNavGroup Title="Отчеты" Icon="@Icons.Material.Filled.Assessment">
         <MudNavLink Href="reports/employee-performance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Производительность сотрудников</MudNavLink>
+        <MudNavLink Href="reports/undated-expiration-stock" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventBusy">Остатки без срока</MudNavLink>
     </MudNavGroup>
     <AuthorizeView Roles="@ApplicationRoles.ManagerOrAdministrator" Context="catalogContext">
     <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">

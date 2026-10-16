@@ -79,6 +79,10 @@ rows are retained and support historical-location suggestions.
 The Web balance list shows one row per warehouse, location, SKU and expiration
 date, with an explicit "Не указан" for a balance without a date. Different dates
 remain separate even after the SKU's expiration-tracking flag is turned off.
+The separate Web report for undated expiration stock lists current nonzero
+balances without a date for SKUs whose local expiration flag is now enabled.
+It shows warehouse, location, SKU and signed quantity, including negative
+balances; zero rows and dated groups do not appear. The report only reads stock.
 
 Posting validates active topology, folder status, locks, the workflow-specific
 zone route, and physical balance in the caller's save. Posting and
