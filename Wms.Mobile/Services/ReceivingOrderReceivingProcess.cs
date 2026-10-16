@@ -28,6 +28,16 @@ public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient cl
         StartAsync("Проверено: 0", orderId, async id =>
             (await client.ConfirmZeroAsync(orderId, skuId, id)).ResourceId);
 
+    public Task<MobileReceivingWorkOrderResponse> AttachSourceAsync(
+        Guid orderId, string barcode) =>
+        StartAsync("Добавить источник", orderId, async id =>
+            (await client.AttachSourceAsync(orderId, barcode, id)).ResourceId);
+
+    public Task<MobileReceivingWorkOrderResponse> DetachSourceAsync(
+        Guid orderId, Guid sourceRefKey) =>
+        StartAsync("Открепить источник", orderId, async id =>
+            (await client.DetachSourceAsync(orderId, sourceRefKey, id)).ResourceId);
+
     public Task<MobileReceivingWorkOrderResponse> EditLpnAsync(
         Guid orderId, Guid lpnId, Guid skuId, decimal quantity, DateOnly? expirationDate) =>
         StartAsync("Сохранить LPN", orderId, async id =>

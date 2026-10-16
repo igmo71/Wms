@@ -66,6 +66,8 @@ public sealed record MobileReceivingSkuCandidateResponse(
 
 public sealed record MobileReceivingCreateOrderRequest(IReadOnlyList<Guid> SourceRefKeys);
 public sealed record MobileReceivingResolveDocumentRequest(string Barcode);
+public sealed record MobileReceivingAttachSourceRequest(Guid ClientRequestId, string Barcode);
+public sealed record MobileReceivingLinkedSourceResponse(Guid RefKey, string? Number);
 public sealed record MobileReceivingDocumentResolutionResponse(
     MobileReceivingSourceResponse? Source, MobileReceivingWorkOrderResponse? Order);
 public sealed record MobileReceivingBarcodeRequest(string Barcode);

@@ -26,6 +26,12 @@ internal static class MobileReceivingOrderEndpoints
             .WithMobileResponses<IReadOnlyList<MobileReceivingWorkOrderResponse>>();
         group.MapGet("/{orderId:guid}", GetOrderAsync)
             .WithMobileResponses<MobileReceivingWorkOrderResponse>();
+        group.MapGet("/{orderId:guid}/sources", GetLinkedSourcesAsync)
+            .WithMobileResponses<IReadOnlyList<MobileReceivingLinkedSourceResponse>>();
+        group.MapPost("/{orderId:guid}/sources", AttachSourceAsync)
+            .WithMobileResponses<MobileReceivingCommandIdResponse>();
+        group.MapPost("/{orderId:guid}/sources/{sourceRefKey:guid}/detach", DetachSourceAsync)
+            .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapGet("/{orderId:guid}/skus", SearchSkuAsync)
             .WithMobileResponses<IReadOnlyList<MobileReceivingSkuCandidateResponse>>();
         group.MapPost("/{orderId:guid}/skus/resolve-barcode", ResolveSkuAsync)
@@ -122,6 +128,43 @@ internal static class MobileReceivingOrderEndpoints
             ? MobileEndpointResults.CommandProblem(OperationError.NotFound("Приходный ордер не найден."))
             : TypedResults.Ok(MapOrder(order));
     }
+
+    private static async Task<IResult> GetLinkedSourcesAsync(
+        Guid orderId, ClaimsPrincipal principal, IReceivingWorkQueryStore orders,
+        GetReceivingSources sources, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        var order = await orders.GetOrderAsync(orderId, userId, ct);
+        if (order is null)
+            return MobileEndpointResults.CommandProblem(
+                OperationError.NotFound("Приходный ордер не найден."));
+        var linked = await sources.GetByRefKeysAsync(order.SourceRefKeys, ct);
+        return TypedResults.Ok<IReadOnlyList<MobileReceivingLinkedSourceResponse>>(
+            linked.Select(x => new MobileReceivingLinkedSourceResponse(x.RefKey, x.Number)).ToArray());
+    }
+
+    private static async Task<IResult> AttachSourceAsync(
+        Guid orderId, MobileReceivingAttachSourceRequest request,
+        ClaimsPrincipal principal, ChangeReceivingOrderSources change, CancellationToken ct)
+    {
+        var decoded = OneSDocumentBarcodeCodec.Decode(request.Barcode);
+        if (!decoded.IsSuccess)
+            return MobileEndpointResults.CommandProblem(decoded.Error!);
+        return await ExecuteForUserAsync(principal, userId => change.ExecuteAsync(
+            new ChangeReceivingOrderSourcesRequest(request.ClientRequestId, orderId,
+                decoded.Value, userId, ReceivingSourceChangeKind.Attach,
+                ReceivingSourceChangeChannel.Mobile), ct));
+    }
+
+    private static async Task<IResult> DetachSourceAsync(
+        Guid orderId, Guid sourceRefKey, MobileReceivingCommandRequest request,
+        ClaimsPrincipal principal, ChangeReceivingOrderSources change, CancellationToken ct) =>
+        await ExecuteForUserAsync(principal, userId => change.ExecuteAsync(
+            new ChangeReceivingOrderSourcesRequest(request.ClientRequestId, orderId,
+                sourceRefKey, userId, ReceivingSourceChangeKind.Detach,
+                ReceivingSourceChangeChannel.Mobile), ct));
 
     private static async Task<IResult> SearchSkuAsync(
         Guid orderId, string? search, ReceivingSkuSearchScope scope,

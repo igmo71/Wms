@@ -42,7 +42,9 @@ reports each source's last successful check and latest attempt error. A failed
 check retains the last successful plan; manual attempts are audited with their
 source updates. Web exposes manual refresh to Managers and source composition
 changes to Operators and Managers under the same posting and status rules.
-Mobile source composition actions are still to be connected.
+Mobile can add a source to an unfinished order by scanning its 1C document
+barcode. It can detach a linked source before the first posted LPN; later
+detachment and any change after completion remain Web Manager actions.
 
 The new Application completion use case allows a current-cycle participant or
 Manager to finish an order once no receiving LPN is open. It attempts to check

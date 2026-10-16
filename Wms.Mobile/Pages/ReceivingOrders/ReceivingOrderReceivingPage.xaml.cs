@@ -13,9 +13,11 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
     private MobileReceivingWorkOrderResponse? _order;
+    private IReadOnlyList<MobileReceivingLinkedSourceResponse> _linkedSources = [];
     private bool _visible;
     private bool _busy;
     private bool _lpnTab;
+    private bool _sourceScanMode;
     private long _scanGeneration;
 
     public ReceivingOrderReceivingPage(ReceivingOrderReceivingProcess process,
@@ -35,8 +37,14 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     public IReadOnlyList<ReceivingWorkItemRow> ItemRows { get; private set; } = [];
     public IReadOnlyList<ReceivingWorkLpnRow> LpnRows { get; private set; } = [];
     public IReadOnlyList<ReceivingWorkLocationRow> LocationRows { get; private set; } = [];
+    public IReadOnlyList<ReceivingLinkedSourceRow> SourceRows { get; private set; } = [];
 
-    public void Show(MobileReceivingWorkOrderResponse order) => Apply(order);
+    public void Show(MobileReceivingWorkOrderResponse order)
+    {
+        _linkedSources = [];
+        _sourceScanMode = false;
+        Apply(order);
+    }
 
     protected override async void OnAppearing()
     {
@@ -66,7 +74,11 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     {
         if (_busy || _order is null) return;
         SetBusy(true);
-        try { Apply(await _orders.GetAsync(_order.Id)); }
+        try
+        {
+            Apply(await _orders.GetAsync(_order.Id));
+            await RefreshLinkedSourcesAsync();
+        }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить ордер."; }
         finally { SetBusy(false); }
@@ -90,9 +102,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
                 or MobileReceivingOrderStatus.InReceiving);
         LocationPanel.IsVisible = !order.IsParticipant && LocationPanel.IsVisible
             && order.Status == MobileReceivingOrderStatus.ReadyForReceiving;
-        ScanHintLabel.Text = order.IsParticipant
-            ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
-            : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
+        SourceScanButton.IsVisible = order.Status is MobileReceivingOrderStatus.ReadyForReceiving
+            or MobileReceivingOrderStatus.InReceiving;
+        if (!SourceScanButton.IsVisible) _sourceScanMode = false;
+        SourceScanButton.Text = _sourceScanMode ? "Отменить добавление источника"
+            : "Добавить источник сканированием";
+        UpdateScanHint();
         ItemRows = order.Items.Select((item, index) =>
         {
             var exact = item.PlanQuantity is decimal plan
@@ -117,8 +132,82 @@ public partial class ReceivingOrderReceivingPage : ContentPage
                     && x.Items.Any(y => y.RemainingQuantity > 0))).ToArray();
         OnPropertyChanged(nameof(ItemRows));
         OnPropertyChanged(nameof(LpnRows));
+        UpdateSourceRows();
         SetTab(_lpnTab);
         UpdateRecovery();
+    }
+
+    private void UpdateScanHint()
+    {
+        ScanHintLabel.Text = _sourceScanMode
+            ? "Отсканируйте штрихкод документа 1С для добавления в этот ордер."
+            : _order?.IsParticipant == true
+                ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
+                : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
+    }
+
+    private async Task RefreshLinkedSourcesAsync()
+    {
+        if (_order is null) return;
+        try
+        {
+            _linkedSources = await _orders.GetLinkedSourcesAsync(_order.Id);
+            UpdateSourceRows();
+        }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить список источников."; }
+    }
+
+    private void UpdateSourceRows()
+    {
+        if (_order is null) return;
+        var canDetach = (_order.Status is MobileReceivingOrderStatus.ReadyForReceiving
+            or MobileReceivingOrderStatus.InReceiving)
+            && _order.Lpns.All(x => x.Status is not
+                (MobileLicensePlateNumberStatus.Closed or MobileLicensePlateNumberStatus.Deleted));
+        SourceRows = _order.SourceRefKeys.Select(refKey =>
+        {
+            var source = _linkedSources.FirstOrDefault(x => x.RefKey == refKey);
+            return new ReceivingLinkedSourceRow(refKey,
+                source?.Number ?? refKey.ToString(), canDetach);
+        }).ToArray();
+        OnPropertyChanged(nameof(SourceRows));
+        SourcesPanel.IsVisible = SourceRows.Count > 0;
+    }
+
+    private void OnSourceScanClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _order?.Status is not
+            (MobileReceivingOrderStatus.ReadyForReceiving or MobileReceivingOrderStatus.InReceiving))
+            return;
+        _sourceScanMode = !_sourceScanMode;
+        SourceScanButton.Text = _sourceScanMode ? "Отменить добавление источника"
+            : "Добавить источник сканированием";
+        UpdateScanHint();
+    }
+
+    private void EndSourceScan()
+    {
+        _sourceScanMode = false;
+        SourceScanButton.Text = "Добавить источник сканированием";
+        UpdateScanHint();
+    }
+
+    private async void OnDetachSourceClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _order is null
+            || sender is not Button { CommandParameter: Guid refKey }
+            || !SourceRows.Any(x => x.RefKey == refKey && x.CanDetach))
+            return;
+        if (!await DisplayAlertAsync("Открепить источник",
+            "Источник будет исключён из текущего плана. Продолжить?", "Открепить", "Отмена"))
+            return;
+        await ExecuteAsync(async () =>
+        {
+            Apply(await _process.DetachSourceAsync(_order.Id, refKey));
+            EndSourceScan();
+            await RefreshLinkedSourcesAsync();
+        });
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
@@ -134,6 +223,16 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private async Task HandleScanAsync(string code)
     {
         if (!_visible || _busy || _process.HasPendingCommand || _order is null) return;
+        if (_sourceScanMode)
+        {
+            await ExecuteAsync(async () =>
+            {
+                Apply(await _process.AttachSourceAsync(_order.Id, code));
+                EndSourceScan();
+                await RefreshLinkedSourcesAsync();
+            });
+            return;
+        }
         if (LocationPanel.IsVisible)
         {
             await ResolveLocationAsync(code);
@@ -289,9 +388,15 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         try
         {
             var opening = _process.PendingLabel == "Открыть LPN";
+            var changingSource = _process.PendingLabel is "Добавить источник" or "Открепить источник";
             Apply(await _process.RetryAsync());
             if (opening) openedId = _process.LastResourceId;
             ErrorLabel.Text = string.Empty;
+            if (changingSource)
+            {
+                EndSourceScan();
+                await RefreshLinkedSourcesAsync();
+            }
             succeeded = true;
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
@@ -305,6 +410,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         RetryButton.IsVisible = _process.HasPendingCommand;
         RetryButton.Text = $"Повторить: {_process.PendingLabel}";
         JoinButton.IsEnabled = !_busy && !_process.HasPendingCommand;
+        SourceScanButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
@@ -339,3 +445,4 @@ public sealed record ReceivingWorkItemRow(Guid SkuId, string Name,
 public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
     string Description, bool CanPutaway);
 public sealed record ReceivingWorkLocationRow(Guid Id, string Display);
+public sealed record ReceivingLinkedSourceRow(Guid RefKey, string Number, bool CanDetach);

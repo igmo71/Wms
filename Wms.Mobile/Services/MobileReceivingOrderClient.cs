@@ -22,6 +22,20 @@ public sealed class MobileReceivingOrderClient
         Guid orderId, CancellationToken ct = default) =>
         GetAsync<MobileReceivingWorkOrderResponse>($"{Route}/{orderId:D}", ct);
 
+    public Task<IReadOnlyList<MobileReceivingLinkedSourceResponse>> GetLinkedSourcesAsync(
+        Guid orderId, CancellationToken ct = default) =>
+        GetListAsync<MobileReceivingLinkedSourceResponse>($"{Route}/{orderId:D}/sources", ct);
+
+    public Task<MobileReceivingCommandIdResponse> AttachSourceAsync(
+        Guid orderId, string barcode, Guid requestId, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingAttachSourceRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/sources",
+            new MobileReceivingAttachSourceRequest(requestId, barcode), ct);
+
+    public Task<MobileReceivingCommandIdResponse> DetachSourceAsync(
+        Guid orderId, Guid sourceRefKey, Guid requestId, CancellationToken ct = default) =>
+        PostIdAsync($"{Route}/{orderId:D}/sources/{sourceRefKey:D}/detach", requestId, ct);
+
     public Task<MobileReceivingDocumentResolutionResponse> ResolveDocumentAsync(
         Guid warehouseId, string barcode, CancellationToken ct = default) =>
         PostAsync<MobileReceivingResolveDocumentRequest, MobileReceivingDocumentResolutionResponse>(
