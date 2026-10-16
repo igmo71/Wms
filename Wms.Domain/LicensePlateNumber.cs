@@ -231,6 +231,27 @@ public sealed class LicensePlateNumber
         return Close(userId, closedAtUtc, canManage);
     }
 
+    public OperationResult CorrectClosedReceivingQuantity(
+        decimal quantity, string userId, DateTimeOffset occurredAtUtc)
+    {
+        if (Status != LicensePlateNumberStatus.Closed || ReceivingCycleId is null
+            || OriginalReceivingLocationId is null)
+            return OperationError.Conflict("Исправить можно только закрытую приёмную LPN.");
+        if (_putaways.Count != 0)
+            return OperationError.Conflict("После первого размещения количество LPN изменить нельзя.");
+
+        var active = _items.Where(x => !x.IsDeleted).Take(2).ToArray();
+        if (active.Length != 1)
+            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+        if (active[0].Quantity == quantity)
+            return OperationError.Invalid("Количество LPN не изменилось.");
+
+        var changed = active[0].SetQuantity(quantity, occurredAtUtc, userId);
+        if (changed.IsSuccess)
+            OperationalRevision++;
+        return changed;
+    }
+
     internal OperationResult Reopen(string userId, DateTimeOffset reopenedAtUtc, bool canManage)
     {
         if (ReceivingCycleId is not null)

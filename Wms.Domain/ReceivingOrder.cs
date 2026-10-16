@@ -212,6 +212,46 @@ public class ReceivingOrder
         return fact;
     }
 
+    public OperationResult<decimal> CorrectClosedReceivingLpnQuantity(
+        LicensePlateNumber lpn, decimal quantity, string userId, DateTimeOffset occurredAtUtc)
+    {
+        if (lpn is null || lpn.ReceivingOrderId != Id || !_licensePlateNumbers.Contains(lpn))
+            return OperationError.NotFound("LPN не найдена в приходном ордере.");
+        if (!WarehouseQuantity.IsNonNegative(quantity))
+            return OperationError.Invalid("Новое количество LPN должно быть неотрицательным.");
+
+        var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
+        if (active.Length != 1)
+            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+        var orderItem = _items.SingleOrDefault(x =>
+            x.StockKeepingUnitId == active[0].StockKeepingUnitId);
+        if (orderItem is null)
+            return OperationError.NotFound("SKU отсутствует в составе ордера.");
+
+        decimal fact;
+        try
+        {
+            fact = checked(_licensePlateNumbers
+                .Where(x => x.Status == LicensePlateNumberStatus.Closed && x.Id != lpn.Id)
+                .SelectMany(x => x.Items)
+                .Where(x => !x.IsDeleted && x.StockKeepingUnitId == active[0].StockKeepingUnitId)
+                .Sum(x => x.Quantity) + quantity);
+        }
+        catch (OverflowException)
+        {
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+        }
+        if (!WarehouseQuantity.IsNonNegative(fact))
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+
+        var changed = lpn.CorrectClosedReceivingQuantity(quantity, userId, occurredAtUtc);
+        if (!changed.IsSuccess)
+            return changed.Error!;
+        orderItem.SetAggregatedLpnFact(fact);
+        AdvanceOperationalRevision();
+        return fact;
+    }
+
     public OperationResult<bool> ConfirmZeroReceived(Guid skuId, string userId)
     {
         var cycle = ActiveReceivingCycle();

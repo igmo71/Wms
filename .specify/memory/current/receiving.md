@@ -38,6 +38,14 @@ the LPN-linked movement, putaway history, audit and command receipt together.
 The LPN revision rejects a concurrent change to the same LPN.
 Mobile can use this putaway while the order is still in receiving.
 
+A `Manager` can correct the quantity of a closed receiving LPN before its first
+putaway, including after order completion. The new quantity is nonnegative;
+the SKU and expiration date stay fixed. The difference posts at the LPN's
+original receiving location and updates its item and the order fact in the
+same command as the movement, turnover, audit and receipt. Any recorded
+putaway blocks the correction. Concurrent changes to the LPN or order reject
+the command.
+
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire
 catalog, including SKU outside the order. An `Operator` or `Manager` can add a

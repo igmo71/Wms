@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ConfirmZeroReceived>();
         services.AddScoped<CloseReceivingLpn>();
         services.AddScoped<PutAwayReceivingLpn>();
+        services.AddScoped<CorrectReceivingLpnQuantity>();
         services.AddScoped<IExpirationTrackingStore, ExpirationTrackingStore>();
         services.AddScoped<SetExpirationTracking>();
         services.AddScoped<IUndatedExpirationStockStore, UndatedExpirationStockStore>();
