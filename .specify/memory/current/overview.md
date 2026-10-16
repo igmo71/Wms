@@ -25,7 +25,9 @@ configurations, Identity data types and migration history reside in
 run in the legacy `Wms` project. `Wms.Application` contains the new command
 execution, inventory-posting and receiving-source/order foundation;
 `Wms.Integration` contains the 1C receiving reader and parser. The currently implemented
-[receiving rules](receiving.md) remain in force until that replacement is delivered.
+[receiving rules](receiving.md) describe the current transition: the old order
+completion no longer posts stock, and the new LPN close use case is not yet
+connected to Web or Mobile.
 
 Warehouse quantities retain at most three decimal places. Read-only Web
 quantity tables show three places; compact TSD displays show up to three.

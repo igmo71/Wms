@@ -15,5 +15,7 @@ internal sealed class ReceivingSourceDocumentConfiguration
             "CK_ReceivingSourceDocuments_RefKey_NotEmpty",
             "[RefKey] <> '00000000-0000-0000-0000-000000000000'"));
         builder.HasIndex(x => x.LastSuccessfulVersionId);
+        builder.Property(x => x.LastSuccessfulVersionId).IsConcurrencyToken();
+        builder.Property(x => x.LastSuccessfulCheckAtUtc).IsConcurrencyToken();
     }
 }

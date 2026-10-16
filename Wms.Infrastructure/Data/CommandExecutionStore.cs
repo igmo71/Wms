@@ -62,7 +62,7 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
             if (exception is DbUpdateConcurrencyException concurrency)
                 return concurrency.Entries.Any(x => x.Entity is InventoryBalance
                     or StorageLocation or LicensePlateNumber or ReceivingOrder
-                    or ReceivingOrderItem or StockKeepingUnit);
+                    or ReceivingOrderItem or StockKeepingUnit or ReceivingSourceDocument);
 
             for (Exception? current = exception; current is not null; current = current.InnerException)
             {

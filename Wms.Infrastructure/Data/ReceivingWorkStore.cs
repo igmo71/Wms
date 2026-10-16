@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
@@ -44,6 +45,25 @@ public sealed class ReceivingWorkStore(IDbContextFactory<ApplicationDbContext> c
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<ReceivingSourceState>> LoadClosingSourcesAsync(
+        ICommandExecutionContext session, Guid orderId, CancellationToken ct)
+    {
+        var db = Db(session);
+        var sourceIds = await db.ReceivingOrderSourceLinks
+            .Where(x => x.ReceivingOrderId == orderId && x.DetachedAtUtc == null)
+            .Select(x => x.ReceivingSourceDocumentId).ToArrayAsync(ct);
+        var documents = await db.ReceivingSourceDocuments
+            .Where(x => sourceIds.Contains(x.Id)).ToArrayAsync(ct);
+        var versionIds = documents.Select(x => x.LastSuccessfulVersionId)
+            .OfType<Guid>().ToArray();
+        var versions = await db.ReceivingSourceVersions.AsNoTracking()
+            .Include(x => x.Lines).Where(x => versionIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+        return documents.Select(source => new ReceivingSourceState(source,
+            source.LastSuccessfulVersionId is Guid versionId
+                ? versions.GetValueOrDefault(versionId) : null)).ToArray();
+    }
+
     public Task<StorageLocation?> LoadLocationAsync(
         ICommandExecutionContext session, Guid locationId, CancellationToken ct) =>
         Db(session).StorageLocations.Include(x => x.Zone).Include(x => x.ActiveLock)
@@ -72,6 +92,32 @@ public sealed class ReceivingWorkStore(IDbContextFactory<ApplicationDbContext> c
             throw new InvalidOperationException("План и признак SKU должны быть загружены в сессии команды.");
         db.Entry(item).Property(x => x.CurrentPlanQuantity).IsModified = true;
         db.Entry(sku).Property(x => x.TracksExpirationDate).IsModified = true;
+    }
+
+    public void GuardClosingSources(
+        ICommandExecutionContext session, IReadOnlyList<ReceivingSourceState> sources)
+    {
+        var db = Db(session);
+        foreach (var state in sources)
+        {
+            var entry = db.Entry(state.Source);
+            if (entry.State == EntityState.Detached)
+                throw new InvalidOperationException("Источник должен быть загружен в сессии команды.");
+            entry.Property(x => x.LastSuccessfulVersionId).IsModified = true;
+            entry.Property(x => x.LastSuccessfulCheckAtUtc).IsModified = true;
+        }
+    }
+
+    public async Task<CloseReceivingLpnResult?> LoadClosingResultAsync(
+        string userId, Guid requestId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var json = await db.WarehouseAuditEvents.AsNoTracking()
+            .Where(x => x.CommandType == "receiving.lpn.close"
+                && x.RequestId == requestId && x.CommandUserId == userId
+                && x.EventType == "receiving.lpn.closed")
+            .Select(x => x.AfterValuesJson).SingleOrDefaultAsync(ct);
+        return json is null ? null : JsonSerializer.Deserialize<CloseReceivingLpnResult>(json);
     }
 
     private static ApplicationDbContext Db(ICommandExecutionContext session) =>

@@ -12,8 +12,16 @@ contributions are summed; an unresolved contribution leaves only its SKU plan
 unknown. Unposted or deletion-marked sources contribute zero. The order fact
 starts unchecked. The source versions and active links are checked again in the
 save transaction; repeating the same complete source selection returns the
-existing order. The replacement UI and receiving posting path are not connected
-yet.
+existing order. The replacement UI is not connected yet.
+
+The new Application close use case refreshes every linked 1C source before
+receipt. It uses the current version plan on success or the last numeric order
+plan, marked unconfirmed, on failure. Closing a positive single-SKU LPN posts
+one movement to its original receiving location, updates the checked order
+fact, and saves audit and command receipt atomically. Plan excess or an unknown
+plan requires `Manager`; a past expiration date requires explicit confirmation.
+Concurrent changes to the plan, SKU expiration flag, source version, order or
+LPN reject the staged close. No Web or Mobile entry point calls it yet.
 
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire
@@ -84,7 +92,8 @@ one. A Manager or Administrator may edit or close any open LPN and may reopen a
 closed LPN without closing the employee's other LPNs. An Operator cannot reopen
 a closed LPN, including their own. Creation,
 last update/removal, closing and reopening retain user and UTC time audit.
-Closing and reopening do not post inventory or complete the receiving order.
+The legacy close and reopen commands do not post inventory; the new close use
+case above does. Neither completes the receiving order.
 Mobile uses one SKU → absolute quantity confirmation cycle and repeat-safe
 commands; Web displays per-LPN composition and employee contribution.
 
@@ -111,24 +120,9 @@ winning location on explicit retry.
 Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
 duplicate-SKU source documents remain visible with a blocking reason and cannot
 be joined. The order view shows the source plan read-only and its LPN list.
-Participation uses the source synchronization assessment. Completion checks
-persist that source assessment separately from their returned completion
-decision: unchecked facts and partial counts do not block joining. Open LPNs,
-unchecked lines and plan/fact differences still restrict completion. Mobile
-join availability uses the source assessment even when the same response shows
-a blocking completion decision; a failed fresh source check also disables joining.
-Direct facts and order-based putaway are removed from the Mobile API. Receiving
-completion with a fresh exact plan/fact match is available to a participant in
-Mobile. Quantity-difference approval and its reason remain a Manager-only Web
-action. The Mobile completion action remains visible while the order is in
-receiving. One compact yellow instruction below the order header shows the
-first obstacle: a failed or blocking fresh source check, open pallets (count),
-unchecked lines (count), then quantity differences requiring correction or a
-manager. There is no second completion hint above the button. The panel and
-completion availability use the same eligibility decision; the panel disappears
-when completion is available. Busy and pending-command guards still apply.
-The Mobile response exposes the persisted source synchronization level separately
-from the completion assessment, so unfinished counting is not shown as a 1C error.
+Participation still uses the legacy source synchronization assessment. The old
+Mobile and Web completion controls may remain visible, but the server rejects
+the old completion command. The replacement completion path is pending.
 
 The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
 accepted from either tab and opens its separate pallet page; an SKU scan is
@@ -162,32 +156,9 @@ means unchecked; zero is an explicit result. Mobile changes facts only through
 absolute quantities of LPN items; the aggregate fact is read-only. Every line
 requires a fact before completion.
 
-Ordinary exact completion is available to an order participant only after every
-active LPN is closed and every source SKU has an explicit aggregate LPN fact,
-including zero.
-It first persists a fresh 1C synchronization checkpoint. Source deletion,
-unposting, unsupported quantity semantics, duplicate SKU, or a changed/ambiguous
-line-to-SKU composition blocks completion. A quantity-only plan/fact difference
-requires a reasoned server-side decision by the `Manager` role specifically;
-`Administrator` does not receive that permission implicitly.
-
-A Manager decision on a quantity difference does not require joining the order
-as a receiving participant. It does not create participation or attribute LPN
-counting to that Manager. The Manager supplies a reason and immediately finalizes
-the order with atomic receipt posting and decision audit. All active LPNs must
-still be closed, every line checked, and the source and LPN fingerprint fresh.
-The participation requirement above continues to apply to ordinary exact
-completion, including when the caller is a Manager.
-
-The completion decision fingerprint covers both the fresh source snapshot and
-the complete local LPN composition. A source or LPN change after display rejects
-the command and requires a new decision. The original plan, current 1C plan,
-fact, differences, source check, and optional Manager decision are retained on
-the order as its immutable completion audit. Final transition, positive receipt
-movements, balances, turnover, audit, and command receipt save atomically. A
-successful replay reads the receipt before 1C and cannot receive stock twice.
-Completion makes no outbound change to 1C; later notifications do not replace
-the accepted facts or completion audit.
+The legacy order-completion command no longer changes the order or posts stock.
+Its previous fingerprint and quantity-difference decision are superseded by
+the active receiving specification; the new completion use case is pending.
 
 Independent putaway starts from a closed LPN rather than an order. Mobile uses
 LPN → SKU → confirmed quantity → destination scan; scanning the destination immediately
@@ -254,10 +225,8 @@ only a snapshot hint; posting revalidates the warehouse, active Storage topology
 folder status and lock. Capacity and storage groups are not considered, no zero
 balances are pre-created, and movement history is not queried for recommendations.
 
-Completion uses an explicitly supplied receiving location or the order's assigned
-location after receipt lookup. Supported UI/API paths change facts only through
-LPN items; order-line facts are recalculated from active LPN items and cannot be
-edited directly. LPN mutations save audit,
-aggregate fact and revisions without posting inventory or calling 1C.
+Draft LPN mutations do not post inventory or call 1C. The new close use case
+uses the LPN's original receiving location and sets the order SKU fact from
+closed LPNs; direct editing of the aggregate order fact is unavailable there.
 Putaway has no 1C checkpoint. After a definitive destination rejection, Mobile
 keeps the selected quantity and allows another destination scan.

@@ -162,6 +162,9 @@ The new receiving work store provides EF concurrency guards for the plan
 quantity of an order SKU row and the SKU expiration flag. A caller can mark
 both loaded properties for conditional update in its final save; a changed
 input then rejects every staged effect of that command.
+Receiving close also conditionally writes the loaded source version and last
+successful check time, so a concurrent 1C refresh invalidates the close before
+its movement, audit and command receipt are committed.
 Only recognized concurrency failures and named constraint violations become
 business conflicts; other persistence failures remain exceptions. Their shared
 legacy classification belongs under `Wms.Application.Persistence`. The new

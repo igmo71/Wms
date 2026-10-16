@@ -13,6 +13,8 @@ public interface IReceivingWorkStore
         ICommandExecutionContext session, Guid orderId, CancellationToken ct);
     Task<IReadOnlyList<ReceivingWorkSource>> LoadSourcesAsync(
         ICommandExecutionContext session, Guid orderId, CancellationToken ct);
+    Task<IReadOnlyList<ReceivingSourceState>> LoadClosingSourcesAsync(
+        ICommandExecutionContext session, Guid orderId, CancellationToken ct);
     Task<StorageLocation?> LoadLocationAsync(
         ICommandExecutionContext session, Guid locationId, CancellationToken ct);
     Task<LicensePlateNumber?> LoadLpnAsync(
@@ -23,4 +25,8 @@ public interface IReceivingWorkStore
         ICommandExecutionContext session, Guid skuId, CancellationToken ct);
     void GuardClosingInputs(
         ICommandExecutionContext session, ReceivingOrderItem item, StockKeepingUnit sku);
+    void GuardClosingSources(
+        ICommandExecutionContext session, IReadOnlyList<ReceivingSourceState> sources);
+    Task<CloseReceivingLpnResult?> LoadClosingResultAsync(
+        string userId, Guid requestId, CancellationToken ct);
 }

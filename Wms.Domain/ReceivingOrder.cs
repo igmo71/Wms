@@ -173,6 +173,45 @@ public class ReceivingOrder
         return cancelled;
     }
 
+    public OperationResult<decimal> CloseReceivingLpn(
+        LicensePlateNumber lpn, string userId, DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateCurrentLpn(lpn, userId, canManage);
+        if (!access.IsSuccess)
+            return access.Error!;
+
+        var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
+        if (active.Length != 1 || !WarehouseQuantity.IsPositive(active[0].Quantity))
+            return OperationError.Invalid("Закрыть можно только положительную монопалету.");
+        var orderItem = _items.SingleOrDefault(x =>
+            x.StockKeepingUnitId == active[0].StockKeepingUnitId);
+        if (orderItem is null)
+            return OperationError.NotFound("SKU отсутствует в составе ордера.");
+
+        decimal fact;
+        try
+        {
+            fact = checked(_licensePlateNumbers
+                .Where(x => x.Status == LicensePlateNumberStatus.Closed)
+                .SelectMany(x => x.Items)
+                .Where(x => !x.IsDeleted && x.StockKeepingUnitId == active[0].StockKeepingUnitId)
+                .Sum(x => x.Quantity) + active[0].Quantity);
+        }
+        catch (OverflowException)
+        {
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+        }
+        if (!WarehouseQuantity.IsNonNegative(fact))
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+
+        var closed = lpn.CloseReceiving(userId, occurredAtUtc, canManage);
+        if (!closed.IsSuccess)
+            return closed.Error!;
+        orderItem.SetAggregatedLpnFact(fact);
+        AdvanceOperationalRevision();
+        return fact;
+    }
+
     public OperationResult<bool> ConfirmZeroReceived(Guid skuId, string userId)
     {
         var cycle = ActiveReceivingCycle();
