@@ -8,11 +8,11 @@ namespace Wms.Mobile;
 public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
 {
     private readonly MobileLicensePlateNumberPutawayClient _client;
+    private readonly MobileReferenceDataClient _reference;
     private readonly IOperationalBarcodeScanner _scanner;
-    private MobileLicensePlateNumberPutawayDetailsResponse? _details;
-    private MobileLicensePlateNumberPutawayItemResponse? _item;
-    private LicensePlateNumberPutawayDetailsPage? _detailsPage;
-    private IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> _recommendations = [];
+    private MobileReceivingWorkLpnResponse? _details;
+    private MobileReceivingWorkLpnItemResponse? _item;
+    private IReadOnlyList<MobileReceivingPutawayRecommendationResponse> _recommendations = [];
     private bool _isVisible;
     private bool _busy;
     private bool _scannerSubscribed;
@@ -23,10 +23,12 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
 
     public LicensePlateNumberPutawayQuantityPage(
         MobileLicensePlateNumberPutawayClient client,
+        MobileReferenceDataClient reference,
         IOperationalBarcodeScanner scanner)
     {
         InitializeComponent();
         _client = client;
+        _reference = reference;
         _scanner = scanner;
         ErrorLabel.PropertyChanged += (_, args) =>
         {
@@ -36,19 +38,17 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> CurrentSkuStockRecommendations =>
-        Recommendations(MobileLicensePlateNumberPutawayRecommendationCategory.CurrentSkuStock);
-    public IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> EmptyWithSkuHistoryRecommendations =>
-        Recommendations(MobileLicensePlateNumberPutawayRecommendationCategory.EmptyWithSkuBalanceHistory);
+    public IReadOnlyList<MobileReceivingPutawayRecommendationResponse> CurrentSkuStockRecommendations =>
+        Recommendations(MobileReceivingPutawayRecommendationKind.CurrentSkuStock);
+    public IReadOnlyList<MobileReceivingPutawayRecommendationResponse> EmptyWithSkuHistoryRecommendations =>
+        Recommendations(MobileReceivingPutawayRecommendationKind.EmptyWithSkuBalanceHistory);
 
     public void Show(
-        MobileLicensePlateNumberPutawayDetailsResponse details,
-        MobileLicensePlateNumberPutawaySelectionResponse selection,
-        LicensePlateNumberPutawayDetailsPage detailsPage)
+        MobileReceivingWorkLpnResponse details,
+        MobileReceivingPutawaySelectionResponse selection)
     {
         _details = details;
         _item = selection.Item;
-        _detailsPage = detailsPage;
         _recommendations = selection.Recommendations;
         OnPropertyChanged(nameof(CurrentSkuStockRecommendations));
         OnPropertyChanged(nameof(EmptyWithSkuHistoryRecommendations));
@@ -113,7 +113,7 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
     }
 
     private bool CanScanDestination => _quantityConfirmed && !QuantityEntry.IsFocused
-        && _details?.CanPutaway == true && _item is not null
+        && _details?.Status == MobileLicensePlateNumberStatus.Closed && _item is not null
         && _quantity > 0 && _quantity <= _item.RemainingQuantity;
 
     private async void OnQuantityFocused(object? sender, FocusEventArgs e)
@@ -161,7 +161,7 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         if (!decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var quantity)
             || !WarehouseQuantityInput.IsSupported(quantity)
             || quantity <= 0 || quantity > _item.RemainingQuantity
-            || _details?.CanPutaway != true)
+            || _details?.Status != MobileLicensePlateNumberStatus.Closed)
         {
             ErrorLabel.Text = $"Введите количество больше нуля, не более {_item.RemainingQuantity:0.###} и не более трёх знаков после запятой.";
         }
@@ -196,7 +196,17 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
     {
         if (!_isVisible || _busy || _pending is not null || !CanScanDestination
             || _details is null || _item is null) return;
-        _pending = new(_details.Id, _item.Id, _quantity, barcode, Guid.NewGuid());
+        SetBusy(true);
+        try
+        {
+            var location = await _reference.ResolveStorageLocationAsync(
+                barcode, _details.WarehouseId, MobileStorageLocationContext.Storage);
+            _pending = new(_details.Id, _item.Id, _quantity, location.Id, Guid.NewGuid());
+        }
+        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось проверить ячейку хранения."; }
+        finally { SetBusy(false); }
+        if (_pending is null) return;
         await ExecutePendingPutawayAsync();
     }
 
@@ -210,11 +220,10 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         ErrorLabel.Text = string.Empty;
         try
         {
-            var response = await _client.PutawayAsync(
+            await _client.PutawayAsync(
                 pending.LpnId, pending.ItemId, pending.Quantity,
-                pending.DestinationBarcode, pending.RequestId);
+                pending.DestinationLocationId, pending.RequestId);
             _pending = null;
-            _detailsPage?.Show(response.Details);
             await Navigation.PopAsync();
         }
         catch (MobileApiException exception)
@@ -239,9 +248,9 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
             _details = await _client.GetAsync(_details.Id);
             _item = _details.Items.SingleOrDefault(x => x.Id == _item.Id);
             UpdateRemainder();
-            if (_item is null || !_details.CanPutaway || _item.RemainingQuantity <= 0)
+            if (_item is null || _details.Status != MobileLicensePlateNumberStatus.Closed
+                || _item.RemainingQuantity <= 0)
             {
-                _detailsPage?.Show(_details);
                 await Navigation.PopAsync();
             }
             else if (_quantity > _item.RemainingQuantity)
@@ -274,9 +283,9 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         NavigationPage.SetHasBackButton(this, !busy && _pending is null);
     }
 
-    private IReadOnlyList<MobileLicensePlateNumberPutawayRecommendationResponse> Recommendations(
-        MobileLicensePlateNumberPutawayRecommendationCategory category) =>
-        _recommendations.Where(x => x.Category == category).ToList();
+    private IReadOnlyList<MobileReceivingPutawayRecommendationResponse> Recommendations(
+        MobileReceivingPutawayRecommendationKind category) =>
+        _recommendations.Where(x => x.Kind == category).ToList();
 
     private void OnNonScanControlLoaded(object? sender, EventArgs e)
     {
@@ -285,5 +294,5 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
     }
 
     private sealed record PendingPutaway(
-        Guid LpnId, Guid ItemId, decimal Quantity, string DestinationBarcode, Guid RequestId);
+        Guid LpnId, Guid ItemId, decimal Quantity, Guid DestinationLocationId, Guid RequestId);
 }

@@ -234,7 +234,7 @@ internal static class MobileReceivingOrderEndpoints
         order.IsParticipant, order.Revision, order.SourceRefKeys,
         order.Items.Select(x => new MobileReceivingWorkItemResponse(
             x.SkuId, x.SkuCode, x.SkuName, x.TracksExpirationDate,
-            x.PlanQuantity, x.FactQuantity)).ToArray(),
+            x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)).ToArray(),
         order.Lpns.Select(MapLpn).ToArray());
 
     internal static MobileReceivingWorkLpnResponse MapLpn(ReceivingWorkLpnView lpn) => new(
@@ -242,7 +242,7 @@ internal static class MobileReceivingOrderEndpoints
         (MobileLicensePlateNumberStatus)lpn.Status,
         lpn.ResponsibleUserId, lpn.OriginalReceivingLocationId, lpn.Revision,
         lpn.Items.Select(x => new MobileReceivingWorkLpnItemResponse(
-            x.Id, x.SkuId, x.SkuCode, x.SkuName,
+            x.Id, x.SkuId, x.SkuCode, x.SkuName, x.UnitOfMeasure,
             x.Quantity, x.ExpirationDate, x.PlacedQuantity,
             x.Quantity - x.PlacedQuantity)).ToArray(),
         lpn.Putaways.Select(x => new MobileReceivingWorkPutawayResponse(

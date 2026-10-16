@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Services;
 
 namespace Wms.Tests.Mobile;
@@ -7,8 +9,7 @@ public sealed class ReceivingRecoverySafetyTests
 {
     [Theory]
     [InlineData("close")]
-    [InlineData("cancel")]
-    [InlineData("complete")]
+    [InlineData("edit")]
     public async Task Lost_response_retries_original_receiving_command_and_blocks_replacement(string kind)
     {
         using var handler = new LostResponseHandler();
@@ -17,12 +18,12 @@ public sealed class ReceivingRecoverySafetyTests
         var orderId = Guid.NewGuid();
         var lpnId = Guid.NewGuid();
         await Assert.ThrowsAsync<HttpRequestException>(() =>
-            ExecuteAsync(process, kind, orderId, lpnId, "original-fingerprint"));
+            ExecuteAsync(process, kind, orderId, lpnId));
         Assert.True(process.HasPendingCommand);
-        // Refreshed data must not replace the original order, LPN or fingerprint.
+        // A pending command retains its original LPN, quantity and date.
         Assert.Throws<InvalidOperationException>(() =>
         {
-            _ = ExecuteAsync(process, kind, Guid.NewGuid(), Guid.NewGuid(), "refreshed-fingerprint");
+            _ = ExecuteAsync(process, kind, Guid.NewGuid(), Guid.NewGuid());
         });
         Assert.Single(handler.Requests);
 
@@ -33,13 +34,13 @@ public sealed class ReceivingRecoverySafetyTests
         Assert.Single(handler.AppliedRequestIds);
     }
 
-    private static Task<Wms.Contracts.Mobile.V1.MobileReceivingOrderCommandResponse> ExecuteAsync(
-        ReceivingOrderReceivingProcess process, string kind, Guid orderId, Guid lpnId,
-        string fingerprint) => kind switch
+    private static Task<MobileReceivingWorkOrderResponse> ExecuteAsync(
+        ReceivingOrderReceivingProcess process, string kind, Guid orderId, Guid lpnId) => kind switch
         {
-            "close" => process.CloseLicensePlateNumberAsync(orderId, lpnId),
-            "cancel" => process.CancelLicensePlateNumberAsync(orderId, lpnId),
-            "complete" => process.CompleteAsync(orderId, fingerprint),
+            "close" => process.CloseLpnAsync(orderId, lpnId, false, null),
+            "edit" => process.EditLpnAsync(orderId, lpnId,
+                Guid.Parse("22d96f33-94af-4f27-81cf-49caa448a93d"),
+                1.25m, new DateOnly(2027, 1, 1)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
 
@@ -51,6 +52,14 @@ public sealed class ReceivingRecoverySafetyTests
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.Method == HttpMethod.Get)
+                return new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new MobileReceivingWorkOrderResponse(
+                        Guid.Empty, null, Guid.Empty,
+                        MobileReceivingOrderStatus.InReceiving, 1, null,
+                        true, 0, [], [], []))
+                };
             var body = await request.Content!.ReadAsStringAsync(cancellationToken);
             Requests.Add((request.RequestUri!.AbsolutePath, body));
             using var payload = System.Text.Json.JsonDocument.Parse(body);
@@ -59,8 +68,14 @@ public sealed class ReceivingRecoverySafetyTests
             if (Requests.Count == 1)
                 throw new TaskCanceledException("Response lost after commit.", new TimeoutException());
 
-            // The second request represents a receipt replay; rendering belongs to UI.
-            return new(HttpStatusCode.OK) { Content = new StringContent("{\"details\":null}") };
+            // The second request represents a receipt replay.
+            return new(HttpStatusCode.OK)
+            {
+                Content = request.RequestUri.AbsolutePath.EndsWith("/close")
+                    ? JsonContent.Create(new MobileReceivingCloseResultResponse(
+                        Guid.Empty, 1m, 1m, true, null, null, false, false))
+                    : JsonContent.Create(new MobileReceivingCommandIdResponse(Guid.Empty))
+            };
         }
     }
 }

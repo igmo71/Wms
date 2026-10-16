@@ -5,74 +5,47 @@ namespace Wms.Mobile.Services;
 
 public sealed class MobileLicensePlateNumberPutawayClient
 {
-    private readonly MobileApiTransport _transport;
+    private readonly MobileApiTransport transport;
+    internal MobileLicensePlateNumberPutawayClient(MobileApiTransport transport) => this.transport = transport;
+    private static string Route => MobileApiRoutes.LicensePlateNumberPutaway;
 
-    internal MobileLicensePlateNumberPutawayClient(MobileApiTransport transport) =>
-        _transport = transport;
+    public Task<MobileReceivingWorkLpnResponse> ResolveAsync(string code,
+        CancellationToken ct = default) =>
+        GetAsync<MobileReceivingWorkLpnResponse>(
+            $"{Route}/resolve?code={Uri.EscapeDataString(code.Trim())}", ct);
 
-    public async Task<MobileLicensePlateNumberPutawayDetailsResponse> ResolveAsync(
-        string code,
-        CancellationToken ct = default)
+    public Task<MobileReceivingWorkLpnResponse> GetAsync(Guid lpnId,
+        CancellationToken ct = default) =>
+        GetAsync<MobileReceivingWorkLpnResponse>($"{Route}/{lpnId:D}", ct);
+
+    public Task<MobileReceivingPutawaySelectionResponse> GetSelectionAsync(
+        Guid lpnId, Guid itemId, CancellationToken ct = default) =>
+        GetAsync<MobileReceivingPutawaySelectionResponse>(
+            $"{Route}/{lpnId:D}/items/{itemId:D}/selection", ct);
+
+    public async Task<MobileReceivingPutawaySelectionResponse> ResolveSkuAsync(
+        Guid lpnId, string barcode, CancellationToken ct = default)
     {
-        using var response = await _transport.PostAsync(
-            $"{MobileApiRoutes.LicensePlateNumberPutaway}/resolve",
-            new MobileResolveLicensePlateNumberPutawayRequest(code),
-            ct);
-        return await response.Content.ReadFromJsonAsync<MobileLicensePlateNumberPutawayDetailsResponse>(ct)
+        using var response = await transport.PostAsync(
+            $"{Route}/{lpnId:D}/resolve-sku", new MobileReceivingBarcodeRequest(barcode), ct);
+        return await MobileApiTransport.ReadCommandResponseAsync<MobileReceivingPutawaySelectionResponse>(
+            response, "Сервер вернул некорректный SKU LPN.", ct);
+    }
+
+    public async Task<MobileReceivingCommandIdResponse> PutawayAsync(
+        Guid lpnId, Guid itemId, decimal quantity, Guid locationId,
+        Guid requestId, CancellationToken ct = default)
+    {
+        using var response = await transport.PostAsync($"{Route}/{lpnId:D}/putaways",
+            new MobileReceivingPutawayRequest(requestId, itemId, locationId, quantity), ct);
+        return await MobileApiTransport.ReadCommandResponseAsync<MobileReceivingCommandIdResponse>(
+            response, "Сервер вернул некорректный результат размещения.", ct);
+    }
+
+    private async Task<T> GetAsync<T>(string route, CancellationToken ct)
+    {
+        using var response = await transport.GetAsync(route, ct);
+        return await response.Content.ReadFromJsonAsync<T>(ct)
             ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректный LPN.");
-    }
-
-    public async Task<MobileLicensePlateNumberPutawayDetailsResponse> GetAsync(
-        Guid lpnId,
-        CancellationToken ct = default)
-    {
-        using var response = await _transport.GetAsync(
-            $"{MobileApiRoutes.LicensePlateNumberPutaway}/{lpnId:D}", ct);
-        return await response.Content.ReadFromJsonAsync<MobileLicensePlateNumberPutawayDetailsResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректный LPN.");
-    }
-
-    public async Task<MobileLicensePlateNumberPutawaySelectionResponse> ResolveSkuAsync(
-        Guid lpnId,
-        string barcode,
-        CancellationToken ct = default)
-    {
-        using var response = await _transport.PostAsync(
-            $"{MobileApiRoutes.LicensePlateNumberPutaway}/{lpnId:D}/resolve-sku",
-            new MobileResolveLicensePlateNumberPutawaySkuRequest(barcode),
-            ct);
-        return await response.Content.ReadFromJsonAsync<MobileLicensePlateNumberPutawaySelectionResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректный товар LPN.");
-    }
-
-    public async Task<MobileLicensePlateNumberPutawaySelectionResponse> GetSelectionAsync(
-        Guid lpnId,
-        Guid lpnItemId,
-        CancellationToken ct = default)
-    {
-        using var response = await _transport.GetAsync(
-            $"{MobileApiRoutes.LicensePlateNumberPutaway}/{lpnId:D}/items/{lpnItemId:D}/selection",
-            ct);
-        return await response.Content.ReadFromJsonAsync<MobileLicensePlateNumberPutawaySelectionResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректные рекомендации размещения.");
-    }
-
-    public async Task<MobileLicensePlateNumberPutawayCommandResponse> PutawayAsync(
-        Guid lpnId,
-        Guid itemId,
-        decimal quantity,
-        string destinationBarcode,
-        Guid clientRequestId,
-        CancellationToken ct = default)
-    {
-        using var response = await _transport.PostAsync(
-            $"{MobileApiRoutes.LicensePlateNumberPutaway}/{lpnId:D}/putaway",
-            new MobilePutawayLicensePlateNumberRequest(
-                clientRequestId, itemId, quantity, destinationBarcode),
-            ct);
-        return await MobileApiTransport.ReadCommandResponseAsync<MobileLicensePlateNumberPutawayCommandResponse>(
-            response,
-            "Сервер вернул некорректный результат размещения LPN.",
-            ct);
     }
 }

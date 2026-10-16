@@ -1,98 +1,62 @@
-<ContentPage
-    x:Class="Wms.Mobile.ReceivingOrderPage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:Wms.Mobile"
-    Title="Приёмка">
-
-    <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
-        <ScrollView>
-            <VerticalStackLayout Padding="12" Spacing="10">
-
-                <Picker
-                    x:Name="WarehousePicker"
-                    ItemDisplayBinding="{Binding Name}"
-                    Loaded="OnNonScanControlLoaded"
-                    SelectedIndexChanged="OnWarehouseChanged"
-                    Title="Выберите склад" />
-
-                <VerticalStackLayout Spacing="5">
-                    <Border Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
-                        <Label
-                            x:Name="ScanInstructionLabel"
-                            FontSize="14"
-                            Text="После выбора склада отсканируйте штрихкод приходного ордера." />
-                    </Border>
-                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Border x:Name="ScanResultPanel" Padding="8" BackgroundColor="#E8F5E9"
-                            Stroke="#81C784" IsVisible="False">
-                        <Label x:Name="ScanResultLabel" FontSize="14" />
-                    </Border>
-                    <BoxView
-                        x:Name="ProgressIndicator"
-                        Color="{StaticResource Primary}"
-                        HeightRequest="3"
-                        IsVisible="False" />
-                    <Label
-                        x:Name="ErrorLabel"
-                        HorizontalTextAlignment="Center"
-                        IsVisible="False"
-                        TextColor="Red" />
-                </VerticalStackLayout>
-
+<ContentPage x:Class="Wms.Mobile.ReceivingOrderPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Приёмка">
+    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
+        <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
+            <ScrollView>
                 <VerticalStackLayout Spacing="10">
-                    <Label
-                        x:Name="ReceivingStatusLabel"
-                        HorizontalTextAlignment="Center"
-                        IsVisible="False" />
-                    <VerticalStackLayout
-                        x:Name="ReceivingOrdersLayout"
-                        BindableLayout.ItemsSource="{Binding ReceivingOrders}"
-                        Spacing="10">
+                    <Picker x:Name="WarehousePicker" Title="Выберите склад"
+                            ItemDisplayBinding="{Binding Name}" SelectedIndexChanged="OnWarehouseChanged" />
+                    <Label Text="Отсканируйте документ 1С или выберите несколько источников ниже." />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label x:Name="SelectionLabel" FontSize="13" />
+                    <Label FontAttributes="Bold" Text="Свободные документы 1С" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SourceRows, Source={x:Reference Page}}" Spacing="5">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:ReceivingOrderQueueItemViewState">
-                                <Border
-                                    Loaded="OnNonScanControlLoaded"
-                                    Padding="14">
+                            <DataTemplate x:DataType="local:ReceivingSourceRow">
+                                <Border Padding="9" Stroke="#D4D4D4">
                                     <Border.GestureRecognizers>
-                                        <TapGestureRecognizer
-                                            CommandParameter="{Binding Id}"
-                                            Tapped="OnOrderTapped" />
+                                        <TapGestureRecognizer CommandParameter="{Binding RefKey}" Tapped="OnSourceTapped" />
                                     </Border.GestureRecognizers>
-                                    <VerticalStackLayout Spacing="4">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <Label
-                                                FontAttributes="Bold"
-                                                FontSize="18"
-                                                Text="{Binding Number}" />
-                                            <Label
-                                                Grid.Column="1"
-                                                Text="{Binding DateText}" />
-                                        </Grid>
-                                        <Label
-                                            FontAttributes="Bold"
-                                            IsVisible="{Binding ShowStatus}"
-                                            Text="{Binding StatusText}" />
-                                        <Label
-                                            FontAttributes="Bold"
-                                            IsVisible="{Binding HasSynchronizationIssue}"
-                                            Text="{Binding SynchronizationText}"
-                                            TextColor="DarkOrange" />
-                                        <Label
-                                            FontAttributes="Bold"
-                                            IsVisible="{Binding HasJoinBlock}"
-                                            Text="{Binding JoinBlockText}"
-                                            TextColor="Red" />
-                                        <Label
-                                            FontSize="16"
-                                            Text="{Binding ProgressText}" />
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
+                                        <Label Text="{Binding SelectionMark}" FontSize="20" />
+                                        <VerticalStackLayout Grid.Column="1">
+                                            <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                            <Label Text="{Binding PlanText}" FontSize="12" />
+                                            <Label Text="{Binding Warning}" FontSize="12" TextColor="DarkOrange" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Label FontAttributes="Bold" Text="Ордера WMS" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding OrderRows, Source={x:Reference Page}}" Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingWorkOrderRow">
+                                <Border Padding="9" Stroke="#D4D4D4">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnOrderTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout>
+                                        <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                        <Label Text="{Binding StatusText}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
-            </VerticalStackLayout>
-        </ScrollView>
-    </RefreshView>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="1" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="CreateButton" Text="Создать ордер из выбранных документов"
+                    Clicked="OnCreateClicked" HeightRequest="46" />
+        </VerticalStackLayout>
+    </Grid>
 </ContentPage>

@@ -1,83 +1,47 @@
-<ContentPage
-    x:Class="Wms.Mobile.LicensePlateNumberPutawayDetailsPage"
-    x:Name="Page"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:contracts="clr-namespace:Wms.Contracts.Mobile.V1;assembly=Wms.Contracts"
-    xmlns:local="clr-namespace:Wms.Mobile"
-    Title="Палета">
-
+<ContentPage x:Class="Wms.Mobile.LicensePlateNumberPutawayDetailsPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Размещение LPN">
     <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="5">
         <ScrollView>
-            <VerticalStackLayout Spacing="10">
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="CodeLabel" FontAttributes="Bold" FontSize="20" />
+                <Label x:Name="StatusLabel" FontSize="12" />
                 <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                <Label x:Name="CompletedLabel" Text="✓ Палета размещена" TextColor="Green"
-                       SemanticProperties.Description="Палета полностью размещена" IsVisible="False" />
-                <Label x:Name="LpnStatusLabel" IsVisible="False" />
-                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items, Source={x:Reference Page}}" Spacing="8">
+                <Label Text="Выберите строку LPN или отсканируйте её SKU." FontSize="12" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items, Source={x:Reference Page}}" Spacing="5">
                     <BindableLayout.ItemTemplate>
-                        <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayItemResponse">
-                            <Border Padding="8">
-                                <Border.Triggers>
-                                    <DataTrigger TargetType="Border" Binding="{Binding IsPartiallyPlaced}" Value="True">
-                                        <Setter Property="BackgroundColor" Value="#FFF3CD" />
-                                    </DataTrigger>
-                                    <DataTrigger TargetType="Border" Binding="{Binding IsFullyPlaced}" Value="True">
-                                        <Setter Property="BackgroundColor" Value="#E8F5E9" />
-                                    </DataTrigger>
-                                </Border.Triggers>
+                        <DataTemplate x:DataType="local:ReceivingPutawayItemRow">
+                            <Border Padding="8" Stroke="#D4D4D4">
                                 <Border.GestureRecognizers>
-                                    <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnItemTapped" />
+                                    <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnItemTapped" />
                                 </Border.GestureRecognizers>
-                                <VerticalStackLayout Spacing="3">
-                                    <Label FontAttributes="Bold" Text="{Binding SkuName}" />
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                        <Label Text="{Binding SkuCode}" />
-                                        <Label Grid.Column="1" Text="{Binding UnitOfMeasure, TargetNullValue='—'}" />
-                                    </Grid>
-                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" RowDefinitions="Auto,Auto">
-                                        <Label FontSize="12" Text="Принято" />
-                                        <Label Grid.Column="1" FontSize="12" Text="Размещено" />
-                                        <Label Grid.Column="2" FontSize="12" Text="Осталось" />
-                                        <Label Grid.Row="1" Text="{Binding AcceptedQuantity, StringFormat='{0:0.###}'}" />
-                                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding PlacedQuantity, StringFormat='{0:0.###}'}" />
-                                        <Label Grid.Row="1" Grid.Column="2" Text="{Binding RemainingQuantity, StringFormat='{0:0.###}'}" />
-                                    </Grid>
+                                <VerticalStackLayout>
+                                    <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                    <Label Text="{Binding QuantityText}" FontSize="12" />
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
-                <VerticalStackLayout x:Name="HistoryPanel" IsVisible="False" Spacing="8">
-                    <Label FontAttributes="Bold" Text="История размещения" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding History, Source={x:Reference Page}}" Spacing="6">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="contracts:MobileLicensePlateNumberPutawayHistoryResponse">
-                                <Border Padding="8">
-                                    <VerticalStackLayout Spacing="2">
-                                        <Label FontAttributes="Bold" Text="{Binding SkuName}" />
-                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                                            <Label Text="{Binding DestinationAddress}" />
-                                            <Label Grid.Column="1" Text="{Binding Quantity, StringFormat='{0:0.###}'}" />
-                                            <Label Grid.Column="2" Text="{Binding UnitOfMeasure, TargetNullValue='—'}" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <Label Text="{Binding CreatedByName}" FontSize="12" />
-                                            <Label Grid.Column="1" Text="{Binding CreatedAtUtc, StringFormat='{0:dd.MM.yyyy HH:mm}'}" FontSize="12" />
-                                        </Grid>
-                                    </VerticalStackLayout>
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
+                <Label FontAttributes="Bold" Text="История размещения" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding History, Source={x:Reference Page}}" Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="local:ReceivingPutawayHistoryRow">
+                            <Border Padding="7" Stroke="#D4D4D4">
+                                <Label Text="{Binding Description}" FontSize="12" />
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
         <VerticalStackLayout Grid.Row="1" Spacing="5">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
-            <Label x:Name="ErrorLabel" HorizontalTextAlignment="Center" IsVisible="False" TextColor="Red" />
-            <Button x:Name="NextLpnButton" Loaded="OnNonScanControlLoaded" Clicked="OnNextLpnClicked"
-                    HeightRequest="46" IsVisible="False" Text="Следующая палета" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="NextLpnButton" Text="Следующая LPN" Clicked="OnNextLpnClicked" IsVisible="False" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

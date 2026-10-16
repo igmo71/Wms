@@ -1,6 +1,7 @@
 # Current receiving and LPN
 
-These are implemented legacy rules. The replacement is specified in [the active feature](../../../specs/001-receiving-stock-lifecycle/spec.md).
+This page records the implemented receiving transition. Remaining replacement
+rules are specified in [the active feature](../../../specs/001-receiving-stock-lifecycle/spec.md).
 
 ## New source-based order foundation
 
@@ -21,8 +22,8 @@ one movement to its original receiving location, updates the checked order
 fact, and saves audit and command receipt atomically. Plan excess or an unknown
 plan requires `Manager`; a past expiration date requires explicit confirmation.
 Concurrent changes to the plan, SKU expiration flag, source version, order or
-LPN reject the staged close. A Web Manager can close an open receiving LPN;
-Mobile does not call this use case yet.
+LPN reject the staged close. A Web Manager or responsible Mobile participant can
+close an open receiving LPN through this use case.
 
 The new Application putaway use case moves a positive part of a closed receiving
 LPN from its original receiving location to a Storage location, even while the
@@ -30,7 +31,7 @@ order is still in receiving. It takes the SKU and expiration date from that LPN,
 checks both its unplaced quantity and the physical source balance, and saves
 the LPN-linked movement, putaway history, audit and command receipt together.
 The LPN revision rejects a concurrent change to the same LPN.
-This use case is not connected to Web or Mobile yet.
+Mobile can use this putaway while the order is still in receiving.
 
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire
@@ -38,7 +39,8 @@ catalog, including SKU outside the order. An `Operator` or `Manager` can add a
 catalog SKU to an order; the unique row starts with known plan `0` and unchecked
 fact. Repeating the command does not add a second row. The addition, command
 receipt and compact audit event are saved together. A Web Manager can search
-the catalog and add a SKU to the order.
+the catalog and add a SKU to the order; Mobile participants can select from
+the order or catalog and always resolve a scanned barcode against the catalog.
 
 The new cycle use case refreshes linked sources before joining and checks their
 posting, deletion mark and warehouse. The first participant selects an active,
@@ -49,7 +51,7 @@ is open. The responsible user can cancel that LPN, including after editing;
 a `Manager` can edit or cancel another user's open LPN. These drafts do not
 post inventory. A current-cycle participant can confirm a SKU as checked zero
 when no active LPN contains it; the audit and command receipt are saved with
-the fact update. Mobile receiving remains unmapped while its replacement is prepared.
+the fact update. Mobile receiving now uses these scenarios.
 
 ## LPN issuance
 
@@ -115,8 +117,8 @@ integration snapshot during import and reconciliation; it is not persisted as a
 second aggregate status.
 
 Receiving participation is stored in `ReceivingOrderParticipant`, unique by
-order and Identity user. The Mobile queue lists the current user's active orders
-for the selected warehouse; scanning an available order can join the user.
+order and Identity user. The Mobile queue lists WMS orders for the selected
+warehouse; opening an available order allows the user to join its current cycle.
 Opening or scanning an already joined order reads it. The first participant
 selects an active unlocked Receiving location for the order warehouse by
 scanning its barcode or searching the available locations by address or name.
@@ -127,40 +129,18 @@ commit together. Later participants reuse the location. Concurrent first entry
 uses the order operational revision; a losing caller reloads and joins the
 winning location on explicit retry.
 
-Joining never writes to 1C. Deleted, unposted, unreadable, unsupported, or
-duplicate-SKU source documents remain visible with a blocking reason and cannot
-be joined. The order view shows the source plan read-only and its LPN list.
-Participation still uses the legacy source synchronization assessment. The old
-Mobile completion control may remain visible, but its route is unmapped and the
-server rejects the old completion command. Web no longer exposes that command;
-the replacement completion path is pending.
-
-The Mobile order page has separate nomenclature and pallet tabs. An LPN scan is
-accepted from either tab and opens its separate pallet page; an SKU scan is
-accepted only on that pallet page and opens a separate absolute-quantity page.
-An editable open pallet also offers manual search and selection of any planned
-order SKU by name or code, including one not yet counted on that pallet. The
-manual selection opens the same quantity page without creating a pallet row;
-the pallet's main list continues to show only its retained item rows. Plan choices
-and retained rows have neutral headings; plan cards are light gray and retained
-rows white. Manual plan choices have a green border only when the order-wide
-checked fact exactly matches the SKU plan across all active pallets; unchecked
-and excess quantities do not receive this border. A successful quantity
-save closes the manual selector on return to the pallet page; failed or cancelled
-edits leave it open.
-No quantity field is focused by navigation or scanning. The order SKU table is
-read-only: unchecked fact is a red question mark, a mismatch is highlighted
-yellow, and an exact match green. Tapping an order SKU opens its aggregate plan
-and fact plus only the LPNs that contain that SKU, with quantity per LPN. The order
-list initially hides exact-match green SKU cards; its fixed bottom area
-shows how many are hidden and lets the operator show or hide them. White unchecked
-and yellow mismatch cards remain visible, and the choice survives order refresh
-and return from a pallet page. An LPN page lists only its retained item rows,
-not every planned order SKU. Pallet
-actions remain visible below the scrolling composition; closing always returns
-to the order's nomenclature tab, and an empty pallet uses a compact cancel
-action. Cancelled LPNs are hidden from operational Mobile lists but remain
-permanently used and auditable.
+Joining never writes to 1C. The Mobile queue shows free 1C sources and WMS
+orders for the selected warehouse. Scanning a free document selects it; scanning
+a linked document opens its WMS order. Several selected sources can create one
+order. The order screen shows current plan and fact, separate nomenclature and
+LPN tabs, and an action to confirm an unchecked SKU as zero. A participant scans
+an issued LPN, then scans a SKU against the entire catalog or searches manually
+in the order or catalog. A SKU outside the order is added with plan zero before
+the operator edits its absolute quantity. The LPN page shows retained items only;
+cancelled LPNs remain auditable but are hidden from the operational list. Closing
+a positive LPN posts receipt; a closed LPN cannot reopen and can be put away
+without waiting for order completion. The old completion control and route are
+absent; the replacement completion use case is pending.
 Receiving imports never discard active local work. WMS owns the receiving
 location, facts, local state, comments, timestamps, and users. A nullable fact
 means unchecked; zero is an explicit result. Mobile changes facts only through
@@ -171,37 +151,16 @@ The legacy order-completion command no longer changes the order or posts stock.
 Its previous fingerprint and quantity-difference decision are superseded by
 the active receiving specification; the new completion use case is pending.
 
-Independent putaway starts from a closed LPN rather than an order. Mobile uses
-LPN → SKU → confirmed quantity → destination scan; scanning the destination immediately
-posts one movement from the order's Receiving location to an active unlocked
-Storage location in the same warehouse. Partial putaway is allowed. The
-remaining quantity is the immutable accepted LPN-item quantity minus its posted
-LPN putaway history, so later picking or other consumption from a destination
-does not change receiving history or make quantity pending again.
-
-Mobile putaway uses three pages: pallet scanning, pallet composition/history,
-and quantity with storage-cell recommendations. Native `NavigationPage` back
-navigation returns through those pages. The composition page uses the LPN code as
-its navigation title, with a checkmark for completed, unblocked pallets. It omits
-the order number and routine step explanations, while retaining blocking reasons
-and quantity-confirmation feedback. Composition and history have no outer cards;
-SKU code and unit share a row, and quantities use compact labelled columns.
-Composition cards are uncolored before putaway, light yellow when partially
-placed, and light green when remaining quantity reaches zero.
-When putaway is unavailable, its history appears if any movements exist. Each
-entry shows the SKU, destination with quantity and unit, then employee name and
-timestamp. Employee names follow the shared Identity display-name fallback rule;
-stored audit user ids remain unchanged.
-Putaway uses "палета" for the physical unit and "ячейка" for a storage
-destination in operator text; the printed LPN code is unchanged. Pending or
-busy commands block backward navigation. A successful movement returns from
-quantity entry to the pallet composition, refreshed from server state.
-The remaining and confirmed quantities share a row; "Entire remainder" shows
-the remainder beside the quantity field. After confirmation the screen asks
-for a storage-cell scan. "Next pallet" appears on the composition page when
-further putaway is unavailable. It and repeat-safe retry on the quantity page
-after an uncertain posting use fixed bottom action areas;
-errors and progress occupy those areas only when present.
+Independent putaway starts from a closed LPN either on its receiving-order page
+or by scanning the LPN on the independent placement screen. Mobile uses
+LPN → SKU → confirmed positive quantity → destination scan. The new Application
+command posts one movement from the LPN's original Receiving location to an
+active unlocked Storage location in the same warehouse. Partial putaway is
+allowed. Remaining quantity is the current LPN quantity less its posted putaway
+history, independent of later picking or other consumption from a destination.
+The LPN screen shows its composition and putaway history; the quantity screen
+shows recommendations and permits any valid Storage destination. Success returns
+to the refreshed LPN screen. Pending or busy commands block backward navigation.
 
 Each SKU selection starts with an empty, unconfirmed quantity and no automatic
 input focus. Finishing input (Done or leaving the field) or explicitly choosing
@@ -215,8 +174,7 @@ After conflict refresh, an insufficient remainder revokes confirmation; an
 unavailable SKU or LPN returns to the current selection/status. Success resets
 quantity confirmation before the next SKU selection.
 
-The legacy Mobile putaway command is disabled while its screen and read endpoints
-await replacement. Only the new Application command can post putaway. Receiving
+The new Mobile putaway command calls `PutAwayReceivingLpn`. Receiving
 orders have no placement status or order-level putaway commands. A scanned
 destination need not be recommended; the new command validates any selected
 destination when posting.

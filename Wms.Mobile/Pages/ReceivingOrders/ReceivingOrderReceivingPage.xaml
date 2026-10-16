@@ -1,86 +1,70 @@
-<ContentPage
-    x:Class="Wms.Mobile.ReceivingOrderReceivingPage"
-    x:Name="Page"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:Wms.Mobile"
-    Title="Приёмка">
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="12" RowSpacing="8">
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
-            <Label x:Name="NumberLabel" FontAttributes="Bold" FontSize="22" />
-            <Label x:Name="StatusLabel" Grid.Column="1" FontAttributes="Bold" VerticalTextAlignment="Center" />
-            <Label x:Name="CheckedLabel" Grid.Row="1" Grid.ColumnSpan="2" FontSize="13" />
-            <Label x:Name="ScanPalletHintLabel" Grid.Row="2" Grid.ColumnSpan="2" FontSize="12"
-                   Text="Отсканируйте свободную палету, чтобы добавить её к ордеру." IsVisible="False" />
-        </Grid>
-        <Border x:Name="SynchronizationPanel" Grid.Row="1" IsVisible="False" Padding="8" BackgroundColor="#FFF3CD" Stroke="#E0B000">
-            <Label x:Name="SynchronizationDetailsLabel" FontSize="13" TextColor="#5C4700" />
-        </Border>
-        <RefreshView x:Name="OrderRefreshView" Grid.Row="2" Refreshing="OnOrderRefreshing">
-            <ScrollView x:Name="OrderScrollView">
-                <VerticalStackLayout Spacing="4">
+<ContentPage x:Class="Wms.Mobile.ReceivingOrderReceivingPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Приёмка">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="StatusLabel" FontSize="13" />
+            <Label x:Name="LocationLabel" FontSize="12" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="OrderRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <VerticalStackLayout x:Name="ManualLocationPanel" IsVisible="False" Spacing="5">
-                        <Label FontAttributes="Bold" FontSize="14" Text="Выбор ячейки приёмки" />
-                        <SearchBar x:Name="LocationSearch" Placeholder="Адрес или название ячейки"
-                                   TextChanged="OnLocationSearchChanged" />
-                        <Label x:Name="LocationSearchHint" FontSize="12" />
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ReceivingLocationRows, Source={x:Reference Page}}" Spacing="4">
+                    <VerticalStackLayout x:Name="LocationPanel" Spacing="5" IsVisible="False">
+                        <Label Text="Выберите место приёмки сканированием или поиском" />
+                        <SearchBar x:Name="LocationSearch" Placeholder="Адрес или название"
+                                   SearchButtonPressed="OnLocationSearch" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding LocationRows, Source={x:Reference Page}}">
                             <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="local:ReceivingLocationRow">
-                                    <Border Padding="9,7" BackgroundColor="#F3F3F3" Stroke="#D4D4D4" StrokeThickness="1">
+                                <DataTemplate x:DataType="local:ReceivingWorkLocationRow">
+                                    <Border Padding="8" Stroke="#D4D4D4">
                                         <Border.GestureRecognizers>
-                                            <TapGestureRecognizer CommandParameter="{Binding Address}" Tapped="OnLocationTapped" />
+                                            <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnLocationTapped" />
                                         </Border.GestureRecognizers>
-                                        <VerticalStackLayout Spacing="2">
-                                            <Label FontAttributes="Bold" FontSize="14" Text="{Binding Address}" />
-                                            <Label FontSize="12" Text="{Binding Name}" />
-                                            <Label FontSize="11" Text="{Binding ZoneName}" />
-                                        </VerticalStackLayout>
+                                        <Label Text="{Binding Display}" />
                                     </Border>
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
-                    <VerticalStackLayout x:Name="ProductLinesPanel" BindableLayout.ItemsSource="{Binding LineRows, Source={x:Reference Page}}" Spacing="3">
+                    <Label x:Name="ScanHintLabel" FontSize="12" />
+                    <VerticalStackLayout x:Name="ProductsPanel" BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:ReceivingOrderLineRow">
-                                <Border Padding="7,5" BackgroundColor="{Binding BackgroundColor}" Stroke="#D4D4D4" StrokeThickness="1">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer CommandParameter="{Binding StockKeepingUnitId}" Tapped="OnSkuTapped" />
-                                    </Border.GestureRecognizers>
-                                    <Grid ColumnDefinitions="28,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
-                                        <Label Grid.RowSpan="2" FontSize="12" Text="{Binding LineNumber}" VerticalTextAlignment="Center" />
-                                        <Label Grid.Column="1" FontAttributes="Bold" FontSize="12" LineBreakMode="WordWrap" Text="{Binding SkuName}" />
-                                        <Label Grid.Row="1" Grid.Column="1" FontSize="11" Text="{Binding SkuCode}" />
-                                        <VerticalStackLayout Grid.Column="2" Grid.RowSpan="2" Spacing="0" MinimumWidthRequest="48">
-                                            <Label FontSize="12" HorizontalTextAlignment="End" Text="{Binding PlanText}" />
-                                            <Label FontAttributes="Bold" FontSize="13" HorizontalTextAlignment="End" Text="{Binding FactText}" TextColor="{Binding FactColor}" />
+                            <DataTemplate x:DataType="local:ReceivingWorkItemRow">
+                                <Border Padding="8" Stroke="#D4D4D4" BackgroundColor="{Binding BackgroundColor}">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                        <VerticalStackLayout>
+                                            <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                            <Label Text="{Binding PlanAndFact}" FontSize="12" />
                                         </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="Детали" FontSize="11"
+                                                CommandParameter="{Binding SkuId}" Clicked="OnSkuClicked" />
+                                        <Button Grid.Column="2" Text="Проверено: 0" FontSize="11"
+                                                IsVisible="{Binding CanConfirmZero}"
+                                                CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
-                    <Label x:Name="AcceptedLinesEmptyLabel" IsVisible="False" Padding="8"
-                           Text="Все позиции приняты. При необходимости покажите их кнопкой ниже." />
-                    <VerticalStackLayout x:Name="LpnPanel" BindableLayout.ItemsSource="{Binding LicensePlateNumbers, Source={x:Reference Page}}" IsVisible="False" Spacing="4">
-                        <BindableLayout.EmptyView>
-                            <Label Padding="8" Text="Палет пока нет. Отсканируйте свободную этикетку LPN." />
-                        </BindableLayout.EmptyView>
+                    <VerticalStackLayout x:Name="LpnsPanel" BindableLayout.ItemsSource="{Binding LpnRows, Source={x:Reference Page}}" IsVisible="False" Spacing="4">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:ReceivingOrderLpnRow">
-                                <Border Padding="8" Stroke="#C8C8C8" StrokeThickness="1">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnLicensePlateNumberTapped" />
-                                    </Border.GestureRecognizers>
-                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                                        <HorizontalStackLayout Spacing="7">
-                                            <Label FontAttributes="Bold" FontSize="16" Text="{Binding Code}" />
-                                            <Label FontSize="12" Text="{Binding StatusName}" VerticalTextAlignment="Center" />
-                                        </HorizontalStackLayout>
-                                        <Label Grid.Row="1" FontSize="12" Text="{Binding ResponsibleUserName}" />
-                                        <Button Grid.Column="1" Grid.RowSpan="2" Clicked="OnCancelLicensePlateNumberClicked" CommandParameter="{Binding Id}" FontSize="20" HeightRequest="36" IsVisible="{Binding CanCancel}" Padding="0" Text="×" WidthRequest="36" />
+                            <DataTemplate x:DataType="local:ReceivingWorkLpnRow">
+                                <Border Padding="8" Stroke="#D4D4D4">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                        <VerticalStackLayout>
+                                            <Label Text="{Binding Code}" FontAttributes="Bold" />
+                                            <Label Text="{Binding Description}" FontSize="12" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Button Text="Открыть" FontSize="11" CommandParameter="{Binding Id}" Clicked="OnLpnClicked" />
+                                            <Button Text="Разместить" FontSize="11" IsVisible="{Binding CanPutaway}"
+                                                    CommandParameter="{Binding Id}" Clicked="OnPutawayClicked" />
+                                        </VerticalStackLayout>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -89,21 +73,14 @@
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
-        <VerticalStackLayout Grid.Row="3" Spacing="5">
-            <Button x:Name="AcceptedLinesButton" Clicked="OnAcceptedLinesClicked" FontSize="13"
-                    HeightRequest="38" IsVisible="False" Padding="6" />
-            <Grid x:Name="TabsGrid" ColumnDefinitions="*,*" ColumnSpacing="6">
-                <Button x:Name="ProductsTabButton" Clicked="OnProductsTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Номенклатура" />
-                <Button x:Name="LpnTabButton" Grid.Column="1" Clicked="OnLpnTabClicked" FontSize="14" HeightRequest="42" Padding="6" Text="Палеты" />
-            </Grid>
-            <BoxView x:Name="CommandProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
-            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" IsVisible="False" TextColor="Red" />
-            <Grid ColumnDefinitions="*">
-                <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
-                <Button x:Name="StartReceivingButton" Clicked="OnStartReceivingClicked" HeightRequest="46" Text="Начать приёмку" />
-                <Button x:Name="ChooseLocationButton" Clicked="OnChooseLocationClicked" HeightRequest="46"
-                        IsVisible="False" Text="Выбрать ячейку из списка" />
-                <Button x:Name="CompleteReceivingButton" Clicked="OnCompleteReceivingClicked" HeightRequest="46" Text="Завершить приёмку" />
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="JoinButton" Text="Начать или присоединиться" Clicked="OnJoinClicked" />
+            <Grid x:Name="TabsGrid" ColumnDefinitions="*,*" ColumnSpacing="5">
+                <Button Text="Номенклатура" Clicked="OnItemsTabClicked" />
+                <Button Grid.Column="1" Text="LPN" Clicked="OnLpnsTabClicked" />
             </Grid>
         </VerticalStackLayout>
     </Grid>

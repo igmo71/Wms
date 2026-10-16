@@ -89,6 +89,8 @@ public class Program
 
         app.MapMobileIdentityEndpoints();
         app.MapMobileBarcodeEndpoints();
+        app.MapMobileReceivingOrderEndpoints();
+        app.MapMobileLicensePlateNumberPutawayEndpoints();
         app.MapMobileInventoryTransferEndpoints();
         app.MapMobileInventoryCountEndpoints();
         app.MapMobileShippingOrderEndpoints();

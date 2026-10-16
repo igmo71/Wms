@@ -19,7 +19,15 @@
                     <Label x:Name="UnitLabel" Grid.Row="3" Grid.Column="1" FontAttributes="Bold" />
                 </Grid>
                 <Label Margin="0,8,0,0" Text="Количество в палете" />
-                <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="0" />
+                <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="0"
+                       Completed="OnQuantityCompleted" />
+                <VerticalStackLayout x:Name="ExpirationPanel" IsVisible="False" Spacing="3">
+                    <HorizontalStackLayout Spacing="8">
+                        <Switch x:Name="ExpirationSwitch" Toggled="OnExpirationToggled" />
+                        <Label Text="Указать срок годности" VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+                    <DatePicker x:Name="ExpirationPicker" IsVisible="False" Format="dd.MM.yyyy" />
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
         <VerticalStackLayout Grid.Row="1" Spacing="6">
@@ -27,7 +35,6 @@
             <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
             <Button x:Name="RetryCommandButton" Clicked="OnRetryCommandClicked" Loaded="OnNonScanControlLoaded" IsVisible="False" HeightRequest="46" Text="Повторить команду" />
             <Button x:Name="ApplyButton" Clicked="OnApplyClicked" HeightRequest="48" Loaded="OnNonScanControlLoaded" Text="Применить" />
-            <Button x:Name="RemoveButton" Clicked="OnRemoveClicked" HeightRequest="42" Loaded="OnNonScanControlLoaded" Text="Удалить из палеты" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

@@ -8,24 +8,23 @@ embedded scanner when available. Manual SKU search, where present, uses name,
 code, or barcode and rejoins the same operation as scanning. Decimal 1C GUID
 barcodes accept and normalize leading zeroes.
 
-The Mobile receiving and LPN putaway endpoint groups are temporarily unmapped.
-Replacement contracts and handlers use the new Application commands and read
-projections; they will be connected with the replacement Mobile screens. Their
+Mobile receiving and LPN putaway use the new Application commands and read
+projections through their replacement endpoint groups. Their
 route policy requires `Operator` or `Manager`; `Administrator` alone does not
 grant receiving access.
 
 The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
 only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
 can activate a focused UI action after the Intent scan has already navigated.
-Scanner-driven pages suppress Android focus on action buttons. Receiving order,
-LPN and LPN putaway pages ignore queued scan callbacks from a previous period of
+Scanner-driven pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
-Independent putaway starts from its own LPN screen.
-Scanning an accepted order shows its number, date and state; an unknown order
-has a distinct not-found message. The receiving order shows that scanning an
-available pallet adds it. Its nomenclature/pallet tabs and current action remain
-below the scrolling content; pallet actions and uncertain-command retry use the
-same fixed bottom area.
+Independent putaway starts from its own LPN screen. The Mobile receiving queue
+lists free 1C sources and WMS orders for the selected warehouse. Scanning a
+document selects a free source or opens its linked order; several selected
+sources create one WMS order. A participant scans an issued LPN, selects or
+globally scans its SKU, enters a positive quantity and may close it. The order
+page offers zero checking and direct putaway of closed LPNs before order
+completion. Closing and putaway use separate retry-safe commands.
 
 Web `/receiving-orders` lists unlinked 1C sources separately from WMS orders.
 Operators and Managers can select several sources of one warehouse, inspect

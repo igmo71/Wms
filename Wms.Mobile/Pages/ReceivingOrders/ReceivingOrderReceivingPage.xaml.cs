@@ -8,720 +8,333 @@ namespace Wms.Mobile;
 public partial class ReceivingOrderReceivingPage : ContentPage
 {
     private readonly ReceivingOrderReceivingProcess _process;
-    private readonly MobileReceivingOrderClient _orderClient;
-    private readonly MobileReferenceDataClient _referenceDataClient;
+    private readonly MobileReceivingOrderClient _orders;
+    private readonly MobileReferenceDataClient _reference;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
-    private MobileReceivingOrderDetailsResponse? _details;
-    private MobileOrderSynchronizationResponse? _synchronization;
-    private bool _isVisible;
-    private long _scanGeneration;
-    private bool _scannerSubscribed;
+    private MobileReceivingWorkOrderResponse? _order;
+    private bool _visible;
     private bool _busy;
-    private bool _awaitingReceivingLocation;
-    private bool _showReceivingLocations;
-    private int _locationSearchVersion;
-    private bool _lpnTabActive;
-    private bool _showAcceptedLines;
-    private int _acceptedLineCount;
-    private bool _hasAppeared;
+    private bool _lpnTab;
+    private long _scanGeneration;
 
-    public ReceivingOrderReceivingPage(
-        ReceivingOrderReceivingProcess process,
-        MobileReceivingOrderClient orderClient,
-        MobileReferenceDataClient referenceDataClient,
-        IOperationalBarcodeScanner scanner,
-        IServiceProvider services)
+    public ReceivingOrderReceivingPage(ReceivingOrderReceivingProcess process,
+        MobileReceivingOrderClient orders, MobileReferenceDataClient reference,
+        IOperationalBarcodeScanner scanner, IServiceProvider services)
     {
         InitializeComponent();
         _process = process;
-        _orderClient = orderClient;
-        _referenceDataClient = referenceDataClient;
+        _orders = orders;
+        _reference = reference;
         _scanner = scanner;
         _services = services;
-        ErrorLabel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(Label.Text))
-                ErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(ErrorLabel.Text);
-        };
+        BindingContext = this;
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<ReceivingOrderLineRow> LineRows { get; private set; } = [];
-    public IReadOnlyList<ReceivingOrderLpnRow> LicensePlateNumbers { get; private set; } = [];
-    public IReadOnlyList<ReceivingLocationRow> ReceivingLocationRows { get; private set; } = [];
+    public IReadOnlyList<ReceivingWorkItemRow> ItemRows { get; private set; } = [];
+    public IReadOnlyList<ReceivingWorkLpnRow> LpnRows { get; private set; } = [];
+    public IReadOnlyList<ReceivingWorkLocationRow> LocationRows { get; private set; } = [];
 
-    private MobileReceivingOrderDetailsResponse Details =>
-        _details ?? throw new InvalidOperationException("Приходный ордер не загружен.");
-
-    private bool CanUseLicensePlateNumbers =>
-        _details?.Order is { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true };
-
-    public void Show(MobileReceivingOrderDetailsResponse details)
-    {
-        _synchronization = null;
-        ApplyDetails(details);
-    }
-
-    public void ShowMain(MobileReceivingOrderDetailsResponse details)
-    {
-        _lpnTabActive = false;
-        Show(details);
-    }
+    public void Show(MobileReceivingWorkOrderResponse order) => Apply(order);
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        _isVisible = true;
-        if (!_scannerSubscribed)
-        {
-            _scanner.ScanReceived += OnScanReceived;
-            _scannerSubscribed = true;
-        }
-
-        if (_hasAppeared)
-            await RefreshAsync(showErrors: false);
-        _hasAppeared = true;
+        _visible = true;
+        _scanner.ScanReceived += OnScanReceived;
+        await RefreshAsync();
         await UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
-        _isVisible = false;
+        _visible = false;
         Interlocked.Increment(ref _scanGeneration);
+        _scanner.ScanReceived -= OnScanReceived;
         CameraScannerView.Stop();
-        if (_scannerSubscribed)
-        {
-            _scanner.ScanReceived -= OnScanReceived;
-            _scannerSubscribed = false;
-        }
         base.OnDisappearing();
     }
 
-    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
+    private async void OnRefreshing(object? sender, EventArgs e)
     {
-        long generation = Volatile.Read(ref _scanGeneration);
+        await RefreshAsync();
+        OrderRefreshView.IsRefreshing = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_busy || _order is null) return;
+        SetBusy(true);
+        try { Apply(await _orders.GetAsync(_order.Id)); }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить ордер."; }
+        finally { SetBusy(false); }
+    }
+
+    private void Apply(MobileReceivingWorkOrderResponse order)
+    {
+        _order = order;
+        NumberLabel.Text = order.Number ?? order.Id.ToString();
+        StatusLabel.Text = order.Status switch
+        {
+            MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
+            MobileReceivingOrderStatus.InReceiving => "В работе",
+            MobileReceivingOrderStatus.Received => "Принят",
+            _ => order.Status.ToString()
+        };
+        LocationLabel.Text = order.ReceivingLocationId is Guid id
+            ? $"Место приёмки: {id}" : "Место приёмки ещё не выбрано";
+        JoinButton.IsVisible = !order.IsParticipant
+            && (order.Status is MobileReceivingOrderStatus.ReadyForReceiving
+                or MobileReceivingOrderStatus.InReceiving);
+        LocationPanel.IsVisible = !order.IsParticipant && LocationPanel.IsVisible
+            && order.Status == MobileReceivingOrderStatus.ReadyForReceiving;
+        ScanHintLabel.Text = order.IsParticipant
+            ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
+            : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
+        ItemRows = order.Items.Select((item, index) =>
+        {
+            var exact = item.PlanQuantity is decimal plan
+                && item.FactQuantity is decimal fact && plan == fact;
+            var activeLpn = order.Lpns.Any(x =>
+                (x.Status is MobileLicensePlateNumberStatus.Open or MobileLicensePlateNumberStatus.Closed)
+                && x.Items.Any(y => y.SkuId == item.SkuId));
+            return new ReceivingWorkItemRow(item.SkuId,
+                $"{index + 1}. {item.SkuName ?? item.SkuId.ToString()}",
+                $"План: {Format(item.PlanQuantity)} · Факт: {Format(item.FactQuantity)} · {item.UnitOfMeasure ?? "—"}",
+                order.IsParticipant && !activeLpn && item.FactQuantity is null,
+                exact ? Colors.LightGreen : item.FactQuantity is null
+                    ? Colors.White : Colors.LightYellow);
+        }).ToArray();
+        LpnRows = order.Lpns.Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
+            .Select(x => new ReceivingWorkLpnRow(x.Id, x.Code,
+                $"{(x.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыта" : "Открыта")} · "
+                + string.Join("; ", x.Items.Select(y =>
+                    $"{y.SkuName ?? y.SkuId.ToString()}: {y.Quantity:0.###} {y.UnitOfMeasure ?? "—"}")),
+                x.Status == MobileLicensePlateNumberStatus.Closed
+                    && x.Items.Any(y => y.RemainingQuantity > 0))).ToArray();
+        OnPropertyChanged(nameof(ItemRows));
+        OnPropertyChanged(nameof(LpnRows));
+        SetTab(_lpnTab);
+        UpdateRecovery();
+    }
+
+    private void OnScanReceived(object? sender, BarcodeScanEvent scan)
+    {
+        var generation = Volatile.Read(ref _scanGeneration);
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            if (_isVisible && generation == Volatile.Read(ref _scanGeneration))
-                await HandleScanAsync(scanEvent.Value);
+            if (_visible && generation == Volatile.Read(ref _scanGeneration))
+                await HandleScanAsync(scan.Value);
         });
     }
 
-    private async Task HandleScanAsync(string barcode)
+    private async Task HandleScanAsync(string code)
     {
-        if (!_isVisible || _busy || _process.HasPendingCommand)
-            return;
-        if (_awaitingReceivingLocation)
+        if (!_visible || _busy || _process.HasPendingCommand || _order is null) return;
+        if (LocationPanel.IsVisible)
         {
-            await ResolveReceivingLocationAsync(barcode);
+            await ResolveLocationAsync(code);
             return;
         }
-        if (!CanUseLicensePlateNumbers)
-            return;
-        if (!IsLicensePlateNumberCode(barcode))
+        if (!_order.IsParticipant)
         {
-            ErrorLabel.Text = "Товар сканируется на экране выбранной палеты.";
+            ErrorLabel.Text = "Сначала присоединитесь к приёмке.";
             return;
         }
-        await OpenLicensePlateNumberAsync(barcode.Trim());
-    }
-
-    private async void OnStartReceivingClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _process.HasPendingCommand || _details is null)
-            return;
-        _awaitingReceivingLocation = true;
-        ErrorLabel.Text = string.Empty;
-        StartReceivingButton.IsVisible = false;
-        UpdateLocationSelectionDisplay();
-        UpdateGuidance();
-        await UpdateCameraAsync();
-    }
-
-    private async void OnChooseLocationClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _process.HasPendingCommand || !_awaitingReceivingLocation)
-            return;
-
-        if (_showReceivingLocations)
+        if (!code.Trim().StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
         {
-            _showReceivingLocations = false;
-            ++_locationSearchVersion;
-            LocationSearch.Unfocus();
-            UpdateLocationSelectionDisplay();
-            UpdateGuidance();
-            await UpdateCameraAsync();
+            ErrorLabel.Text = "SKU сканируется на экране LPN.";
             return;
         }
-
-        LocationSearch.Text = string.Empty;
-        _showReceivingLocations = true;
-        var version = ++_locationSearchVersion;
-        UpdateLocationSelectionDisplay();
-        UpdateGuidance();
-        await UpdateCameraAsync();
-        await OrderScrollView.ScrollToAsync(0, 0, false);
-        await LoadReceivingLocationsAsync(version);
+        await ExecuteAsync(async () =>
+        {
+            Apply(await _process.OpenLpnAsync(_order.Id, code.Trim()));
+        });
+        if (!_process.HasPendingCommand && _process.LastResourceId is Guid id)
+            await OpenLpnPageAsync(id);
     }
 
-    private async void OnLocationSearchChanged(object? sender, TextChangedEventArgs e)
+    private async void OnJoinClicked(object? sender, EventArgs e)
     {
-        if (!_showReceivingLocations)
+        if (_order is null || _busy || _process.HasPendingCommand) return;
+        if (_order.Status == MobileReceivingOrderStatus.InReceiving)
+        {
+            await ExecuteAsync(async () => Apply(await _process.JoinAsync(_order.Id, null)));
             return;
-        var version = ++_locationSearchVersion;
-        await Task.Delay(300);
-        if (version == _locationSearchVersion && _showReceivingLocations)
-            await LoadReceivingLocationsAsync(version);
+        }
+        LocationPanel.IsVisible = true;
+        await SearchLocationsAsync();
     }
 
-    private async Task LoadReceivingLocationsAsync(int version)
-    {
-        if (_details is null || !_showReceivingLocations || version != _locationSearchVersion)
-            return;
+    private async void OnLocationSearch(object? sender, EventArgs e) => await SearchLocationsAsync();
 
-        LocationSearchHint.Text = "Загрузка ячеек…";
-        ReceivingLocationRows = [];
-        OnPropertyChanged(nameof(ReceivingLocationRows));
+    private async Task SearchLocationsAsync()
+    {
+        if (_order is null || _busy) return;
+        SetBusy(true);
         try
         {
-            var result = await _referenceDataClient.FindReceivingLocationsAsync(
-                Details.Order.WarehouseId, LocationSearch.Text);
-            if (!_showReceivingLocations || version != _locationSearchVersion)
-                return;
-            ReceivingLocationRows = result.Locations.Select(location => new ReceivingLocationRow(
-                location.Address, location.Name, location.ZoneName)).ToArray();
-            OnPropertyChanged(nameof(ReceivingLocationRows));
-            LocationSearchHint.Text = result.HasMore
-                ? "Показаны первые 50 ячеек. Уточните поиск."
-                : ReceivingLocationRows.Count == 0
-                    ? "Доступные ячейки приёмки не найдены."
-                    : string.Empty;
+            var result = await _reference.FindReceivingLocationsAsync(_order.WarehouseId, LocationSearch.Text);
+            LocationRows = result.Locations.Select(x => new ReceivingWorkLocationRow(
+                x.Id, $"{x.Address} · {x.Name}")).ToArray();
+            OnPropertyChanged(nameof(LocationRows));
         }
-        catch (MobileApiException exception)
-        {
-            if (version == _locationSearchVersion)
-                LocationSearchHint.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            if (version == _locationSearchVersion)
-                LocationSearchHint.Text = "Сервер WMS недоступен. Повторите поиск.";
-        }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось найти места приёмки."; }
+        finally { SetBusy(false); }
     }
 
     private async void OnLocationTapped(object? sender, TappedEventArgs e)
     {
-        if (_busy || !_awaitingReceivingLocation || _process.HasPendingCommand
-            || e.Parameter is not string barcode)
-            return;
-        LocationSearch.Unfocus();
-        await ResolveReceivingLocationAsync(barcode);
+        if (e.Parameter is Guid id) await JoinAtAsync(id);
     }
 
-    private async Task ResolveReceivingLocationAsync(string barcode)
+    private async Task ResolveLocationAsync(string barcode)
     {
+        if (_order is null) return;
         SetBusy(true);
-        ErrorLabel.Text = string.Empty;
         try
         {
-            var location = await _referenceDataClient.ResolveStorageLocationAsync(
-                barcode, Details.Order.WarehouseId, MobileStorageLocationContext.Receiving);
-            var confirmed = await DisplayAlertAsync(
-                "Начать приёмку", $"Позиция {location.Address}?", "Начать", "Назад");
-            if (!confirmed)
-            {
-                _awaitingReceivingLocation = false;
-                _showReceivingLocations = false;
-                ApplyDetails(Details);
-                return;
-            }
-
-            var response = await _process.StartAsync(Details.Order.Id, barcode);
-            _awaitingReceivingLocation = false;
-            _showReceivingLocations = false;
-            ApplyDetails(response.Details);
-        }
-        catch (MobileApiException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование позиции.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        finally
-        {
+            var location = await _reference.ResolveStorageLocationAsync(
+                barcode, _order.WarehouseId, MobileStorageLocationContext.Receiving);
             SetBusy(false);
-            await UpdateCameraAsync();
+            if (await DisplayAlertAsync("Место приёмки", $"Начать в {location.Address}?", "Да", "Нет"))
+                await JoinAtAsync(location.Id);
         }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось проверить место приёмки."; }
+        finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private async Task OpenLicensePlateNumberAsync(string code)
+    private async Task JoinAtAsync(Guid locationId)
     {
-        if (_process.HasPendingCommand)
-            return;
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try
+        if (_order is null || _busy || _process.HasPendingCommand) return;
+        await ExecuteAsync(async () =>
         {
-            var response = await _process.OpenLicensePlateNumberAsync(Details.Order.Id, code);
-            ApplyDetails(response.Details);
-            if (response.SelectedLicensePlateNumberId is Guid id)
-                await OpenLicensePlateNumberPageAsync(id);
-        }
-        catch (MobileApiException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text = "Ответ сервера не получен. Повторно отсканируйте тот же LPN.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        finally
-        {
-            SetBusy(false);
-            await UpdateCameraAsync();
-        }
+            Apply(await _process.JoinAsync(_order.Id, locationId));
+            LocationPanel.IsVisible = false;
+        });
     }
 
-    private async void OnLicensePlateNumberTapped(object? sender, TappedEventArgs e)
+    private async void OnZeroClicked(object? sender, EventArgs e)
     {
-        if (e.Parameter is Guid id && !_busy && !_process.HasPendingCommand)
-            await OpenLicensePlateNumberPageAsync(id);
+        if (sender is not Button { CommandParameter: Guid skuId } || _order is null) return;
+        if (!await DisplayAlertAsync("Проверено: 0", "Подтвердить отсутствие этого SKU?", "Да", "Нет")) return;
+        await ExecuteAsync(async () => Apply(await _process.ConfirmZeroAsync(_order.Id, skuId)));
     }
 
-    private async Task OpenLicensePlateNumberPageAsync(Guid id)
+    private async void OnLpnClicked(object? sender, EventArgs e)
     {
+        if (sender is Button { CommandParameter: Guid id }) await OpenLpnPageAsync(id);
+    }
+
+    private async Task OpenLpnPageAsync(Guid id)
+    {
+        if (_order is null || _busy || _process.HasPendingCommand) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
-        page.Show(Details.Order.Id, id, _process);
+        page.Show(_order.Id, id, _process);
         await Navigation.PushAsync(page);
     }
 
-    private async void OnSkuTapped(object? sender, TappedEventArgs e)
+    private async void OnPutawayClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || e.Parameter is not Guid skuId)
-            return;
+        if (_order is null || _busy || _process.HasPendingCommand
+            || sender is not Button { CommandParameter: Guid id }) return;
+        var lpn = _order.Lpns.SingleOrDefault(x => x.Id == id);
+        if (lpn is null) return;
+        var page = _services.GetRequiredService<LicensePlateNumberPutawayDetailsPage>();
+        page.Show(lpn);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnSkuClicked(object? sender, EventArgs e)
+    {
+        if (_order is null || _busy || _process.HasPendingCommand
+            || sender is not Button { CommandParameter: Guid skuId }) return;
         var page = _services.GetRequiredService<ReceivingOrderSkuDistributionPage>();
-        page.Show(Details.Order.Id, skuId, _process);
+        page.Show(_order.Id, skuId, _process);
         await Navigation.PushAsync(page);
     }
 
-    private async void OnCancelLicensePlateNumberClicked(object? sender, EventArgs e)
+    private void OnItemsTabClicked(object? sender, EventArgs e) => SetTab(false);
+    private void OnLpnsTabClicked(object? sender, EventArgs e) => SetTab(true);
+    private void SetTab(bool lpns)
     {
-        if (_busy || sender is not Button { CommandParameter: Guid id })
-            return;
-        var lpn = Details.LicensePlateNumbers.SingleOrDefault(x => x.Id == id);
-        if (lpn?.CanCancel != true || _process.HasPendingCommand)
-            return;
-        if (!await DisplayAlertAsync(
-                "Отменить палету", $"Отменить пустую палету {lpn.Code}?", "Отменить", "Назад"))
-            return;
+        _lpnTab = lpns;
+        ProductsPanel.IsVisible = !lpns;
+        LpnsPanel.IsVisible = lpns;
+    }
 
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (_busy || _process.HasPendingCommand) return;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
+        try { await action(); }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
+        catch (InvalidOperationException ex) { ErrorLabel.Text = ex.Message; }
+        finally { SetBusy(false); UpdateRecovery(); await UpdateCameraAsync(); }
+    }
+
+    private async void OnRetryClicked(object? sender, EventArgs e)
+    {
+        if (_busy || !_process.HasPendingCommand) return;
+        SetBusy(true);
+        Guid? openedId = null;
+        var succeeded = false;
         try
         {
-            var response = await _process.CancelLicensePlateNumberAsync(Details.Order.Id, id);
-            _synchronization = null;
-            ApplyDetails(response.Details);
-        }
-        catch (MobileApiException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text = "Ответ сервера не получен. Повторите отмену этой же палеты.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        finally
-        {
-            SetBusy(false);
-        }
-    }
-
-    private async void OnCompleteReceivingClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _synchronization?.Fingerprint is not { Length: > 0 } fingerprint
-            || _process.HasPendingCommand)
-            return;
-        if (!await DisplayAlertAsync(
-                "Завершить приёмку", "Завершить ордер и оприходовать принятый товар?", "Завершить", "Назад"))
-            return;
-
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        var refreshAfterFailure = false;
-        try
-        {
-            var response = await _process.CompleteAsync(Details.Order.Id, fingerprint);
-            ApplyDetails(response.Details);
-            await DisplayAlertAsync("Приёмка завершена", "Ордер успешно завершён.", "Готово");
-            await Navigation.PopAsync();
-        }
-        catch (MobileApiException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-            refreshAfterFailure = true;
-        }
-        catch (HttpRequestException)
-        {
-            ErrorLabel.Text = "Ответ сервера не получен. Повторите завершение приёмки.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            ErrorLabel.Text = exception.Message;
-        }
-        finally
-        {
-            SetBusy(false);
-        }
-        if (refreshAfterFailure)
-            await RefreshAsync(showErrors: false);
-    }
-
-    private void OnProductsTabClicked(object? sender, EventArgs e) => SetLpnTab(false);
-    private void OnLpnTabClicked(object? sender, EventArgs e) => SetLpnTab(true);
-
-    private void OnAcceptedLinesClicked(object? sender, EventArgs e)
-    {
-        _showAcceptedLines = !_showAcceptedLines;
-        UpdateProductLines();
-    }
-
-    private void SetLpnTab(bool active)
-    {
-        if (active && LicensePlateNumbers.Count == 0)
-            return;
-        _lpnTabActive = active;
-        ProductsTabButton.Opacity = active ? 0.65 : 1;
-        LpnTabButton.Opacity = active ? 1 : 0.65;
-        UpdateLocationSelectionDisplay();
-    }
-
-    private void UpdateLocationSelectionDisplay()
-    {
-        var selecting = _showReceivingLocations && _awaitingReceivingLocation
-            && !_process.HasPendingCommand;
-        ManualLocationPanel.IsVisible = selecting;
-        ProductLinesPanel.IsVisible = !selecting && !_lpnTabActive;
-        LpnPanel.IsVisible = !selecting && _lpnTabActive;
-        AcceptedLinesEmptyLabel.IsVisible = !selecting && !_lpnTabActive
-            && !_showAcceptedLines && _acceptedLineCount > 0 && LineRows.Count == 0;
-        AcceptedLinesButton.IsVisible = !selecting && !_lpnTabActive && _acceptedLineCount > 0;
-        TabsGrid.IsVisible = !selecting;
-        ChooseLocationButton.IsVisible = _awaitingReceivingLocation && !_process.HasPendingCommand;
-        ChooseLocationButton.IsEnabled = !_busy;
-        ChooseLocationButton.Text = selecting ? "Скрыть список ячеек" : "Выбрать ячейку из списка";
-    }
-
-    private async void OnOrderRefreshing(object? sender, EventArgs e) =>
-        await RefreshAsync(showErrors: true);
-
-    private async Task RefreshAsync(bool showErrors)
-    {
-        if (_busy || _details is null)
-        {
-            OrderRefreshView.IsRefreshing = false;
-            return;
-        }
-        SetBusy(true);
-        if (showErrors)
+            var opening = _process.PendingLabel == "Открыть LPN";
+            Apply(await _process.RetryAsync());
+            if (opening) openedId = _process.LastResourceId;
             ErrorLabel.Text = string.Empty;
-        try
-        {
-            ApplyDetails(await _orderClient.GetAsync(Details.Order.Id));
-            if (_showReceivingLocations)
-                await LoadReceivingLocationsAsync(++_locationSearchVersion);
+            succeeded = true;
         }
-        catch (MobileApiException exception)
-        {
-            if (showErrors) ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            if (showErrors) ErrorLabel.Text = "Сервер WMS недоступен.";
-        }
-        finally
-        {
-            OrderRefreshView.IsRefreshing = false;
-            SetBusy(false);
-        }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
+        finally { SetBusy(false); UpdateRecovery(); await UpdateCameraAsync(); }
+        if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
     }
 
-    private void ApplyDetails(MobileReceivingOrderDetailsResponse details)
+    private void UpdateRecovery()
     {
-        _details = details;
-        if (details.Order.Status != MobileReceivingOrderStatus.ReadyForReceiving)
-        {
-            _awaitingReceivingLocation = false;
-            _showReceivingLocations = false;
-            ++_locationSearchVersion;
-        }
-        _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
-            _synchronization, details.Order.Synchronization);
-        NumberLabel.Text = details.Order.Number;
-        StatusLabel.Text = details.Order.Status switch
-        {
-            MobileReceivingOrderStatus.ReadyForReceiving => "Готов",
-            MobileReceivingOrderStatus.InReceiving => "В работе",
-            MobileReceivingOrderStatus.ProcessingRequired => "Обработка",
-            _ => "Завершён"
-        };
-        CheckedLabel.Text = $"Проверено: {details.Order.Progress.ConfirmedLineCount} из {details.Order.Progress.TotalLineCount}";
-        ScanPalletHintLabel.IsVisible = CanUseLicensePlateNumbers;
-        _acceptedLineCount = details.Lines.Count(ReceivingOrderLineRow.IsFullyAccepted);
-        UpdateProductLines();
-        LicensePlateNumbers = details.LicensePlateNumbers
-            .Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
-            .Select(x => new ReceivingOrderLpnRow(
-                x.Id, x.Code, x.StatusName, x.ResponsibleUserName, x.CanCancel))
-            .ToArray();
-        OnPropertyChanged(nameof(LicensePlateNumbers));
-        LpnTabButton.IsEnabled = LicensePlateNumbers.Count > 0;
-        if (_lpnTabActive && LicensePlateNumbers.Count == 0)
-            _lpnTabActive = false;
-        SetLpnTab(_lpnTabActive);
-        StartReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.ReadyForReceiving
-            && !_awaitingReceivingLocation && !_process.HasPendingCommand;
-        StartReceivingButton.IsEnabled = !_busy
-            && !_process.HasPendingCommand
-            && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
-        CompleteReceivingButton.IsVisible = details.Order.Status == MobileReceivingOrderStatus.InReceiving
-            && details.Order.IsParticipant && !_process.HasPendingCommand;
-        CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
-        UpdateRecoveryControls();
-        UpdateGuidance();
-    }
-
-    private void UpdateProductLines()
-    {
-        LineRows = Details.Lines
-            .Where(line => _showAcceptedLines || !ReceivingOrderLineRow.IsFullyAccepted(line))
-            .Select(ReceivingOrderLineRow.From)
-            .ToArray();
-        OnPropertyChanged(nameof(LineRows));
-        AcceptedLinesButton.Text = _showAcceptedLines
-            ? $"Скрыть принятые ({_acceptedLineCount})"
-            : $"Показать принятые ({_acceptedLineCount})";
-        AcceptedLinesEmptyLabel.IsVisible = !_lpnTabActive && !_showAcceptedLines
-            && !_showReceivingLocations && _acceptedLineCount > 0 && LineRows.Count == 0;
-    }
-
-
-    private async void OnRetryCommandClicked(object? sender, EventArgs e)
-    {
-        if (_busy || !_process.HasPendingCommand)
-            return;
-        bool completing = _process.IsCompletionPending;
-        bool opening = _process.IsOpenLpnPending;
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try
-        {
-            var response = await _process.RetryAsync();
-            _awaitingReceivingLocation = false;
-            ApplyDetails(response.Details);
-            if (completing)
-            {
-                await DisplayAlertAsync("Приёмка завершена", "Ордер успешно завершён.", "Готово");
-                await Navigation.PopAsync();
-            }
-            else if (opening && response.SelectedLicensePlateNumberId is Guid id)
-                await OpenLicensePlateNumberPageAsync(id);
-        }
-        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Ответ не получен. Повторите сохранённую команду."; }
-        catch (InvalidOperationException exception) { ErrorLabel.Text = exception.Message; }
-        finally
-        {
-            SetBusy(false);
-            await UpdateCameraAsync();
-        }
-    }
-
-    private void UpdateRecoveryControls()
-    {
-        RetryCommandButton.IsVisible = _process.HasPendingCommand;
-        RetryCommandButton.IsEnabled = !_busy;
-        RetryCommandButton.Text = $"Повторить: {_process.PendingLabel}";
-        if (_process.HasPendingCommand)
-        {
-            StartReceivingButton.IsVisible = false;
-            CompleteReceivingButton.IsVisible = false;
-        }
-        UpdateLocationSelectionDisplay();
+        RetryButton.IsVisible = _process.HasPendingCommand;
+        RetryButton.Text = $"Повторить: {_process.PendingLabel}";
+        JoinButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
     protected override bool OnBackButtonPressed()
     {
-        if (_busy || _process.HasPendingCommand)
-        {
-            ErrorLabel.Text = "Сначала получите результат текущей команды.";
-            return true;
-        }
-        if (_showReceivingLocations)
-        {
-            _showReceivingLocations = false;
-            ++_locationSearchVersion;
-            LocationSearch.Unfocus();
-            UpdateLocationSelectionDisplay();
-            UpdateGuidance();
-            _ = UpdateCameraAsync();
-            return true;
-        }
-        if (_awaitingReceivingLocation)
-        {
-            _awaitingReceivingLocation = false;
-            ApplyDetails(Details);
-            _ = UpdateCameraAsync();
-            return true;
-        }
-        return base.OnBackButtonPressed();
+        if (!_busy && !_process.HasPendingCommand) return base.OnBackButtonPressed();
+        ErrorLabel.Text = "Сначала завершите повтор команды.";
+        return true;
     }
 
     private void SetBusy(bool busy)
     {
+        Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
-        CommandProgressIndicator.IsVisible = busy;
-        StartReceivingButton.IsEnabled = !busy
-            && !_process.HasPendingCommand
-            && _synchronization is not null
-            && OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization);
-        CompleteReceivingButton.IsEnabled = CanCompleteReceiving();
-        UpdateGuidance();
-        UpdateRecoveryControls();
-    }
-
-    private bool CanCompleteReceiving()
-    {
-        if (_busy
-            || _details is not
-            {
-                Order: { Status: MobileReceivingOrderStatus.InReceiving, IsParticipant: true }
-            }
-            || _synchronization is not { Fingerprint.Length: > 0 })
-        {
-            return false;
-        }
-
-        return !_process.HasPendingCommand
-            && GetCompletionHint() is null;
-    }
-
-    private void UpdateGuidance()
-    {
-        var message = _awaitingReceivingLocation
-            ? _showReceivingLocations
-                ? "Выберите ячейку зоны приёмки из списка."
-                : "Отсканируйте позицию зоны приёмки или выберите её из списка."
-            : _details?.Order.Status == MobileReceivingOrderStatus.InReceiving
-                ? GetCompletionHint()
-                : _synchronization is not null && OrderSynchronizationPresentation.HasIssue(_synchronization)
-                    ? OrderSynchronizationPresentation.BuildDetails(_synchronization, showChangedFields: false)
-                    : null;
-        SynchronizationDetailsLabel.Text = message;
-        SynchronizationPanel.IsVisible = !string.IsNullOrWhiteSpace(message);
-    }
-
-    private string? GetCompletionHint()
-    {
-        if (_details is null || _synchronization is null)
-            return "Проверяем возможность завершения приёмки…";
-        if (!_synchronization.IsFresh || !string.IsNullOrWhiteSpace(_synchronization.VerificationError))
-            return "Не удалось проверить ордер в 1С. Потяните список вниз для повторной проверки.";
-        if (_synchronization.SourceLevel == MobileOrderSynchronizationLevel.Blocking)
-            return "Есть расхождение с 1С. Обратитесь к ответственному для устранения.";
-        if (_synchronization.SourceLevel == MobileOrderSynchronizationLevel.RequiresOperatorDecision)
-            return "Подтвердите изменения из 1С в веб-приложении.";
-        var openCount = _details.LicensePlateNumbers.Count(x => x.Status == MobileLicensePlateNumberStatus.Open);
-        if (openCount > 0)
-            return $"Закройте открытые палеты: {openCount}.";
-        var uncheckedCount = _details.Lines.Count(x => !x.FactQuantity.HasValue);
-        if (uncheckedCount > 0)
-            return $"Укажите количество для оставшихся позиций: {uncheckedCount}.";
-        if (_synchronization.RequiresManager || _details.Lines.Any(x => x.FactQuantity != x.PlanQuantity))
-            return "Есть расхождения количества. Исправьте или обратитесь к менеджеру";
-        if (!OrderSynchronizationPresentation.CanPerformCriticalTransition(_synchronization))
-            return "Не удалось подтвердить возможность завершения. Потяните список вниз для повторной проверки.";
-        if (string.IsNullOrWhiteSpace(_synchronization.Fingerprint))
-            return "Потяните список вниз для проверки перед завершением.";
-        return null;
+        ProgressIndicator.IsVisible = busy;
+        UpdateRecovery();
     }
 
     private async Task UpdateCameraAsync()
     {
-        if (_isVisible && !_busy && !_showReceivingLocations && !_process.HasPendingCommand
-            && _scanner.ActiveSource == BarcodeScanSource.Camera
-            && (_awaitingReceivingLocation || CanUseLicensePlateNumbers))
+        if (_visible && !_busy && !_process.HasPendingCommand
+            && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
-        else
-            CameraScannerView.Stop();
+        else CameraScannerView.Stop();
     }
 
-    private static bool IsLicensePlateNumberCode(string value)
-    {
-        var code = value.Trim();
-        return code.Length == 15
-            && code.StartsWith("LPN", StringComparison.OrdinalIgnoreCase)
-            && code[3..].All(char.IsDigit);
-    }
+    private static string Format(decimal? value) => value?.ToString("0.###") ?? "?";
 }
 
-public sealed record ReceivingOrderLpnRow(
-    Guid Id,
-    string Code,
-    string StatusName,
-    string ResponsibleUserName,
-    bool CanCancel);
-
-public sealed record ReceivingLocationRow(
-    string Address,
-    string Name,
-    string ZoneName);
-
-public sealed record ReceivingOrderLineRow(
-    int LineNumber,
-    Guid StockKeepingUnitId,
-    string SkuCode,
-    string SkuName,
-    string PlanText,
-    string FactText,
-    Color BackgroundColor,
-    Color FactColor)
-{
-    public static bool IsFullyAccepted(MobileReceivingOrderLineResponse line) =>
-        line.FactQuantity is decimal fact && fact == line.PlanQuantity;
-
-    public static ReceivingOrderLineRow From(MobileReceivingOrderLineResponse line)
-    {
-        var unit = string.IsNullOrWhiteSpace(line.UnitOfMeasure) ? " —" : $" {line.UnitOfMeasure}";
-        var background = !line.FactQuantity.HasValue
-            ? Colors.White
-            : IsFullyAccepted(line)
-                ? Color.FromArgb("#E8F5E9")
-                : Color.FromArgb("#FFF4CC");
-        return new ReceivingOrderLineRow(
-            line.LineNumber,
-            line.StockKeepingUnitId,
-            line.SkuCode,
-            line.SkuName,
-            $"{line.PlanQuantity:0.###}{unit}",
-            line.FactQuantity.HasValue ? $"{line.FactQuantity:0.###}{unit}" : "?",
-            background,
-            line.FactQuantity.HasValue ? Colors.Black : Colors.DarkRed);
-    }
-}
+public sealed record ReceivingWorkItemRow(Guid SkuId, string Name,
+    string PlanAndFact, bool CanConfirmZero, Color BackgroundColor);
+public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
+    string Description, bool CanPutaway);
+public sealed record ReceivingWorkLocationRow(Guid Id, string Display);

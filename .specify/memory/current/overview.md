@@ -27,8 +27,9 @@ execution, inventory-posting and receiving-source/order foundation;
 `Wms.Integration` contains the 1C receiving reader and parser. The currently implemented
 [receiving rules](receiving.md) describe the current transition: the old order
 completion no longer posts stock, and Web now calls the new LPN close use case.
-The new putaway use case is not yet connected to Web or Mobile. The Mobile receiving and putaway routes
-are temporarily unmapped while their replacement handlers await the new client.
+The new putaway use case is connected to Mobile. Mobile receiving and putaway
+routes call the new Application handlers; the former Mobile endpoint groups are
+not mapped.
 
 Warehouse quantities retain at most three decimal places. Read-only Web
 quantity tables show three places; compact TSD displays show up to three.

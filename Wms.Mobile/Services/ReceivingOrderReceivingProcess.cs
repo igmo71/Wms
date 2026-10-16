@@ -2,69 +2,73 @@ using Wms.Contracts.Mobile.V1;
 
 namespace Wms.Mobile.Services;
 
-public sealed class ReceivingOrderReceivingProcess
+public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient client)
 {
-    private readonly MobileReceivingOrderClient _orderClient;
     private PendingCommand? _pending;
     private bool _executing;
 
-    internal ReceivingOrderReceivingProcess(MobileReceivingOrderClient orderClient) => _orderClient = orderClient;
     public bool HasPendingCommand => _pending is not null;
-    public bool IsOpenLpnPending => _pending?.Kind == "open";
-    public bool IsCancelLpnPending => _pending?.Kind == "cancel";
-    public bool IsCompletionPending => _pending?.Kind == "complete";
-    public bool IsClosePending => _pending?.Kind == "close";
     public string? PendingLabel => _pending?.Label;
+    public Guid? LastResourceId { get; private set; }
+    public MobileReceivingCloseResultResponse? LastCloseResult { get; private set; }
 
-    public Task<MobileReceivingOrderCommandResponse> CompleteAsync(Guid orderId, string expectedFingerprint) =>
-        StartAsync("complete", "Завершить приёмку", id => _orderClient.CompleteAsync(orderId, expectedFingerprint, id));
+    public Task<MobileReceivingWorkOrderResponse> JoinAsync(Guid orderId, Guid? locationId) =>
+        StartAsync("Присоединиться к приёмке", orderId, async id =>
+            (await client.JoinAsync(orderId, locationId, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> StartAsync(Guid orderId, string receivingLocationBarcode) =>
-        StartAsync("start", "Начать приёмку", id => _orderClient.JoinAsync(orderId, receivingLocationBarcode, id));
+    public Task<MobileReceivingWorkOrderResponse> OpenLpnAsync(Guid orderId, string code) =>
+        StartAsync("Открыть LPN", orderId, async id =>
+            (await client.OpenLpnAsync(orderId, code, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> OpenLicensePlateNumberAsync(Guid orderId, string code) =>
-        StartAsync("open", "Открыть палету", id => _orderClient.OpenLicensePlateNumberAsync(orderId, code, id));
+    public Task<MobileReceivingWorkOrderResponse> AddSkuAsync(Guid orderId, Guid skuId) =>
+        StartAsync("Добавить SKU", orderId, async id =>
+            (await client.AddSkuAsync(orderId, skuId, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> CancelLicensePlateNumberAsync(Guid orderId, Guid lpnId) =>
-        StartAsync("cancel", "Отменить палету", id => _orderClient.CancelLicensePlateNumberAsync(orderId, lpnId, id));
+    public Task<MobileReceivingWorkOrderResponse> ConfirmZeroAsync(Guid orderId, Guid skuId) =>
+        StartAsync("Проверено: 0", orderId, async id =>
+            (await client.ConfirmZeroAsync(orderId, skuId, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> SetLicensePlateNumberItemQuantityAsync(
-        Guid orderId, Guid lpnId, Guid skuId, decimal quantity) =>
-        StartAsync("quantity", "Сохранить количество",
-            id => _orderClient.SetLicensePlateNumberItemQuantityAsync(orderId, lpnId, skuId, quantity, id));
+    public Task<MobileReceivingWorkOrderResponse> EditLpnAsync(
+        Guid orderId, Guid lpnId, Guid skuId, decimal quantity, DateOnly? expirationDate) =>
+        StartAsync("Сохранить LPN", orderId, async id =>
+            (await client.EditLpnAsync(orderId, lpnId, skuId, quantity, expirationDate, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> RemoveLicensePlateNumberItemAsync(
-        Guid orderId, Guid lpnId, Guid skuId) =>
-        StartAsync("remove", "Удалить товар",
-            id => _orderClient.RemoveLicensePlateNumberItemAsync(orderId, lpnId, skuId, id));
+    public Task<MobileReceivingWorkOrderResponse> CancelLpnAsync(Guid orderId, Guid lpnId) =>
+        StartAsync("Отменить LPN", orderId, async id =>
+            (await client.CancelLpnAsync(orderId, lpnId, id)).ResourceId);
 
-    public Task<MobileReceivingOrderCommandResponse> CloseLicensePlateNumberAsync(Guid orderId, Guid lpnId) =>
-        StartAsync("close", "Закрыть палету", id => _orderClient.CloseLicensePlateNumberAsync(orderId, lpnId, id));
+    public Task<MobileReceivingWorkOrderResponse> CloseLpnAsync(
+        Guid orderId, Guid lpnId, bool confirmExpiredDate, string? managerReason) =>
+        StartAsync("Закрыть LPN", orderId, async id =>
+        {
+            LastCloseResult = await client.CloseLpnAsync(
+                orderId, lpnId, confirmExpiredDate, managerReason, id);
+            return LastCloseResult.LpnId;
+        });
 
-    public Task<MobileReceivingOrderCommandResponse> ReopenLicensePlateNumberAsync(Guid orderId, Guid lpnId) =>
-        StartAsync("reopen", "Возобновить палету", id => _orderClient.ReopenLicensePlateNumberAsync(orderId, lpnId, id));
-
-    private Task<MobileReceivingOrderCommandResponse> StartAsync(
-        string kind, string label, Func<Guid, Task<MobileReceivingOrderCommandResponse>> execute)
+    private Task<MobileReceivingWorkOrderResponse> StartAsync(
+        string label, Guid orderId, Func<Guid, Task<Guid>> execute)
     {
-        if (HasPendingCommand)
+        if (_pending is not null)
             throw new InvalidOperationException("Сначала повторите незавершённую команду.");
-        // Captured value inputs survive refresh; retry never reads current page controls.
-        _pending = new(Guid.NewGuid(), kind, label, execute);
+        LastResourceId = null;
+        LastCloseResult = null;
+        _pending = new PendingCommand(Guid.NewGuid(), label, orderId, execute);
         return RetryAsync();
     }
 
-    public async Task<MobileReceivingOrderCommandResponse> RetryAsync()
+    public async Task<MobileReceivingWorkOrderResponse> RetryAsync()
     {
         if (_executing)
-            throw new InvalidOperationException("Дождитесь результата текущего запроса.");
+            throw new InvalidOperationException("Дождитесь результата текущей команды.");
         var pending = _pending ?? throw new InvalidOperationException("Нет команды для повтора.");
         _executing = true;
         try
         {
-            var response = await pending.Execute(pending.RequestId);
+            LastResourceId = await pending.Execute(pending.RequestId);
+            var order = await client.GetAsync(pending.OrderId);
             _pending = null;
-            return response;
+            return order;
         }
         catch (MobileApiException)
         {
@@ -74,6 +78,6 @@ public sealed class ReceivingOrderReceivingProcess
         finally { _executing = false; }
     }
 
-    private sealed record PendingCommand(Guid RequestId, string Kind, string Label,
-        Func<Guid, Task<MobileReceivingOrderCommandResponse>> Execute);
+    private sealed record PendingCommand(Guid RequestId, string Label, Guid OrderId,
+        Func<Guid, Task<Guid>> Execute);
 }

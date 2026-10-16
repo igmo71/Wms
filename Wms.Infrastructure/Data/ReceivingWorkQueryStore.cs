@@ -15,7 +15,7 @@ public sealed class ReceivingWorkQueryStore(
         var orders = await OrderQuery(db)
             .Where(x => (warehouseId == null || x.WarehouseId == warehouseId)
                 && !x.DeletionMark
-                && x.Cycles.Any())
+                && x.SourceLinks.Any())
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(ct);
         return orders.Select(x => MapOrder(x, userId)).ToArray();
@@ -26,7 +26,7 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var order = await OrderQuery(db)
-            .SingleOrDefaultAsync(x => x.Id == orderId && x.Cycles.Any(), ct);
+            .SingleOrDefaultAsync(x => x.Id == orderId && x.SourceLinks.Any(), ct);
         return order is null ? null : MapOrder(order, userId);
     }
 

@@ -5,166 +5,115 @@ namespace Wms.Mobile.Services;
 
 public sealed class MobileReceivingOrderClient
 {
-    private readonly MobileApiTransport _transport;
+    private readonly MobileApiTransport transport;
+    internal MobileReceivingOrderClient(MobileApiTransport transport) => this.transport = transport;
+    private static string Route => MobileApiRoutes.ReceivingOrders;
 
-    internal MobileReceivingOrderClient(MobileApiTransport transport)
+    public Task<IReadOnlyList<MobileReceivingWorkOrderResponse>> GetOrdersAsync(
+        Guid warehouseId, CancellationToken ct = default) =>
+        GetListAsync<MobileReceivingWorkOrderResponse>($"{Route}?warehouseId={warehouseId:D}", ct);
+
+    public Task<IReadOnlyList<MobileReceivingSourceResponse>> GetUnlinkedSourcesAsync(
+        Guid warehouseId, CancellationToken ct = default) =>
+        GetListAsync<MobileReceivingSourceResponse>(
+            $"{Route}/sources/unlinked?warehouseId={warehouseId:D}", ct);
+
+    public Task<MobileReceivingWorkOrderResponse> GetAsync(
+        Guid orderId, CancellationToken ct = default) =>
+        GetAsync<MobileReceivingWorkOrderResponse>($"{Route}/{orderId:D}", ct);
+
+    public Task<MobileReceivingDocumentResolutionResponse> ResolveDocumentAsync(
+        Guid warehouseId, string barcode, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingResolveDocumentRequest, MobileReceivingDocumentResolutionResponse>(
+            $"{Route}/sources/resolve?warehouseId={warehouseId:D}",
+            new MobileReceivingResolveDocumentRequest(barcode), ct);
+
+    public Task<MobileReceivingCommandIdResponse> CreateOrderAsync(
+        IReadOnlyList<Guid> sourceRefKeys, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingCreateOrderRequest, MobileReceivingCommandIdResponse>(
+            Route, new MobileReceivingCreateOrderRequest(sourceRefKeys), ct);
+
+    public Task<IReadOnlyList<MobileReceivingSkuCandidateResponse>> SearchSkuAsync(
+        Guid orderId, string? search, bool catalog, CancellationToken ct = default) =>
+        GetListAsync<MobileReceivingSkuCandidateResponse>(
+            $"{Route}/{orderId:D}/skus?scope={(catalog ? "Catalog" : "Order")}&search={Uri.EscapeDataString(search ?? string.Empty)}", ct);
+
+    public Task<MobileReceivingSkuCandidateResponse> ResolveSkuAsync(
+        Guid orderId, string barcode, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingBarcodeRequest, MobileReceivingSkuCandidateResponse>(
+            $"{Route}/{orderId:D}/skus/resolve-barcode",
+            new MobileReceivingBarcodeRequest(barcode), ct);
+
+    public Task<MobileReceivingCommandIdResponse> AddSkuAsync(
+        Guid orderId, Guid skuId, Guid requestId, CancellationToken ct = default) =>
+        PostIdAsync($"{Route}/{orderId:D}/skus/{skuId:D}", requestId, ct);
+
+    public Task<MobileReceivingCommandIdResponse> ConfirmZeroAsync(
+        Guid orderId, Guid skuId, Guid requestId, CancellationToken ct = default) =>
+        PostIdAsync($"{Route}/{orderId:D}/skus/{skuId:D}/confirm-zero", requestId, ct);
+
+    public Task<MobileReceivingCommandIdResponse> JoinAsync(
+        Guid orderId, Guid? locationId, Guid requestId, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingJoinCycleRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/join",
+            new MobileReceivingJoinCycleRequest(requestId, locationId), ct);
+
+    public Task<MobileReceivingCommandIdResponse> OpenLpnAsync(
+        Guid orderId, string code, Guid requestId, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingOpenLpnRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/lpns",
+            new MobileReceivingOpenLpnRequest(requestId, code), ct);
+
+    public Task<MobileReceivingCommandIdResponse> EditLpnAsync(
+        Guid orderId, Guid lpnId, Guid skuId, decimal quantity,
+        DateOnly? expirationDate, Guid requestId, CancellationToken ct = default) =>
+        PutAsync<MobileReceivingEditLpnRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/lpns/{lpnId:D}",
+            new MobileReceivingEditLpnRequest(requestId, skuId, quantity, expirationDate), ct);
+
+    public Task<MobileReceivingCommandIdResponse> CancelLpnAsync(
+        Guid orderId, Guid lpnId, Guid requestId, CancellationToken ct = default) =>
+        PostIdAsync($"{Route}/{orderId:D}/lpns/{lpnId:D}/cancel", requestId, ct);
+
+    public Task<MobileReceivingCloseResultResponse> CloseLpnAsync(
+        Guid orderId, Guid lpnId, bool confirmExpiredDate, string? managerReason,
+        Guid requestId, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingCloseLpnRequest, MobileReceivingCloseResultResponse>(
+            $"{Route}/{orderId:D}/lpns/{lpnId:D}/close",
+            new MobileReceivingCloseLpnRequest(requestId, confirmExpiredDate, managerReason), ct);
+
+    private Task<MobileReceivingCommandIdResponse> PostIdAsync(
+        string route, Guid requestId, CancellationToken ct) =>
+        PostAsync<MobileReceivingCommandRequest, MobileReceivingCommandIdResponse>(
+            route, new MobileReceivingCommandRequest(requestId), ct);
+
+    private async Task<IReadOnlyList<T>> GetListAsync<T>(string route, CancellationToken ct)
     {
-        _transport = transport;
+        using var response = await transport.GetAsync(route, ct);
+        return await response.Content.ReadFromJsonAsync<List<T>>(ct)
+            ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректный список приёмки.");
     }
 
-    public async Task<MobileReceivingOrderWorkQueueResponse> GetWorkQueueAsync(
-        Guid warehouseId,
-        CancellationToken ct = default)
+    private async Task<T> GetAsync<T>(string route, CancellationToken ct)
     {
-        var route = $"{MobileApiRoutes.ReceivingOrders}?warehouseId={warehouseId:D}";
-        using HttpResponseMessage response = await _transport.GetAsync(route, ct);
-        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderWorkQueueResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(
-                response,
-                "Сервер вернул некорректную очередь приёмки и размещения.");
+        using var response = await transport.GetAsync(route, ct);
+        return await response.Content.ReadFromJsonAsync<T>(ct)
+            ?? throw MobileApiTransport.InvalidResponse(response, "Сервер вернул некорректное состояние приёмки.");
     }
 
-    public Task<MobileReceivingOrderDetailsResponse> GetAsync(
-        Guid orderId,
-        CancellationToken ct = default) =>
-        GetDetailsAsync($"{MobileApiRoutes.ReceivingOrders}/{orderId:D}", ct);
-
-    public async Task<MobileReceivingOrderDetailsResponse> ResolveDocumentAsync(
-        Guid warehouseId,
-        string barcode,
-        CancellationToken ct = default)
+    private async Task<TResponse> PostAsync<TRequest, TResponse>(
+        string route, TRequest request, CancellationToken ct)
     {
-        var route = $"{MobileApiRoutes.ReceivingOrders}/resolve-document";
-        using HttpResponseMessage response = await _transport.PostAsync(
-            route,
-            new MobileResolveReceivingOrderDocumentRequest(warehouseId, barcode),
-            ct);
-        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderDetailsResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(
-                response,
-                "Сервер вернул некорректный приходный ордер.");
+        using var response = await transport.PostAsync(route, request, ct);
+        return await MobileApiTransport.ReadCommandResponseAsync<TResponse>(
+            response, "Сервер вернул некорректный результат команды приёмки.", ct);
     }
 
-    public Task<MobileReceivingOrderCommandResponse> JoinAsync(
-        Guid orderId,
-        string? receivingLocationBarcode,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/join-receiving",
-            new MobileJoinReceivingOrderRequest(clientRequestId, receivingLocationBarcode),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> CompleteAsync(
-        Guid orderId,
-        string expectedFingerprint,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/complete-receiving",
-            new MobileCompleteReceivingOrderRequest(clientRequestId, expectedFingerprint),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> OpenLicensePlateNumberAsync(
-        Guid orderId,
-        string code,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/open",
-            new MobileOpenReceivingLicensePlateNumberRequest(clientRequestId, code),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> CancelLicensePlateNumberAsync(
-        Guid orderId,
-        Guid lpnId,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/cancel",
-            new MobileReceivingOrderCommandRequest(clientRequestId),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> SetLicensePlateNumberItemQuantityAsync(
-        Guid orderId,
-        Guid lpnId,
-        Guid skuId,
-        decimal quantity,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/items/{skuId:D}/quantity",
-            new MobileSetReceivingLicensePlateNumberItemQuantityRequest(clientRequestId, quantity),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> RemoveLicensePlateNumberItemAsync(
-        Guid orderId,
-        Guid lpnId,
-        Guid skuId,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/items/{skuId:D}/remove",
-            new MobileReceivingOrderCommandRequest(clientRequestId),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> CloseLicensePlateNumberAsync(
-        Guid orderId,
-        Guid lpnId,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/close",
-            new MobileReceivingOrderCommandRequest(clientRequestId),
-            ct);
-
-    public Task<MobileReceivingOrderCommandResponse> ReopenLicensePlateNumberAsync(
-        Guid orderId,
-        Guid lpnId,
-        Guid clientRequestId,
-        CancellationToken ct = default) =>
-        PostCommandAsync(
-            $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lpns/{lpnId:D}/reopen",
-            new MobileReceivingOrderCommandRequest(clientRequestId),
-            ct);
-
-    public async Task<IReadOnlyList<MobileReceivingOrderLineCandidateResponse>> ResolveSkuAsync(
-        Guid orderId,
-        string barcode,
-        CancellationToken ct = default)
+    private async Task<TResponse> PutAsync<TRequest, TResponse>(
+        string route, TRequest request, CancellationToken ct)
     {
-        var route = $"{MobileApiRoutes.ReceivingOrders}/{orderId:D}/lines/resolve-sku";
-        using HttpResponseMessage response = await _transport.PostAsync(
-            route,
-            new MobileResolveReceivingOrderSkuRequest(barcode),
-            ct);
-        return await response.Content
-            .ReadFromJsonAsync<List<MobileReceivingOrderLineCandidateResponse>>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(
-                response,
-                "Сервер вернул некорректные строки товара приходного ордера.");
-    }
-
-    private async Task<MobileReceivingOrderDetailsResponse> GetDetailsAsync(
-        string route,
-        CancellationToken ct)
-    {
-        using HttpResponseMessage response = await _transport.GetAsync(route, ct);
-        return await response.Content.ReadFromJsonAsync<MobileReceivingOrderDetailsResponse>(ct)
-            ?? throw MobileApiTransport.InvalidResponse(
-                response,
-                "Сервер вернул некорректный приходный ордер.");
-    }
-
-    private async Task<MobileReceivingOrderCommandResponse> PostCommandAsync<TRequest>(
-        string route,
-        TRequest request,
-        CancellationToken ct)
-    {
-        using HttpResponseMessage response = await _transport.PostAsync(route, request, ct);
-        return await MobileApiTransport.ReadCommandResponseAsync<MobileReceivingOrderCommandResponse>(
-            response,
-            "Сервер вернул некорректный результат операции с приходным ордером.",
-            ct);
+        using var response = await transport.PutAsync(route, request, ct);
+        return await MobileApiTransport.ReadCommandResponseAsync<TResponse>(
+            response, "Сервер вернул некорректный результат команды приёмки.", ct);
     }
 }

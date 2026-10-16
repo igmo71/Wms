@@ -31,11 +31,9 @@ as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
 Integration registers the receiving source HTTP reader and parser in both hosts;
 Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
-`Wms.Contracts`. In the current
-receiving flow, closing an LPN changes its state while completing the order
-posts receipt movements.
-The target flow moves that posting point to LPN closure. A delivery increment
-must remove the former path when the new one becomes callable.
+`Wms.Contracts`. Closing a receiving LPN posts its receipt movement; the new
+putaway command posts its placement movement. The former order-completion and
+putaway posting routes are no longer mapped.
 
 ## Direction
 
@@ -118,11 +116,11 @@ their replacement. The two executors have distinct namespaces.
 The new inventory posting handler loads tracked locations and four-dimensional
 balances through an Infrastructure store bound to that command session. It
 stages the movement, balance changes and turnovers for the executor's single
-commit; no receiving or putaway endpoint calls it yet.
+commit. Receiving LPN closure and putaway use this handler.
 
-Existing warehouse mutations in Web/Mobile enter legacy application commands through
-`CommandExecutor`: LPN issuance/counting/putaway, receiving participation and
-completion, picking, shipping/rollback, transfers and inventory counts.
+Other existing warehouse mutations in Web/Mobile enter legacy application commands
+through `CommandExecutor`: LPN issuance, picking, shipping/rollback, transfers
+and inventory counts. Receiving and putaway use the new Application executor.
 The executor owns receipt lookup before mutable validation and external access,
 replay, winning receipt recovery after final-save races, and atomic final save
 of business state plus receipt. Callers supply `CommandContext` with request
@@ -138,8 +136,9 @@ the `ClientRequestId` name; schema renames preserve existing receipt keys,
 types, hashes and results. Location barcode parsing may precede the application
 command at the API boundary; inventory-count barcode resolution follows receipt lookup.
 
-Receiving completion calls `PersistCompletionCheckpointAsync`; shipping uses
-`PersistReadyForShipmentCheckpointAsync` and `PersistShippedCheckpointAsync`.
+The former receiving-completion checkpoint is no longer called by an active
+receiving route. Shipping uses `PersistReadyForShipmentCheckpointAsync` and
+`PersistShippedCheckpointAsync`.
 These explicitly named operations run after receipt lookup and before final
 effects. Each is an independent synchronization commit and survives a failed
 final phase. Other

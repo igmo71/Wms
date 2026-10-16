@@ -6,19 +6,18 @@ namespace Wms.Mobile;
 
 public partial class ReceivingOrderSkuDistributionPage : ContentPage
 {
-    private readonly MobileReceivingOrderClient _orderClient;
+    private readonly MobileReceivingOrderClient _orders;
     private readonly IServiceProvider _services;
+    private ReceivingOrderReceivingProcess _process = null!;
     private Guid _orderId;
     private Guid _skuId;
-    private ReceivingOrderReceivingProcess _process = null!;
     private bool _busy;
 
-    public ReceivingOrderSkuDistributionPage(
-        MobileReceivingOrderClient orderClient,
+    public ReceivingOrderSkuDistributionPage(MobileReceivingOrderClient orders,
         IServiceProvider services)
     {
         InitializeComponent();
-        _orderClient = orderClient;
+        _orders = orders;
         _services = services;
     }
 
@@ -26,98 +25,61 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 
     public void Show(Guid orderId, Guid skuId, ReceivingOrderReceivingProcess process)
     {
-        _process = process;
         _orderId = orderId;
         _skuId = skuId;
+        _process = process;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await RefreshAsync(showErrors: true);
+        await RefreshAsync();
     }
 
-    private async void OnRefreshing(object? sender, EventArgs e) =>
-        await RefreshAsync(showErrors: true);
-
-    private async Task RefreshAsync(bool showErrors)
+    private async void OnRefreshing(object? sender, EventArgs e)
     {
-        if (_busy)
-        {
-            SkuRefreshView.IsRefreshing = false;
-            return;
-        }
+        await RefreshAsync();
+        SkuRefreshView.IsRefreshing = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_busy) return;
         _busy = true;
-        if (showErrors) ErrorLabel.Text = string.Empty;
         try
         {
-            ApplyDetails(await _orderClient.GetAsync(_orderId));
+            var order = await _orders.GetAsync(_orderId);
+            var item = order.Items.SingleOrDefault(x => x.SkuId == _skuId)
+                ?? throw new InvalidOperationException("SKU отсутствует в ордере.");
+            SkuNameLabel.Text = item.SkuName ?? item.SkuId.ToString();
+            SkuCodeLabel.Text = item.SkuCode;
+            PlanLabel.Text = item.PlanQuantity?.ToString("0.###") ?? "?";
+            FactLabel.Text = item.FactQuantity?.ToString("0.###") ?? "?";
+            UnitLabel.Text = item.UnitOfMeasure ?? "—";
+            PalletRows = order.Lpns.Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
+                .Select(x => new { Lpn = x, Item = x.Items.SingleOrDefault(y => y.SkuId == _skuId) })
+                .Where(x => x.Item is not null)
+                .Select(x => new ReceivingOrderSkuPalletRow(x.Lpn.Id, x.Lpn.Code,
+                    x.Lpn.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыта" : "Открыта",
+                    x.Lpn.ResponsibleUserId ?? "—",
+                    $"{x.Item!.Quantity:0.###} {item.UnitOfMeasure ?? "—"}"))
+                .ToArray();
+            OnPropertyChanged(nameof(PalletRows));
         }
-        catch (MobileApiException exception)
-        {
-            if (showErrors) ErrorLabel.Text = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            if (showErrors) ErrorLabel.Text = "Сервер WMS недоступен.";
-        }
-        catch (InvalidOperationException exception)
-        {
-            if (showErrors) ErrorLabel.Text = exception.Message;
-        }
-        finally
-        {
-            _busy = false;
-            SkuRefreshView.IsRefreshing = false;
-        }
-    }
-
-    private void ApplyDetails(MobileReceivingOrderDetailsResponse details)
-    {
-        var lines = details.Lines.Where(x => x.StockKeepingUnitId == _skuId).ToArray();
-        if (lines.Length == 0)
-            throw new InvalidOperationException("Номенклатура отсутствует в плане приходного ордера.");
-
-        var first = lines[0];
-        var unit = string.IsNullOrWhiteSpace(first.UnitOfMeasure) ? "—" : first.UnitOfMeasure;
-        SkuNameLabel.Text = first.SkuName;
-        SkuCodeLabel.Text = first.SkuCode;
-        PlanLabel.Text = lines.Sum(x => x.PlanQuantity).ToString("0.###");
-        FactLabel.Text = lines.All(x => x.FactQuantity.HasValue)
-            ? lines.Sum(x => x.FactQuantity!.Value).ToString("0.###")
-            : "?";
-        UnitLabel.Text = unit;
-        PalletRows = details.LicensePlateNumbers
-            .Where(lpn => lpn.Status != MobileLicensePlateNumberStatus.Cancelled)
-            .Select(lpn => new
-            {
-                LicensePlateNumber = lpn,
-                Item = lpn.Items.SingleOrDefault(x => x.StockKeepingUnitId == _skuId)
-            })
-            .Where(x => x.Item is not null)
-            .Select(x => new ReceivingOrderSkuPalletRow(
-                x.LicensePlateNumber.Id,
-                x.LicensePlateNumber.Code,
-                x.LicensePlateNumber.StatusName,
-                x.LicensePlateNumber.ResponsibleUserName,
-                $"{x.Item!.Quantity:0.###} {unit}"))
-            .ToArray();
-        OnPropertyChanged(nameof(PalletRows));
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить SKU."; }
+        catch (InvalidOperationException ex) { ErrorLabel.Text = ex.Message; }
+        finally { _busy = false; }
     }
 
     private async void OnPalletTapped(object? sender, TappedEventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || e.Parameter is not Guid lpnId)
-            return;
+        if (_busy || _process.HasPendingCommand || e.Parameter is not Guid id) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
-        page.Show(_orderId, lpnId, _process);
+        page.Show(_orderId, id, _process);
         await Navigation.PushAsync(page);
     }
 }
 
-public sealed record ReceivingOrderSkuPalletRow(
-    Guid LicensePlateNumberId,
-    string Code,
-    string StatusName,
-    string ResponsibleUserName,
-    string QuantityText);
+public sealed record ReceivingOrderSkuPalletRow(Guid LicensePlateNumberId,
+    string Code, string StatusName, string ResponsibleUserName, string QuantityText);

@@ -10,136 +10,109 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
     private readonly MobileLicensePlateNumberPutawayClient _client;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
-    private MobileLicensePlateNumberPutawayDetailsResponse? _details;
-    private bool _hasAppeared;
-    private bool _isVisible;
+    private MobileReceivingWorkLpnResponse? _lpn;
+    private bool _visible;
     private bool _busy;
-    private bool _scannerSubscribed;
     private long _scanGeneration;
 
-    public LicensePlateNumberPutawayDetailsPage(
-        MobileLicensePlateNumberPutawayClient client,
-        IOperationalBarcodeScanner scanner,
-        IServiceProvider services)
+    public LicensePlateNumberPutawayDetailsPage(MobileLicensePlateNumberPutawayClient client,
+        IOperationalBarcodeScanner scanner, IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
         _scanner = scanner;
         _services = services;
-        ErrorLabel.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(Label.Text))
-                ErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(ErrorLabel.Text);
-        };
+        BindingContext = this;
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<MobileLicensePlateNumberPutawayItemResponse> Items => _details?.Items ?? [];
-    public IReadOnlyList<MobileLicensePlateNumberPutawayHistoryResponse> History => _details?.History ?? [];
+    public IReadOnlyList<ReceivingPutawayItemRow> Items { get; private set; } = [];
+    public IReadOnlyList<ReceivingPutawayHistoryRow> History { get; private set; } = [];
 
-    public void Show(MobileLicensePlateNumberPutawayDetailsResponse details)
+    public void Show(MobileReceivingWorkLpnResponse lpn)
     {
-        _details = details;
-        Title = details.Code;
-        CompletedLabel.IsVisible = details.IsCompleted && details.BlockedReason is null;
-        LpnStatusLabel.Text = details.BlockedReason;
-        LpnStatusLabel.IsVisible = !string.IsNullOrWhiteSpace(details.BlockedReason);
-        HistoryPanel.IsVisible = !details.CanPutaway && details.History.Count > 0;
-        NextLpnButton.IsVisible = !details.CanPutaway;
+        _lpn = lpn;
+        CodeLabel.Text = lpn.Code;
+        StatusLabel.Text = lpn.Status == MobileLicensePlateNumberStatus.Closed
+            ? "Закрыта: доступна для размещения" : "Размещение доступно только после закрытия LPN";
+        Items = lpn.Items.Select(x => new ReceivingPutawayItemRow(x.Id,
+            x.SkuName ?? x.SkuId.ToString(),
+            $"Принято {x.Quantity:0.###} · размещено {x.PlacedQuantity:0.###} · осталось {x.RemainingQuantity:0.###} {x.UnitOfMeasure ?? "—"} · срок {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}")).ToArray();
+        History = lpn.Putaways.Select(x => new ReceivingPutawayHistoryRow(
+            $"{x.Quantity:0.###} → {x.DestinationStorageLocationId} · {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}")).ToArray();
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(History));
+        NextLpnButton.IsVisible = !lpn.Items.Any(x => x.RemainingQuantity > 0);
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        _isVisible = true;
-        if (!_scannerSubscribed)
-        {
-            _scanner.ScanReceived += OnScanReceived;
-            _scannerSubscribed = true;
-        }
-        if (_hasAppeared && _details is not null)
-            await RefreshAsync();
-        _hasAppeared = true;
+        _visible = true;
+        _scanner.ScanReceived += OnScanReceived;
+        if (_lpn is not null) await RefreshAsync();
         await UpdateCameraAsync();
     }
 
     protected override void OnDisappearing()
     {
-        _isVisible = false;
+        _visible = false;
         Interlocked.Increment(ref _scanGeneration);
+        _scanner.ScanReceived -= OnScanReceived;
         CameraScannerView.Stop();
-        if (_scannerSubscribed)
-        {
-            _scanner.ScanReceived -= OnScanReceived;
-            _scannerSubscribed = false;
-        }
         base.OnDisappearing();
     }
 
-    protected override bool OnBackButtonPressed()
+    private void OnScanReceived(object? sender, BarcodeScanEvent scan)
     {
-        if (!_busy) return base.OnBackButtonPressed();
-        ErrorLabel.Text = "Дождитесь результата операции.";
-        return true;
-    }
-
-    private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent)
-    {
-        long generation = Volatile.Read(ref _scanGeneration);
+        var generation = Volatile.Read(ref _scanGeneration);
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            if (_isVisible && generation == Volatile.Read(ref _scanGeneration))
-                await SelectByBarcodeAsync(scanEvent.Value);
+            if (_visible && generation == Volatile.Read(ref _scanGeneration))
+                await ResolveSkuAsync(scan.Value);
         });
     }
 
-    private async Task SelectByBarcodeAsync(string barcode)
+    private async Task ResolveSkuAsync(string barcode)
     {
-        if (!_isVisible || _busy || _details?.CanPutaway != true) return;
+        if (!_visible || _busy || _lpn?.Status != MobileLicensePlateNumberStatus.Closed) return;
         SetBusy(true);
-        ErrorLabel.Text = string.Empty;
         try
         {
-            await OpenQuantityAsync(await _client.ResolveSkuAsync(_details.Id, barcode));
+            var selection = await _client.ResolveSkuAsync(_lpn.Id, barcode);
+            await OpenQuantityAsync(selection);
         }
-        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование товара."; }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось определить SKU LPN."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
     private async void OnItemTapped(object? sender, TappedEventArgs e)
     {
-        if (!_isVisible || _busy || _details?.CanPutaway != true
-            || e.Parameter is not MobileLicensePlateNumberPutawayItemResponse { RemainingQuantity: > 0 } item)
-            return;
+        if (_busy || _lpn?.Status != MobileLicensePlateNumberStatus.Closed
+            || e.Parameter is not Guid itemId
+            || !_lpn.Items.Any(x => x.Id == itemId && x.RemainingQuantity > 0)) return;
         SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try
-        {
-            await OpenQuantityAsync(await _client.GetSelectionAsync(_details.Id, item.Id));
-        }
-        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите выбор товара."; }
+        try { await OpenQuantityAsync(await _client.GetSelectionAsync(_lpn.Id, itemId)); }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось загрузить рекомендации размещения."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private async Task OpenQuantityAsync(MobileLicensePlateNumberPutawaySelectionResponse selection)
+    private async Task OpenQuantityAsync(MobileReceivingPutawaySelectionResponse selection)
     {
         var page = _services.GetRequiredService<LicensePlateNumberPutawayQuantityPage>();
-        page.Show(_details!, selection, this);
+        page.Show(_lpn!, selection);
         await Navigation.PushAsync(page);
     }
 
     private async Task RefreshAsync()
     {
-        if (_details is null) return;
+        if (_lpn is null || _busy) return;
         SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try { Show(await _client.GetAsync(_details.Id)); }
-        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить палету. Повторите открытие."; }
+        try { Show(await _client.GetAsync(_lpn.Id)); }
+        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить LPN."; }
         finally { SetBusy(false); }
     }
 
@@ -148,13 +121,11 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
         if (!_busy) await Navigation.PopAsync();
     }
 
-    private async Task UpdateCameraAsync()
+    protected override bool OnBackButtonPressed()
     {
-        if (_isVisible && !_busy && _details?.CanPutaway == true
-            && _scanner.ActiveSource == BarcodeScanSource.Camera)
-            await CameraScannerView.StartAsync();
-        else
-            CameraScannerView.Stop();
+        if (!_busy) return base.OnBackButtonPressed();
+        ErrorLabel.Text = "Дождитесь результата операции.";
+        return true;
     }
 
     private void SetBusy(bool busy)
@@ -166,9 +137,15 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
         NavigationPage.SetHasBackButton(this, !busy);
     }
 
-    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    private async Task UpdateCameraAsync()
     {
-        if (sender is VisualElement element)
-            AndroidFocus.Suppress(element);
+        if (_visible && !_busy && _lpn?.Status == MobileLicensePlateNumberStatus.Closed
+            && _lpn.Items.Any(x => x.RemainingQuantity > 0)
+            && _scanner.ActiveSource == BarcodeScanSource.Camera)
+            await CameraScannerView.StartAsync();
+        else CameraScannerView.Stop();
     }
 }
+
+public sealed record ReceivingPutawayItemRow(Guid Id, string Name, string QuantityText);
+public sealed record ReceivingPutawayHistoryRow(string Description);
