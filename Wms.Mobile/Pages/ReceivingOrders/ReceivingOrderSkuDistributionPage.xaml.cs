@@ -56,7 +56,8 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
             PlanLabel.Text = item.PlanQuantity?.ToString("0.###") ?? "?";
             FactLabel.Text = item.FactQuantity?.ToString("0.###") ?? "?";
             UnitLabel.Text = item.UnitOfMeasure ?? "—";
-            PalletRows = order.Lpns.Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
+            PalletRows = order.Lpns.Where(x => x.Status is not
+                (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
                 .Select(x => new { Lpn = x, Item = x.Items.SingleOrDefault(y => y.SkuId == _skuId) })
                 .Where(x => x.Item is not null)
                 .Select(x => new ReceivingOrderSkuPalletRow(x.Lpn.Id, x.Lpn.Code,

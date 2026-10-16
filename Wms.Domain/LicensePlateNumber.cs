@@ -252,6 +252,19 @@ public sealed class LicensePlateNumber
         return changed;
     }
 
+    public OperationResult DeleteClosedReceiving(string userId, DateTimeOffset occurredAtUtc)
+    {
+        if (Status != LicensePlateNumberStatus.Closed || ReceivingCycleId is null
+            || OriginalReceivingLocationId is null)
+            return OperationError.Conflict("Удалить можно только закрытую приёмную LPN.");
+        if (string.IsNullOrWhiteSpace(userId) || occurredAtUtc == default)
+            return OperationError.Invalid("Для удаления LPN обязательны пользователь и время.");
+
+        Status = LicensePlateNumberStatus.Deleted;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
     internal OperationResult Reopen(string userId, DateTimeOffset reopenedAtUtc, bool canManage)
     {
         if (ReceivingCycleId is not null)

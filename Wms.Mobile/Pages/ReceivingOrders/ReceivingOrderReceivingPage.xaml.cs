@@ -107,7 +107,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
                 exact ? Colors.LightGreen : item.FactQuantity is null
                     ? Colors.White : Colors.LightYellow);
         }).ToArray();
-        LpnRows = order.Lpns.Where(x => x.Status != MobileLicensePlateNumberStatus.Cancelled)
+        LpnRows = order.Lpns.Where(x => x.Status is not
+            (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
             .Select(x => new ReceivingWorkLpnRow(x.Id, x.Code,
                 $"{(x.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыта" : "Открыта")} · "
                 + string.Join("; ", x.Items.Select(y =>

@@ -14,7 +14,8 @@ public enum MobileLicensePlateNumberStatus
     Available = 0,
     Open = 1,
     Closed = 2,
-    Cancelled = 3
+    Cancelled = 3,
+    Deleted = 4
 }
 
 public sealed record MobileReceivingSourceLineResponse(

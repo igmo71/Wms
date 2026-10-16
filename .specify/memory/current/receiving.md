@@ -46,6 +46,17 @@ same command as the movement, turnover, audit and receipt. Any recorded
 putaway blocks the correction. Concurrent changes to the LPN or order reject
 the command.
 
+The new Application deletion preview lists a closed receiving LPN's own posted
+receipt, quantity corrections and putaways in reverse order, with their original
+addresses and dates. It forecasts every affected balance group and flags a
+negative result. A `Manager` confirms that exact snapshot; changed LPN state,
+movement history or balance versions require a fresh preview. Negative results
+require explicit confirmation. Deletion adds one linked reversal per original
+movement, retains independent stock operations, marks the LPN `Deleted`,
+recalculates the order fact and commits audit and command receipt atomically.
+With no other closed LPN for the SKU, the fact returns to checked zero only if
+the SKU had an earlier explicit zero confirmation; otherwise it is unchecked.
+
 The new SKU query searches either the order composition or the synchronized
 catalog by name, code or barcode. Barcode resolution always uses the entire
 catalog, including SKU outside the order. An `Operator` or `Manager` can add a

@@ -92,6 +92,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             MobileLicensePlateNumberStatus.Open => "Открыта",
             MobileLicensePlateNumberStatus.Closed => "Закрыта: приход проведён",
             MobileLicensePlateNumberStatus.Cancelled => "Отменена",
+            MobileLicensePlateNumberStatus.Deleted => "Удалена",
             _ => lpn.Status.ToString()
         };
         ItemRows = lpn.Items.Select(x => new ReceivingLpnItemRow(x.SkuId,

@@ -252,6 +252,46 @@ public class ReceivingOrder
         return fact;
     }
 
+    public OperationResult<decimal?> DeleteClosedReceivingLpn(
+        LicensePlateNumber lpn, bool zeroPreviouslyConfirmed,
+        string userId, DateTimeOffset occurredAtUtc)
+    {
+        if (lpn is null || lpn.ReceivingOrderId != Id || !_licensePlateNumbers.Contains(lpn))
+            return OperationError.NotFound("LPN не найдена в приходном ордере.");
+        var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
+        if (active.Length != 1)
+            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+        var orderItem = _items.SingleOrDefault(x =>
+            x.StockKeepingUnitId == active[0].StockKeepingUnitId);
+        if (orderItem is null)
+            return OperationError.NotFound("SKU отсутствует в составе ордера.");
+
+        var remaining = _licensePlateNumbers
+            .Where(x => x.Status == LicensePlateNumberStatus.Closed && x.Id != lpn.Id)
+            .SelectMany(x => x.Items)
+            .Where(x => !x.IsDeleted && x.StockKeepingUnitId == active[0].StockKeepingUnitId)
+            .ToArray();
+        decimal? fact;
+        try
+        {
+            fact = remaining.Length > 0 ? checked(remaining.Sum(x => x.Quantity))
+                : zeroPreviouslyConfirmed ? 0m : null;
+        }
+        catch (OverflowException)
+        {
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+        }
+        if (fact is decimal quantity && !WarehouseQuantity.IsNonNegative(quantity))
+            return OperationError.Invalid("Суммарный факт SKU выходит за допустимый диапазон.");
+
+        var deleted = lpn.DeleteClosedReceiving(userId, occurredAtUtc);
+        if (!deleted.IsSuccess)
+            return deleted.Error!;
+        orderItem.SetAggregatedLpnFact(fact);
+        AdvanceOperationalRevision();
+        return fact;
+    }
+
     public OperationResult<bool> ConfirmZeroReceived(Guid skuId, string userId)
     {
         var cycle = ActiveReceivingCycle();
@@ -719,7 +759,8 @@ public class ReceivingOrder
     private OperationResult RecalculateLpnFacts()
     {
         var activeItems = _licensePlateNumbers
-            .Where(x => x.Status != LicensePlateNumberStatus.Cancelled)
+            .Where(x => x.Status is not (LicensePlateNumberStatus.Cancelled
+                or LicensePlateNumberStatus.Deleted))
             .SelectMany(x => x.Items)
             .Where(x => !x.IsDeleted)
             .ToLookup(x => x.StockKeepingUnitId);

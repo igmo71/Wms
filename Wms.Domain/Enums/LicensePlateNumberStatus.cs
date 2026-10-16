@@ -14,5 +14,8 @@ public enum LicensePlateNumberStatus
     Closed = 2,
 
     [Display(Name = "Отменена")]
-    Cancelled = 3
+    Cancelled = 3,
+
+    [Display(Name = "Удалена")]
+    Deleted = 4
 }
