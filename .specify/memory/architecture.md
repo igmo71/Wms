@@ -32,8 +32,9 @@ Their shared EF context and new command execution store registration come from I
 Integration registers the receiving source HTTP reader and parser in both hosts;
 Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
 `Wms.Contracts`. Closing a receiving LPN posts its receipt movement; the new
-putaway command posts its placement movement. The former order-completion and
-putaway posting routes are no longer mapped.
+putaway command posts its placement movement. The former receiving command and
+putaway services have been removed; the legacy label service only issues and
+reads labels for listing and printing.
 
 ## Direction
 
