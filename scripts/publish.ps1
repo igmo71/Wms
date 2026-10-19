@@ -5,16 +5,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Assert-ExitCode([int]$ExitCode, [string]$Step) {
+    if ($ExitCode -ne 0) {
+        throw "$Step failed with exit code $ExitCode."
+    }
+}
+
 dotnet publish .\Wms.WebApi\Wms.WebApi.csproj `
   -c Release `
   --os linux `
   --arch x64 `
   /t:PublishContainer `
   -p:ContainerRepository=wms-webapi `
-  -p:ContainerImageTag=$Tag
-
-docker tag wms-webapi:$Tag $Registry/wms-webapi:$Tag
-docker push $Registry/wms-webapi:$Tag
+  -p:ContainerImageTag=$Tag `
+  -p:LocalRegistry=Docker
+Assert-ExitCode $LASTEXITCODE "WebApi container publish"
 
 dotnet publish .\Wms.WebApp\Wms.WebApp.csproj `
   -c Release `
@@ -22,10 +27,19 @@ dotnet publish .\Wms.WebApp\Wms.WebApp.csproj `
   --arch x64 `
   /t:PublishContainer `
   -p:ContainerRepository=wms-webapp `
-  -p:ContainerImageTag=$Tag
+  -p:ContainerImageTag=$Tag `
+  -p:LocalRegistry=Docker
+Assert-ExitCode $LASTEXITCODE "WebApp container publish"
 
+docker tag wms-webapi:$Tag $Registry/wms-webapi:$Tag
+Assert-ExitCode $LASTEXITCODE "WebApi image tag"
 docker tag wms-webapp:$Tag $Registry/wms-webapp:$Tag
+Assert-ExitCode $LASTEXITCODE "WebApp image tag"
+
+docker push $Registry/wms-webapi:$Tag
+Assert-ExitCode $LASTEXITCODE "WebApi image push"
 docker push $Registry/wms-webapp:$Tag
+Assert-ExitCode $LASTEXITCODE "WebApp image push"
 
 Write-Host ""
 Write-Host "Published:"
