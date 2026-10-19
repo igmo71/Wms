@@ -9,7 +9,7 @@ Project-wide principles live in the [WMS Constitution](constitution.md).
 
 | Project | Current responsibility |
 |---|---|
-| `Wms` | Legacy application services and 1C mapping adapter; consumes Application contracts and Infrastructure persistence. |
+| `Wms` | Remaining older workflows and 1C adapters; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
 | `Wms.Application` | New command execution, receiving source and order use cases and contracts; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
@@ -31,9 +31,9 @@ Their shared EF context and new command execution store registration come from I
 Integration registers the receiving source HTTP reader and parser in both hosts;
 Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
 `Wms.Contracts`. Closing a receiving LPN posts its receipt movement; the new
-putaway command posts its placement movement. The former receiving command and
-putaway services have been removed; the legacy label service only issues and
-reads labels for listing and printing.
+putaway command posts its placement movement. Former receiving command,
+source-order synchronization, and putaway services have been removed. The
+remaining label service issues and reads labels for listing and printing.
 
 ## Direction
 
@@ -72,9 +72,9 @@ queries external facts, invokes domain operations or integrations, obtains time
 and user identity, and makes persistence explicit. Database-backed,
 authorization, cross-aggregate, and external-system checks remain here.
 
-Application owns the source and execution-sink ports for receiving and shipping
-and the synchronization operations that apply snapshots. UI and endpoints do
-not compose concrete 1C services.
+Application owns the receiving source reader port and shipping source and
+execution-sink ports. Receiving notifications invoke source synchronization
+directly. UI and endpoints do not compose concrete 1C services.
 
 Organize application code by business feature. Separate command and query
 services only when they are distinct public responsibilities; reads needed by a

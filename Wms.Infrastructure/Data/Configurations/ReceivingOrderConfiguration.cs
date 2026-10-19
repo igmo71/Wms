@@ -11,22 +11,8 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
         builder.HasKey(x => x.Id);
         builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
 
-        builder.Property(x => x.Number).HasMaxLength(DefaultConfiguration.Code);
-        builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.BaseOrderType).HasMaxLength(DefaultConfiguration.Name);
-        builder.Property(x => x.SynchronizationFingerprint)
-            .HasMaxLength(DefaultConfiguration.Fingerprint);
-        builder.Property(x => x.SynchronizationAcknowledgedBy)
-            .HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.CompletionFingerprint)
-            .HasMaxLength(DefaultConfiguration.Fingerprint);
-        builder.Property(x => x.CompletionApprovedBy)
-            .HasMaxLength(DefaultConfiguration.Guid);
-        builder.Property(x => x.CompletionApprovalReason)
-            .HasMaxLength(DefaultConfiguration.Description);
-        builder.Ignore(x => x.Shipper);
 
         builder.HasOne(X => X.Warehouse).WithMany()
             .HasForeignKey(X => X.WarehouseId).HasPrincipalKey(X => X.Id)

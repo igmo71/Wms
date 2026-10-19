@@ -18,11 +18,10 @@ response records the attempt error without replacing the last successful
 version. For linked WMS orders, successful checks recalculate only the current
 plan as described in [receiving.md](receiving.md).
 
-The existing 1C notification adapter fetches the document through this source
-check before mapping it to its older import snapshot. That adapter may still
-maintain a legacy source-order record; it is not the active receiving or stock
-posting path. Web Managers may check all sources of one WMS order manually.
-Each attempt records its outcome and mirror update in audit.
+The 1C receiving notification checks and stores the source document. It does
+not create a WMS receiving order; an operator creates that order explicitly
+from selected sources. Web Managers may check all sources of one WMS order manually.
+Manual checks record their outcome in audit.
 
 New receiving and putaway do not write status, item tables, or comments to 1C.
 WMS owns its receiving location, facts, cycles, LPNs, movements, users, and
@@ -30,16 +29,6 @@ timestamps. Current receiving has no direct line-comment command. Historical
 receiving comments remain WMS-owned annotations, not warehouse facts.
 
 ## Remaining older processes
-
-The synchronization assessment (`Synchronized`,
-`RequiresOperatorDecision`, or `Blocking`) and protected-plan behavior in
-the older import path still serve its existing consumers. They do not decide
-new receiving completion. Before older warehouse work starts, admissible
-source metadata and plan can be replaced while WMS and 1C are in matching
-initial states. After work starts, the older synchronization path protects
-local facts. A document notification may create a missing older source-order
-record; an explicit check requires one already present. Web may acknowledge a
-fresh operator-decision fingerprint; Mobile cannot acknowledge it.
 
 The older picking and shipping screens support pull-to-refresh of their source
 assessment. Picking completion and final shipping fetch a fresh checkpoint

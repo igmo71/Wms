@@ -10,7 +10,14 @@ several distinct 1C documents identified by `Ref_Key`. Web can create the order
 from free sources; Mobile can select free documents or scan one into an
 unfinished order. A linked document opens its WMS order. Active source links
 retain history. Repeating the same complete selection returns the existing
-order.
+order. Creation records the acting user, source versions, and command receipt
+with an audit event in the same transaction. Repeating the same request ID
+returns its original order without another creation event.
+Receiving notifications update only the 1C source mirror and the current plan
+of an already linked WMS order; they never create a WMS order.
+The latest successful version supplies each source's own number, date, sender,
+warehouse and business operations, and basis document in order details; these
+fields do not become shared order attributes.
 
 Successful source checks retain separate source lines and immutable versions.
 The current plan sums known contributions by SKU. An unposted, deleted, or
@@ -64,6 +71,8 @@ requires a Manager. The close posts one receipt at the LPN's original Receiving
 location, updates the order's checked fact from closed LPNs, and commits
 movement, audit, and command receipt together. Concurrent changes to its
 decision inputs reject all staged effects. A closed LPN cannot reopen.
+When every source has been detached during an active cycle, the known plan is
+zero; closing a positive LPN then requires a Manager.
 
 The local SKU expiration-tracking flag belongs to WMS. A Web Manager can switch
 it with an audit event; catalog imports preserve it. An open LPN may keep a
@@ -91,6 +100,10 @@ checks both the unplaced quantity of that LPN and physical source balance,
 retains its SKU and expiration date, and commits the linked movement, history,
 audit, and command receipt together. Receiving orders have no placement status
 or order-level putaway command.
+Putaway recommendations prioritize locations with a positive current quantity
+of the selected SKU. A historical location is suggested only when it has a
+saved zero balance row for that SKU and no nonzero balances; negative balances
+are not presented as empty locations.
 
 On the Mobile quantity screen, editing or focusing an amount revokes its
 confirmation. Finishing input or choosing the entire remainder confirms a

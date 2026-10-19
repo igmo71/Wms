@@ -11,9 +11,6 @@ internal class ReceivingOrderItemConfiguration : IEntityTypeConfiguration<Receiv
     {
         builder.HasKey(x => new { x.ReceivingOrderId, x.StockKeepingUnitId });
 
-        builder.Property(x => x.Comment).HasMaxLength(DefaultConfiguration.Description);
-        builder.Property(x => x.PlanQuantity)
-            .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale);
         builder.Property(x => x.CurrentPlanQuantity)
             .HasPrecision(WarehouseQuantity.Precision, WarehouseQuantity.Scale)
             .IsConcurrencyToken();

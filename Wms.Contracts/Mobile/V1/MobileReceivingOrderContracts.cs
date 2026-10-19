@@ -2,11 +2,9 @@ namespace Wms.Contracts.Mobile.V1;
 
 public enum MobileReceivingOrderStatus
 {
-    Unknown = 0,
-    ReadyForReceiving = 1,
-    InReceiving = 2,
-    ProcessingRequired = 3,
-    Received = 4
+    ReadyForReceiving = 0,
+    InReceiving = 1,
+    Received = 2
 }
 
 public enum MobileLicensePlateNumberStatus
@@ -52,8 +50,8 @@ public sealed record MobileReceivingWorkLpnResponse(
     IReadOnlyList<MobileReceivingWorkPutawayResponse> Putaways);
 
 public sealed record MobileReceivingWorkOrderResponse(
-    Guid Id, string? Number, Guid WarehouseId, MobileReceivingOrderStatus Status,
-    int? ActiveCycleNumber, Guid? ReceivingLocationId,
+    Guid Id, Guid WarehouseId, MobileReceivingOrderStatus Status,
+    int ActiveCycleNumber, Guid? ReceivingLocationId,
     bool IsParticipant, long Revision,
     IReadOnlyList<Guid> SourceRefKeys,
     IReadOnlyList<MobileReceivingWorkItemResponse> Items,
@@ -64,10 +62,14 @@ public sealed record MobileReceivingSkuCandidateResponse(
     bool TracksExpirationDate, bool IsInOrder,
     decimal? CurrentPlanQuantity, decimal? FactQuantity);
 
-public sealed record MobileReceivingCreateOrderRequest(IReadOnlyList<Guid> SourceRefKeys);
+public sealed record MobileReceivingCreateOrderRequest(
+    Guid ClientRequestId, IReadOnlyList<Guid> SourceRefKeys);
 public sealed record MobileReceivingResolveDocumentRequest(string Barcode);
 public sealed record MobileReceivingAttachSourceRequest(Guid ClientRequestId, string Barcode);
-public sealed record MobileReceivingLinkedSourceResponse(Guid RefKey, string? Number);
+public sealed record MobileReceivingLinkedSourceResponse(
+    Guid RefKey, string? Number, string? Date, string? Sender,
+    string? SenderType, string? WarehouseOperation, string? BusinessOperation,
+    string? BasisDocument, string? BasisDocumentType);
 public sealed record MobileReceivingDocumentResolutionResponse(
     MobileReceivingSourceResponse? Source, MobileReceivingWorkOrderResponse? Order);
 public sealed record MobileReceivingBarcodeRequest(string Barcode);

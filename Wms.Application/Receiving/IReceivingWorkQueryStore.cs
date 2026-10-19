@@ -40,8 +40,8 @@ public sealed record ReceivingWorkCycleView(
     IReadOnlyList<ReceivingWorkCycleSourceView> Sources);
 
 public sealed record ReceivingWorkOrderView(
-    Guid Id, string? Number, Guid WarehouseId, ReceivingOrderStatus Status,
-    int? ActiveCycleNumber, Guid? ReceivingLocationId, bool IsParticipant,
+    Guid Id, Guid WarehouseId, ReceivingOrderStatus Status,
+    int ActiveCycleNumber, Guid? ReceivingLocationId, bool IsParticipant,
     long Revision, IReadOnlyList<Guid> SourceRefKeys,
     IReadOnlyList<ReceivingWorkItemView> Items,
     IReadOnlyList<ReceivingWorkLpnView> Lpns,

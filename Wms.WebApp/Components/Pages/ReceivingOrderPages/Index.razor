@@ -74,7 +74,7 @@
     <MudPaper Class="pa-4">
         <MudText Typo="Typo.h6" Class="mb-2">Ордера WMS</MudText>
         <MudTextField T="string" @bind-Value="_orderFilter" Immediate="true"
-                      Label="Поиск по номеру или ID" Class="mb-3" />
+                      Label="Поиск по ID ордера" Class="mb-3" />
         @if (_busy)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
@@ -91,7 +91,7 @@
                 @foreach (var order in FilteredOrders)
                 {
                     <tr>
-                        <td><MudLink Href="@($"receiving-orders/{order.Id}")">@(order.Number ?? order.Id.ToString())</MudLink></td>
+                        <td><MudLink Href="@($"receiving-orders/{order.Id}")">@order.Id</MudLink></td>
                         <td>@order.WarehouseId</td>
                         <td>@order.Status.GetDisplayName()</td>
                         <td>@order.SourceRefKeys.Count</td>

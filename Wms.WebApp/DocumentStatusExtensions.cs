@@ -29,14 +29,6 @@ internal static class DocumentStatusExtensions
         _ => Color.Default
     };
 
-    public static string GetIcon(this ReceivingOrderQueue queue) => queue switch
-    {
-        ReceivingOrderQueue.ForClient => Icons.Material.Filled.Person,
-        ReceivingOrderQueue.UrgentlyOnSale => Icons.Material.Filled.Bolt,
-        ReceivingOrderQueue.Expired => Icons.Material.Filled.EventBusy,
-        _ => Icons.Material.Filled.HelpOutline
-    };
-
     public static string GetIcon(this ShippingOrderQueue queue) => queue switch
     {
         ShippingOrderQueue.LiveQueue => Icons.Material.Filled.People,

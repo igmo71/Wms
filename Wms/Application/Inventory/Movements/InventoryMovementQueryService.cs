@@ -82,7 +82,7 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
                 RecorderNumber = movement.RecorderType switch
                 {
                     Domain.Enums.RecorderType.ReceivingOrder when movement.RecorderId is Guid recorderId
-                        && receivingOrders.TryGetValue(recorderId, out var order) => order.Number,
+                        && receivingOrders.TryGetValue(recorderId, out var order) => order.Id.ToString(),
                     Domain.Enums.RecorderType.ShippingOrder when movement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Number,
                     RecorderType.InventoryCount when movement.RecorderId is Guid recorderId
@@ -94,7 +94,7 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
                 RecorderDate = movement.RecorderType switch
                 {
                     Domain.Enums.RecorderType.ReceivingOrder when movement.RecorderId is Guid recorderId
-                        && receivingOrders.TryGetValue(recorderId, out var order) => order.Date,
+                        && receivingOrders.TryGetValue(recorderId, out var order) => order.CreatedAtUtc.UtcDateTime,
                     Domain.Enums.RecorderType.ShippingOrder when movement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Date,
                     RecorderType.InventoryCount when movement.RecorderId is Guid recorderId
@@ -133,10 +133,8 @@ public class InventoryMovementQueryService(IDbContextFactory<ApplicationDbContex
         if (!string.IsNullOrWhiteSpace(listQuery.DocumentSearchString))
         {
             var searchString = listQuery.DocumentSearchString;
-            var receivingOrderIds = await dbContext.ReceivingOrders
-                .Where(x => x.Number!.Contains(searchString))
-                .Select(x => x.Id)
-                .ToArrayAsync(ct);
+            Guid[] receivingOrderIds = Guid.TryParse(searchString, out var receivingOrderId)
+                ? [receivingOrderId] : [];
             var shippingOrderIds = await dbContext.ShippingOrders
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)

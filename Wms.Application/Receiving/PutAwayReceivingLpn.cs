@@ -77,7 +77,7 @@ public sealed class PutAwayReceivingLpn(
                     lpn.OriginalReceivingLocationId, command.DestinationStorageLocationId,
                     item.StockKeepingUnitId, command.Quantity, now,
                     RecorderType.ReceivingOrder, order.Id,
-                    Math.Max(1, orderItem.LineNumber), command.UserId,
+                    1, command.UserId,
                     item.ExpirationDate, lpn.Id);
                 if (!movement.IsSuccess)
                     return movement.Error!;

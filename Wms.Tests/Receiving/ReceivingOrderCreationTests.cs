@@ -47,7 +47,7 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         Assert.True((await synchronize.ExecuteAsync(sourceKey)).IsSuccess);
         var orderId = Value(await new CreateReceivingOrder(
             new ReceivingOrderStore(database), parser, TimeProvider.System)
-            .ExecuteAsync([sourceKey]));
+            .ExecuteAsync(new CreateReceivingOrderRequest(Guid.NewGuid(), [sourceKey], "manager")));
         var executor = new CommandExecutor(new CommandExecutionStore(database));
         var store = new ReceivingWorkStore(database);
         var permission = new WarehousePermission(new ManagerPermission());
@@ -133,7 +133,7 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         Assert.True((await synchronization.ExecuteAsync(firstKey)).IsSuccess);
         var orderId = Value(await new CreateReceivingOrder(
             new ReceivingOrderStore(database), parser, TimeProvider.System)
-            .ExecuteAsync([firstKey]));
+            .ExecuteAsync(new CreateReceivingOrderRequest(Guid.NewGuid(), [firstKey], "manager")));
         var query = new ReceivingWorkQueryStore(database);
         var change = new ChangeReceivingOrderSources(
             new CommandExecutor(new CommandExecutionStore(database)),
@@ -219,16 +219,33 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         Assert.Equal(4, available.Count);
         Assert.Equal(0m, available.Single(x => x.RefKey == unpostedKey).PlanBySku[skuId]);
         var create = new CreateReceivingOrder(store, parser, TimeProvider.System);
-        var wrongWarehouse = await create.ExecuteAsync([firstKey, otherKey]);
+        var wrongWarehouse = await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            Guid.NewGuid(), [firstKey, otherKey], "manager"));
         Assert.False(wrongWarehouse.IsSuccess);
 
-        var first = Value(await create.ExecuteAsync([firstKey, firstKey, secondKey, unpostedKey]));
+        var creationRequest = new CreateReceivingOrderRequest(Guid.NewGuid(),
+            [firstKey, firstKey, secondKey, unpostedKey], "manager");
+        var first = Value(await create.ExecuteAsync(creationRequest));
         Assert.NotEqual(firstKey, first);
         Assert.NotEqual(secondKey, first);
-        Assert.Equal(first, Value(await create.ExecuteAsync([secondKey, firstKey, unpostedKey])));
+        Assert.Equal(first, Value(await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            creationRequest.RequestId, [secondKey, firstKey, unpostedKey], "manager"))));
+        Assert.Equal(first, Value(await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            Guid.NewGuid(), [secondKey, firstKey, unpostedKey], "manager"))));
+        Assert.False((await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            creationRequest.RequestId, [otherKey], "manager"))).IsSuccess);
 
         await using var verify = database.CreateDbContext();
         Assert.Equal(1, await verify.ReceivingOrders.CountAsync(x => x.Id == first));
+        Assert.Equal(2, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "receiving.order.create" && x.ResultResourceId == first));
+        var creationAudit = await verify.WarehouseAuditEvents.SingleAsync(x =>
+            x.EventType == "receiving.order.created" && x.ReceivingOrderId == first);
+        Assert.Equal("manager", creationAudit.ActorUserId);
+        Assert.Equal(creationRequest.RequestId, creationAudit.RequestId);
+        Assert.Equal("receiving.order.create", creationAudit.CommandType);
+        Assert.Equal(3, JsonSerializer.Deserialize<Guid[]>(
+            creationAudit.SourceVersionIdsJson)!.Length);
         var links = await verify.ReceivingOrderSourceLinks
             .Where(x => x.ReceivingOrderId == first && x.DetachedAtUtc == null)
             .ToListAsync();

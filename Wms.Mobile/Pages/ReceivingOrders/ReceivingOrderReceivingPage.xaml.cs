@@ -87,7 +87,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void Apply(MobileReceivingWorkOrderResponse order)
     {
         _order = order;
-        NumberLabel.Text = order.Number ?? order.Id.ToString();
+        NumberLabel.Text = order.Id.ToString();
         StatusLabel.Text = order.Status switch
         {
             MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
@@ -169,7 +169,17 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         {
             var source = _linkedSources.FirstOrDefault(x => x.RefKey == refKey);
             return new ReceivingLinkedSourceRow(refKey,
-                source?.Number ?? refKey.ToString(), canDetach);
+                source?.Number ?? refKey.ToString(),
+                source is null ? string.Empty : string.Join("\n", new[]
+                {
+                    $"Дата: {source.Date ?? "—"}",
+                    $"Отправитель: {source.Sender ?? "—"}"
+                        + (source.SenderType is null ? "" : $" ({source.SenderType})"),
+                    $"Складская операция: {source.WarehouseOperation ?? "—"}",
+                    $"Хозяйственная операция: {source.BusinessOperation ?? "—"}",
+                    $"Основание: {source.BasisDocument ?? "—"}"
+                        + (source.BasisDocumentType is null ? "" : $" ({source.BasisDocumentType})"),
+                }), canDetach);
         }).ToArray();
         OnPropertyChanged(nameof(SourceRows));
         SourcesPanel.IsVisible = SourceRows.Count > 0;
@@ -445,4 +455,5 @@ public sealed record ReceivingWorkItemRow(Guid SkuId, string Name,
 public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
     string Description, bool CanPutaway);
 public sealed record ReceivingWorkLocationRow(Guid Id, string Display);
-public sealed record ReceivingLinkedSourceRow(Guid RefKey, string Number, bool CanDetach);
+public sealed record ReceivingLinkedSourceRow(
+    Guid RefKey, string Number, string Details, bool CanDetach);

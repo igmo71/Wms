@@ -1,11 +1,12 @@
 /*
     Очистка прикладных данных WMS для текущей схемы базы данных.
     Включает справочники и топологию склада.
-    Учитывает состав LPN, историю размещения и участников приемки.
+    Учитывает источники и циклы приемки, LPN, движения и журнал аудита.
     Запускать при остановленных WebApp, WebApi и обработчиках интеграции.
 
     Не очищаются:
-      - таблицы ASP.NET Core Identity (dbo.AspNet*);
+      - таблицы ASP.NET Core Identity (dbo.AspNet*); предпочтение склада
+        у пользователей сбрасывается перед удалением складов;
       - dbo.__EFMigrationsHistory;
       - последовательность LicensePlateNumberSequence (старые коды не переиспользуются).
 
@@ -21,11 +22,16 @@ SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    -- Квитанции повторных команд относятся к удаляемым операциям.
+    -- Аудит ссылается на команды, приемки, LPN, источники и номенклатуру.
+    DELETE FROM [dbo].[WarehouseAuditEvents];
     DELETE FROM [dbo].[CommandReceipts];
 
     -- История размещения ссылается на LPN, его строки и складские движения.
     DELETE FROM [dbo].[LicensePlateNumberPutaways];
+    DELETE FROM [dbo].[InventoryTurnovers];
+    DELETE FROM [dbo].[InventoryMovements];
+    DELETE FROM [dbo].[InventoryBalances];
+
     DELETE FROM [dbo].[LicensePlateNumberItems];
     DELETE FROM [dbo].[LicensePlateNumbers];
     DELETE FROM [dbo].[LicensePlateNumberBatches];
@@ -33,23 +39,23 @@ BEGIN TRY
     -- Все блокировки удаляются вместе с топологией склада.
     DELETE FROM [dbo].[StorageLocationLocks];
 
-    -- История складских операций зависит от движений, мест хранения,
-    -- номенклатуры и складов.
-    DELETE FROM [dbo].[InventoryTurnovers];
-    DELETE FROM [dbo].[InventoryMovements];
-    DELETE FROM [dbo].[InventoryBalances];
-
-    -- Строки документов удаляются раньше их заголовков.
+    -- Дочерние записи документов и снимки источников удаляются первыми.
     DELETE FROM [dbo].[InventoryCountItems];
     DELETE FROM [dbo].[ReceivingOrderItems];
     DELETE FROM [dbo].[ReceivingOrderParticipants];
+    DELETE FROM [dbo].[ReceivingCycleSourceVersions];
+    DELETE FROM [dbo].[ReceivingOrderSourceLinks];
+    DELETE FROM [dbo].[ReceivingSourceLineProjections];
     DELETE FROM [dbo].[ShippingOrderBaseItems];
     DELETE FROM [dbo].[ShippingOrderItems];
 
-    -- Документы зависят от складов, мест хранения и справочников.
+    -- Циклы, заказы и версии источников зависят от складов и справочников.
     DELETE FROM [dbo].[InventoryCounts];
     DELETE FROM [dbo].[InventoryTransfers];
+    DELETE FROM [dbo].[ReceivingCycles];
     DELETE FROM [dbo].[ReceivingOrders];
+    DELETE FROM [dbo].[ReceivingSourceVersions];
+    DELETE FROM [dbo].[ReceivingSourceDocuments];
     DELETE FROM [dbo].[ShippingOrders];
 
     -- Зависимые справочники и топология склада.
@@ -70,6 +76,13 @@ BEGIN TRY
     DELETE FROM [dbo].[OrganizationalUnits];
     DELETE FROM [dbo].[Partners];
     DELETE FROM [dbo].[UnitsOfMeasure];
+
+    -- Identity сохраняется, но пользовательское предпочтение удаляемого склада
+    -- должно быть сброшено из-за внешнего ключа на Warehouses.
+    UPDATE [dbo].[AspNetUsers]
+    SET [DefaultWarehouseId] = NULL
+    WHERE [DefaultWarehouseId] IS NOT NULL;
+
     DELETE FROM [dbo].[Warehouses];
 
     COMMIT TRANSACTION;

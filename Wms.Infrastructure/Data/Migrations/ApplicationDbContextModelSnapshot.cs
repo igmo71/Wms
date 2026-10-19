@@ -746,13 +746,6 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset?>("ReopenedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("ReopenedBy")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<string>("ResponsibleUserId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
@@ -1027,22 +1020,8 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("ActiveCycleNumber")
+                    b.Property<int>("ActiveCycleNumber")
                         .HasColumnType("int");
-
-                    b.Property<Guid>("BaseOrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("BaseOrderType")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("BusinessOperation")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -1051,67 +1030,15 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
-                    b.Property<string>("CompletionApprovalReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTimeOffset?>("CompletionApprovedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CompletionApprovedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<string>("CompletionCurrentPlanJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CompletionDifferencesJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CompletionFactJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CompletionFingerprint")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("CompletionOriginalPlanJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset?>("CompletionSourceCheckedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("DeletionMark")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Number")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
 
                     b.Property<long>("OperationalRevision")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
-                    b.Property<bool>("Posted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("Queue")
-                        .HasColumnType("int");
-
                     b.Property<Guid?>("ReceivingLocationId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ShipperId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("ShipperType")
-                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset?>("StartedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -1123,31 +1050,8 @@ namespace Wms.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<DateTimeOffset?>("SynchronizationAcknowledgedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("SynchronizationAcknowledgedBy")
-                        .HasMaxLength(36)
-                        .HasColumnType("nvarchar(36)");
-
-                    b.Property<DateTimeOffset?>("SynchronizationDetectedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("SynchronizationFingerprint")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("SynchronizationLevel")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("WarehouseOperation")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1166,23 +1070,12 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Comment")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
                     b.Property<decimal?>("CurrentPlanQuantity")
                         .IsConcurrencyToken()
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
                     b.Property<decimal?>("FactQuantity")
-                        .HasPrecision(15, 3)
-                        .HasColumnType("decimal(15,3)");
-
-                    b.Property<int>("LineNumber")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("PlanQuantity")
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
@@ -1202,7 +1095,7 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("JoinedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid?>("ReceivingCycleId")
+                    b.Property<Guid>("ReceivingCycleId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ReceivingOrderId")
@@ -1218,8 +1111,7 @@ namespace Wms.Data.Migrations
                     b.HasIndex("ReceivingOrderId");
 
                     b.HasIndex("ReceivingCycleId", "UserId")
-                        .IsUnique()
-                        .HasFilter("[ReceivingCycleId] IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("ReceivingOrderParticipants");
                 });
@@ -2302,7 +2194,8 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.ReceivingCycle", "ReceivingCycle")
                         .WithMany()
                         .HasForeignKey("ReceivingCycleId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Wms.Domain.ReceivingOrder", "ReceivingOrder")
                         .WithMany("Participants")

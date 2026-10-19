@@ -11,7 +11,6 @@ using Wms.Application.Commands;
 using Wms.Application.OrganizationalUnits;
 using Wms.Application.Parties;
 using Wms.Application.Partners;
-using Wms.Application.ReceivingOrders;
 using Wms.Application.Reports.EmployeePerformance;
 using Wms.Application.ShippingOrders;
 using Wms.Application.SkuBarcodes;
@@ -46,9 +45,6 @@ public static class DependencyInjection
         services.AddScoped<PartyQueryService>();
         services.AddScoped<PartnerService>();
         services.AddScoped<PickingQueryService>();
-        services.AddScoped<ReceivingOrderSynchronizationService>();
-        services.AddScoped<MobileReceivingOrderQueryService>();
-        services.AddScoped<ReceivingOrderQueryService>();
         services.AddScoped<ShippingOrderCommandService>();
         services.AddScoped<ShippingOrderSynchronizationService>();
         services.AddScoped<MobileShippingOrderQueryService>();

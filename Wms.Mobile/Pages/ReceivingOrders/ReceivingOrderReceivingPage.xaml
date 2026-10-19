@@ -26,6 +26,7 @@
                                             <VerticalStackLayout>
                                                 <Label Text="{Binding Number}" FontAttributes="Bold" />
                                                 <Label Text="{Binding RefKey}" FontSize="10" />
+                                                <Label Text="{Binding Details}" FontSize="11" />
                                             </VerticalStackLayout>
                                             <Button Grid.Column="1" Text="Открепить" FontSize="11"
                                                     IsVisible="{Binding CanDetach}"

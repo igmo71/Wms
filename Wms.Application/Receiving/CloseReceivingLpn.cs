@@ -48,8 +48,6 @@ public sealed class CloseReceivingLpn(
                     command.UserId, operationCt)).IsSuccess;
 
                 var refKeys = await store.LoadSourceRefKeysAsync(command.OrderId, operationCt);
-                if (refKeys.Count == 0)
-                    return OperationError.Conflict("У ордера нет действующих источников 1С.");
                 string? synchronizationError = null;
                 foreach (var refKey in refKeys)
                 {
@@ -121,7 +119,7 @@ public sealed class CloseReceivingLpn(
                 var movement = InventoryMovement.Create(Guid.NewGuid(), order.WarehouseId,
                     null, lpn.OriginalReceivingLocationId, item.StockKeepingUnitId,
                     item.Quantity, now, RecorderType.ReceivingOrder, order.Id,
-                    Math.Max(1, orderItem.LineNumber), command.UserId,
+                    1, command.UserId,
                     item.ExpirationDate, lpn.Id);
                 if (!movement.IsSuccess)
                     return movement.Error!;
@@ -165,32 +163,19 @@ public sealed class CloseReceivingLpn(
     private decimal? CalculatePlan(
         IReadOnlyList<ReceivingSourceState> sources, Guid warehouseId, Guid skuId)
     {
-        decimal sum = 0;
+        var contributions = new List<(ParsedReceivingSource Source, ReceivingSourcePlan Plan)>(
+            sources.Count);
         foreach (var state in sources)
         {
             var version = state.Version;
             if (version is null)
                 return null;
             var parsed = parser.Parse(state.Source.RefKey, version.SnapshotJson);
-            if (!parsed.IsSuccess || parsed.Value!.WarehouseId != warehouseId
-                || parsed.Value.Posted is null || parsed.Value.DeletionMark is null)
+            if (!parsed.IsSuccess)
                 return null;
-            if (parsed.Value.Posted == false || parsed.Value.DeletionMark == true)
-                continue;
-            var quantity = version.CalculatePlan().QuantityFor(skuId);
-            if (quantity is null)
-                return null;
-            try
-            {
-                sum = checked(sum + quantity.Value);
-            }
-            catch (OverflowException)
-            {
-                return null;
-            }
-            if (!WarehouseQuantity.IsNonNegative(sum))
-                return null;
+            contributions.Add((parsed.Value!, version.CalculatePlan()));
         }
-        return sum;
+        return ReceivingOrderPlanProjection.Sum(warehouseId, contributions)
+            .GetValueOrDefault(skuId, 0m);
     }
 }

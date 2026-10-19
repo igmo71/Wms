@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
 using Wms.Common;
 using Wms.Domain;
@@ -10,6 +11,18 @@ namespace Wms.Data;
 public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> contextFactory)
     : IReceivingOrderStore
 {
+    public async Task<CommandReceiptSnapshot?> FindReceiptAsync(
+        string userId, string commandType, Guid requestId, CancellationToken ct)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(ct);
+        return await context.CommandReceipts.AsNoTracking()
+            .Where(x => x.UserId == userId && x.CommandType == commandType
+                && x.RequestId == requestId)
+            .Select(x => new CommandReceiptSnapshot(x.UserId, x.CommandType,
+                x.RequestId, x.RequestHash, x.ResultResourceId))
+            .SingleOrDefaultAsync(ct);
+    }
+
     public async Task<IReadOnlyList<ReceivingSourceState>> LoadSourcesAsync(
         IReadOnlyCollection<Guid> refKeys, CancellationToken ct)
     {
@@ -36,11 +49,52 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
         IReadOnlyList<ReceivingOrderItem> items,
         IReadOnlyList<ReceivingSourceExpectation> expectedSources,
+        CommandReceiptSnapshot receipt, WarehouseAuditEvent createdAudit,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await CreateCoreAsync(order, links, items, expectedSources,
+                receipt, createdAudit, ct);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException
+            && (exception is SqlException { Number: 1205 }
+                || exception is DbUpdateException
+                {
+                    InnerException: SqlException { Number: 2601 or 2627 or 1205 }
+                }))
+        {
+            var winner = await FindReceiptAsync(
+                receipt.UserId, receipt.CommandType, receipt.RequestId, ct);
+            if (winner is not null)
+                return winner.RequestHash == receipt.RequestHash
+                    ? winner.ResultResourceId
+                    : OperationError.Conflict(
+                        "Этот идентификатор запроса уже использован с другими данными.");
+            return OperationError.Conflict(
+                "Источник уже был привязан или строка ордера создана конкурентно.");
+        }
+    }
+
+    private async Task<OperationResult<Guid>> CreateCoreAsync(
+        ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
+        IReadOnlyList<ReceivingOrderItem> items,
+        IReadOnlyList<ReceivingSourceExpectation> expectedSources,
+        CommandReceiptSnapshot receipt, WarehouseAuditEvent createdAudit,
         CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
+
+        var existingReceipt = await context.CommandReceipts.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.UserId == receipt.UserId
+                && x.CommandType == receipt.CommandType
+                && x.RequestId == receipt.RequestId, ct);
+        if (existingReceipt is not null)
+            return existingReceipt.RequestHash == receipt.RequestHash
+                ? existingReceipt.ResultResourceId
+                : OperationError.Conflict("Этот идентификатор запроса уже использован с другими данными.");
 
         var sourceIds = expectedSources.Select(x => x.SourceId).ToArray();
         var activeLinks = await context.ReceivingOrderSourceLinks.AsNoTracking()
@@ -58,7 +112,12 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
                     .Select(x => x.ReceivingSourceDocumentId).ToListAsync(ct);
                 if (existingSourceIds.Count == sourceIds.Length
                     && existingSourceIds.All(sourceIds.Contains))
+                {
+                    context.CommandReceipts.Add(NewReceipt(receipt, existingOrderId));
+                    await context.SaveChangesAsync(ct);
+                    await transaction.CommitAsync(ct);
                     return existingOrderId;
+                }
             }
             return OperationError.Conflict("Один из источников уже привязан к другому ордеру.");
         }
@@ -78,18 +137,23 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         context.ReceivingOrders.Add(order);
         context.ReceivingOrderSourceLinks.AddRange(links);
         context.ReceivingOrderItems.AddRange(items);
-        try
-        {
-            await context.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            return order.Id;
-        }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is SqlException { Number: 2601 or 2627 })
-        {
-            return OperationError.Conflict("Источник уже был привязан или строка ордера создана конкурентно.");
-        }
+        context.CommandReceipts.Add(NewReceipt(receipt, order.Id));
+        context.WarehouseAuditEvents.Add(createdAudit);
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return order.Id;
     }
+
+    private static CommandReceipt NewReceipt(
+        CommandReceiptSnapshot receipt, Guid resultResourceId) => new()
+    {
+        UserId = receipt.UserId,
+        CommandType = receipt.CommandType,
+        RequestId = receipt.RequestId,
+        RequestHash = receipt.RequestHash,
+        ResultResourceId = resultResourceId,
+        CompletedAtUtc = DateTimeOffset.UtcNow
+    };
 
     private static async Task<IReadOnlyList<ReceivingSourceState>> WithVersionsAsync(
         ApplicationDbContext context,

@@ -11,7 +11,10 @@ public sealed record ReceivingSourceLine(
 
 public sealed record ParsedReceivingSource(
     Guid RefKey, Guid? WarehouseId, bool? Posted, bool? DeletionMark,
-    string? Number, IReadOnlyList<ReceivingSourceLine> Lines);
+    string? Number, string? Date, string? Sender, string? SenderType,
+    string? WarehouseOperation, string? BusinessOperation,
+    string? BasisDocument, string? BasisDocumentType,
+    IReadOnlyList<ReceivingSourceLine> Lines);
 
 public interface IReceivingSourceParser
 {

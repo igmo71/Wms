@@ -16,6 +16,7 @@ public partial class Index
     private IReadOnlyList<ReceivingSourceView> _sources = [];
     private IReadOnlyList<ReceivingWorkOrderView> _orders = [];
     private readonly HashSet<Guid> _selected = [];
+    private (Guid RequestId, Guid[] SourceRefKeys)? _pendingCreate;
     private string? _orderFilter;
     private string? _error;
     private bool _busy;
@@ -23,14 +24,13 @@ public partial class Index
     private IEnumerable<ReceivingSourceView> SelectedSources =>
         _sources.Where(x => _selected.Contains(x.RefKey));
 
-    private bool CanCreate => _selected.Count > 0
+    private bool CanCreate => _pendingCreate is not null || (_selected.Count > 0
         && SelectedSources.All(x => x.WarehouseId is not null && x.VersionId is not null)
-        && SelectedSources.Select(x => x.WarehouseId).Distinct().Count() == 1;
+        && SelectedSources.Select(x => x.WarehouseId).Distinct().Count() == 1);
 
     private IEnumerable<ReceivingWorkOrderView> FilteredOrders =>
         string.IsNullOrWhiteSpace(_orderFilter) ? _orders
-            : _orders.Where(x => x.Id.ToString().Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase)
-                || x.Number?.Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase) == true);
+            : _orders.Where(x => x.Id.ToString().Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase));
 
     private IReadOnlyList<(Guid SkuId, decimal? Quantity)> SelectedPlan
     {
@@ -86,6 +86,7 @@ public partial class Index
 
     private void ToggleSource(Guid refKey, ChangeEventArgs args)
     {
+        _pendingCreate = null;
         if (args.Value is true)
             _selected.Add(refKey);
         else
@@ -100,11 +101,27 @@ public partial class Index
         _error = null;
         try
         {
-            var result = await CreateOrder.ExecuteAsync(_selected.ToArray());
+            var userId = (await Authentication.GetAuthenticationStateAsync()).User
+                .FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId is null)
+            {
+                _error = "Не удалось определить пользователя.";
+                return;
+            }
+            _pendingCreate ??= (Guid.NewGuid(), _selected.ToArray());
+            var pending = _pendingCreate.Value;
+            var result = await CreateOrder.ExecuteAsync(new CreateReceivingOrderRequest(
+                pending.RequestId, pending.SourceRefKeys, userId));
             if (result.IsSuccess)
+            {
+                _pendingCreate = null;
                 Navigation.NavigateTo($"receiving-orders/{result.Value}");
+            }
             else
+            {
+                _pendingCreate = null;
                 _error = result.Error!.Message;
+            }
         }
         catch (Exception exception)
         {

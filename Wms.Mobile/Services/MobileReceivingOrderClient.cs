@@ -43,9 +43,9 @@ public sealed class MobileReceivingOrderClient
             new MobileReceivingResolveDocumentRequest(barcode), ct);
 
     public Task<MobileReceivingCommandIdResponse> CreateOrderAsync(
-        IReadOnlyList<Guid> sourceRefKeys, CancellationToken ct = default) =>
+        Guid requestId, IReadOnlyList<Guid> sourceRefKeys, CancellationToken ct = default) =>
         PostAsync<MobileReceivingCreateOrderRequest, MobileReceivingCommandIdResponse>(
-            Route, new MobileReceivingCreateOrderRequest(sourceRefKeys), ct);
+            Route, new MobileReceivingCreateOrderRequest(requestId, sourceRefKeys), ct);
 
     public Task<IReadOnlyList<MobileReceivingSkuCandidateResponse>> SearchSkuAsync(
         Guid orderId, string? search, bool catalog, CancellationToken ct = default) =>

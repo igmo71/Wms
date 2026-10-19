@@ -53,6 +53,15 @@
                         }
                     </td>
                 </tr>
+                <tr>
+                    <td colspan="6">
+                        Дата: @(source.Date ?? "—") ·
+                        Отправитель: @(source.Sender ?? "—")@(source.SenderType is null ? "" : $" ({source.SenderType})") ·
+                        Складская операция: @(source.WarehouseOperation ?? "—") ·
+                        Хозяйственная операция: @(source.BusinessOperation ?? "—") ·
+                        Основание: @(source.BasisDocument ?? "—")@(source.BasisDocumentType is null ? "" : $" ({source.BasisDocumentType})")
+                    </td>
+                </tr>
                 @foreach (var line in source.Lines.Where(x => x.Error is not null))
                 {
                     <tr><td colspan="6">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>

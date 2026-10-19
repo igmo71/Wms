@@ -12,8 +12,7 @@ internal sealed class ReceivingOrderParticipantConfiguration
         builder.HasKey(x => x.Id);
         builder.Property(x => x.UserId).HasMaxLength(450).IsRequired();
         builder.HasIndex(x => new { x.ReceivingCycleId, x.UserId })
-            .IsUnique()
-            .HasFilter("[ReceivingCycleId] IS NOT NULL");
+            .IsUnique();
         builder.HasOne(x => x.ReceivingOrder)
             .WithMany(x => x.Participants)
             .HasForeignKey(x => x.ReceivingOrderId)

@@ -67,7 +67,7 @@ public sealed class CorrectReceivingLpnQuantity(
                     increase ? lpn.OriginalReceivingLocationId : null,
                     item.StockKeepingUnitId, Math.Abs(command.Quantity - oldQuantity), now,
                     RecorderType.ReceivingOrder, order.Id,
-                    Math.Max(1, orderItem.LineNumber), command.UserId,
+                    1, command.UserId,
                     item.ExpirationDate, lpn.Id);
                 if (!movement.IsSuccess)
                     return movement.Error!;

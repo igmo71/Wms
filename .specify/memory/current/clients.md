@@ -22,8 +22,9 @@ Independent putaway starts from its own LPN screen. The Mobile receiving queue
 lists free 1C sources and WMS orders for the selected warehouse. Scanning a
 document selects a free source or opens its linked order; several selected
 sources create one WMS order. A participant scans an issued LPN, selects or
-globally scans its SKU, enters a positive quantity and may close it. The order
-page offers zero checking and direct putaway of closed LPNs before order
+globally scans its SKU, enters a positive quantity and may close it. WMS orders
+are identified by their own IDs; 1C numbers belong to individual sources. The
+order page offers zero checking and direct putaway of closed LPNs before order
 completion. Closing and putaway use separate retry-safe commands.
 The active Mobile order has a document-scan mode for adding a source and shows
 linked documents with a detach action before the first posted LPN. Each change

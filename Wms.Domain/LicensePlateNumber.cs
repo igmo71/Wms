@@ -28,8 +28,6 @@ public sealed class LicensePlateNumber
     public DateTimeOffset? CancelledAtUtc { get; private set; }
     public string? ClosedBy { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
-    public string? ReopenedBy { get; private set; }
-    public DateTimeOffset? ReopenedAtUtc { get; private set; }
     public long OperationalRevision { get; private set; }
     public IReadOnlyCollection<LicensePlateNumberItem> Items => _items;
     public IReadOnlyCollection<LicensePlateNumberPutaway> Putaways => _putaways;
@@ -41,49 +39,18 @@ public sealed class LicensePlateNumber
             || cycle.ReceivingLocationId is null)
             return OperationError.Invalid("Для LPN нужен действующий цикл с местом приёмки.");
 
-        var result = Assign(cycle.ReceivingOrderId, userId, createdAtUtc);
-        if (!result.IsSuccess)
-            return result;
-
-        ReceivingCycleId = cycle.Id;
-        OriginalReceivingLocationId = cycle.ReceivingLocationId;
-        return OperationResult.Success();
-    }
-
-    internal OperationResult Assign(Guid receivingOrderId, string userId, DateTimeOffset createdAtUtc)
-    {
         if (Status != LicensePlateNumberStatus.Available || ReceivingOrderId is not null)
             return OperationError.Conflict("Этикетка уже связана с LPN.");
-        if (receivingOrderId == Guid.Empty)
-            return OperationError.Invalid("Идентификатор приходного ордера обязателен.");
-        if (string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid("Ответственный за LPN не определён.");
-        if (createdAtUtc == default)
-            return OperationError.Invalid("Время создания LPN обязательно.");
+        if (string.IsNullOrWhiteSpace(userId) || createdAtUtc == default)
+            return OperationError.Invalid("Для LPN обязательны ответственный и время создания.");
 
-        ReceivingOrderId = receivingOrderId;
+        ReceivingOrderId = cycle.ReceivingOrderId;
+        ReceivingCycleId = cycle.Id;
+        OriginalReceivingLocationId = cycle.ReceivingLocationId;
         Status = LicensePlateNumberStatus.Open;
         CreatedBy = userId.Trim();
         ResponsibleUserId = userId.Trim();
         CreatedAtUtc = createdAtUtc;
-        OperationalRevision++;
-        return OperationResult.Success();
-    }
-
-    internal OperationResult CancelEmpty(string userId, DateTimeOffset cancelledAtUtc)
-    {
-        if (Status != LicensePlateNumberStatus.Open)
-            return OperationError.Invalid("Отменить можно только открытый LPN.");
-        if (!string.Equals(ResponsibleUserId, userId, StringComparison.Ordinal))
-            return OperationError.Conflict("Отменить LPN может только ответственный сотрудник.");
-        if (_items.Any(x => !x.IsDeleted))
-            return OperationError.Invalid("Отменить можно только пустой LPN.");
-        if (cancelledAtUtc == default)
-            return OperationError.Invalid("Время отмены LPN обязательно.");
-
-        Status = LicensePlateNumberStatus.Cancelled;
-        CancelledBy = userId;
-        CancelledAtUtc = cancelledAtUtc;
         OperationalRevision++;
         return OperationResult.Success();
     }
@@ -143,81 +110,6 @@ public sealed class LicensePlateNumber
         return OperationResult.Success();
     }
 
-    internal OperationResult SetItemQuantity(
-        Guid stockKeepingUnitId,
-        decimal quantity,
-        string userId,
-        DateTimeOffset occurredAtUtc,
-        bool canManage)
-    {
-        var access = ValidateEditing(userId, canManage);
-        if (!access.IsSuccess)
-            return access;
-        if (stockKeepingUnitId == Guid.Empty)
-            return OperationError.Invalid("SKU для строки LPN обязателен.");
-        var validation = LicensePlateNumberItem.Validate(quantity, occurredAtUtc, userId);
-        if (!validation.IsSuccess)
-            return validation;
-
-        var item = _items.SingleOrDefault(x =>
-            x.StockKeepingUnitId == stockKeepingUnitId && !x.IsDeleted);
-        if (item is null)
-        {
-            if (ReceivingCycleId is not null && _items.Any(x => !x.IsDeleted))
-                return OperationError.Conflict("Приёмная LPN может содержать только один SKU.");
-            _items.Add(new LicensePlateNumberItem(
-                Id, stockKeepingUnitId, null, quantity, occurredAtUtc, userId.Trim()));
-        }
-        else
-        {
-            var update = item.SetQuantity(quantity, occurredAtUtc, userId);
-            if (!update.IsSuccess)
-                return update;
-        }
-
-        OperationalRevision++;
-        return OperationResult.Success();
-    }
-
-    internal OperationResult RemoveItem(
-        Guid stockKeepingUnitId,
-        string userId,
-        DateTimeOffset occurredAtUtc,
-        bool canManage)
-    {
-        var access = ValidateEditing(userId, canManage);
-        if (!access.IsSuccess)
-            return access;
-        var item = _items.SingleOrDefault(x =>
-            x.StockKeepingUnitId == stockKeepingUnitId && !x.IsDeleted);
-        if (item is null)
-            return OperationError.NotFound("Строка состава LPN не найдена.");
-
-        var result = item.Delete(occurredAtUtc, userId);
-        if (result.IsSuccess)
-            OperationalRevision++;
-        return result;
-    }
-
-    internal OperationResult Close(string userId, DateTimeOffset closedAtUtc, bool canManage)
-    {
-        var access = ValidateEditing(userId, canManage);
-        if (!access.IsSuccess)
-            return access;
-        if (closedAtUtc == default)
-            return OperationError.Invalid("Время закрытия LPN обязательно.");
-        if (ReceivingCycleId is not null
-            && (_items.Count(x => !x.IsDeleted) != 1
-                || !_items.Any(x => !x.IsDeleted && WarehouseQuantity.IsPositive(x.Quantity))))
-            return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
-
-        Status = LicensePlateNumberStatus.Closed;
-        ClosedBy = userId.Trim();
-        ClosedAtUtc = closedAtUtc;
-        OperationalRevision++;
-        return OperationResult.Success();
-    }
-
     public OperationResult CloseReceiving(string userId, DateTimeOffset closedAtUtc, bool canManage)
     {
         if (ReceivingCycleId is null || OriginalReceivingLocationId is null)
@@ -228,7 +120,16 @@ public sealed class LicensePlateNumber
         var active = activeItems.SingleOrDefault();
         if (active is null || !WarehouseQuantity.IsPositive(active.Quantity))
             return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
-        return Close(userId, closedAtUtc, canManage);
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (closedAtUtc == default)
+            return OperationError.Invalid("Время закрытия LPN обязательно.");
+        Status = LicensePlateNumberStatus.Closed;
+        ClosedBy = userId.Trim();
+        ClosedAtUtc = closedAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
     }
 
     public OperationResult CorrectClosedReceivingQuantity(
@@ -264,35 +165,6 @@ public sealed class LicensePlateNumber
         OperationalRevision++;
         return OperationResult.Success();
     }
-
-    internal OperationResult Reopen(string userId, DateTimeOffset reopenedAtUtc, bool canManage)
-    {
-        if (ReceivingCycleId is not null)
-            return OperationError.Conflict("Закрытую приёмную LPN нельзя возобновить.");
-        if (!canManage)
-            return OperationError.Conflict("Возобновить закрытый LPN может только менеджер.");
-        if (Status != LicensePlateNumberStatus.Closed)
-            return OperationError.Invalid("Возобновить можно только закрытый LPN.");
-        if (reopenedAtUtc == default || string.IsNullOrWhiteSpace(userId))
-            return OperationError.Invalid("Для возобновления LPN обязателен пользователь и время.");
-
-        Status = LicensePlateNumberStatus.Open;
-        ReopenedBy = userId.Trim();
-        ReopenedAtUtc = reopenedAtUtc;
-        OperationalRevision++;
-        return OperationResult.Success();
-    }
-
-    internal OperationResult<LicensePlateNumberPutaway> CreatePutaway(
-        Guid itemId,
-        Guid destinationStorageLocationId,
-        decimal quantity,
-        Guid inventoryMovementId,
-        string userId,
-        DateTimeOffset createdAtUtc)
-        => CreatePutawayCore(
-            itemId, ReceivingOrder?.ReceivingLocationId, destinationStorageLocationId,
-            quantity, inventoryMovementId, userId, createdAtUtc);
 
     public OperationResult<LicensePlateNumberPutaway> CreateReceivingPutaway(
         Guid itemId,

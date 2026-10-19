@@ -13,6 +13,7 @@ public partial class ReceivingOrderPage : ContentPage
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
     private readonly HashSet<Guid> _selected = [];
+    private (Guid RequestId, Guid[] SourceRefKeys)? _pendingCreate;
     private IReadOnlyList<MobileReceivingSourceResponse> _sources = [];
     private bool _loaded;
     private bool _visible;
@@ -73,6 +74,7 @@ public partial class ReceivingOrderPage : ContentPage
     {
         if (Warehouse is { } warehouse) _selection.Select(warehouse.Id);
         _selected.Clear();
+        _pendingCreate = null;
         await RefreshAsync();
     }
 
@@ -92,7 +94,7 @@ public partial class ReceivingOrderPage : ContentPage
             var orders = await _orders.GetOrdersAsync(warehouse.Id);
             _selected.IntersectWith(_sources.Select(x => x.RefKey));
             OrderRows = orders.Select(x => new ReceivingWorkOrderRow(
-                x.Id, x.Number ?? x.Id.ToString(), StatusText(x.Status))).ToArray();
+                x.Id, x.Id.ToString(), StatusText(x.Status))).ToArray();
             OnPropertyChanged(nameof(OrderRows));
             ShowSelection();
         }
@@ -126,6 +128,7 @@ public partial class ReceivingOrderPage : ContentPage
             }
             if (resolved.Source is { } source)
             {
+                _pendingCreate = null;
                 _selected.Add(source.RefKey);
                 _sources = await _orders.GetUnlinkedSourcesAsync(warehouse.Id);
                 ShowSelection();
@@ -139,6 +142,7 @@ public partial class ReceivingOrderPage : ContentPage
     private void OnSourceTapped(object? sender, TappedEventArgs e)
     {
         if (_busy || e.Parameter is not Guid id) return;
+        _pendingCreate = null;
         if (!_selected.Add(id)) _selected.Remove(id);
         ShowSelection();
     }
@@ -159,21 +163,29 @@ public partial class ReceivingOrderPage : ContentPage
                 $"{group.Key}: {(group.Any(x => x.Value is null) ? "неизвестно" : group.Sum(x => x.Value!.Value).ToString("0.###"))}");
         SelectionLabel.Text = selectedSources.Length == 0 ? "Документы не выбраны."
             : $"Выбрано: {selectedSources.Length}. Суммарный план: {string.Join("; ", plan)}";
-        CreateButton.IsEnabled = !_busy && selectedSources.Length > 0;
+        CreateButton.IsEnabled = !_busy && (_pendingCreate is not null || selectedSources.Length > 0);
     }
 
     private async void OnCreateClicked(object? sender, EventArgs e)
     {
-        if (_busy || _selected.Count == 0) return;
+        if (_busy || (_selected.Count == 0 && _pendingCreate is null)) return;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try
         {
-            var result = await _orders.CreateOrderAsync(_selected.ToArray());
+            _pendingCreate ??= (Guid.NewGuid(), _selected.ToArray());
+            var pending = _pendingCreate.Value;
+            var result = await _orders.CreateOrderAsync(
+                pending.RequestId, pending.SourceRefKeys);
             await OpenOrderAsync(await _orders.GetAsync(result.ResourceId));
+            _pendingCreate = null;
             _selected.Clear();
         }
-        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (MobileApiException ex)
+        {
+            _pendingCreate = null;
+            ErrorLabel.Text = ex.Message;
+        }
         catch (HttpRequestException) { ErrorLabel.Text = "Результат создания не подтверждён. Повторите те же документы."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
@@ -200,7 +212,7 @@ public partial class ReceivingOrderPage : ContentPage
         Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
         ProgressIndicator.IsVisible = busy;
-        CreateButton.IsEnabled = !busy && _selected.Count > 0;
+        CreateButton.IsEnabled = !busy && (_pendingCreate is not null || _selected.Count > 0);
     }
 
     private async Task UpdateCameraAsync()

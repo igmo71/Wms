@@ -108,17 +108,31 @@ public sealed class ReceivingSourceParser : IReceivingSourceParser
             bool? deletionMark = document.TryGetProperty("DeletionMark", out var sourceDeletion)
                 && sourceDeletion.ValueKind is JsonValueKind.True or JsonValueKind.False
                 ? sourceDeletion.GetBoolean() : null;
-            var number = document.TryGetProperty("Number", out var sourceNumber)
-                && sourceNumber.ValueKind == JsonValueKind.String
-                ? sourceNumber.GetString() : null;
-
             return new ParsedReceivingSource(
-                refKey, warehouseId, posted, deletionMark, number, lines);
+                refKey, warehouseId, posted, deletionMark,
+                ReadScalar(document, "Number"), ReadScalar(document, "Date"),
+                ReadScalar(document, "Отправитель"), ReadScalar(document, "Отправитель_Type"),
+                ReadScalar(document, "СкладскаяОперация"),
+                ReadScalar(document, "ХозяйственнаяОперация"),
+                ReadScalar(document, "Распоряжение"), ReadScalar(document, "Распоряжение_Type"),
+                lines);
         }
         catch (JsonException)
         {
             return OperationError.Failure("1С вернула нечитаемый JSON приходного документа.");
         }
+    }
+
+    private static string? ReadScalar(JsonElement document, string name)
+    {
+        if (!document.TryGetProperty(name, out var value))
+            return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => value.GetRawText(),
+            _ => null
+        };
     }
 
     private static bool TryGuid(JsonElement value, out Guid result)

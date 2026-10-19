@@ -75,7 +75,7 @@ public sealed class DeleteReceivingLpn(
                     var movement = InventoryMovement.CreateReversal(
                         Guid.NewGuid(), originals[reversal.OriginalMovementId], now,
                         RecorderType.ReceivingOrder, order.Id,
-                        Math.Max(1, orderItem.LineNumber), command.UserId);
+                        1, command.UserId);
                     if (!movement.IsSuccess)
                         return movement.Error!;
                     var posted = await posting.HandleAsync(new PostInventoryMovement.Command(

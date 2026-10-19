@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Wms.Application.ReceivingOrders;
+using Wms.Application.Receiving;
 using Wms.Application.ShippingOrders;
 using Wms.Common;
 using Wms.Integration.OneS.Models;
@@ -73,8 +73,8 @@ internal class NotifyBackgroundService(
             nameof(Catalog_ФизическиеЛица) =>
                 await services.GetRequiredService<Catalog_ФизическиеЛица_Service>()
                     .ImportAsync(notifyRecord.Ref_Key, ct),
-            nameof(Document_ПриходныйОрдерНаТовары) =>
-                await ImportReceivingOrderAsync(services, notifyRecord.Ref_Key, ct),
+            "Document_ПриходныйОрдерНаТовары" =>
+                await SynchronizeReceivingDocumentAsync(services, notifyRecord.Ref_Key, ct),
             nameof(Document_РасходныйОрдерНаТовары) =>
                 await ImportShippingOrderAsync(services, notifyRecord.Ref_Key, ct),
             nameof(InformationRegister_ШтрихкодыНоменклатуры) =>
@@ -84,19 +84,21 @@ internal class NotifyBackgroundService(
         };
     }
 
-    private async Task<OperationResult> ImportReceivingOrderAsync(
+    private async Task<OperationResult> SynchronizeReceivingDocumentAsync(
         IServiceProvider services,
         string refKey,
         CancellationToken ct)
     {
-        OperationResult<Guid> orderIdResult = await ParseDocumentIdAfterDelayAsync(
+        OperationResult<Guid> refKeyResult = await ParseDocumentIdAfterDelayAsync(
             refKey,
             "приходного",
             ct);
-        return orderIdResult.IsSuccess
-            ? await services.GetRequiredService<ReceivingOrderSynchronizationService>()
-                .ImportNotificationAsync(orderIdResult.Value, ct)
-            : orderIdResult.Error!;
+        if (!refKeyResult.IsSuccess)
+            return refKeyResult.Error!;
+
+        var result = await services.GetRequiredService<SynchronizeReceivingSource>()
+            .ExecuteAsync(refKeyResult.Value, ct);
+        return result.IsSuccess ? OperationResult.Success() : result.Error!;
     }
 
     private async Task<OperationResult> ImportShippingOrderAsync(

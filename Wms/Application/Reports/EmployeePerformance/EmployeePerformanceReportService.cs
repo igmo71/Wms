@@ -169,26 +169,6 @@ public sealed class EmployeePerformanceReportService(
     private static IQueryable<EmployeePerformanceDocumentProjection> BuildDocuments(
         ApplicationDbContext dbContext)
     {
-        var receiving =
-            from order in dbContext.ReceivingOrders.AsNoTracking()
-            where false
-            select new EmployeePerformanceDocumentProjection
-            {
-                DocumentType = EmployeePerformanceDocumentType.Receiving,
-                DocumentId = order.Id,
-                Number = order.Number,
-                DocumentDate = order.Date,
-                WarehouseId = order.WarehouseId,
-                WarehouseName = order.Warehouse!.Name ?? string.Empty,
-                UserId = string.Empty,
-                UserName = string.Empty,
-                PositiveLineCount = 0,
-                KnownFactWeightKg = 0,
-                IsFactWeightComplete = true,
-                StartedAtUtc = DateTimeOffset.MinValue,
-                CompletedAtUtc = DateTimeOffset.MinValue
-            };
-
         var picking =
             from order in dbContext.ShippingOrders.AsNoTracking()
             where order.ReadyForShipmentBy != null
@@ -222,7 +202,7 @@ public sealed class EmployeePerformanceReportService(
                 CompletedAtUtc = order.ReadyForShipmentAtUtc!.Value
             };
 
-        return receiving.Concat(picking);
+        return picking;
     }
 
     private static IQueryable<EmployeePerformanceDocumentProjection> ApplyCommonFilters(

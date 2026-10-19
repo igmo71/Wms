@@ -16,7 +16,6 @@ public sealed class LicensePlateNumberConfiguration : IEntityTypeConfiguration<L
         builder.Property(x => x.ResponsibleUserId).HasMaxLength(450);
         builder.Property(x => x.CancelledBy).HasMaxLength(450);
         builder.Property(x => x.ClosedBy).HasMaxLength(450);
-        builder.Property(x => x.ReopenedBy).HasMaxLength(450);
         builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
         builder.HasIndex(x => x.ReceivingOrderId);
         builder.HasOne(x => x.Batch).WithMany(x => x.Labels).HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);

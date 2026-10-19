@@ -87,6 +87,61 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Source_warehouse_change_keeps_zero_plan_when_manager_closes_lpn()
+    {
+        var state = await SeedAsync(5m, 3m);
+        state.Reader.WarehouseId = Guid.NewGuid();
+        var command = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "manager-test");
+
+        var result = Value(await Handler(state.Reader).ExecuteAsync(command));
+
+        Assert.True(result.SourceCheckSucceeded);
+        Assert.Equal(0m, result.UsedPlan);
+        Assert.True(result.ManagerException);
+        await using var verify = database.CreateDbContext();
+        var item = await verify.ReceivingOrderItems.SingleAsync(x =>
+            x.ReceivingOrderId == state.OrderId && x.StockKeepingUnitId == state.SkuId);
+        Assert.Equal(0m, item.CurrentPlanQuantity);
+        Assert.Equal(3m, item.FactQuantity);
+    }
+
+    [Fact]
+    public async Task Last_source_detached_allows_manager_close_against_zero_plan()
+    {
+        var state = await SeedAsync(5m, 3m);
+        var parser = new ReceivingSourceParser();
+        var permission = new WarehousePermission(new ReceivingPermission());
+        var changeSources = new ChangeReceivingOrderSources(
+            new CommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingOrderSourceChangeStore(),
+            new ReceivingWorkQueryStore(database), parser,
+            new SynchronizeReceivingSource(state.Reader, parser,
+                new ReceivingSourceStore(database, parser), TimeProvider.System),
+            permission, TimeProvider.System);
+        Value(await changeSources.ExecuteAsync(new ChangeReceivingOrderSourcesRequest(
+            Guid.NewGuid(), state.OrderId, state.SourceKey, "manager-test",
+            ReceivingSourceChangeKind.Detach, ReceivingSourceChangeChannel.Web)));
+
+        var close = Handler(state.Reader);
+        var operatorCommand = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
+        Error(await close.ExecuteAsync(operatorCommand), OperationErrorType.Conflict);
+        var managerCommand = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "manager-test");
+        var result = Value(await close.ExecuteAsync(managerCommand));
+
+        Assert.Equal(0m, result.UsedPlan);
+        Assert.Equal(3m, result.TotalFact);
+        Assert.True(result.ManagerException);
+        await using var verify = database.CreateDbContext();
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.RequestId == operatorCommand.RequestId));
+        Assert.Single(await verify.InventoryMovements.Where(x =>
+            x.LicensePlateNumberId == state.LpnId).ToListAsync());
+    }
+
+    [Fact]
     public async Task Current_expiration_flag_blocks_undated_close_and_past_date_needs_confirmation()
     {
         var state = await SeedAsync(5m, 3m);
@@ -204,7 +259,7 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
         Assert.True((await sync.ExecuteAsync(sourceKey)).IsSuccess);
         var orderId = Value(await new CreateReceivingOrder(
             new ReceivingOrderStore(database), parser, TimeProvider.System)
-            .ExecuteAsync([sourceKey]));
+            .ExecuteAsync(new CreateReceivingOrderRequest(Guid.NewGuid(), [sourceKey], "manager")));
         var lpnId = batch.Labels.Single().Id;
         var joinedAt = DateTimeOffset.UtcNow;
         await using (var prepare = database.CreateDbContext())
@@ -235,13 +290,14 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     {
         public bool Fail { get; set; }
         public decimal Quantity { get; set; } = quantity;
+        public Guid WarehouseId { get; set; } = warehouseId;
 
         public Task<OperationResult<ReceivingSourceRead>> ReadAsync(
             Guid refKey, CancellationToken ct) =>
             Task.FromResult<OperationResult<ReceivingSourceRead>>(
                 Fail ? OperationError.Failure("1С недоступна.")
                     : new ReceivingSourceRead(refKey, $$"""
-                        {"value":[{"Ref_Key":"{{key}}","Склад_Key":"{{warehouseId}}",
+                        {"value":[{"Ref_Key":"{{key}}","Склад_Key":"{{WarehouseId}}",
                         "Posted":true,"DeletionMark":false,"Number":"Close",
                         "Товары":[{"LineNumber":"1","Номенклатура_Key":"{{skuId}}",
                         "Количество":{{Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}]}]}

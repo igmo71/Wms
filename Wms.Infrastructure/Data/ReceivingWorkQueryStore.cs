@@ -14,9 +14,7 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var orders = await OrderQuery(db)
-            .Where(x => (warehouseId == null || x.WarehouseId == warehouseId)
-                && !x.DeletionMark
-                && x.SourceLinks.Any())
+            .Where(x => warehouseId == null || x.WarehouseId == warehouseId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(ct);
         return orders.Select(x => MapOrder(x, userId)).ToArray();
@@ -27,7 +25,7 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var order = await OrderQuery(db)
-            .SingleOrDefaultAsync(x => x.Id == orderId && x.SourceLinks.Any(), ct);
+            .SingleOrDefaultAsync(x => x.Id == orderId, ct);
         return order is null ? null : MapOrder(order, userId);
     }
 
@@ -106,11 +104,12 @@ public sealed class ReceivingWorkQueryStore(
                 HasSelectedSkuBalance = db.InventoryBalances.Any(b =>
                     b.StorageLocationId == x.Id
                     && b.StockKeepingUnitId == skuId),
-                HasAnyStock = db.InventoryBalances.Any(b =>
-                    b.StorageLocationId == x.Id && b.Quantity > 0)
+                HasAnyNonzeroBalance = db.InventoryBalances.Any(b =>
+                    b.StorageLocationId == x.Id && b.Quantity != 0)
             })
             .Where(x => x.CurrentSkuQuantity > 0
-                || !x.HasAnyStock && x.HasSelectedSkuBalance)
+                || x.CurrentSkuQuantity == 0 && !x.HasAnyNonzeroBalance
+                    && x.HasSelectedSkuBalance)
             .OrderByDescending(x => x.CurrentSkuQuantity > 0)
             .ThenBy(x => x.PickSequence.HasValue ? 0 : 1)
             .ThenBy(x => x.PickSequence)
@@ -140,7 +139,7 @@ public sealed class ReceivingWorkQueryStore(
         var activeCycleId = order.Cycles
             .SingleOrDefault(x => x.Number == order.ActiveCycleNumber)?.Id;
         return new ReceivingWorkOrderView(
-            order.Id, order.Number, order.WarehouseId, order.Status,
+            order.Id, order.WarehouseId, order.Status,
             order.ActiveCycleNumber, order.ReceivingLocationId,
             activeCycleId is Guid cycleId && order.Participants.Any(x =>
                 x.ReceivingCycleId == cycleId && x.UserId == userId),
@@ -148,7 +147,7 @@ public sealed class ReceivingWorkQueryStore(
             order.SourceLinks.Where(x => x.DetachedAtUtc is null
                     && x.ReceivingSourceDocument is not null)
                 .Select(x => x.ReceivingSourceDocument!.RefKey).ToArray(),
-            order.Items.OrderBy(x => x.LineNumber).Select(x =>
+            order.Items.OrderBy(x => x.StockKeepingUnitId).Select(x =>
                 new ReceivingWorkItemView(x.StockKeepingUnitId,
                     x.StockKeepingUnit?.Code, x.StockKeepingUnit?.Name,
                     x.StockKeepingUnit?.TracksExpirationDate == true,

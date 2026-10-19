@@ -1,3 +1,4 @@
+using Wms.Application.CommandExecution;
 using Wms.Common;
 using Wms.Domain;
 
@@ -8,6 +9,9 @@ public sealed record ReceivingSourceState(
 
 public sealed record ReceivingSourceView(
     Guid RefKey, Guid? WarehouseId, string? Number,
+    string? Date, string? Sender, string? SenderType,
+    string? WarehouseOperation, string? BusinessOperation,
+    string? BasisDocument, string? BasisDocumentType,
     bool? Posted, bool? DeletionMark, Guid? VersionId,
     DateTimeOffset? LastSuccessfulCheckAtUtc, DateTimeOffset? LastAttemptAtUtc,
     string? LastAttemptError, IReadOnlyDictionary<Guid, decimal?> PlanBySku,
@@ -28,7 +32,11 @@ public interface IReceivingOrderStore
         ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
         IReadOnlyList<ReceivingOrderItem> items,
         IReadOnlyList<ReceivingSourceExpectation> expectedSources,
+        CommandReceiptSnapshot receipt, WarehouseAuditEvent createdAudit,
         CancellationToken ct);
+
+    Task<CommandReceiptSnapshot?> FindReceiptAsync(
+        string userId, string commandType, Guid requestId, CancellationToken ct);
 }
 
 public sealed record ReceivingSourceExpectation(
@@ -82,6 +90,9 @@ public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSo
                 .ToArray() ?? [];
             results.Add(new ReceivingSourceView(
                 state.Source.RefKey, parsed?.WarehouseId, parsed?.Number,
+                parsed?.Date, parsed?.Sender, parsed?.SenderType,
+                parsed?.WarehouseOperation, parsed?.BusinessOperation,
+                parsed?.BasisDocument, parsed?.BasisDocumentType,
                 parsed?.Posted, parsed?.DeletionMark, state.Version?.Id,
                 state.Source.LastSuccessfulCheckAtUtc, state.Source.LastAttemptAtUtc,
                 state.Source.LastAttemptError, quantities,

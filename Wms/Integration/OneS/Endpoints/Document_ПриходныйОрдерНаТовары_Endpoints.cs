@@ -26,7 +26,7 @@ internal static class Document_ПриходныйОрдерНаТовары_Endp
         CancellationToken ct)
     {
         await notifyChannel.Writer.WriteAsync(
-            new NotifyRecord(request.Ref_Key, nameof(Document_ПриходныйОрдерНаТовары)),
+            new NotifyRecord(request.Ref_Key, "Document_ПриходныйОрдерНаТовары"),
             ct);
 
         return TypedResults.Ok();

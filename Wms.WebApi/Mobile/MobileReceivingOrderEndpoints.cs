@@ -99,8 +99,14 @@ internal static class MobileReceivingOrderEndpoints
 
     private static async Task<IResult> CreateOrderAsync(
         MobileReceivingCreateOrderRequest request,
-        CreateReceivingOrder create, CancellationToken ct) =>
-        CommandId(await create.ExecuteAsync(request.SourceRefKeys, ct));
+        ClaimsPrincipal principal, CreateReceivingOrder create, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+            return TypedResults.Unauthorized();
+        return CommandId(await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            request.ClientRequestId, request.SourceRefKeys, userId), ct));
+    }
 
     private static async Task<IResult> GetOrdersAsync(
         Guid warehouseId, ClaimsPrincipal principal,
@@ -142,7 +148,10 @@ internal static class MobileReceivingOrderEndpoints
                 OperationError.NotFound("Приходный ордер не найден."));
         var linked = await sources.GetByRefKeysAsync(order.SourceRefKeys, ct);
         return TypedResults.Ok<IReadOnlyList<MobileReceivingLinkedSourceResponse>>(
-            linked.Select(x => new MobileReceivingLinkedSourceResponse(x.RefKey, x.Number)).ToArray());
+            linked.Select(x => new MobileReceivingLinkedSourceResponse(
+                x.RefKey, x.Number, x.Date, x.Sender, x.SenderType,
+                x.WarehouseOperation, x.BusinessOperation,
+                x.BasisDocument, x.BasisDocumentType)).ToArray());
     }
 
     private static async Task<IResult> AttachSourceAsync(
@@ -272,7 +281,7 @@ internal static class MobileReceivingOrderEndpoints
         sku.IsInOrder, sku.CurrentPlanQuantity, sku.FactQuantity);
 
     private static MobileReceivingWorkOrderResponse MapOrder(ReceivingWorkOrderView order) => new(
-        order.Id, order.Number, order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
+        order.Id, order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
         order.ActiveCycleNumber, order.ReceivingLocationId,
         order.IsParticipant, order.Revision, order.SourceRefKeys,
         order.Items.Select(x => new MobileReceivingWorkItemResponse(
