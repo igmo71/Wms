@@ -35,7 +35,10 @@ public sealed record MobileReceivingSourceResponse(
 public sealed record MobileReceivingWorkItemResponse(
     Guid SkuId, string? SkuCode, string? SkuName,
     bool TracksExpirationDate, string? UnitOfMeasure,
-    decimal? PlanQuantity, decimal? FactQuantity);
+    decimal? PlanQuantity, decimal? FactQuantity)
+{
+    public bool IsCurrent { get; init; } = true;
+}
 
 public sealed record MobileReceivingWorkLpnItemResponse(
     Guid Id, Guid SkuId, string? SkuCode, string? SkuName,

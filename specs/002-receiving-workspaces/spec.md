@@ -2,7 +2,7 @@
 
 **Feature Branch**: `codex/002-receiving-workspaces`
 **Created**: 2026-10-19
-**Status**: Ready for planning
+**Status**: Completed and accepted
 **Input**: Обсуждение ручной проверки эпика 001: понятный номер и время ордера WMS, отдельные страницы документов 1С и ордеров WMS, Web для наблюдения и решений менеджера, Mobile для фактической приёмки.
 
 ## User Scenarios & Testing

@@ -26,6 +26,8 @@ public partial class Details
 
     private ReceivingWorkOrderView? _order;
     private IReadOnlyList<ReceivingSourceView> _sources = [];
+    private IReadOnlyList<ReceivingSourceChangeHistoryView> _sourceHistory = [];
+    private IReadOnlyDictionary<Guid, string> _sourceNames = new Dictionary<Guid, string>();
     private IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>
         _deletionHistory = new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
     private string? _userId;
@@ -195,8 +197,15 @@ public partial class Details
                 return;
             }
             _order = await Orders.GetOrderAsync(Id, _userId, CancellationToken.None);
-            _sources = _order is null ? [] : await Sources.GetByRefKeysAsync(
-                _order.SourceRefKeys);
+            _sourceHistory = !_canManage || _order is null ? [] : await Orders.GetSourceChangeHistoryAsync(
+                Id, CancellationToken.None);
+            IReadOnlyList<ReceivingSourceView> sourceViews = _order is null ? [] : await Sources.GetByRefKeysAsync(
+                _order.SourceRefKeys.Concat(_sourceHistory.Select(x => x.SourceRefKey))
+                    .Distinct().ToArray());
+            var activeRefKeys = _order?.SourceRefKeys.ToHashSet() ?? new HashSet<Guid>();
+            _sources = sourceViews.Where(x => activeRefKeys.Contains(x.RefKey)).ToArray();
+            _sourceNames = sourceViews.ToDictionary(x => x.RefKey,
+                x => x.Number ?? x.RefKey.ToString());
             _deletionHistory = _canManage && _order?.Lpns.Any(x =>
                 x.Status == LicensePlateNumberStatus.Deleted) == true
                 ? await Orders.GetDeletionHistoryAsync(Id, CancellationToken.None)

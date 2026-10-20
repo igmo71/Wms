@@ -294,7 +294,8 @@ internal static class MobileReceivingOrderEndpoints
         order.IsParticipant, order.Revision, order.SourceRefKeys,
         order.Items.Select(x => new MobileReceivingWorkItemResponse(
             x.SkuId, x.SkuCode, x.SkuName, x.TracksExpirationDate,
-            x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)).ToArray(),
+            x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)
+        { IsCurrent = x.IsCurrent }).ToArray(),
         order.Lpns.Select(MapLpn).ToArray())
     {
         WarehouseName = order.WarehouseName,

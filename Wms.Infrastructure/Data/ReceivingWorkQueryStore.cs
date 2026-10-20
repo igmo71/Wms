@@ -17,7 +17,8 @@ public sealed class ReceivingWorkQueryStore(
             .Where(x => warehouseId == null || x.WarehouseId == warehouseId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(ct);
-        return orders.Select(x => MapOrder(x, userId)).ToArray();
+        var sourceSkus = await LoadCurrentSourceSkusAsync(db, null, warehouseId, ct);
+        return orders.Select(x => MapOrder(x, userId, sourceSkus)).ToArray();
     }
 
     public async Task<ReceivingWorkOrderView?> GetOrderAsync(
@@ -26,7 +27,10 @@ public sealed class ReceivingWorkQueryStore(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var order = await OrderQuery(db)
             .SingleOrDefaultAsync(x => x.Id == orderId, ct);
-        return order is null ? null : MapOrder(order, userId);
+        if (order is null)
+            return null;
+        var sourceSkus = await LoadCurrentSourceSkusAsync(db, orderId, null, ct);
+        return MapOrder(order, userId, sourceSkus);
     }
 
     public async Task<ReceivingWorkOrderView?> GetOrderBySourceAsync(
@@ -81,6 +85,28 @@ public sealed class ReceivingWorkQueryStore(
                     movement.StockKeepingUnitId, movement.ExpirationDate,
                     movement.Quantity, movement.PostedAtUtc,
                     movement.ConfirmedBy)).ToArray());
+    }
+
+    public async Task<IReadOnlyList<ReceivingSourceChangeHistoryView>>
+        GetSourceChangeHistoryAsync(Guid orderId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var events = await (from audit in db.WarehouseAuditEvents.AsNoTracking()
+            join source in db.ReceivingSourceDocuments.AsNoTracking()
+                on audit.ReceivingSourceDocumentId equals (Guid?)source.Id
+            where audit.ReceivingOrderId == orderId
+                && (audit.EventType == "receiving.order.source-attached"
+                    || audit.EventType == "receiving.order.source-detached")
+            orderby audit.OccurredAtUtc descending, audit.Id descending
+            select new
+            {
+                source.RefKey, audit.EventType, audit.OccurredAtUtc,
+                Actor = db.Users.Where(user => user.Id == audit.ActorUserId)
+                    .Select(user => user.UserName).FirstOrDefault() ?? audit.ActorUserId
+            }).ToArrayAsync(ct);
+        return events.Select(x => new ReceivingSourceChangeHistoryView(
+            x.RefKey, x.EventType == "receiving.order.source-detached",
+            x.OccurredAtUtc, x.Actor ?? "—")).ToArray();
     }
 
     public async Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
@@ -139,10 +165,32 @@ public sealed class ReceivingWorkQueryStore(
                 .ThenInclude(x => x.DestinationStorageLocation)
             .AsSplitQuery();
 
-    private static ReceivingWorkOrderView MapOrder(ReceivingOrder order, string userId)
+    private static async Task<ILookup<Guid, Guid>> LoadCurrentSourceSkusAsync(
+        ApplicationDbContext db, Guid? orderId, Guid? warehouseId, CancellationToken ct)
+    {
+        var rows = await (from link in db.ReceivingOrderSourceLinks.AsNoTracking()
+            join order in db.ReceivingOrders.AsNoTracking()
+                on link.ReceivingOrderId equals order.Id
+            join source in db.ReceivingSourceDocuments.AsNoTracking()
+                on link.ReceivingSourceDocumentId equals source.Id
+            join line in db.ReceivingSourceLineProjections.AsNoTracking()
+                on source.LastSuccessfulVersionId equals (Guid?)line.ReceivingSourceVersionId
+            where link.DetachedAtUtc == null
+                && (orderId == null || link.ReceivingOrderId == orderId)
+                && (warehouseId == null || order.WarehouseId == warehouseId)
+                && line.StockKeepingUnitId != null
+            select new { link.ReceivingOrderId, SkuId = line.StockKeepingUnitId!.Value })
+            .Distinct().ToArrayAsync(ct);
+        return rows.ToLookup(x => x.ReceivingOrderId, x => x.SkuId);
+    }
+
+    private static ReceivingWorkOrderView MapOrder(
+        ReceivingOrder order, string userId, ILookup<Guid, Guid> sourceSkus)
     {
         var activeCycleId = order.Cycles
             .SingleOrDefault(x => x.Number == order.ActiveCycleNumber)?.Id;
+        var currentSkuIds = sourceSkus[order.Id].ToHashSet();
+        currentSkuIds.UnionWith(ReceivingCurrentComposition.PostedSkuIds(order));
         return new ReceivingWorkOrderView(
             order.Id, order.Number, order.CreatedAtUtc,
             order.WarehouseId, order.Status,
@@ -159,7 +207,8 @@ public sealed class ReceivingWorkQueryStore(
                     x.StockKeepingUnit?.TracksExpirationDate == true,
                     x.StockKeepingUnit?.BaseUnitOfMeasure?.Description
                         ?? x.StockKeepingUnit?.BaseUnitOfMeasure?.Abbreviation,
-                    x.CurrentPlanQuantity, x.FactQuantity)).ToArray(),
+                    x.CurrentPlanQuantity, x.FactQuantity)
+                { IsCurrent = currentSkuIds.Contains(x.StockKeepingUnitId) }).ToArray(),
             order.LicensePlateNumbers.Where(x => x.ReceivingCycleId is not null)
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => MapLpn(x, order.WarehouseId)).ToArray(),

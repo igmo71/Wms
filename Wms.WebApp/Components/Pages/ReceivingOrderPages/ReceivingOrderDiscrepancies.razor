@@ -8,13 +8,20 @@
             После последнего завершения появилось новое расхождение. Прежнее решение показано в истории циклов ниже.
         </MudAlert>
     }
+    @if (Order.CurrentItems.Any(x => x.PlanQuantity is decimal plan
+        && x.FactQuantity is decimal fact && fact > plan))
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            Принятый факт превышает текущий план. Проверьте состав источников и приёмные LPN.
+        </MudAlert>
+    }
     @if (Sources.Any(x => x.LastAttemptError is not null))
     {
         <MudAlert Severity="Severity.Warning" Class="mb-3">
             Свежая сверка не всех источников подтверждена. Текущий план основан на последних успешных версиях.
         </MudAlert>
     }
-    <MudTable T="ReceivingWorkItemView" Items="Order.Items" Dense="true" Hover="true" Striped="true" Elevation="0">
+    <MudTable T="ReceivingWorkItemView" Items="Order.CurrentItems" Dense="true" Hover="true" Striped="true" Elevation="0">
         <HeaderContent><MudTh>SKU</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Текущее расхождение</MudTh></HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>

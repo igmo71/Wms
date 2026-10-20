@@ -30,8 +30,12 @@ Successful source checks retain separate source lines and immutable versions.
 The current plan sums known contributions by SKU. An unposted, deleted, or
 different-warehouse source contributes zero. An unresolved quantity or metadata
 makes only the affected known SKU plan unknown; valid plans for other SKUs
-remain visible. Former SKU rows remain with zero when their contribution
-disappears; newly known rows are added. An identical check does not advance
+remain visible. Former SKU rows remain stored with zero when their contribution
+disappears, preserving fact, zero confirmations, and open LPN work. The current
+Web and Mobile plan/fact list shows only SKU from the latest versions of linked
+sources or active closed LPNs; former SKU without either is hidden. A posted
+SKU without a current source line remains visible with known plan zero and its
+fact. Newly known rows are added. An identical check does not advance
 the order revision. A failed check records the error and retains the last
 successful version and plan. Source changes do not rewrite the WMS warehouse,
 fact, LPNs, movements, or lifecycle status.
@@ -41,24 +45,29 @@ unfinished order when its warehouse matches. An Operator may detach one through
 Mobile before the first posted receiving LPN. Web source changes require Manager
 and a matching preview token, including before the first posted LPN. After
 completion, the Web-channel command permits attachment and detachment with the
-same Manager requirement. Detaching the last source retains the order and its known
+same Manager requirement. Detaching the last source retains the order and its stored
 SKU rows with zero plan. Web Managers can check all linked sources again,
 including on a completed order; the view distinguishes an empty source list,
 last successful checks, and latest attempt errors. Source changes and manual
 checks retain command audit.
-The Manager-only source-composition preview checks the target and projects only
-changed SKU plans without changing the order, fact, or movements. For attachment
+The Manager-only source-composition preview checks the target and shows changed
+SKU plans before and after, posted fact, and projected excess without changing
+the order, fact, or movements. For attachment
 it first refreshes the free 1C source. The returned state token covers the order
 revision, active links, source versions, and target link.
-Stale Web preview state is rejected before its changes are saved. Command receipt replay
-still returns the original result. Mobile source changes retain their existing
+Stale Web preview state, including a changed fact, is rejected before its changes
+are saved. The Web order shows current discrepancies separately from preserved
+cycle snapshots and exposes manual source attachment/detachment audit with the
+document, actor, and time. Command receipt replay still returns the original
+result. Mobile source changes retain their existing
 request and receipt behavior.
 
-Mobile SKU search offers the order composition and synchronized catalog by name,
+Mobile SKU search offers stored order SKU and the synchronized catalog by name,
 code, or barcode. A scanned barcode resolves against the entire catalog even
 when manual search is scoped to the order. Adding a catalog SKU creates one
-order row with known plan zero and unchecked fact; repetition does not duplicate
-it. Later source checks can update that row's plan.
+stored order row with known plan zero and unchecked fact; it enters the current
+plan/fact list when it appears in a linked source or a receiving LPN is posted.
+Repetition does not duplicate it. Later source checks can update that row's plan.
 
 ## Cycle and receiving work
 
@@ -98,7 +107,7 @@ dates survive a later flag change and do not merge stock groups.
 
 A current-cycle participant or Manager can complete an order when no receiving
 LPN is open. Completion tries to check every linked source, then stores an
-immutable snapshot of that cycle's plan, fact, source versions, and check
+immutable snapshot of that cycle's stored plan/fact rows, source versions, and check
 failure. Discrepancy or unchecked fact does not require Manager approval.
 Completion posts no stock and does not write to 1C. A Web Manager may reopen a
 completed order as a new cycle with a new location and participant set. Earlier

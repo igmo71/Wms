@@ -141,5 +141,5 @@ public partial class ReceivingSourceCompositionDialog
     private void Cancel() => MudDialog.Cancel();
 
     private static string PlanText(bool present, decimal? quantity) =>
-        !present ? "Нет строки" : quantity?.ToString("0.###") ?? "Неизвестно";
+        !present ? "0 (нет в текущем списке)" : quantity?.ToString("0.###") ?? "Неизвестно";
 }

@@ -4,7 +4,10 @@ namespace Wms.Application.Receiving;
 
 public sealed record ReceivingWorkItemView(
     Guid SkuId, string? SkuCode, string? SkuName, bool TracksExpirationDate,
-    string? UnitOfMeasure, decimal? PlanQuantity, decimal? FactQuantity);
+    string? UnitOfMeasure, decimal? PlanQuantity, decimal? FactQuantity)
+{
+    public bool IsCurrent { get; init; }
+}
 
 public sealed record ReceivingWorkLpnItemView(
     Guid Id, Guid SkuId, string? SkuCode, string? SkuName,
@@ -31,6 +34,10 @@ public sealed record ReceivingLpnReversalHistoryView(
     Guid SkuId, DateOnly? ExpirationDate, decimal Quantity,
     DateTimeOffset? PostedAtUtc, string? ConfirmedBy);
 
+public sealed record ReceivingSourceChangeHistoryView(
+    Guid SourceRefKey, bool Detached, DateTimeOffset OccurredAtUtc,
+    string Actor);
+
 public sealed record ReceivingWorkCycleItemView(
     Guid SkuId, decimal? PlanQuantity, decimal? FactQuantity);
 
@@ -56,8 +63,10 @@ public sealed record ReceivingWorkOrderView(
 {
     public string? WarehouseName { get; init; }
     public string? ReceivingLocationAddress { get; init; }
+    public IReadOnlyList<ReceivingWorkItemView> CurrentItems =>
+        Items.Where(x => x.IsCurrent).ToArray();
 
-    public int CurrentDiscrepancyCount => Items.Count(x =>
+    public int CurrentDiscrepancyCount => CurrentItems.Count(x =>
         x.PlanQuantity is null || x.FactQuantity is null
         || x.PlanQuantity != x.FactQuantity);
 
@@ -72,7 +81,7 @@ public sealed record ReceivingWorkOrderView(
             if (last is null)
                 return false;
             var old = last.Items.ToDictionary(x => x.SkuId);
-            return Items.Any(item =>
+            return CurrentItems.Any(item =>
                 (item.PlanQuantity is null || item.FactQuantity is null
                     || item.PlanQuantity != item.FactQuantity)
                 && (!old.TryGetValue(item.SkuId, out var snapshot)
@@ -98,6 +107,8 @@ public interface IReceivingWorkQueryStore
         Guid? lpnId, string? code, CancellationToken ct);
     Task<IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>>
         GetDeletionHistoryAsync(Guid orderId, CancellationToken ct);
+    Task<IReadOnlyList<ReceivingSourceChangeHistoryView>>
+        GetSourceChangeHistoryAsync(Guid orderId, CancellationToken ct);
     Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
         GetPutawayRecommendationsAsync(
             Guid warehouseId, Guid skuId, CancellationToken ct);

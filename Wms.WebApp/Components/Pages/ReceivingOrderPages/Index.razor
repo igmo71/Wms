@@ -40,7 +40,7 @@
                     <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudTd>
                     <MudTd DataLabel="Статус">@context.Status.GetDisplayName()</MudTd>
                     <MudTd DataLabel="Источников">@context.SourceRefKeys.Count</MudTd>
-                    <MudTd DataLabel="Строк">@context.Items.Count</MudTd>
+                    <MudTd DataLabel="Строк">@context.CurrentItems.Count</MudTd>
                     <MudTd DataLabel="Расхождения и непроверенные SKU">@context.CurrentDiscrepancyCount
                         @if (context.HasNewDiscrepancyAfterCompletion)
                         {

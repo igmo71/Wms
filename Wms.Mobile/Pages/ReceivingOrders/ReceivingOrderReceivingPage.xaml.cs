@@ -110,7 +110,7 @@ public partial class ReceivingOrderReceivingPage : ContentPage
         SourceScanButton.Text = _sourceScanMode ? "Отменить добавление источника"
             : "Добавить источник сканированием";
         UpdateScanHint();
-        ItemRows = order.Items.Select((item, index) =>
+        ItemRows = order.Items.Where(item => item.IsCurrent).Select((item, index) =>
         {
             var exact = item.PlanQuantity is decimal plan
                 && item.FactQuantity is decimal fact && plan == fact;

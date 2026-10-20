@@ -75,6 +75,27 @@
     }
 </MudPaper>
 
+@if (CanManage && SourceHistory.Count > 0)
+{
+    <MudPaper Class="pa-4 mt-3">
+        <MudButton Variant="Variant.Text" OnClick="() => _showSourceHistory = !_showSourceHistory">
+            @(_showSourceHistory ? "Скрыть историю связей" : "История связей с документами 1С")
+        </MudButton>
+        @if (_showSourceHistory)
+        {
+            <MudTable T="ReceivingSourceChangeHistoryView" Items="SourceHistory" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent><MudTh>Время</MudTh><MudTh>Действие</MudTh><MudTh>Документ 1С</MudTh><MudTh>Исполнитель</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Время">@context.OccurredAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Действие">@(context.Detached ? "Откреплён" : "Прикреплён")</MudTd>
+                    <MudTd DataLabel="Документ 1С">@(SourceNames.GetValueOrDefault(context.SourceRefKey) ?? context.SourceRefKey.ToString())</MudTd>
+                    <MudTd DataLabel="Исполнитель">@context.Actor</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
 <ReceivingOrderDiscrepancies Order="Order" Sources="Sources" />
 
 <MudPaper Class="pa-4">
@@ -117,6 +138,8 @@
 @code {
     [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
+    [Parameter] public IReadOnlyList<ReceivingSourceChangeHistoryView> SourceHistory { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<Guid, string> SourceNames { get; set; } = new Dictionary<Guid, string>();
     [Parameter] public bool CanManage { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public ReceivingOrderRefreshResult? RefreshResult { get; set; }
@@ -124,6 +147,7 @@
     [Parameter] public EventCallback OnChangeComposition { get; set; }
 
     private bool _showSourceDetails;
+    private bool _showSourceHistory;
 
     private string SkuName(Guid skuId) =>
         Order.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();

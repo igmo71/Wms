@@ -13,7 +13,8 @@ public sealed record PreviewReceivingOrderSourceChangeRequest(
 
 public sealed record ReceivingSourceCompositionPlanChange(
     Guid SkuId, string? SkuName, bool BeforePresent, decimal? BeforePlan,
-    bool AfterPresent, decimal? AfterPlan);
+    bool AfterPresent, decimal? AfterPlan, decimal? FactQuantity,
+    decimal? ProjectedExcess);
 
 public sealed record ReceivingSourceCompositionPreview(
     Guid OrderId, string OrderNumber, ReceivingSourceChangeKind Kind,
@@ -107,19 +108,29 @@ public sealed class PreviewReceivingOrderSourceChange(
         }
 
         var projected = ReceivingOrderPlanProjection.Sum(order.WarehouseId, contributions);
-        var before = order.Items.ToDictionary(item => item.StockKeepingUnitId,
-            item => item.CurrentPlanQuantity);
-        var changed = before.Keys.Concat(projected.Keys).Distinct()
+        var items = order.Items.ToDictionary(item => item.StockKeepingUnitId);
+        var postedSkuIds = ReceivingCurrentComposition.PostedSkuIds(order);
+        var beforeSkuIds = ReceivingCurrentComposition.SourceSkuIds(state.ActiveSources);
+        beforeSkuIds.UnionWith(postedSkuIds);
+        var afterSkuIds = ReceivingCurrentComposition.SourceSkuIds(included);
+        afterSkuIds.UnionWith(postedSkuIds);
+        var changed = beforeSkuIds.Concat(afterSkuIds).Distinct()
             .OrderBy(skuId => skuId)
             .Select(skuId =>
             {
-                var beforePresent = before.TryGetValue(skuId, out var beforePlan);
-                var afterPresent = beforePresent || projected.ContainsKey(skuId);
+                var beforePresent = beforeSkuIds.Contains(skuId);
+                var beforePlan = items.TryGetValue(skuId, out var item)
+                    ? item.CurrentPlanQuantity : 0m;
+                var afterPresent = afterSkuIds.Contains(skuId);
                 var afterPlan = projected.TryGetValue(skuId, out var value) ? value : 0m;
+                var fact = item?.FactQuantity;
                 return new
                 {
                     SkuId = skuId, BeforePresent = beforePresent, BeforePlan = beforePlan,
-                    AfterPresent = afterPresent, AfterPlan = (decimal?)afterPlan
+                    AfterPresent = afterPresent, AfterPlan = (decimal?)afterPlan,
+                    Fact = fact,
+                    ProjectedExcess = fact is decimal quantity && afterPlan is decimal plan
+                        && quantity > plan ? quantity - plan : (decimal?)null
                 };
             })
             .Where(change => change.BeforePresent != change.AfterPresent
@@ -132,7 +143,8 @@ public sealed class PreviewReceivingOrderSourceChange(
             changed.Select(change => change.SkuId).ToArray(), [], ct);
         var changes = changed.Select(change => new ReceivingSourceCompositionPlanChange(
             change.SkuId, referenceNames.Skus.GetValueOrDefault(change.SkuId),
-            change.BeforePresent, change.BeforePlan, change.AfterPresent, change.AfterPlan))
+            change.BeforePresent, change.BeforePlan, change.AfterPresent, change.AfterPlan,
+            change.Fact, change.ProjectedExcess))
             .ToArray();
 
         return new ReceivingSourceCompositionPreview(order.Id, order.Number, request.Kind,
@@ -177,7 +189,10 @@ internal static class ReceivingSourceCompositionToken
                     source.Source.LastSuccessfulCheckAtUtc
                 }).ToArray(),
             CurrentPlan = order.Items.OrderBy(item => item.StockKeepingUnitId)
-                .Select(item => new { item.StockKeepingUnitId, item.CurrentPlanQuantity })
+                .Select(item => new
+                {
+                    item.StockKeepingUnitId, item.CurrentPlanQuantity, item.FactQuantity
+                })
                 .ToArray()
         });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));

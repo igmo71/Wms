@@ -86,13 +86,19 @@
                 else
                 {
                     <MudTable T="ReceivingSourceCompositionPlanChange" Items="_preview.PlanChanges" Dense="true" Hover="true" Elevation="0">
-                        <HeaderContent><MudTh>SKU</MudTh><MudTh>До</MudTh><MudTh>После</MudTh></HeaderContent>
+                        <HeaderContent><MudTh>SKU</MudTh><MudTh>План до</MudTh><MudTh>План после</MudTh><MudTh>Принято</MudTh><MudTh>Превышение после</MudTh></HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
-                            <MudTd DataLabel="До">@PlanText(context.BeforePresent, context.BeforePlan)</MudTd>
-                            <MudTd DataLabel="После">@PlanText(context.AfterPresent, context.AfterPlan)</MudTd>
+                            <MudTd DataLabel="План до">@PlanText(context.BeforePresent, context.BeforePlan)</MudTd>
+                            <MudTd DataLabel="План после">@PlanText(context.AfterPresent, context.AfterPlan)</MudTd>
+                            <MudTd DataLabel="Принято">@(context.FactQuantity?.ToString("0.###") ?? "Не проверено")</MudTd>
+                            <MudTd DataLabel="Превышение после">@(context.ProjectedExcess?.ToString("0.###") ?? "—")</MudTd>
                         </RowTemplate>
                     </MudTable>
+                }
+                @if (_preview.PlanChanges.Any(x => x.ProjectedExcess > 0))
+                {
+                    <MudAlert Severity="Severity.Warning">После изменения источников принятый факт превысит новый план. Проверьте расхождение в ордере.</MudAlert>
                 }
                 @if (_preview.HasUnknownSku)
                 {

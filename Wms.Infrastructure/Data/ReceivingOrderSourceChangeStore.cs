@@ -24,6 +24,8 @@ public sealed class ReceivingOrderSourceChangeStore(
         ApplicationDbContext db, Guid orderId, Guid sourceRefKey, CancellationToken ct)
     {
         var order = await db.ReceivingOrders.Include(x => x.Items)
+            .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Items)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(x => x.Id == orderId, ct);
         if (order is null)
             return new(null, null, null, null, [], false);
