@@ -1,0 +1,11 @@
+.receiving-sources-page ::deep .source-list tbody tr {
+    cursor: pointer;
+}
+
+.receiving-sources-page ::deep tr.source-row-active > td {
+    background-color: rgba(128, 128, 128, 0.24) !important;
+}
+
+.receiving-sources-page ::deep tr.source-row-selected > td {
+    background-color: rgba(128, 128, 128, 0.12) !important;
+}

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using MudBlazor;
 using Wms.Application.Receiving;
 using Wms.Common;
 using Wms.Data;
@@ -17,6 +18,7 @@ public partial class Sources
 
     private IReadOnlyList<ReceivingSourceView> _sources = [];
     private readonly HashSet<Guid> _selected = [];
+    private Guid? _activeSourceRefKey;
     private (Guid RequestId, Guid[] SourceRefKeys)? _pendingCreate;
     private string? _sourceFilter;
     private string? _error;
@@ -32,17 +34,22 @@ public partial class Sources
     private IEnumerable<ReceivingSourceView> SelectedSources =>
         _sources.Where(x => x.LinkedOrderId is null && _selected.Contains(x.RefKey));
 
+    private ReceivingSourceView? ActiveSource => _activeSourceRefKey is Guid refKey
+        ? _sources.FirstOrDefault(x => x.RefKey == refKey) : null;
+
     private bool CanCreate => _canManage && (_pendingCreate is not null ||
         (_selected.Count > 0 && SelectedSources.Count() == _selected.Count
             && SelectedSources.All(x => x.WarehouseId is not null && x.VersionId is not null)
             && SelectedSources.Select(x => x.WarehouseId).Distinct().Count() == 1));
 
-    private IReadOnlyList<(Guid SkuId, decimal? Quantity)> SelectedPlan
+    private sealed record SourcePlanRow(Guid SkuId, decimal? Quantity);
+
+    private IReadOnlyList<SourcePlanRow> SelectedPlan
     {
         get
         {
             var sources = SelectedSources.ToArray();
-            var skuIds = sources.SelectMany(x => x.PlanBySku.Keys).Distinct().Order().ToArray();
+            var skuIds = sources.SelectMany(x => x.PlanBySku.Keys).Distinct().ToArray();
             return skuIds.Select(skuId =>
             {
                 decimal? total = 0;
@@ -58,14 +65,37 @@ public partial class Sources
                     try { total = checked(total.Value + part.Value); }
                     catch (OverflowException) { total = null; }
                 }
-                return (skuId, total);
-            }).ToArray();
+                return new SourcePlanRow(skuId, total);
+            }).OrderBy(x => SkuName(x.SkuId), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.SkuId).ToArray();
         }
     }
 
     private string SkuName(Guid skuId) =>
         SelectedSources.SelectMany(x => x.SkuNames)
             .FirstOrDefault(x => x.Key == skuId).Value ?? skuId.ToString();
+
+    private static string SourceSkuName(ReceivingSourceView source, ReceivingSourceLineView line) =>
+        line.StockKeepingUnitId is Guid skuId
+            ? source.SkuNames.GetValueOrDefault(skuId) ?? skuId.ToString()
+            : line.SourceSkuRefKey?.ToString() ?? "Не определена";
+
+    private static IReadOnlyList<ReceivingSourceLineView> SortedSourceLines(ReceivingSourceView source) =>
+        source.Lines.OrderBy(line => SourceSkuName(source, line), StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(line => line.LineNumber).ToArray();
+
+    private string SourceRowClass(ReceivingSourceView source, int _) =>
+        _selected.Contains(source.RefKey) ? "source-row-selected"
+            : _activeSourceRefKey == source.RefKey ? "source-row-active" : "";
+
+    private void OnSourceRowClick(TableRowClickEventArgs<ReceivingSourceView> args)
+    {
+        if (args.Item is null)
+            return;
+        _activeSourceRefKey = args.Item.RefKey;
+        _selected.Clear();
+        _pendingCreate = null;
+    }
 
     private static string SourceDate(string? value) =>
         DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
@@ -91,6 +121,8 @@ public partial class Sources
             _sources = await ReceivingSources.ListAllAsync();
             _selected.IntersectWith(_sources.Where(x => x.LinkedOrderId is null)
                 .Select(x => x.RefKey));
+            if (_activeSourceRefKey is Guid refKey && _sources.All(x => x.RefKey != refKey))
+                _activeSourceRefKey = null;
         }
         catch (Exception exception)
         {
@@ -104,6 +136,7 @@ public partial class Sources
         if (!_canManage || !_sources.Any(x => x.RefKey == refKey && x.LinkedOrderId is null))
             return;
         _pendingCreate = null;
+        _activeSourceRefKey = null;
         if (selected)
             _selected.Add(refKey);
         else

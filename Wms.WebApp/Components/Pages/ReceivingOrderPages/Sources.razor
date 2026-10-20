@@ -4,6 +4,7 @@
 
 <PageTitle>Документы 1С для приёмки</PageTitle>
 
+<div class="receiving-sources-page">
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center">
         <MudText Typo="Typo.h5">Документы 1С для приёмки</MudText>
@@ -16,6 +17,8 @@
         <MudAlert Severity="Severity.Error">@_error</MudAlert>
     }
 
+    <MudGrid>
+    <MudItem xs="12" lg="7">
     <MudPaper Class="pa-4">
         <MudTextField T="string" @bind-Value="_sourceFilter" Immediate="true"
                       Label="Поиск по номеру документа 1С" Class="mb-3" />
@@ -30,30 +33,24 @@
         else
         {
             <MudTable T="ReceivingSourceView" Items="FilteredSources" Dense="true" Hover="true"
-                      Striped="true" Elevation="0" RowsPerPage="15">
+                      Class="source-list" Elevation="0" RowsPerPage="15" OnRowClick="OnSourceRowClick"
+                      RowClassFunc="SourceRowClass">
                 <HeaderContent>
-                    @if (_canManage) { <MudTh></MudTh> }
                     <MudTh>Документ 1С</MudTh>
-                    <MudTh>Дата</MudTh>
-                    <MudTh>Склад</MudTh>
-                    <MudTh>Отправитель</MudTh>
+                    <MudTh>Отправитель / склад</MudTh>
                     <MudTh>Сверка</MudTh>
                     <MudTh>Состояние</MudTh>
                     <MudTh>Ордер WMS</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    @if (_canManage)
-                    {
-                        <MudTd>
-                            <MudCheckBox T="bool" Value="@_selected.Contains(context.RefKey)"
-                                         ValueChanged="@(value => ToggleSource(context.RefKey, value))"
-                                         Disabled="@(context.LinkedOrderId is not null)" />
-                        </MudTd>
-                    }
-                    <MudTd DataLabel="Документ 1С">@(context.Number ?? context.RefKey.ToString())</MudTd>
-                    <MudTd DataLabel="Дата">@SourceDate(context.Date)</MudTd>
-                    <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
-                    <MudTd DataLabel="Отправитель">@(context.SenderName ?? context.Sender ?? "—")</MudTd>
+                    <MudTd DataLabel="Документ 1С">
+                        <MudText>@(context.Number ?? context.RefKey.ToString())</MudText>
+                        <MudText Typo="Typo.caption">@SourceDate(context.Date)</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Отправитель / склад">
+                        <MudText>@(context.SenderName ?? context.Sender ?? "—")</MudText>
+                        <MudText Typo="Typo.caption">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudText>
+                    </MudTd>
                     <MudTd DataLabel="Сверка">
                         @if (context.LastAttemptError is not null)
                         {
@@ -69,7 +66,16 @@
                     <MudTd DataLabel="Ордер WMS">
                         @if (context.LinkedOrderId is Guid orderId)
                         {
-                            <MudLink Href="@($"receiving-orders/{orderId}")">@(context.LinkedOrderNumber ?? "Открыть ордер")</MudLink>
+                            <span @onclick:stopPropagation="true">
+                                <MudLink Href="@($"receiving-orders/{orderId}")">@(context.LinkedOrderNumber ?? "Открыть ордер")</MudLink>
+                            </span>
+                        }
+                        else if (_canManage)
+                        {
+                            <div @onclick:stopPropagation="true">
+                                <MudCheckBox T="bool" Value="@_selected.Contains(context.RefKey)"
+                                             ValueChanged="@(value => ToggleSource(context.RefKey, value))" />
+                            </div>
                         }
                         else
                         {
@@ -81,22 +87,23 @@
             </MudTable>
         }
     </MudPaper>
+    </MudItem>
 
-    @if (_canManage)
-    {
+    <MudItem xs="12" lg="5">
         <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6">Создать ордер WMS</MudText>
-            <MudText Typo="Typo.body2" Class="mb-3">
-                Выберите свободные документы одного склада. План суммируется по SKU;
-                неизвестное количество остаётся неизвестным.
-            </MudText>
             @if (_selected.Count > 0)
             {
-                <MudText Typo="Typo.subtitle2">Суммарный план выбранных документов</MudText>
-                @foreach (var plan in SelectedPlan)
-                {
-                    <MudText>@SkuName(plan.SkuId): @(plan.Quantity?.ToString("0.###") ?? "неизвестно")</MudText>
-                }
+                <MudTable T="SourcePlanRow" Items="SelectedPlan" Dense="true" Elevation="0" RowsPerPage="15">
+                    <HeaderContent>
+                        <MudTh>Номенклатура</MudTh>
+                        <MudTh>План</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Номенклатура">@SkuName(context.SkuId)</MudTd>
+                        <MudTd DataLabel="План">@(context.Quantity?.ToString("0.###") ?? "Неизвестно")</MudTd>
+                    </RowTemplate>
+                    <PagerContent><MudTablePager /></PagerContent>
+                </MudTable>
                 @if (SelectedSources.Any(x => x.HasUnknownSku))
                 {
                     <MudAlert Severity="Severity.Warning" Class="mt-2">
@@ -109,11 +116,59 @@
                         Выбранные документы относятся к разным складам.
                     </MudAlert>
                 }
+                @if (_canManage)
+                {
+                    <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled"
+                               Disabled="@(_busy || !CanCreate)" OnClick="CreateAsync">
+                        Создать ордер WMS
+                    </MudButton>
+                }
             }
-            <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled"
-                       Disabled="@(_busy || !CanCreate)" OnClick="CreateAsync">
-                Создать ордер WMS
-            </MudButton>
+            else if (ActiveSource is { } source)
+            {
+                @if (source.VersionId is null)
+                {
+                    <MudText>Документ ещё не сверен с 1С.</MudText>
+                }
+                else if (source.Lines.Count == 0)
+                {
+                    <MudText>В последней сохранённой версии нет строк номенклатуры.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingSourceLineView" Items="SortedSourceLines(source)" Dense="true" Elevation="0" RowsPerPage="15">
+                        <HeaderContent>
+                            <MudTh>№</MudTh>
+                            <MudTh>Номенклатура</MudTh>
+                            <MudTh>Количество 1С</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="№">@context.LineNumber</MudTd>
+                            <MudTd DataLabel="Номенклатура">
+                                <MudText>@SourceSkuName(source, context)</MudText>
+                                @if (context.Error is not null)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Error">@context.Error</MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Количество 1С">
+                                @(context.Quantity?.ToString("0.###") ?? "Неизвестно")
+                                @if (context.Quantity is null && context.RawQuantity is not null)
+                                {
+                                    <MudText Typo="Typo.caption">Исходное: @context.RawQuantity</MudText>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <PagerContent><MudTablePager /></PagerContent>
+                    </MudTable>
+                }
+            }
+            else
+            {
+                <MudText>Нажмите на документ, чтобы увидеть его состав, или выберите свободные документы галками.</MudText>
+            }
         </MudPaper>
-    }
+    </MudItem>
+    </MudGrid>
 </MudStack>
+</div>

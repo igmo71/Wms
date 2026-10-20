@@ -45,6 +45,14 @@ The Web menu group «Приёмка» opens separate 1C documents and WMS orders
 `/receiving-orders` lists only WMS orders by their own numbers and actual
 creation times. `/receiving-sources` lists both free and linked 1C documents
 with their WMS order link; only a Manager can create an order from that page.
+The source list and its SKU table sit side by side on wide screens. Clicking any
+source row shows the lines of its latest saved 1C version, even when linked to
+an order, and clears checked sources. Checking free sources instead shows their
+combined SKU plan and the Manager's create action. The active row has a darker
+gray tint; checked rows use a lighter gray tint. On narrow screens the tables
+stack vertically. The WMS order column contains a link for linked sources and
+a selection checkbox for free sources when the user is a Manager. Both SKU
+tables sort by displayed nomenclature name.
 The Web order card uses the WMS number as its heading and shows the actual
 creation time separately; its route continues to use the internal ID.
 Receiving lists and cards show synchronized warehouse and SKU names, local
