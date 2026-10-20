@@ -3,10 +3,11 @@
 Before starting a task, read [the project constitution](.specify/memory/constitution.md),
 the [current-system overview](.specify/memory/current/overview.md), and the
 relevant subcontext in `.specify/memory/current/`.
-For work on a feature, read its `spec.md`; `.specify/feature.json` points to the
-current Spec Kit feature. A completed feature is historical, even if that pointer
-still names it. Read other specifications only when the user names them or the
-current feature directly requires their decision history. The top-level
+For work on a feature with a specification, read its `spec.md`;
+`.specify/feature.json` points to the current Spec Kit feature. A completed
+feature is historical, even if that pointer still names it. Read other
+specifications only when the user names them or the current feature directly
+requires their decision history. The top-level
 `archive/legacy-specs/` is excluded from normal context gathering.
 
 - Treat current documentation as the guide to implemented behavior and feature
@@ -23,13 +24,17 @@ current feature directly requires their decision history. The top-level
   Current-state files describe implemented rules; the backlog describes remaining
   work. Neither contains implementation logs, test inventories, or repeated
   handoffs; preserve decision history in frozen specs.
-- Create a substantial feature under the Spec Kit `specs/NNN-feature-slug/`
-  structure. Keep `spec.md` about the business outcome, `plan.md` about the
-  implementation approach, and `tasks.md` about bounded implementation work.
-  Clarify material open questions before treating a draft as ready to implement.
-- When a feature is complete, distill lasting rules into `.specify/memory/current/`
-  and retain its feature directory as decision history. Create a new feature
-  specification for a later change instead of rewriting completed history.
+- Scale documentation to the task. A small, bounded issue may proceed from
+  discussion and resolved assumptions to implementation without a formal
+  `plan.md` or `tasks.md`. Use the Spec Kit `specs/NNN-feature-slug/` structure
+  when the business outcome needs a durable specification; add `plan.md` when
+  the technical approach needs explanation, and `tasks.md` when dependent
+  increments need tracking. Clarify material questions before implementation.
+- When a specified feature is complete, distill lasting rules into
+  `.specify/memory/current/` and retain its feature directory as decision
+  history. Give a later substantial change its own issue, specification and
+  branch instead of rewriting completed history. Small follow-ups may be
+  resolved in their issue and reflected in current documentation when built.
 - Treat one implementation increment as one task and leave a concise handoff.
 - Minimize tool calls. Read only required file sections, batch independent reads,
   keep command output bounded, and do not expand verification after sufficient

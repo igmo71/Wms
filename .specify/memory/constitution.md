@@ -53,27 +53,33 @@ in [`AGENTS.md`](../../AGENTS.md).
 engineering principles. `current/` describes implemented behavior by
 subcontext, and `architecture.md` describes current technical structure and
 engineering conventions. `backlog.md` contains deferred work; operational
-runbooks belong in `.specify/runbooks/`. An active `spec.md` describes the
-intended business outcome; `plan.md` explains its implementation; `tasks.md`
+runbooks belong in `.specify/runbooks/`. When used, `spec.md` describes the
+intended business outcome, `plan.md` explains its implementation, and `tasks.md`
 records bounded increments. Keep each detailed rule in one owning document and
 link to it elsewhere. A planned change MUST NOT be presented as implemented.
 Use lowercase file names for project documentation; keep the conventional
 Spec Kit names `constitution.md`, `spec.md`, `plan.md`, and `tasks.md`.
 
-Completed feature directories remain historical records. New requirements get
-a new feature specification; lasting accepted rules move into the relevant
-current-state subcontext as the corresponding implementation becomes real.
+Completed feature directories remain historical records. Later changes that
+need a specification get a new feature directory; small follow-ups can be
+resolved in their issue and discussion. Lasting accepted rules move into the
+relevant current-state subcontext as the implementation becomes real.
 Top-level `archive/legacy-specs/` preserves older material but is not a source
 for current decisions.
 
 ## Delivery Workflow
 
-For a substantial change, write or refine `spec.md`, resolve material questions,
-write `plan.md`, then derive `tasks.md`. Analyze contradictions before coding and
-check the delivered result against the artifacts. Work in reviewable increments
-and keep the specification aligned with accepted discoveries. The developer
-runs operational verification and EF migration commands as stated in
-`AGENTS.md`; the agent reviews their reported results and created migrations.
+Scale the workflow to the size and uncertainty of the change. Resolve material
+questions through discussion; a bounded change may then go straight to
+implementation. Use a new `spec.md` when the business outcome needs a durable
+record, `plan.md` when the approach or sequence needs explanation, and `tasks.md`
+when multiple dependent increments need tracking. A specification alone does
+not require the other artifacts. This keeps small corrections moving while
+preserving decisions that matter. Analyze contradictions before coding and
+check delivered work against any agreed artifacts. Work in reviewable
+increments. The developer runs operational verification and EF migration
+commands as stated in `AGENTS.md`; the agent reviews their reported results
+and created migrations.
 
 ## Governance
 
@@ -84,4 +90,4 @@ change. Increment MAJOR for incompatible governance changes, MINOR for new or
 materially expanded rules, and PATCH for clarification. User instructions take
 precedence over this document.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-15
+**Version**: 1.2.0 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-20
