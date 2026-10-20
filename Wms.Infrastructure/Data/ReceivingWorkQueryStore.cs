@@ -49,7 +49,8 @@ public sealed class ReceivingWorkQueryStore(
             .Include(x => x.ReceivingOrder)
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit)
                 .ThenInclude(x => x!.BaseUnitOfMeasure)
-            .Include(x => x.Putaways).AsSplitQuery();
+            .Include(x => x.Putaways).ThenInclude(x => x.DestinationStorageLocation)
+            .AsSplitQuery();
         var lpn = lpnId is Guid id
             ? await query.SingleOrDefaultAsync(x => x.Id == id, ct)
             : await query.SingleOrDefaultAsync(x => x.Code == code, ct);
@@ -122,6 +123,9 @@ public sealed class ReceivingWorkQueryStore(
 
     private static IQueryable<ReceivingOrder> OrderQuery(ApplicationDbContext db) =>
         db.ReceivingOrders.AsNoTracking()
+            .Include(x => x.Warehouse)
+            .Include(x => x.ReceivingLocation)
+            .Include(x => x.Cycles).ThenInclude(x => x.ReceivingLocation)
             .Include(x => x.Items).ThenInclude(x => x.StockKeepingUnit)
                 .ThenInclude(x => x!.BaseUnitOfMeasure)
             .Include(x => x.Participants)
@@ -132,6 +136,7 @@ public sealed class ReceivingWorkQueryStore(
                 .ThenInclude(x => x.StockKeepingUnit)
                     .ThenInclude(x => x.BaseUnitOfMeasure)
             .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Putaways)
+                .ThenInclude(x => x.DestinationStorageLocation)
             .AsSplitQuery();
 
     private static ReceivingWorkOrderView MapOrder(ReceivingOrder order, string userId)
@@ -139,7 +144,8 @@ public sealed class ReceivingWorkQueryStore(
         var activeCycleId = order.Cycles
             .SingleOrDefault(x => x.Number == order.ActiveCycleNumber)?.Id;
         return new ReceivingWorkOrderView(
-            order.Id, order.WarehouseId, order.Status,
+            order.Id, order.Number, order.CreatedAtUtc,
+            order.WarehouseId, order.Status,
             order.ActiveCycleNumber, order.ReceivingLocationId,
             activeCycleId is Guid cycleId && order.Participants.Any(x =>
                 x.ReceivingCycleId == cycleId && x.UserId == userId),
@@ -158,7 +164,11 @@ public sealed class ReceivingWorkQueryStore(
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => MapLpn(x, order.WarehouseId)).ToArray(),
             order.Cycles.OrderByDescending(x => x.Number)
-                .Select(MapCycle).ToArray());
+                .Select(MapCycle).ToArray())
+        {
+            WarehouseName = order.Warehouse?.Name,
+            ReceivingLocationAddress = order.ReceivingLocation?.DisplayAddress
+        };
     }
 
     private sealed record SnapshotQuantity(Guid SkuId, decimal? Quantity);
@@ -175,7 +185,10 @@ public sealed class ReceivingWorkQueryStore(
             cycle.SourceCheckFailed, items,
             cycle.SourceVersions.Select(x => new ReceivingWorkCycleSourceView(
                 x.ReceivingSourceDocument?.RefKey ?? Guid.Empty,
-                x.ReceivingSourceVersionId)).ToArray());
+                x.ReceivingSourceVersionId)).ToArray())
+        {
+            ReceivingLocationAddress = cycle.ReceivingLocation?.DisplayAddress
+        };
     }
 
     private static IReadOnlyDictionary<Guid, decimal?> ReadSnapshot(string? json) =>
@@ -203,6 +216,9 @@ public sealed class ReceivingWorkQueryStore(
             lpn.Putaways.OrderByDescending(x => x.CreatedAtUtc).Select(x =>
                 new ReceivingWorkPutawayView(x.Id, x.LicensePlateNumberItemId,
                     x.DestinationStorageLocationId, x.Quantity,
-                    x.CreatedAtUtc, x.InventoryMovementId)).ToArray());
+                    x.CreatedAtUtc, x.InventoryMovementId)
+                {
+                    DestinationAddress = x.DestinationStorageLocation?.DisplayAddress
+                }).ToArray());
     }
 }

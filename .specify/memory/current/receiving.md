@@ -1,11 +1,16 @@
 # Current receiving and LPN
 
-This page records active receiving and putaway behavior. The business decisions
-are in [the feature specification](../../../specs/001-receiving-stock-lifecycle/spec.md).
+This page records active receiving and putaway behavior. The base lifecycle
+decisions are in [epic 001](../../../specs/001-receiving-stock-lifecycle/spec.md);
+WMS numbering and source-composition decisions are in
+[feature 002](../../../specs/002-receiving-workspaces/spec.md).
 
 ## Sources and WMS orders
 
-One WMS receiving order has its own ID and fixed warehouse. It may combine
+One WMS receiving order has its own ID, immutable human-readable `yyMMdd-HHmmss`
+number, and fixed warehouse. The number starts from the local second of creation;
+if occupied, creation takes the next free second under a transaction lock. The
+actual `CreatedAtUtc` remains unchanged by a number collision. It may combine
 several distinct 1C documents identified by `Ref_Key`. Web can create the order
 from free sources; Mobile can select free documents or scan one into an
 unfinished order. A linked document opens its WMS order. Active source links
@@ -13,6 +18,8 @@ retain history. Repeating the same complete selection returns the existing
 order. Creation records the acting user, source versions, and command receipt
 with an audit event in the same transaction. Repeating the same request ID
 returns its original order without another creation event.
+The number migration assumes an empty `ReceivingOrders` table. It adds a
+required number column and unique index without historical backfill.
 Receiving notifications update only the 1C source mirror and the current plan
 of an already linked WMS order; they never create a WMS order.
 The latest successful version supplies each source's own number, date, sender,
@@ -29,17 +36,25 @@ the order revision. A failed check records the error and retains the last
 successful version and plan. Source changes do not rewrite the WMS warehouse,
 fact, LPNs, movements, or lifecycle status.
 
-An Operator or Manager may attach a freshly checked source to an unfinished
-order when its warehouse matches. An Operator may detach one before the first
-posted receiving LPN. After completion, attachment also requires a Manager
-through Web. Later detachment, including after completion, has the same Web
-Manager requirement. Detaching the last source retains the order and its known
+An Operator or Manager may attach a freshly checked source through Mobile to an
+unfinished order when its warehouse matches. An Operator may detach one through
+Mobile before the first posted receiving LPN. Web source changes require Manager
+and a matching preview token, including before the first posted LPN. After
+completion, the Web-channel command permits attachment and detachment with the
+same Manager requirement. Detaching the last source retains the order and its known
 SKU rows with zero plan. Web Managers can check all linked sources again,
 including on a completed order; the view distinguishes an empty source list,
 last successful checks, and latest attempt errors. Source changes and manual
 checks retain command audit.
+The Manager-only source-composition preview checks the target and projects only
+changed SKU plans without changing the order, fact, or movements. For attachment
+it first refreshes the free 1C source. The returned state token covers the order
+revision, active links, source versions, and target link.
+Stale Web preview state is rejected before its changes are saved. Command receipt replay
+still returns the original result. Mobile source changes retain their existing
+request and receipt behavior.
 
-The SKU search offers the order composition and synchronized catalog by name,
+Mobile SKU search offers the order composition and synchronized catalog by name,
 code, or barcode. A scanned barcode resolves against the entire catalog even
 when manual search is scoped to the order. Adding a catalog SKU creates one
 order row with known plan zero and unchecked fact; repetition does not duplicate

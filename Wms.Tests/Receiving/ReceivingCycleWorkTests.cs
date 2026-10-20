@@ -22,6 +22,7 @@ public sealed class ReceivingCycleWorkTests(SqlDatabase database)
         var location = Location(warehouseId, zone, 1);
         var now = DateTimeOffset.UtcNow;
         var order = Value(ReceivingOrder.CreateNew(warehouseId, now));
+        AssignTestReceivingOrderNumber(order);
         Value(order.JoinCurrentCycle(location.Id, "operator-test", now));
         var batch = Value(LicensePlateNumberBatch.Issue(1, "operator-test", now));
         await using (var seed = database.CreateDbContext())

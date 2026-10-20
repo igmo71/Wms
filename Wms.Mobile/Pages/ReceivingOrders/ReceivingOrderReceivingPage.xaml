@@ -7,6 +7,7 @@
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
         <VerticalStackLayout Spacing="3">
             <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="CreatedAtLabel" FontSize="12" />
             <Label x:Name="StatusLabel" FontSize="13" />
             <Label x:Name="LocationLabel" FontSize="12" />
         </VerticalStackLayout>

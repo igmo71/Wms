@@ -1,6 +1,8 @@
 using System.Data;
+using System.Globalization;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
 using Wms.Common;
@@ -45,6 +47,33 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         return await WithVersionsAsync(context, sources, ct);
     }
 
+    public async Task<IReadOnlyList<ReceivingSourceState>> ListAllSourcesAsync(
+        CancellationToken ct)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(ct);
+        var sources = await context.ReceivingSourceDocuments.AsNoTracking()
+            .OrderByDescending(x => x.LastSuccessfulCheckAtUtc)
+            .ThenBy(x => x.RefKey)
+            .ToListAsync(ct);
+        var activeLinks = await context.ReceivingOrderSourceLinks.AsNoTracking()
+            .Where(x => x.DetachedAtUtc == null)
+            .Select(x => new
+            {
+                x.ReceivingSourceDocumentId,
+                x.ReceivingOrderId,
+                OrderNumber = x.ReceivingOrder!.Number
+            })
+            .ToDictionaryAsync(x => x.ReceivingSourceDocumentId, ct);
+        var states = await WithVersionsAsync(context, sources, ct);
+        return states.Select(state => activeLinks.TryGetValue(state.Source.Id, out var link)
+            ? state with
+            {
+                LinkedOrderId = link.ReceivingOrderId,
+                LinkedOrderNumber = link.OrderNumber
+            }
+            : state).ToArray();
+    }
+
     public async Task<OperationResult<Guid>> CreateAsync(
         ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
         IReadOnlyList<ReceivingOrderItem> items,
@@ -86,6 +115,9 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
+        var numberLock = await AcquireNumberLockAsync(context, transaction, ct);
+        if (!numberLock.IsSuccess)
+            return numberLock.Error!;
 
         var existingReceipt = await context.CommandReceipts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.UserId == receipt.UserId
@@ -134,6 +166,10 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         if (!await context.Warehouses.AnyAsync(x => x.Id == order.WarehouseId, ct))
             return OperationError.NotFound("Склад источников не найден в WMS.");
 
+        var assignedNumber = await AssignNextNumberAsync(context, order, ct);
+        if (!assignedNumber.IsSuccess)
+            return assignedNumber.Error!;
+
         context.ReceivingOrders.Add(order);
         context.ReceivingOrderSourceLinks.AddRange(links);
         context.ReceivingOrderItems.AddRange(items);
@@ -142,6 +178,48 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return order.Id;
+    }
+
+    private static async Task<OperationResult> AcquireNumberLockAsync(
+        ApplicationDbContext context, IDbContextTransaction transaction,
+        CancellationToken ct)
+    {
+        await using var command = context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = transaction.GetDbTransaction();
+        command.CommandText = """
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock
+                @Resource = N'receiving-order-number',
+                @LockMode = N'Exclusive',
+                @LockOwner = N'Transaction',
+                @LockTimeout = 10000;
+            SELECT @result;
+            """;
+        var lockResult = Convert.ToInt32(await command.ExecuteScalarAsync(ct),
+            CultureInfo.InvariantCulture);
+        return lockResult < 0
+            ? OperationError.Conflict("Не удалось выделить номер ордера; повторите создание.")
+            : OperationResult.Success();
+    }
+
+    private static async Task<OperationResult> AssignNextNumberAsync(
+        ApplicationDbContext context, ReceivingOrder order, CancellationToken ct)
+    {
+        var candidate = order.CreatedAtUtc.LocalDateTime;
+        while (true)
+        {
+            var number = candidate.ToString("yyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            if (!await context.ReceivingOrders.AnyAsync(x => x.Number == number, ct))
+                return order.AssignNumber(number);
+            try
+            {
+                candidate = candidate.AddSeconds(1);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return OperationError.Conflict("Свободный номер приходного ордера не найден.");
+            }
+        }
     }
 
     private static CommandReceipt NewReceipt(

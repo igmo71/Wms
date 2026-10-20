@@ -2,8 +2,9 @@
 @attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Domain.Enums
 @using Wms.Common
+@using Wms.Application.Receiving
 
-<PageTitle>Приходные ордера</PageTitle>
+<PageTitle>Ордера WMS</PageTitle>
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center">
@@ -18,63 +19,8 @@
     }
 
     <MudPaper Class="pa-4">
-        <MudText Typo="Typo.h6" Class="mb-2">Создать ордер из документов 1С</MudText>
-        <MudText Typo="Typo.body2" Class="mb-3">
-            Выберите один или несколько свободных документов одного склада. План суммируется по SKU;
-            неизвестное количество остаётся неизвестным.
-        </MudText>
-        @if (_sources.Count == 0)
-        {
-            <MudText>Свободных документов нет.</MudText>
-        }
-        else
-        {
-            <table class="mud-table mud-table-dense w-100">
-                <thead><tr><th></th><th>Документ 1С</th><th>Склад</th><th>Проверен</th><th>План</th><th>Состояние</th></tr></thead>
-                <tbody>
-                @foreach (var source in _sources)
-                {
-                    <tr>
-                        <td><input type="checkbox" checked="@_selected.Contains(source.RefKey)"
-                                   @onchange="e => ToggleSource(source.RefKey, e)" /></td>
-                        <td>@(source.Number ?? source.RefKey.ToString())</td>
-                        <td>@source.WarehouseId</td>
-                        <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
-                        <td>@(source.HasUnknownSku ? "Есть неизвестные строки" : "Известен")</td>
-                        <td>@(source.LastAttemptError ?? (source.Posted == false ? "Не проведён" : source.DeletionMark == true ? "Помечен удалённым" : "Актуален"))</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        }
-        @if (_selected.Count > 0)
-        {
-            <MudText Typo="Typo.subtitle2" Class="mt-3">Суммарный план выбранных документов</MudText>
-            @foreach (var plan in SelectedPlan)
-            {
-                <MudText>@plan.SkuId: @(plan.Quantity?.ToString("0.###") ?? "неизвестно")</MudText>
-            }
-            @if (SelectedSources.Any(x => x.HasUnknownSku))
-            {
-                <MudAlert Severity="Severity.Warning" Class="mt-2">
-                    В источниках есть строки без определённого SKU или количества. Их причины видны в карточке ордера.
-                </MudAlert>
-            }
-            @if (SelectedSources.Select(x => x.WarehouseId).Distinct().Count() != 1)
-            {
-                <MudAlert Severity="Severity.Warning" Class="mt-2">Выбранные документы относятся к разным складам.</MudAlert>
-            }
-        }
-        <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled"
-                   Disabled="@(_busy || !CanCreate)" OnClick="CreateAsync">
-            Создать ордер WMS
-        </MudButton>
-    </MudPaper>
-
-    <MudPaper Class="pa-4">
-        <MudText Typo="Typo.h6" Class="mb-2">Ордера WMS</MudText>
         <MudTextField T="string" @bind-Value="_orderFilter" Immediate="true"
-                      Label="Поиск по ID ордера" Class="mb-3" />
+                      Label="Поиск по номеру ордера WMS" Class="mb-3" />
         @if (_busy)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
@@ -85,28 +31,25 @@
         }
         else
         {
-            <table class="mud-table mud-table-dense w-100">
-                <thead><tr><th>Ордер</th><th>Склад</th><th>Статус</th><th>Источников</th><th>Строк</th><th>Расхождения и непроверенные SKU</th></tr></thead>
-                <tbody>
-                @foreach (var order in FilteredOrders)
-                {
-                    <tr>
-                        <td><MudLink Href="@($"receiving-orders/{order.Id}")">@order.Id</MudLink></td>
-                        <td>@order.WarehouseId</td>
-                        <td>@order.Status.GetDisplayName()</td>
-                        <td>@order.SourceRefKeys.Count</td>
-                        <td>@order.Items.Count</td>
-                        <td>
-                            @order.CurrentDiscrepancyCount
-                            @if (order.HasNewDiscrepancyAfterCompletion)
-                            {
-                                <MudText Color="Color.Warning">Новое после завершения</MudText>
-                            }
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+            <MudTable T="ReceivingWorkOrderView" Items="FilteredOrders" Dense="true" Hover="true"
+                      Striped="true" Elevation="0" RowsPerPage="15">
+                <HeaderContent><MudTh>Номер WMS</MudTh><MudTh>Создан</MudTh><MudTh>Склад</MudTh><MudTh>Статус</MudTh><MudTh>Источников</MudTh><MudTh>Строк</MudTh><MudTh>Расхождения и непроверенные SKU</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Номер WMS"><MudLink Href="@($"receiving-orders/{context.Id}")">@context.Number</MudLink></MudTd>
+                    <MudTd DataLabel="Создан">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudTd>
+                    <MudTd DataLabel="Статус">@context.Status.GetDisplayName()</MudTd>
+                    <MudTd DataLabel="Источников">@context.SourceRefKeys.Count</MudTd>
+                    <MudTd DataLabel="Строк">@context.Items.Count</MudTd>
+                    <MudTd DataLabel="Расхождения и непроверенные SKU">@context.CurrentDiscrepancyCount
+                        @if (context.HasNewDiscrepancyAfterCompletion)
+                        {
+                            <MudText Color="Color.Warning">Новое после завершения</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent><MudTablePager /></PagerContent>
+            </MudTable>
         }
     </MudPaper>
 </MudStack>

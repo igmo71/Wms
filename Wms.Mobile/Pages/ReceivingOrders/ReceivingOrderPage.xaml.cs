@@ -94,7 +94,9 @@ public partial class ReceivingOrderPage : ContentPage
             var orders = await _orders.GetOrdersAsync(warehouse.Id);
             _selected.IntersectWith(_sources.Select(x => x.RefKey));
             OrderRows = orders.Select(x => new ReceivingWorkOrderRow(
-                x.Id, x.Id.ToString(), StatusText(x.Status))).ToArray();
+                x.Id, x.Number,
+                $"Создан: {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}",
+                StatusText(x.Status))).ToArray();
             OnPropertyChanged(nameof(OrderRows));
             ShowSelection();
         }
@@ -154,13 +156,13 @@ public partial class ReceivingOrderPage : ContentPage
             _selected.Contains(x.RefKey) ? "☑" : "□",
             x.PlanBySku.Count == 0 ? "План отсутствует"
                 : string.Join("; ", x.PlanBySku.Select(p =>
-                    $"{p.Key}: {(p.Value?.ToString("0.###") ?? "неизвестно")}")),
+                    $"{(x.SkuNames.TryGetValue(p.Key, out var skuName) ? skuName : p.Key.ToString())}: {(p.Value?.ToString("0.###") ?? "неизвестно")}")),
             x.LastAttemptError ?? (x.HasUnknownSku ? "Есть неопределённые строки" : string.Empty))).ToArray();
         OnPropertyChanged(nameof(SourceRows));
         var selectedSources = _sources.Where(x => _selected.Contains(x.RefKey)).ToArray();
         var plan = selectedSources.SelectMany(x => x.PlanBySku)
             .GroupBy(x => x.Key).Select(group =>
-                $"{group.Key}: {(group.Any(x => x.Value is null) ? "неизвестно" : group.Sum(x => x.Value!.Value).ToString("0.###"))}");
+                $"{(selectedSources.SelectMany(x => x.SkuNames).FirstOrDefault(x => x.Key == group.Key).Value ?? group.Key.ToString())}: {(group.Any(x => x.Value is null) ? "неизвестно" : group.Sum(x => x.Value!.Value).ToString("0.###"))}");
         SelectionLabel.Text = selectedSources.Length == 0 ? "Документы не выбраны."
             : $"Выбрано: {selectedSources.Length}. Суммарный план: {string.Join("; ", plan)}";
         CreateButton.IsEnabled = !_busy && (_pendingCreate is not null || selectedSources.Length > 0);
@@ -233,4 +235,5 @@ public partial class ReceivingOrderPage : ContentPage
 
 public sealed record ReceivingSourceRow(Guid RefKey, string Number,
     string SelectionMark, string PlanText, string Warning);
-public sealed record ReceivingWorkOrderRow(Guid Id, string Number, string StatusText);
+public sealed record ReceivingWorkOrderRow(
+    Guid Id, string Number, string CreatedAtText, string StatusText);

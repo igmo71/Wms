@@ -26,7 +26,11 @@ public sealed record MobileReceivingSourceResponse(
     DateTimeOffset? LastSuccessfulCheckAtUtc, DateTimeOffset? LastAttemptAtUtc,
     string? LastAttemptError, bool HasUnknownSku,
     IReadOnlyDictionary<Guid, decimal?> PlanBySku,
-    IReadOnlyList<MobileReceivingSourceLineResponse> Lines);
+    IReadOnlyList<MobileReceivingSourceLineResponse> Lines)
+{
+    public string? WarehouseName { get; init; }
+    public IReadOnlyDictionary<Guid, string> SkuNames { get; init; } = new Dictionary<Guid, string>();
+}
 
 public sealed record MobileReceivingWorkItemResponse(
     Guid SkuId, string? SkuCode, string? SkuName,
@@ -50,12 +54,17 @@ public sealed record MobileReceivingWorkLpnResponse(
     IReadOnlyList<MobileReceivingWorkPutawayResponse> Putaways);
 
 public sealed record MobileReceivingWorkOrderResponse(
-    Guid Id, Guid WarehouseId, MobileReceivingOrderStatus Status,
+    Guid Id, string Number, DateTimeOffset CreatedAtUtc,
+    Guid WarehouseId, MobileReceivingOrderStatus Status,
     int ActiveCycleNumber, Guid? ReceivingLocationId,
     bool IsParticipant, long Revision,
     IReadOnlyList<Guid> SourceRefKeys,
     IReadOnlyList<MobileReceivingWorkItemResponse> Items,
-    IReadOnlyList<MobileReceivingWorkLpnResponse> Lpns);
+    IReadOnlyList<MobileReceivingWorkLpnResponse> Lpns)
+{
+    public string? WarehouseName { get; init; }
+    public string? ReceivingLocationAddress { get; init; }
+}
 
 public sealed record MobileReceivingSkuCandidateResponse(
     Guid SkuId, string? Name, string? Code,
@@ -69,7 +78,10 @@ public sealed record MobileReceivingAttachSourceRequest(Guid ClientRequestId, st
 public sealed record MobileReceivingLinkedSourceResponse(
     Guid RefKey, string? Number, string? Date, string? Sender,
     string? SenderType, string? WarehouseOperation, string? BusinessOperation,
-    string? BasisDocument, string? BasisDocumentType);
+    string? BasisDocument, string? BasisDocumentType)
+{
+    public string? SenderName { get; init; }
+}
 public sealed record MobileReceivingDocumentResolutionResponse(
     MobileReceivingSourceResponse? Source, MobileReceivingWorkOrderResponse? Order);
 public sealed record MobileReceivingBarcodeRequest(string Barcode);

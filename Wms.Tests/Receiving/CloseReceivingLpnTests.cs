@@ -112,16 +112,24 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
         var state = await SeedAsync(5m, 3m);
         var parser = new ReceivingSourceParser();
         var permission = new WarehousePermission(new ReceivingPermission());
+        var sourceChangeStore = new ReceivingOrderSourceChangeStore(database);
+        var synchronize = new SynchronizeReceivingSource(state.Reader, parser,
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
+        var preview = new PreviewReceivingOrderSourceChange(sourceChangeStore,
+            parser, synchronize, new ReceivingReferenceNameStore(database), permission);
         var changeSources = new ChangeReceivingOrderSources(
             new CommandExecutor(new CommandExecutionStore(database)),
-            new ReceivingOrderSourceChangeStore(),
+            sourceChangeStore,
             new ReceivingWorkQueryStore(database), parser,
-            new SynchronizeReceivingSource(state.Reader, parser,
-                new ReceivingSourceStore(database, parser), TimeProvider.System),
+            synchronize,
             permission, TimeProvider.System);
+        var stateToken = Value(await preview.ExecuteAsync(
+            new PreviewReceivingOrderSourceChangeRequest(state.OrderId, state.SourceKey,
+                ReceivingSourceChangeKind.Detach, "manager-test"))).StateToken;
         Value(await changeSources.ExecuteAsync(new ChangeReceivingOrderSourcesRequest(
             Guid.NewGuid(), state.OrderId, state.SourceKey, "manager-test",
-            ReceivingSourceChangeKind.Detach, ReceivingSourceChangeChannel.Web)));
+            ReceivingSourceChangeKind.Detach, ReceivingSourceChangeChannel.Web,
+            stateToken)));
 
         var close = Handler(state.Reader);
         var operatorCommand = new CloseReceivingLpnCommand(

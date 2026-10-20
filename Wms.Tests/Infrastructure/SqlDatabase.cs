@@ -51,7 +51,8 @@ public sealed class SqlDatabase : IAsyncLifetime, IDbContextFactory<ApplicationD
     {
         var builder = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseApplicationServiceProvider(_services)
-            .UseSqlServer(ConnectionString);
+            .UseSqlServer(ConnectionString,
+                sqlServer => sqlServer.UseCompatibilityLevel(120));
         if (interceptors.Length > 0)
             builder.AddInterceptors(interceptors);
         return builder.Options;

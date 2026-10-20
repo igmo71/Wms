@@ -3,7 +3,7 @@
 @using Wms.Domain.Enums
 @using Wms.Common
 
-<PageTitle>Приходный ордер WMS</PageTitle>
+<PageTitle>@(_order is null ? "Приходный ордер WMS" : $"Ордер WMS {_order.Number}")</PageTitle>
 
 @if (_loading)
 {
@@ -17,7 +17,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Ордер WMS @_order.Id</MudText>
+            <MudText Typo="Typo.h5">Ордер WMS @_order.Number</MudText>
             <MudSpacer />
             <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
         </MudStack>
@@ -33,28 +33,16 @@ else
         {
             <MudAlert Severity="Severity.Success">@_sourceChangeMessage</MudAlert>
         }
-        @if (_closeResult is not null)
-        {
-            <MudAlert Severity="@(_closeResult.SourceCheckSucceeded ? Severity.Success : Severity.Warning)">
-                LPN закрыта. Использованный план: @Format(_closeResult.UsedPlan);
-                факт SKU: @Format(_closeResult.TotalFact).
-                @if (!_closeResult.SourceCheckSucceeded)
-                {
-                    <span>Сверка источников не подтверждена: @_closeResult.SourceCheckError</span>
-                }
-            </MudAlert>
-        }
-
         <MudPaper Class="pa-4">
-            <MudText>Склад: @_order.WarehouseId · Статус: @_order.Status.GetDisplayName()</MudText>
-            <MudText>Цикл: @_order.ActiveCycleNumber · Место приёмки: @(_order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText>
+            <MudText>Создан: @_order.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudText>
+            <MudText>Склад: @(_order.WarehouseName ?? _order.WarehouseId.ToString()) · Статус: @_order.Status.GetDisplayName()</MudText>
+            <MudText>Цикл: @_order.ActiveCycleNumber · Место приёмки: @(_order.ReceivingLocationAddress ?? _order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText>
             <MudText Typo="Typo.caption">Завершение ордера не проводит товар. Приход возникает при закрытии каждой LPN.</MudText>
-            @if (_order.Status == ReceivingOrderStatus.InReceiving
-                && (_order.IsParticipant || _canManage))
+            @if (_order.Status == ReceivingOrderStatus.InReceiving && _canManage)
             {
                 @if (_order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
                 {
-                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN.</MudText>
+                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN в мобильном приложении.</MudText>
                 }
                 <MudButton Class="mt-2" Color="Color.Primary" Variant="Variant.Filled"
                            Disabled="@(_busy || _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))"
@@ -68,33 +56,10 @@ else
             }
         </MudPaper>
 
-        <ReceivingOrderDetailsView Order="_order" Sources="_sources" FreeSources="_freeSources"
-                                   CanManage="_canManage" CanChangeSources="CanChangeSources"
-                                   CanDetachSources="CanDetachSources" Busy="_busy"
+        <ReceivingOrderDetailsView Order="_order" Sources="_sources"
+                                   CanManage="_canManage" Busy="_busy"
                                    RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
-                                   OnAttach="AttachSourceAsync" OnDetach="DetachSourceAsync" />
-
-        @if (_canManage)
-        {
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Добавить SKU из справочника</MudText>
-                <MudStack Row="true" AlignItems="AlignItems.End">
-                    <MudTextField T="string" @bind-Value="_skuSearch" Label="Наименование, код или штрихкод" />
-                    <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="SearchSkuAsync">Найти</MudButton>
-                </MudStack>
-                @foreach (var sku in _candidates)
-                {
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2">
-                        <MudText>@(sku.Name ?? sku.SkuId.ToString()) · @sku.Code · @(sku.IsInOrder ? "уже в ордере" : "вне плана источников")</MudText>
-                        <MudSpacer />
-                        @if (!sku.IsInOrder)
-                        {
-                            <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="() => AddSkuAsync(sku.SkuId)">Добавить</MudButton>
-                        }
-                    </MudStack>
-                }
-            </MudPaper>
-        }
+                                   OnChangeComposition="OpenSourceCompositionAsync" />
 
         <MudPaper Class="pa-4">
             <MudText Typo="Typo.h6" Class="mb-2">Приёмные LPN</MudText>
@@ -108,10 +73,6 @@ else
                     <MudStack Row="true" AlignItems="AlignItems.Center">
                         <MudText Typo="Typo.subtitle1">@lpn.Code · @lpn.Status.GetDisplayName()</MudText>
                         <MudSpacer />
-                        @if (_canManage && lpn.Status == LicensePlateNumberStatus.Open)
-                        {
-                            <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="() => PrepareClose(lpn.Id)">Закрыть LPN</MudButton>
-                        }
                         @if (_canManage && lpn.Status == LicensePlateNumberStatus.Closed)
                         {
                             @if (lpn.Putaways.Count == 0 && lpn.Items.Count == 1)
@@ -135,17 +96,9 @@ else
                     }
                     @foreach (var putaway in lpn.Putaways)
                     {
-                        <MudText Typo="Typo.caption">@(lpn.Status == LicensePlateNumberStatus.Deleted ? "Историческое размещение" : "Размещено") @Format(putaway.Quantity) → @putaway.DestinationStorageLocationId · @putaway.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.caption">@(lpn.Status == LicensePlateNumberStatus.Deleted ? "Историческое размещение" : "Размещено") @Format(putaway.Quantity) → @(putaway.DestinationAddress ?? putaway.DestinationStorageLocationId.ToString()) · @putaway.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
                     }
-                    @if (_closeLpnId == lpn.Id)
-                    {
-                        <MudDivider Class="my-2" />
-                        <MudText>Перед закрытием WMS повторно сверит источники и проверит текущий план. Превышение или неизвестный план требует Manager.</MudText>
-                        <label><input type="checkbox" @bind="_confirmExpired" /> Подтверждаю закрытие LPN с прошедшей датой, если она есть</label>
-                        <MudTextField T="string" @bind-Value="_managerReason" Label="Причина менеджера (необязательно)" />
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CloseLpnAsync">Подтвердить закрытие</MudButton>
-                    }
-                    @if (_correctionLpnId == lpn.Id)
+                    @if (_canManage && _correctionLpnId == lpn.Id)
                     {
                         <MudDivider Class="my-2" />
                         <MudText>Поправка количества проводится в исходном месте приёмки. SKU и срок годности сохраняются.</MudText>
@@ -154,54 +107,44 @@ else
                                    Disabled="@(_busy || _correctionQuantity is null || _correctionQuantity < 0)"
                                    OnClick="CorrectLpnAsync">Провести поправку</MudButton>
                     }
-                    @if (_deletionLpnId == lpn.Id && _deletionPreview is { } preview)
+                    @if (_canManage && _deletionLpnId == lpn.Id && _deletionPreview is { } preview)
                     {
                         <MudDivider Class="my-2" />
                         <MudText Typo="Typo.subtitle2">Обратные движения по исходным адресам</MudText>
-                        <table class="mud-table mud-table-dense w-100">
-                            <thead><tr><th>Откуда</th><th>Куда</th><th>SKU</th><th>Срок годности</th><th>Количество</th></tr></thead>
-                            <tbody>
-                            @foreach (var movement in preview.Reversals)
-                            {
-                                <tr>
-                                    <td>@(movement.SourceAddress ?? "Вне склада")</td>
-                                    <td>@(movement.DestinationAddress ?? "Вне склада")</td>
-                                    <td>@SkuName(movement.StockKeepingUnitId)</td>
-                                    <td>@(movement.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
-                                    <td>@Format(movement.Quantity)</td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
+                        <MudTable Items="preview.Reversals" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "Вне склада")</MudTd>
+                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "Вне склада")</MudTd>
+                                <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
+                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
                         <MudText Typo="Typo.subtitle2" Class="mt-2">Прогноз остатков после удаления</MudText>
-                        <table class="mud-table mud-table-dense w-100">
-                            <thead><tr><th>Ячейка</th><th>SKU</th><th>Срок годности</th><th>Сейчас</th><th>После</th></tr></thead>
-                            <tbody>
-                            @foreach (var balance in preview.Balances)
-                            {
-                                <tr>
-                                    <td>@balance.Address</td>
-                                    <td>@SkuName(balance.StockKeepingUnitId)</td>
-                                    <td>@(balance.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
-                                    <td>@Format(balance.Before)</td>
-                                    <td>
-                                        @if (balance.After < 0)
-                                        {
-                                            <MudText Color="Color.Error">@Format(balance.After)</MudText>
-                                        }
-                                        else
-                                        {
-                                            @Format(balance.After)
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
+                        <MudTable Items="preview.Balances" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent><MudTh>Ячейка</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Сейчас</MudTh><MudTh>После</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Ячейка">@context.Address</MudTd>
+                                <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
+                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                                <MudTd DataLabel="Сейчас">@Format(context.Before)</MudTd>
+                                <MudTd DataLabel="После">
+                                    @if (context.After < 0)
+                                    {
+                                        <MudText Color="Color.Error">@Format(context.After)</MudText>
+                                    }
+                                    else
+                                    {
+                                        @Format(context.After)
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
                         @if (preview.RequiresNegativeConfirmation)
                         {
                             <MudAlert Severity="Severity.Warning" Class="mt-2">После удаления появятся отрицательные остатки.</MudAlert>
-                            <label><input type="checkbox" @bind="_confirmNegative" /> Подтверждаю отрицательные остатки по указанным ячейкам</label>
+                            <MudCheckBox T="bool" @bind-Value="_confirmNegative" Label="Подтверждаю отрицательные остатки по указанным ячейкам" />
                         }
                         <MudButton Class="mt-2" Color="Color.Error" Variant="Variant.Filled"
                                    Disabled="@(_busy || preview.RequiresNegativeConfirmation && !_confirmNegative)"
@@ -212,24 +155,19 @@ else
                     {
                         <MudDivider Class="my-2" />
                         <MudText Typo="Typo.subtitle2">История удаления · обратные движения</MudText>
-                        <table class="mud-table mud-table-dense w-100">
-                            <thead><tr><th>Время</th><th>Пользователь</th><th>Откуда</th><th>Куда</th><th>SKU</th><th>Срок годности</th><th>Количество</th><th>Исходное движение</th></tr></thead>
-                            <tbody>
-                            @foreach (var movement in history)
-                            {
-                                <tr>
-                                    <td>@(movement.PostedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
-                                    <td>@movement.ConfirmedBy</td>
-                                    <td>@(movement.SourceAddress ?? "Вне склада")</td>
-                                    <td>@(movement.DestinationAddress ?? "Вне склада")</td>
-                                    <td>@SkuName(movement.SkuId)</td>
-                                    <td>@(movement.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</td>
-                                    <td>@Format(movement.Quantity)</td>
-                                    <td>@movement.OriginalMovementId</td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
+                        <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent><MudTh>Время</MudTh><MudTh>Пользователь</MudTh><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh><MudTh>Исходное движение</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Время">@(context.PostedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
+                                <MudTd DataLabel="Пользователь">@context.ConfirmedBy</MudTd>
+                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "Вне склада")</MudTd>
+                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "Вне склада")</MudTd>
+                                <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
+                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                                <MudTd DataLabel="Исходное движение">@context.OriginalMovementId</MudTd>
+                            </RowTemplate>
+                        </MudTable>
                     }
                 </MudPaper>
             }

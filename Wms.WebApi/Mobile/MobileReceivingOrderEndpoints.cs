@@ -151,7 +151,10 @@ internal static class MobileReceivingOrderEndpoints
             linked.Select(x => new MobileReceivingLinkedSourceResponse(
                 x.RefKey, x.Number, x.Date, x.Sender, x.SenderType,
                 x.WarehouseOperation, x.BusinessOperation,
-                x.BasisDocument, x.BasisDocumentType)).ToArray());
+                x.BasisDocument, x.BasisDocumentType)
+            {
+                SenderName = x.SenderName
+            }).ToArray());
     }
 
     private static async Task<IResult> AttachSourceAsync(
@@ -274,20 +277,29 @@ internal static class MobileReceivingOrderEndpoints
         source.PlanBySku,
         source.Lines.Select(x => new MobileReceivingSourceLineResponse(
             x.LineNumber, x.SourceSkuRefKey, x.StockKeepingUnitId, x.RawQuantity,
-            x.Quantity, x.Error)).ToArray());
+            x.Quantity, x.Error)).ToArray())
+    {
+        WarehouseName = source.WarehouseName,
+        SkuNames = source.SkuNames
+    };
 
     private static MobileReceivingSkuCandidateResponse MapSku(ReceivingSkuCandidate sku) => new(
         sku.SkuId, sku.Name, sku.Code, sku.TracksExpirationDate,
         sku.IsInOrder, sku.CurrentPlanQuantity, sku.FactQuantity);
 
     private static MobileReceivingWorkOrderResponse MapOrder(ReceivingWorkOrderView order) => new(
-        order.Id, order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
+        order.Id, order.Number, order.CreatedAtUtc,
+        order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
         order.ActiveCycleNumber, order.ReceivingLocationId,
         order.IsParticipant, order.Revision, order.SourceRefKeys,
         order.Items.Select(x => new MobileReceivingWorkItemResponse(
             x.SkuId, x.SkuCode, x.SkuName, x.TracksExpirationDate,
             x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)).ToArray(),
-        order.Lpns.Select(MapLpn).ToArray());
+        order.Lpns.Select(MapLpn).ToArray())
+    {
+        WarehouseName = order.WarehouseName,
+        ReceivingLocationAddress = order.ReceivingLocationAddress
+    };
 
     internal static MobileReceivingWorkLpnResponse MapLpn(ReceivingWorkLpnView lpn) => new(
         lpn.Id, lpn.Code, lpn.OrderId, lpn.WarehouseId,

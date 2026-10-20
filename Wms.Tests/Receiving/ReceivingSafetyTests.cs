@@ -498,6 +498,7 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
         var zone = Zone(warehouse.Id, "NC", ZoneType.Receiving);
         var location = Location(warehouse.Id, zone, 1);
         var order = Value(ReceivingOrder.CreateNew(warehouse.Id, now));
+        AssignTestReceivingOrderNumber(order);
         var orderItem = Value(ReceivingOrderItem.CreateForSku(order.Id, sku.Id, 5m));
         var batch = Value(LicensePlateNumberBatch.Issue(1, "close-test", now));
         var lpnId = batch.Labels.Single().Id;

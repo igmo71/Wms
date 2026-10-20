@@ -2,10 +2,15 @@
 
 <MudPaper Class="pa-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
-        <MudText Typo="Typo.h6">Источники 1С</MudText>
+        <MudText Typo="Typo.h6">Источники 1С · @Sources.Count</MudText>
         <MudSpacer />
         @if (CanManage)
         {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(Busy || !OnChangeComposition.HasDelegate)"
+                       OnClick="() => OnChangeComposition.InvokeAsync()">
+                Изменить состав
+            </MudButton>
             <MudButton Variant="Variant.Outlined" Disabled="Busy" OnClick="() => OnRefresh.InvokeAsync()">
                 Повторить сверку всех источников
             </MudButton>
@@ -14,6 +19,18 @@
     @if (Sources.Count == 0)
     {
         <MudAlert Severity="Severity.Warning">Действующих источников нет. Текущий план известных SKU равен нулю.</MudAlert>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2">Документы: @string.Join(", ", Sources.Select(source => source.Number ?? source.RefKey.ToString()))</MudText>
+        <MudText Typo="Typo.body2" Color="@(Sources.Any(source => source.LastAttemptError is not null) ? Color.Warning : Color.Default)">
+            Сверка: @(Sources.Count(source => source.LastSuccessfulCheckAtUtc is not null)) из @Sources.Count с успешной версией;
+            ошибок последней попытки: @(Sources.Count(source => source.LastAttemptError is not null));
+            последняя попытка: @(Sources.Max(source => source.LastAttemptAtUtc)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет").
+        </MudText>
+        <MudButton Variant="Variant.Text" OnClick="() => _showSourceDetails = !_showSourceDetails">
+            @(_showSourceDetails ? "Скрыть подробности" : "Подробности источников")
+        </MudButton>
     }
     @if (RefreshResult is { } result)
     {
@@ -32,79 +49,29 @@
             }
         </MudAlert>
     }
-    @if (Sources.Count > 0)
+    @if (Sources.Count > 0 && _showSourceDetails)
     {
-        <table class="mud-table mud-table-dense w-100">
-            <thead><tr><th>Документ</th><th>Склад 1С</th><th>Версия</th><th>Последняя успешная сверка</th><th>Состояние</th><th>Действие</th></tr></thead>
-            <tbody>
-            @foreach (var source in Sources)
-            {
-                <tr>
-                    <td>@(source.Number ?? source.RefKey.ToString())</td>
-                    <td>@source.WarehouseId</td>
-                    <td>@(source.VersionId?.ToString() ?? "Нет")</td>
-                    <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</td>
-                    <td>@SourceState(source)</td>
-                    <td>
-                        @if (CanDetachSources)
-                        {
-                            <MudButton Variant="Variant.Text" Disabled="Busy"
-                                       OnClick="() => OnDetach.InvokeAsync(source.RefKey)">Открепить</MudButton>
-                        }
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="6">
-                        Дата: @(source.Date ?? "—") ·
-                        Отправитель: @(source.Sender ?? "—")@(source.SenderType is null ? "" : $" ({source.SenderType})") ·
-                        Складская операция: @(source.WarehouseOperation ?? "—") ·
-                        Хозяйственная операция: @(source.BusinessOperation ?? "—") ·
-                        Основание: @(source.BasisDocument ?? "—")@(source.BasisDocumentType is null ? "" : $" ({source.BasisDocumentType})")
-                    </td>
-                </tr>
-                @foreach (var line in source.Lines.Where(x => x.Error is not null))
-                {
-                    <tr><td colspan="6">Строка @line.LineNumber · SKU @(line.StockKeepingUnitId?.ToString() ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен"): @line.Error</td></tr>
-                }
-            }
-            </tbody>
-        </table>
-    }
-    @if (CanChangeSources)
-    {
-        <MudDivider Class="my-3" />
-        <MudText Typo="Typo.subtitle2">Добавить свободный источник</MudText>
-        <MudText Typo="Typo.caption">Перед добавлением WMS снова читает документ из 1С и проверяет его склад. Меняется текущий план, проведённый факт сохраняется.</MudText>
-        <MudTextField T="string" @bind-Value="_sourceSearch" Immediate="true"
-                      Label="Поиск по номеру или Ref_Key" Class="mt-2" />
-        @if (!MatchingFreeSources.Any())
-        {
-            <MudText Class="mt-2">Свободных документов по запросу нет.</MudText>
-        }
-        else
-        {
-            <table class="mud-table mud-table-dense w-100 mt-2">
-                <thead><tr><th>Документ</th><th>Склад 1С</th><th>Сверен</th><th></th></tr></thead>
-                <tbody>
-                @foreach (var source in MatchingFreeSources)
-                {
-                    <tr>
-                        <td>@(source.Number ?? source.RefKey.ToString())</td>
-                        <td>@source.WarehouseId</td>
-                        <td>@(source.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</td>
-                        <td><MudButton Variant="Variant.Text" Disabled="Busy"
-                                       OnClick="() => OnAttach.InvokeAsync(source.RefKey)">Добавить</MudButton></td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        }
-        <MudTextField T="string" @bind-Value="_manualRefKey" Label="Или введите Ref_Key документа 1С" Class="mt-3" />
-        <MudButton Variant="Variant.Outlined" Disabled="Busy" OnClick="AttachByRefKeyAsync">Добавить по Ref_Key</MudButton>
-        @if (_manualError is not null)
-        {
-            <MudText Color="Color.Error">@_manualError</MudText>
-        }
+        <MudTable T="ReceivingSourceView" Items="Sources" Dense="true" Hover="true" Striped="true" Elevation="0">
+            <HeaderContent><MudTh>Документ</MudTh><MudTh>Склад 1С</MudTh><MudTh>Реквизиты источника</MudTh><MudTh>Состояние</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Документ">
+                    <MudText>@(context.Number ?? context.RefKey.ToString())</MudText>
+                    <MudText Typo="Typo.caption">Сверен: @(context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет")</MudText>
+                    <MudText Typo="Typo.caption">Версия: @(context.VersionId?.ToString() ?? "нет")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Склад 1С">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="Реквизиты источника">
+                    <MudText Typo="Typo.body2">Дата: @SourceDate(context.Date) · Отправитель: @SenderDisplay(context)</MudText>
+                    <MudText Typo="Typo.body2">Складская операция: @(context.WarehouseOperation ?? "—") · Хозяйственная операция: @(context.BusinessOperation ?? "—")</MudText>
+                    <MudText Typo="Typo.body2">Основание: @BasisDisplay(context)</MudText>
+                    @foreach (var line in context.Lines.Where(x => x.Error is not null))
+                    {
+                        <MudText Color="Color.Warning" Typo="Typo.caption">Строка @line.LineNumber · SKU @SourceSkuName(context, line): @line.Error</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Состояние">@SourceState(context)</MudTd>
+            </RowTemplate>
+        </MudTable>
     }
 </MudPaper>
 
@@ -118,26 +85,21 @@
             <MudText Typo="Typo.subtitle1">
                 Цикл @cycle.Number · @(cycle.CompletedAtUtc is null ? "Не завершён" : $"Завершён {cycle.CompletedAtUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}")
             </MudText>
-            <MudText Typo="Typo.caption">Место приёмки: @(cycle.ReceivingLocationId?.ToString() ?? "не выбрано") · Завершил: @(cycle.CompletedBy ?? "—")</MudText>
+            <MudText Typo="Typo.caption">Место приёмки: @(cycle.ReceivingLocationAddress ?? cycle.ReceivingLocationId?.ToString() ?? "не выбрано") · Завершил: @(cycle.CompletedBy ?? "—")</MudText>
             @if (cycle.CompletedAtUtc is not null)
             {
                 @if (cycle.SourceCheckFailed)
                 {
                     <MudAlert Severity="Severity.Warning" Class="mt-2">При завершении свежая сверка источников не удалась.</MudAlert>
                 }
-                <table class="mud-table mud-table-dense w-100 mt-2">
-                    <thead><tr><th>SKU</th><th>План на момент завершения</th><th>Факт на момент завершения</th></tr></thead>
-                    <tbody>
-                    @foreach (var item in cycle.Items)
-                    {
-                        <tr>
-                            <td>@SkuName(item.SkuId)</td>
-                            <td>@Format(item.PlanQuantity)</td>
-                            <td>@(item.FactQuantity?.ToString("0.###") ?? "Не проверено")</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+                <MudTable T="ReceivingWorkCycleItemView" Items="cycle.Items" Dense="true" Hover="true" Elevation="0" Class="mt-2">
+                    <HeaderContent><MudTh>SKU</MudTh><MudTh>План на момент завершения</MudTh><MudTh>Факт на момент завершения</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
+                        <MudTd DataLabel="План">@Format(context.PlanQuantity)</MudTd>
+                        <MudTd DataLabel="Факт">@(context.FactQuantity?.ToString("0.###") ?? "Не проверено")</MudTd>
+                    </RowTemplate>
+                </MudTable>
                 <MudText Typo="Typo.caption" Class="mt-2">Версии источников:</MudText>
                 @if (cycle.Sources.Count == 0)
                 {
@@ -155,45 +117,49 @@
 @code {
     [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
-    [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> FreeSources { get; set; } = [];
     [Parameter] public bool CanManage { get; set; }
-    [Parameter] public bool CanChangeSources { get; set; }
-    [Parameter] public bool CanDetachSources { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public ReceivingOrderRefreshResult? RefreshResult { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }
-    [Parameter] public EventCallback<Guid> OnAttach { get; set; }
-    [Parameter] public EventCallback<Guid> OnDetach { get; set; }
+    [Parameter] public EventCallback OnChangeComposition { get; set; }
 
-    private string? _sourceSearch;
-    private string? _manualRefKey;
-    private string? _manualError;
-
-    private IEnumerable<ReceivingSourceView> MatchingFreeSources
-    {
-        get
-        {
-            var term = _sourceSearch?.Trim();
-            return FreeSources.Where(source => string.IsNullOrEmpty(term)
-                || source.RefKey.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
-                || source.Number?.Contains(term, StringComparison.OrdinalIgnoreCase) == true)
-                .Take(20);
-        }
-    }
-
-    private async Task AttachByRefKeyAsync()
-    {
-        if (!Guid.TryParse(_manualRefKey?.Trim(), out var refKey) || refKey == Guid.Empty)
-        {
-            _manualError = "Укажите корректный Ref_Key документа 1С.";
-            return;
-        }
-        _manualError = null;
-        await OnAttach.InvokeAsync(refKey);
-    }
+    private bool _showSourceDetails;
 
     private string SkuName(Guid skuId) =>
         Order.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();
+
+    private static string SenderDisplay(ReceivingSourceView source)
+    {
+        var name = source.SenderName ?? source.Sender ?? "—";
+        return source.SenderType == "StandardODATA.Catalog_Партнеры"
+            ? $"{name} (партнёр 1С)" : name;
+    }
+
+    private static string SourceDate(string? value) =>
+        DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var date)
+            ? date.ToString("dd.MM.yyyy") : value ?? "—";
+
+    private static string BasisDisplay(ReceivingSourceView source)
+    {
+        var type = source.BasisDocumentType switch
+        {
+            "StandardODATA.Document_ПриобретениеТоваровУслуг" => "приобретение товаров и услуг 1С",
+            null => null,
+            _ => "документ 1С"
+        };
+        return (source.BasisDocument ?? "—") + (type is null ? "" : $" ({type})");
+    }
+
+    private static string SourceSkuName(
+        ReceivingSourceView source, ReceivingSourceLineView line)
+    {
+        if (line.StockKeepingUnitId is Guid skuId
+            && source.SkuNames.TryGetValue(skuId, out var name))
+            return name;
+        return line.StockKeepingUnitId?.ToString()
+            ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен";
+    }
 
     private static string Format(decimal? quantity) =>
         quantity?.ToString("0.###") ?? "Неизвестно";

@@ -156,6 +156,11 @@ retain their own explicit save boundaries.
 Migrations are immutable after they may have reached a non-disposable database.
 Schema correction then requires a new migration. Replacing history is permitted
 only for an explicit pre-production baseline reset of every affected database.
+The EF Core SQL Server provider uses compatibility level 120 for the reported
+SQL Server 12.x deployment; SQL-dependent integration tests use the same level.
+EF migrations are created and applied with EF commands; generated files are
+reviewed, not edited manually. Migrations must avoid syntax introduced after
+SQL Server 2014.
 
 Use optimistic concurrency only where a stale save threatens a documented
 invariant. Shared-resource coordination may use a targeted operational revision.
@@ -163,6 +168,12 @@ The new receiving work store provides EF concurrency guards for the plan
 quantity of an order SKU row and the SKU expiration flag. A caller can mark
 both loaded properties for conditional update in its final save; a changed
 input then rejects every staged effect of that command.
+Receiving order creation allocates its human-readable number under a
+transaction-scoped SQL application lock and `Serializable` isolation. A unique
+index and format constraint protect persisted numbers; number, source links,
+receipt, and audit commit together. Web source-composition commands compare a
+preview token after receipt lookup and guard the order revision and source
+versions in the final save, so changed decision inputs reject the command.
 Receiving close also conditionally writes the loaded source version and last
 successful check time, so a concurrent 1C refresh invalidates the close before
 its movement, audit and command receipt are committed.

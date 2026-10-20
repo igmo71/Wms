@@ -19,7 +19,8 @@ public static class DependencyInjection
 
         services.AddDbContextFactory<ApplicationDbContext>(options =>
         {
-            options.UseSqlServer(connectionString);
+            options.UseSqlServer(connectionString,
+                sqlServer => sqlServer.UseCompatibilityLevel(120));
             options.EnableSensitiveDataLogging();
             options.EnableDetailedErrors();
         });
@@ -36,7 +37,9 @@ public static class DependencyInjection
         services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();
         services.AddScoped<CreateReceivingOrder>();
         services.AddScoped<GetReceivingSources>();
+        services.AddScoped<IReceivingReferenceNames, ReceivingReferenceNameStore>();
         services.AddScoped<IReceivingOrderSourceChangeStore, ReceivingOrderSourceChangeStore>();
+        services.AddScoped<PreviewReceivingOrderSourceChange>();
         services.AddScoped<ChangeReceivingOrderSources>();
         services.AddScoped<ResynchronizeReceivingOrder>();
         services.AddScoped<CompleteReceivingOrder>();

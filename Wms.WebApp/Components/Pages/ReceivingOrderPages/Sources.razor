@@ -1,0 +1,119 @@
+@page "/receiving-sources"
+@attribute [Authorize(Roles = "Operator,Manager")]
+@using Wms.Application.Receiving
+
+<PageTitle>Документы 1С для приёмки</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Документы 1С для приёмки</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_busy">Обновить</MudButton>
+    </MudStack>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+
+    <MudPaper Class="pa-4">
+        <MudTextField T="string" @bind-Value="_sourceFilter" Immediate="true"
+                      Label="Поиск по номеру документа 1С" Class="mb-3" />
+        @if (_busy)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (!FilteredSources.Any())
+        {
+            <MudText>Документы не найдены.</MudText>
+        }
+        else
+        {
+            <MudTable T="ReceivingSourceView" Items="FilteredSources" Dense="true" Hover="true"
+                      Striped="true" Elevation="0" RowsPerPage="15">
+                <HeaderContent>
+                    @if (_canManage) { <MudTh></MudTh> }
+                    <MudTh>Документ 1С</MudTh>
+                    <MudTh>Дата</MudTh>
+                    <MudTh>Склад</MudTh>
+                    <MudTh>Отправитель</MudTh>
+                    <MudTh>Сверка</MudTh>
+                    <MudTh>Состояние</MudTh>
+                    <MudTh>Ордер WMS</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    @if (_canManage)
+                    {
+                        <MudTd>
+                            <MudCheckBox T="bool" Value="@_selected.Contains(context.RefKey)"
+                                         ValueChanged="@(value => ToggleSource(context.RefKey, value))"
+                                         Disabled="@(context.LinkedOrderId is not null)" />
+                        </MudTd>
+                    }
+                    <MudTd DataLabel="Документ 1С">@(context.Number ?? context.RefKey.ToString())</MudTd>
+                    <MudTd DataLabel="Дата">@SourceDate(context.Date)</MudTd>
+                    <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                    <MudTd DataLabel="Отправитель">@(context.SenderName ?? context.Sender ?? "—")</MudTd>
+                    <MudTd DataLabel="Сверка">
+                        @if (context.LastAttemptError is not null)
+                        {
+                            <MudText Color="Color.Error">@context.LastAttemptError</MudText>
+                        }
+                        else
+                        {
+                            <MudText>@(context.LastSuccessfulCheckAtUtc is null ? "Не сверен" : "Успешно")</MudText>
+                        }
+                        <MudText Typo="Typo.caption">@(context.LastAttemptAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Состояние">@SourceStatus(context)</MudTd>
+                    <MudTd DataLabel="Ордер WMS">
+                        @if (context.LinkedOrderId is Guid orderId)
+                        {
+                            <MudLink Href="@($"receiving-orders/{orderId}")">@(context.LinkedOrderNumber ?? "Открыть ордер")</MudLink>
+                        }
+                        else
+                        {
+                            <MudText>Свободен</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent><MudTablePager /></PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+
+    @if (_canManage)
+    {
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">Создать ордер WMS</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Выберите свободные документы одного склада. План суммируется по SKU;
+                неизвестное количество остаётся неизвестным.
+            </MudText>
+            @if (_selected.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2">Суммарный план выбранных документов</MudText>
+                @foreach (var plan in SelectedPlan)
+                {
+                    <MudText>@SkuName(plan.SkuId): @(plan.Quantity?.ToString("0.###") ?? "неизвестно")</MudText>
+                }
+                @if (SelectedSources.Any(x => x.HasUnknownSku))
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-2">
+                        В источниках есть строки без определённого SKU или количества.
+                    </MudAlert>
+                }
+                @if (SelectedSources.Select(x => x.WarehouseId).Distinct().Count() != 1)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-2">
+                        Выбранные документы относятся к разным складам.
+                    </MudAlert>
+                }
+            }
+            <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled"
+                       Disabled="@(_busy || !CanCreate)" OnClick="CreateAsync">
+                Создать ордер WMS
+            </MudButton>
+        </MudPaper>
+    }
+</MudStack>

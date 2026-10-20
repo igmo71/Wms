@@ -6,37 +6,42 @@
 <MudNavMenu>
     <AuthorizeView Roles="@ApplicationRoles.WmsUser" Context="wmsContext">
         <Authorized>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
-    <MudNavLink Href="receiving-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assignment">Приемка</MudNavLink>
-    <MudNavLink Href="lpn-labels" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Print">Этикетки LPN</MudNavLink>
-    <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
-    <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
-    <MudNavLink Href="inventory-transfers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoveUp">Перемещения</MudNavLink>
-    <MudNavGroup Title="Остатки и Обороты" Icon="@Icons.Material.Filled.Inventory">
-        <MudNavLink Href="inventory-balances" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Остатки</MudNavLink>
-        <MudNavLink Href="inventory-movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Движения</MudNavLink>
-        <MudNavLink Href="inventory-turnovers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Обороты</MudNavLink>
-    </MudNavGroup>
-    <MudNavGroup Title="Отчеты" Icon="@Icons.Material.Filled.Assessment">
-        <MudNavLink Href="reports/employee-performance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Производительность сотрудников</MudNavLink>
-        <MudNavLink Href="reports/undated-expiration-stock" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventBusy">Остатки без срока</MudNavLink>
-    </MudNavGroup>
-    <AuthorizeView Roles="@ApplicationRoles.ManagerOrAdministrator" Context="catalogContext">
-    <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">
-        <MudNavLink Href="warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Склады</MudNavLink>
-        <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="configurationContext">
-            <MudNavLink Href="zones" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Зоны</MudNavLink>
-            <MudNavLink Href="storage-locations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Ячейки хранения</MudNavLink>
-        </AuthorizeView>
-        <MudNavLink Href="stock-keeping-units" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Номенклатура</MudNavLink>
-        <MudNavLink Href="partners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Handshake">Партнёры</MudNavLink>
-        <MudNavLink Href="individuals" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">Физические лица</MudNavLink>
-        <MudNavLink Href="organizational-units" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Структура предприятия</MudNavLink>
-        <MudNavLink Href="sku-barcodes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.QrCode">Штрихкоды</MudNavLink>
-        <MudNavLink Href="units-of-measure" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Единицы измерения</MudNavLink>
-        <MudNavLink Href="delivery-directions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Направления доставки</MudNavLink>
-    </MudNavGroup>
-    </AuthorizeView>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Главная</MudNavLink>
+            <AuthorizeView Roles="Operator,Manager" Context="receivingContext">
+                <MudNavGroup Title="Приёмка" Icon="@Icons.Material.Filled.Assignment">
+                    <MudNavLink Href="receiving-sources" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Description">Документы 1С</MudNavLink>
+                    <MudNavLink Href="receiving-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assignment">Ордера WMS</MudNavLink>
+                    <MudNavLink Href="lpn-labels" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Print">Этикетки LPN</MudNavLink>
+                </MudNavGroup>
+            </AuthorizeView>
+            <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
+            <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
+            <MudNavLink Href="inventory-transfers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoveUp">Перемещения</MudNavLink>
+            <MudNavGroup Title="Остатки и Обороты" Icon="@Icons.Material.Filled.Inventory">
+                <MudNavLink Href="inventory-balances" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Остатки</MudNavLink>
+                <MudNavLink Href="inventory-movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Движения</MudNavLink>
+                <MudNavLink Href="inventory-turnovers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Обороты</MudNavLink>
+            </MudNavGroup>
+            <MudNavGroup Title="Отчеты" Icon="@Icons.Material.Filled.Assessment">
+                <MudNavLink Href="reports/employee-performance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Производительность сотрудников</MudNavLink>
+                <MudNavLink Href="reports/undated-expiration-stock" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventBusy">Остатки без срока</MudNavLink>
+            </MudNavGroup>
+            <AuthorizeView Roles="@ApplicationRoles.ManagerOrAdministrator" Context="catalogContext">
+                <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">
+                    <MudNavLink Href="warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Склады</MudNavLink>
+                    <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="configurationContext">
+                        <MudNavLink Href="zones" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GridView">Зоны</MudNavLink>
+                        <MudNavLink Href="storage-locations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Ячейки хранения</MudNavLink>
+                    </AuthorizeView>
+                    <MudNavLink Href="stock-keeping-units" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Номенклатура</MudNavLink>
+                    <MudNavLink Href="partners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Handshake">Партнёры</MudNavLink>
+                    <MudNavLink Href="individuals" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">Физические лица</MudNavLink>
+                    <MudNavLink Href="organizational-units" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Структура предприятия</MudNavLink>
+                    <MudNavLink Href="sku-barcodes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.QrCode">Штрихкоды</MudNavLink>
+                    <MudNavLink Href="units-of-measure" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Единицы измерения</MudNavLink>
+                    <MudNavLink Href="delivery-directions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountTree">Направления доставки</MudNavLink>
+                </MudNavGroup>
+            </AuthorizeView>
             @* <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink> *@
             <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="administratorContext">
                 <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ManageAccounts">Пользователи</MudNavLink>

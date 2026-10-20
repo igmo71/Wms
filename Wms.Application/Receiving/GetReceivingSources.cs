@@ -5,7 +5,11 @@ using Wms.Domain;
 namespace Wms.Application.Receiving;
 
 public sealed record ReceivingSourceState(
-    ReceivingSourceDocument Source, ReceivingSourceVersion? Version);
+    ReceivingSourceDocument Source, ReceivingSourceVersion? Version)
+{
+    public Guid? LinkedOrderId { get; init; }
+    public string? LinkedOrderNumber { get; init; }
+}
 
 public sealed record ReceivingSourceView(
     Guid RefKey, Guid? WarehouseId, string? Number,
@@ -15,7 +19,14 @@ public sealed record ReceivingSourceView(
     bool? Posted, bool? DeletionMark, Guid? VersionId,
     DateTimeOffset? LastSuccessfulCheckAtUtc, DateTimeOffset? LastAttemptAtUtc,
     string? LastAttemptError, IReadOnlyDictionary<Guid, decimal?> PlanBySku,
-    bool HasUnknownSku, IReadOnlyList<ReceivingSourceLineView> Lines);
+    bool HasUnknownSku, IReadOnlyList<ReceivingSourceLineView> Lines)
+{
+    public string? WarehouseName { get; init; }
+    public string? SenderName { get; init; }
+    public IReadOnlyDictionary<Guid, string> SkuNames { get; init; } = new Dictionary<Guid, string>();
+    public Guid? LinkedOrderId { get; init; }
+    public string? LinkedOrderNumber { get; init; }
+}
 
 public sealed record ReceivingSourceLineView(
     int LineNumber, Guid? SourceSkuRefKey, Guid? StockKeepingUnitId,
@@ -27,6 +38,8 @@ public interface IReceivingOrderStore
         IReadOnlyCollection<Guid> refKeys, CancellationToken ct);
 
     Task<IReadOnlyList<ReceivingSourceState>> ListUnlinkedSourcesAsync(CancellationToken ct);
+
+    Task<IReadOnlyList<ReceivingSourceState>> ListAllSourcesAsync(CancellationToken ct);
 
     Task<OperationResult<Guid>> CreateAsync(
         ReceivingOrder order, IReadOnlyList<ReceivingOrderSourceLink> links,
@@ -42,13 +55,34 @@ public interface IReceivingOrderStore
 public sealed record ReceivingSourceExpectation(
     Guid SourceId, Guid VersionId, DateTimeOffset CheckedAtUtc);
 
-public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSourceParser parser)
+public interface IReceivingReferenceNames
 {
+    Task<ReceivingReferenceNames> GetAsync(
+        IReadOnlyCollection<Guid> warehouseIds, IReadOnlyCollection<Guid> skuIds,
+        IReadOnlyCollection<Guid> partnerIds, CancellationToken ct);
+}
+
+public sealed record ReceivingReferenceNames(
+    IReadOnlyDictionary<Guid, string> Warehouses,
+    IReadOnlyDictionary<Guid, string> Skus,
+    IReadOnlyDictionary<Guid, string> Partners);
+
+public sealed class GetReceivingSources(
+    IReceivingOrderStore store, IReceivingSourceParser parser,
+    IReceivingReferenceNames names)
+{
+    public async Task<IReadOnlyList<ReceivingSourceView>> ListAllAsync(
+        CancellationToken ct = default)
+    {
+        var states = await store.ListAllSourcesAsync(ct);
+        return await MapAsync(states, ct);
+    }
+
     public async Task<IReadOnlyList<ReceivingSourceView>> ListUnlinkedAsync(
         CancellationToken ct = default)
     {
         var states = await store.ListUnlinkedSourcesAsync(ct);
-        return Map(states);
+        return await MapAsync(states, ct);
     }
 
     public async Task<IReadOnlyList<ReceivingSourceView>> GetByRefKeysAsync(
@@ -56,12 +90,14 @@ public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSo
     {
         if (refKeys is null || refKeys.Count == 0)
             return [];
-        return Map(await store.LoadSourcesAsync(refKeys.Distinct().ToArray(), ct));
+        return await MapAsync(await store.LoadSourcesAsync(refKeys.Distinct().ToArray(), ct), ct);
     }
 
-    private IReadOnlyList<ReceivingSourceView> Map(
-        IReadOnlyList<ReceivingSourceState> states)
+    private async Task<IReadOnlyList<ReceivingSourceView>> MapAsync(
+        IReadOnlyList<ReceivingSourceState> states, CancellationToken ct)
     {
+        if (states.Count == 0)
+            return [];
         var results = new List<ReceivingSourceView>(states.Count);
         foreach (var state in states)
         {
@@ -96,8 +132,31 @@ public sealed class GetReceivingSources(IReceivingOrderStore store, IReceivingSo
                 parsed?.Posted, parsed?.DeletionMark, state.Version?.Id,
                 state.Source.LastSuccessfulCheckAtUtc, state.Source.LastAttemptAtUtc,
                 state.Source.LastAttemptError, quantities,
-                !metadataKnown || active && plan?.HasUnknownSku == true, lines));
+                !metadataKnown || active && plan?.HasUnknownSku == true, lines)
+            {
+                LinkedOrderId = state.LinkedOrderId,
+                LinkedOrderNumber = state.LinkedOrderNumber
+            });
         }
-        return results;
+        var warehouseIds = results.Where(x => x.WarehouseId.HasValue)
+            .Select(x => x.WarehouseId!.Value).Distinct().ToArray();
+        var skuIds = results.SelectMany(x => x.PlanBySku.Keys
+            .Concat(x.Lines.Where(line => line.StockKeepingUnitId.HasValue)
+                .Select(line => line.StockKeepingUnitId!.Value))).Distinct().ToArray();
+        var partnerIds = results.Where(x => x.SenderType == "StandardODATA.Catalog_Партнеры"
+                && Guid.TryParse(x.Sender, out _))
+            .Select(x => Guid.Parse(x.Sender!)).Distinct().ToArray();
+        var references = await names.GetAsync(warehouseIds, skuIds, partnerIds, ct);
+        return results.Select(source => source with
+        {
+            WarehouseName = source.WarehouseId is Guid warehouseId
+                && references.Warehouses.TryGetValue(warehouseId, out var warehouseName)
+                    ? warehouseName : null,
+            SenderName = source.SenderType == "StandardODATA.Catalog_Партнеры"
+                && Guid.TryParse(source.Sender, out var partnerId)
+                && references.Partners.TryGetValue(partnerId, out var partnerName)
+                    ? partnerName : null,
+            SkuNames = references.Skus
+        }).ToArray();
     }
 }

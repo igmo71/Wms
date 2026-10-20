@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Wms.Application.Commands;
@@ -10,6 +11,8 @@ namespace Wms.Tests.Infrastructure;
 
 internal static class TestSupport
 {
+    private static long _receivingOrderNumberSequence;
+
     public static CommandContext Command(string user = "test-user") => new(Guid.NewGuid(), user);
 
     public static T Value<T>(OperationResult<T> result)
@@ -19,6 +22,11 @@ internal static class TestSupport
     }
 
     public static void Success(OperationResult result) => Assert.True(result.IsSuccess, result.Error?.Message);
+
+    public static void AssignTestReceivingOrderNumber(ReceivingOrder order) =>
+        Success(order.AssignNumber(new DateTime(2099, 1, 1)
+            .AddSeconds(Interlocked.Increment(ref _receivingOrderNumberSequence))
+            .ToString("yyMMdd-HHmmss", CultureInfo.InvariantCulture)));
 
     public static void Error(OperationResult result, OperationErrorType type) => Assert.Equal(type, result.Error?.Type);
 

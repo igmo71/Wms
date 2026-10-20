@@ -1,0 +1,116 @@
+@using Wms.Application.Receiving
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+            @if (_busy)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            @if (_preview is null)
+            {
+                <MudText Typo="Typo.subtitle1">Добавить свободный документ 1С</MudText>
+                <MudTextField T="string" @bind-Value="_search" Immediate="true"
+                              Label="Поиск по номеру или Ref_Key" />
+                @if (!MatchingFreeSources.Any())
+                {
+                    <MudText>Свободных документов по запросу нет. Можно указать Ref_Key для свежей сверки 1С.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingSourceView" Items="MatchingFreeSources" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Документ</MudTh><MudTh>Склад</MudTh><MudTh>Последняя сверка</MudTh><MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Документ">@(context.Number ?? context.RefKey.ToString())</MudTd>
+                            <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                            <MudTd DataLabel="Последняя сверка">@(context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</MudTd>
+                            <MudTd><MudButton Variant="Variant.Text" Disabled="_busy"
+                                              OnClick="() => PreviewAsync(ReceivingSourceChangeKind.Attach, context.RefKey)">Выбрать</MudButton></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudTextField T="string" @bind-Value="_manualRefKey" Label="Ref_Key документа 1С" />
+                    <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="PreviewByRefKeyAsync">Проверить</MudButton>
+                </MudStack>
+
+                <MudDivider />
+                <MudText Typo="Typo.subtitle1">Открепить связанный документ</MudText>
+                @if (_linkedSources.Count == 0)
+                {
+                    <MudText>У ордера нет действующих источников.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingSourceView" Items="_linkedSources" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Документ</MudTh><MudTh>Склад</MudTh><MudTh>Сверка</MudTh><MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Документ">@(context.Number ?? context.RefKey.ToString())</MudTd>
+                            <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                            <MudTd DataLabel="Сверка">@(context.LastAttemptError ?? context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</MudTd>
+                            <MudTd><MudButton Variant="Variant.Text" Disabled="_busy"
+                                              OnClick="() => PreviewAsync(ReceivingSourceChangeKind.Detach, context.RefKey)">Выбрать</MudButton></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle1">
+                    @(_preview.Kind == ReceivingSourceChangeKind.Attach ? "Прикрепить" : "Открепить")
+                    документ @(_preview.SourceNumber ?? _preview.SourceRefKey.ToString())
+                </MudText>
+                <MudText Typo="Typo.body2">Ref_Key: @_preview.SourceRefKey</MudText>
+                <MudText Typo="Typo.body2">Склад: @(_preview.SourceWarehouseName ?? _preview.SourceWarehouseId?.ToString() ?? "неизвестен")</MudText>
+                @if (_preview.SourcePosted != true || _preview.SourceDeletionMark != false)
+                {
+                    <MudAlert Severity="Severity.Warning">Документ не подтверждён как актуальный; его вклад в план может быть нулевым или неизвестным.</MudAlert>
+                }
+                @if (_preview.SourceCheckError is not null)
+                {
+                    <MudAlert Severity="Severity.Warning">Последняя сверка: @_preview.SourceCheckError</MudAlert>
+                }
+                <MudText Typo="Typo.subtitle2">Изменение текущего плана</MudText>
+                @if (_preview.PlanChanges.Count == 0)
+                {
+                    <MudText>План по SKU не изменится.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingSourceCompositionPlanChange" Items="_preview.PlanChanges" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent><MudTh>SKU</MudTh><MudTh>До</MudTh><MudTh>После</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
+                            <MudTd DataLabel="До">@PlanText(context.BeforePresent, context.BeforePlan)</MudTd>
+                            <MudTd DataLabel="После">@PlanText(context.AfterPresent, context.AfterPlan)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                @if (_preview.HasUnknownSku)
+                {
+                    <MudAlert Severity="Severity.Warning">В составе остаются строки с неизвестной номенклатурой или количеством.</MudAlert>
+                }
+                <MudAlert Severity="Severity.Info">@_preview.FactPreservationWarning</MudAlert>
+                <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="BackToSelection">Выбрать другой документ</MudButton>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="_busy" OnClick="Cancel">Закрыть</MudButton>
+        @if (_preview is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy"
+                       OnClick="ConfirmAsync">
+                @(_preview.Kind == ReceivingSourceChangeKind.Attach ? "Подтвердить прикрепление" : "Подтвердить открепление")
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>

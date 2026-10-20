@@ -13,7 +13,10 @@ public sealed record ReceivingWorkLpnItemView(
 
 public sealed record ReceivingWorkPutawayView(
     Guid Id, Guid ItemId, Guid DestinationStorageLocationId,
-    decimal Quantity, DateTimeOffset CreatedAtUtc, Guid MovementId);
+    decimal Quantity, DateTimeOffset CreatedAtUtc, Guid MovementId)
+{
+    public string? DestinationAddress { get; init; }
+}
 
 public sealed record ReceivingWorkLpnView(
     Guid Id, string Code, Guid OrderId, Guid WarehouseId,
@@ -37,16 +40,23 @@ public sealed record ReceivingWorkCycleView(
     int Number, Guid? ReceivingLocationId, DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc, string? CompletedBy, bool SourceCheckFailed,
     IReadOnlyList<ReceivingWorkCycleItemView> Items,
-    IReadOnlyList<ReceivingWorkCycleSourceView> Sources);
+    IReadOnlyList<ReceivingWorkCycleSourceView> Sources)
+{
+    public string? ReceivingLocationAddress { get; init; }
+}
 
 public sealed record ReceivingWorkOrderView(
-    Guid Id, Guid WarehouseId, ReceivingOrderStatus Status,
+    Guid Id, string Number, DateTimeOffset CreatedAtUtc,
+    Guid WarehouseId, ReceivingOrderStatus Status,
     int ActiveCycleNumber, Guid? ReceivingLocationId, bool IsParticipant,
     long Revision, IReadOnlyList<Guid> SourceRefKeys,
     IReadOnlyList<ReceivingWorkItemView> Items,
     IReadOnlyList<ReceivingWorkLpnView> Lpns,
     IReadOnlyList<ReceivingWorkCycleView> Cycles)
 {
+    public string? WarehouseName { get; init; }
+    public string? ReceivingLocationAddress { get; init; }
+
     public int CurrentDiscrepancyCount => Items.Count(x =>
         x.PlanQuantity is null || x.FactQuantity is null
         || x.PlanQuantity != x.FactQuantity);

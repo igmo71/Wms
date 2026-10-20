@@ -87,7 +87,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
     private void Apply(MobileReceivingWorkOrderResponse order)
     {
         _order = order;
-        NumberLabel.Text = order.Id.ToString();
+        NumberLabel.Text = $"Ордер WMS {order.Number}";
+        CreatedAtLabel.Text = $"Создан: {order.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}";
         StatusLabel.Text = order.Status switch
         {
             MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
@@ -96,7 +97,8 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             _ => order.Status.ToString()
         };
         LocationLabel.Text = order.ReceivingLocationId is Guid id
-            ? $"Место приёмки: {id}" : "Место приёмки ещё не выбрано";
+            ? $"Склад: {order.WarehouseName ?? order.WarehouseId.ToString()} · Место приёмки: {order.ReceivingLocationAddress ?? id.ToString()}"
+            : $"Склад: {order.WarehouseName ?? order.WarehouseId.ToString()} · Место приёмки ещё не выбрано";
         JoinButton.IsVisible = !order.IsParticipant
             && (order.Status is MobileReceivingOrderStatus.ReadyForReceiving
                 or MobileReceivingOrderStatus.InReceiving);
@@ -172,13 +174,12 @@ public partial class ReceivingOrderReceivingPage : ContentPage
                 source?.Number ?? refKey.ToString(),
                 source is null ? string.Empty : string.Join("\n", new[]
                 {
-                    $"Дата: {source.Date ?? "—"}",
-                    $"Отправитель: {source.Sender ?? "—"}"
-                        + (source.SenderType is null ? "" : $" ({source.SenderType})"),
+                    $"Дата: {SourceDate(source.Date)}",
+                    $"Отправитель: {source.SenderName ?? source.Sender ?? "—"}"
+                        + (source.SenderType == "StandardODATA.Catalog_Партнеры" ? " (партнёр 1С)" : ""),
                     $"Складская операция: {source.WarehouseOperation ?? "—"}",
                     $"Хозяйственная операция: {source.BusinessOperation ?? "—"}",
-                    $"Основание: {source.BasisDocument ?? "—"}"
-                        + (source.BasisDocumentType is null ? "" : $" ({source.BasisDocumentType})"),
+                    $"Основание: {BasisDisplay(source)}",
                 }), canDetach);
         }).ToArray();
         OnPropertyChanged(nameof(SourceRows));
@@ -445,6 +446,22 @@ public partial class ReceivingOrderReceivingPage : ContentPage
             && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
+    }
+
+    private static string SourceDate(string? value) =>
+        DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var date)
+            ? date.ToString("dd.MM.yyyy") : value ?? "—";
+
+    private static string BasisDisplay(MobileReceivingLinkedSourceResponse source)
+    {
+        var type = source.BasisDocumentType switch
+        {
+            "StandardODATA.Document_ПриобретениеТоваровУслуг" => "приобретение товаров и услуг 1С",
+            null => null,
+            _ => "документ 1С"
+        };
+        return (source.BasisDocument ?? "—") + (type is null ? "" : $" ({type})");
     }
 
     private static string Format(decimal? value) => value?.ToString("0.###") ?? "?";

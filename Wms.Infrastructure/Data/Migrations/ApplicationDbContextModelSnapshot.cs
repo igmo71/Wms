@@ -1033,6 +1033,11 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("nvarchar(13)");
+
                     b.Property<long>("OperationalRevision")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
@@ -1055,11 +1060,17 @@ namespace Wms.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Number")
+                        .IsUnique();
+
                     b.HasIndex("ReceivingLocationId");
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("ReceivingOrders");
+                    b.ToTable("ReceivingOrders", t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivingOrders_NumberFormat", "LEN([Number]) = 13 AND [Number] LIKE '[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]'");
+                        });
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingOrderItem", b =>

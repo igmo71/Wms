@@ -1,3 +1,4 @@
+using System.Globalization;
 using Wms.Common;
 using Wms.Domain.Enums;
 
@@ -16,6 +17,7 @@ public class ReceivingOrder
     }
 
     public Guid Id { get; private set; }
+    public string Number { get; private set; } = null!;
     public int ActiveCycleNumber { get; private set; }
     public long OperationalRevision { get; private set; }
     public Guid WarehouseId { get; private set; }
@@ -33,6 +35,19 @@ public class ReceivingOrder
     public IReadOnlyCollection<LicensePlateNumber> LicensePlateNumbers => _licensePlateNumbers;
     public IReadOnlyCollection<ReceivingOrderSourceLink> SourceLinks => _sourceLinks;
     public IReadOnlyCollection<ReceivingCycle> Cycles => _cycles;
+
+    public OperationResult AssignNumber(string number)
+    {
+        if (!string.IsNullOrEmpty(Number))
+            return OperationError.Conflict("Номер приходного ордера уже назначен.");
+        if (number is null || number.Length != 13
+            || !DateTime.TryParseExact(number, "yyMMdd-HHmmss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            return OperationError.Invalid("Номер приходного ордера должен иметь формат yyMMdd-HHmmss.");
+
+        Number = number;
+        return OperationResult.Success();
+    }
 
     public void RecordSourceCompositionChange() => AdvanceOperationalRevision();
 

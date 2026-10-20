@@ -9,6 +9,11 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
     public void Configure(EntityTypeBuilder<ReceivingOrder> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Number).HasMaxLength(13).IsRequired();
+        builder.HasIndex(x => x.Number).IsUnique();
+        builder.ToTable(table => table.HasCheckConstraint(
+            "CK_ReceivingOrders_NumberFormat",
+            "LEN([Number]) = 13 AND [Number] LIKE '[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]'"));
         builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
 
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);

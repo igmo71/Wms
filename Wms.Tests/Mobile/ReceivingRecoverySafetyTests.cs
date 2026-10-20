@@ -56,7 +56,7 @@ public sealed class ReceivingRecoverySafetyTests
                 return new(HttpStatusCode.OK)
                 {
                     Content = JsonContent.Create(new MobileReceivingWorkOrderResponse(
-                        Guid.Empty, Guid.Empty,
+                        Guid.Empty, "990101-000001", DateTimeOffset.UtcNow, Guid.Empty,
                         MobileReceivingOrderStatus.InReceiving, 1, null,
                         true, 0, [], [], []))
                 };

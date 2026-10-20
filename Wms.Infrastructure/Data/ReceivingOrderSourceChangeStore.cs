@@ -6,12 +6,23 @@ using Wms.Domain.Enums;
 
 namespace Wms.Data;
 
-public sealed class ReceivingOrderSourceChangeStore : IReceivingOrderSourceChangeStore
+public sealed class ReceivingOrderSourceChangeStore(
+    IDbContextFactory<ApplicationDbContext> contextFactory) : IReceivingOrderSourceChangeStore
 {
-    public async Task<ReceivingSourceChangeState> LoadAsync(
-        ICommandExecutionContext session, Guid orderId, Guid sourceRefKey, CancellationToken ct)
+    public async Task<ReceivingSourceChangeState> LoadPreviewAsync(
+        Guid orderId, Guid sourceRefKey, CancellationToken ct)
     {
-        var db = Db(session);
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await LoadStateAsync(db, orderId, sourceRefKey, ct);
+    }
+
+    public Task<ReceivingSourceChangeState> LoadAsync(
+        ICommandExecutionContext session, Guid orderId, Guid sourceRefKey, CancellationToken ct)
+        => LoadStateAsync(Db(session), orderId, sourceRefKey, ct);
+
+    private static async Task<ReceivingSourceChangeState> LoadStateAsync(
+        ApplicationDbContext db, Guid orderId, Guid sourceRefKey, CancellationToken ct)
+    {
         var order = await db.ReceivingOrders.Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == orderId, ct);
         if (order is null)
@@ -46,7 +57,10 @@ public sealed class ReceivingOrderSourceChangeStore : IReceivingOrderSourceChang
             x.ReceivingOrderId == orderId && (x.Status == LicensePlateNumberStatus.Closed
                 || x.Status == LicensePlateNumberStatus.Deleted), ct);
         return new(order, source is null ? null : State(source), targetLink,
-            linkedOrderId, activeDocuments.Select(State).ToArray(), hasPostedLpn);
+            linkedOrderId, activeDocuments.Select(State).ToArray(), hasPostedLpn)
+        {
+            ActiveLinks = links
+        };
     }
 
     public void GuardSources(ICommandExecutionContext session,

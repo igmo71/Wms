@@ -1,6 +1,6 @@
 # Current WMS state
 
-This directory describes implemented behavior. The code and migrations remain the source of truth for implementation details. The receiving decisions are in [the feature specification](../../../specs/001-receiving-stock-lifecycle/spec.md).
+This directory describes implemented behavior. The code and migrations remain the source of truth for implementation details. The receiving lifecycle decisions are in [epic 001](../../../specs/001-receiving-stock-lifecycle/spec.md); workspace and numbering decisions are in [feature 002](../../../specs/002-receiving-workspaces/spec.md).
 
 Read only the relevant area: [identity](identity.md), [inventory](inventory.md), [receiving](receiving.md), [other warehouse workflows](other-workflows.md), [1C integration](integration.md), and [clients](clients.md). Current technical structure and conventions are in [architecture](../architecture.md); deferred work is in [backlog](../backlog.md).
 

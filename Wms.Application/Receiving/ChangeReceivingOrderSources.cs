@@ -11,16 +11,22 @@ public enum ReceivingSourceChangeChannel { Web, Mobile }
 
 public sealed record ChangeReceivingOrderSourcesRequest(
     Guid RequestId, Guid OrderId, Guid SourceRefKey, string UserId,
-    ReceivingSourceChangeKind Kind, ReceivingSourceChangeChannel Channel);
+    ReceivingSourceChangeKind Kind, ReceivingSourceChangeChannel Channel,
+    string? StateToken = null);
 
 public sealed record ReceivingSourceChangeState(
     ReceivingOrder? Order, ReceivingSourceState? Target,
     ReceivingOrderSourceLink? TargetLink, Guid? TargetLinkedOrderId,
     IReadOnlyList<ReceivingSourceState> ActiveSources,
-    bool HasPostedLpn);
+    bool HasPostedLpn)
+{
+    public IReadOnlyList<ReceivingOrderSourceLink> ActiveLinks { get; init; } = [];
+}
 
 public interface IReceivingOrderSourceChangeStore
 {
+    Task<ReceivingSourceChangeState> LoadPreviewAsync(
+        Guid orderId, Guid sourceRefKey, CancellationToken ct);
     Task<ReceivingSourceChangeState> LoadAsync(
         ICommandExecutionContext session, Guid orderId, Guid sourceRefKey, CancellationToken ct);
     void GuardSources(ICommandExecutionContext session,
@@ -53,7 +59,14 @@ public sealed class ChangeReceivingOrderSources(
                     return access.Error!;
                 var canManage = (await permission.RequireManagerAsync(
                     request.UserId, operationCt)).IsSuccess;
-                if (request.Kind == ReceivingSourceChangeKind.Attach)
+                if (request.Channel == ReceivingSourceChangeChannel.Web && !canManage)
+                    return OperationError.Conflict("Для изменения источников в Web нужна роль Manager.");
+                if (request.Channel == ReceivingSourceChangeChannel.Web
+                    && string.IsNullOrWhiteSpace(request.StateToken))
+                    return OperationError.Invalid("Перед изменением состава обновите предпросмотр.");
+
+                if (request.Kind == ReceivingSourceChangeKind.Attach
+                    && request.Channel == ReceivingSourceChangeChannel.Mobile)
                 {
                     var preview = await orders.GetOrderAsync(
                         request.OrderId, request.UserId, operationCt);
@@ -84,6 +97,12 @@ public sealed class ChangeReceivingOrderSources(
                 if (order.Status is not (ReceivingOrderStatus.ReadyForReceiving
                     or ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.Received))
                     return OperationError.Conflict("Состав источников нельзя изменить в текущем статусе ордера.");
+                if (request.Channel == ReceivingSourceChangeChannel.Web
+                    && !string.Equals(request.StateToken,
+                        ReceivingSourceCompositionToken.Create(
+                            state, request.Kind, request.SourceRefKey),
+                        StringComparison.Ordinal))
+                    return OperationError.Conflict("Данные изменились, обновите предпросмотр.");
 
                 var managerOnly = order.Status == ReceivingOrderStatus.Received
                     || request.Kind == ReceivingSourceChangeKind.Detach && state.HasPostedLpn;
@@ -157,7 +176,10 @@ public sealed class ChangeReceivingOrderSources(
                 }
 
                 order.RecordSourceCompositionChange();
-                store.GuardSources(session, included);
+                var guardedSources = request.Channel == ReceivingSourceChangeChannel.Web
+                    && request.Kind == ReceivingSourceChangeKind.Detach
+                    ? included.Append(target).ToArray() : included;
+                store.GuardSources(session, guardedSources);
                 var audit = WarehouseAuditEvent.Create(
                     request.Kind == ReceivingSourceChangeKind.Attach
                         ? "receiving.order.source-attached" : "receiving.order.source-detached",

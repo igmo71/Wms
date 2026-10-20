@@ -20,6 +20,7 @@ public sealed class ReceivingSkuSelectionTests(SqlDatabase database)
         var manualSkuId = Guid.NewGuid();
         var scannedSkuId = Guid.NewGuid();
         var order = Value(ReceivingOrder.CreateNew(warehouseId, DateTimeOffset.UtcNow));
+        AssignTestReceivingOrderNumber(order);
         await using (var seed = database.CreateDbContext())
         {
             seed.Warehouses.Add(new Warehouse { Id = warehouseId, Name = "SKU selection" });

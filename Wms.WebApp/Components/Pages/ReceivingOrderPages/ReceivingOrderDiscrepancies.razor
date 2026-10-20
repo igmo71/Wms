@@ -14,43 +14,22 @@
             Свежая сверка не всех источников подтверждена. Текущий план основан на последних успешных версиях.
         </MudAlert>
     }
-    <table class="mud-table mud-table-dense w-100">
-        <thead><tr><th>SKU</th><th>Код</th><th>План</th><th>Факт</th><th>Текущее расхождение</th></tr></thead>
-        <tbody>
-        @foreach (var item in Order.Items)
-        {
-            <tr>
-                <td>@(item.SkuName ?? item.SkuId.ToString())</td>
-                <td>@item.SkuCode</td>
-                <td>@Format(item.PlanQuantity) @item.UnitOfMeasure</td>
-                <td>@(item.FactQuantity is null ? "Не проверено" : Format(item.FactQuantity) + " " + item.UnitOfMeasure)</td>
-                <td>@Difference(item)</td>
-            </tr>
-            @if (item.PlanQuantity is null)
-            {
-                var reasons = Sources.Where(source => source.Posted == true
-                    && source.DeletionMark == false
-                    && source.WarehouseId == Order.WarehouseId)
-                    .SelectMany(source => source.Lines
-                    .Where(line => (line.StockKeepingUnitId == item.SkuId
-                        || line.SourceSkuRefKey == item.SkuId) && line.Error is not null)
-                    .Select(line => $"{source.Number ?? source.RefKey.ToString()}, строка {line.LineNumber}: {line.Error}"))
-                    .ToArray();
-                <tr><td colspan="5">
-                    План SKU неизвестен.
-                    @if (reasons.Length > 0)
-                    {
-                        @(string.Join("; ", reasons))
-                    }
-                    else
-                    {
-                        <span>Проверьте состояние источников и допустимость суммы количеств.</span>
-                    }
-                </td></tr>
-            }
-        }
-        </tbody>
-    </table>
+    <MudTable T="ReceivingWorkItemView" Items="Order.Items" Dense="true" Hover="true" Striped="true" Elevation="0">
+        <HeaderContent><MudTh>SKU</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Текущее расхождение</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
+            <MudTd DataLabel="Код">@context.SkuCode</MudTd>
+            <MudTd DataLabel="План">@Format(context.PlanQuantity) @context.UnitOfMeasure</MudTd>
+            <MudTd DataLabel="Факт">@(context.FactQuantity is null ? "Не проверено" : Format(context.FactQuantity) + " " + context.UnitOfMeasure)</MudTd>
+            <MudTd DataLabel="Текущее расхождение">
+                @Difference(context)
+                @if (context.PlanQuantity is null)
+                {
+                    <MudText Typo="Typo.caption">@UnknownPlanReason(context)</MudText>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
 </MudPaper>
 
 @code {
@@ -65,4 +44,17 @@
         : item.FactQuantity is null ? "Факт не проверен"
         : item.FactQuantity == item.PlanQuantity ? "Нет"
         : $"{item.FactQuantity - item.PlanQuantity:0.###} {item.UnitOfMeasure}";
+
+    private string UnknownPlanReason(ReceivingWorkItemView item)
+    {
+        var reasons = Sources.Where(source => source.Posted == true
+            && source.DeletionMark == false && source.WarehouseId == Order.WarehouseId)
+            .SelectMany(source => source.Lines
+                .Where(line => (line.StockKeepingUnitId == item.SkuId
+                    || line.SourceSkuRefKey == item.SkuId) && line.Error is not null)
+                .Select(line => $"{source.Number ?? source.RefKey.ToString()}, строка {line.LineNumber}: {line.Error}"))
+            .ToArray();
+        return reasons.Length > 0 ? string.Join("; ", reasons)
+            : "Проверьте состояние источников и допустимость суммы количеств.";
+    }
 }

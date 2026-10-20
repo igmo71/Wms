@@ -17,10 +17,15 @@ without hiding valid quantities of other SKUs. A failed read or unreadable
 response records the attempt error without replacing the last successful
 version. For linked WMS orders, successful checks recalculate only the current
 plan as described in [receiving.md](receiving.md).
+The 1C sender type `StandardODATA.Catalog_Партнеры` denotes a reference to the
+partner catalog. Receiving views resolve its reference to the locally imported
+partner name when available; the source snapshot retains the original ID and
+type.
 
 The 1C receiving notification checks and stores the source document. It does
-not create a WMS receiving order; an operator creates that order explicitly
-from selected sources. Web Managers may check all sources of one WMS order manually.
+not create a WMS receiving order; a Web Manager or Mobile receiving worker
+creates that order explicitly from selected sources. Web Managers may check all
+sources of one WMS order manually.
 Manual checks record their outcome in audit.
 
 New receiving and putaway do not write status, item tables, or comments to 1C.
