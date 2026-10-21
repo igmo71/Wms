@@ -19,6 +19,7 @@ public sealed record ReceivingWorkPutawayView(
     decimal Quantity, DateTimeOffset CreatedAtUtc, Guid MovementId)
 {
     public string? DestinationAddress { get; init; }
+    public string? CreatedBy { get; init; }
 }
 
 public sealed record ReceivingWorkLpnView(

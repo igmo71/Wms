@@ -102,11 +102,11 @@ public sealed class ReceivingWorkQueryStore(
             {
                 source.RefKey, audit.EventType, audit.OccurredAtUtc,
                 Actor = db.Users.Where(user => user.Id == audit.ActorUserId)
-                    .Select(user => user.UserName).FirstOrDefault() ?? audit.ActorUserId
+                    .Select(user => user.DisplayName).FirstOrDefault()
             }).ToArrayAsync(ct);
         return events.Select(x => new ReceivingSourceChangeHistoryView(
             x.RefKey, x.EventType == "receiving.order.source-detached",
-            x.OccurredAtUtc, x.Actor ?? "—")).ToArray();
+            x.OccurredAtUtc, string.IsNullOrWhiteSpace(x.Actor) ? "Имя не указано" : x.Actor)).ToArray();
     }
 
     public async Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
@@ -210,7 +210,7 @@ public sealed class ReceivingWorkQueryStore(
                     x.CurrentPlanQuantity, x.FactQuantity)
                 { IsCurrent = currentSkuIds.Contains(x.StockKeepingUnitId) }).ToArray(),
             order.LicensePlateNumbers.Where(x => x.ReceivingCycleId is not null)
-                .OrderByDescending(x => x.CreatedAtUtc)
+                .OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
                 .Select(x => MapLpn(x, order.WarehouseId)).ToArray(),
             order.Cycles.OrderByDescending(x => x.Number)
                 .Select(MapCycle).ToArray())
@@ -267,7 +267,8 @@ public sealed class ReceivingWorkQueryStore(
                     x.DestinationStorageLocationId, x.Quantity,
                     x.CreatedAtUtc, x.InventoryMovementId)
                 {
-                    DestinationAddress = x.DestinationStorageLocation?.DisplayAddress
+                    DestinationAddress = x.DestinationStorageLocation?.DisplayAddress,
+                    CreatedBy = x.CreatedBy
                 }).ToArray());
     }
 }

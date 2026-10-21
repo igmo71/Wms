@@ -11,6 +11,8 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
 public partial class Sources
 {
+    [SupplyParameterFromQuery(Name = "document")] public Guid? DocumentRefKey { get; set; }
+
     [Inject] private GetReceivingSources ReceivingSources { get; set; } = null!;
     [Inject] private CreateReceivingOrder CreateOrder { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
@@ -19,17 +21,25 @@ public partial class Sources
     private IReadOnlyList<ReceivingSourceView> _sources = [];
     private readonly HashSet<Guid> _selected = [];
     private Guid? _activeSourceRefKey;
+    private Guid? _appliedDocumentRefKey;
     private (Guid RequestId, Guid[] SourceRefKeys)? _pendingCreate;
     private string? _sourceFilter;
     private string? _error;
     private bool _canManage;
     private bool _busy;
 
-    private IEnumerable<ReceivingSourceView> FilteredSources =>
-        string.IsNullOrWhiteSpace(_sourceFilter) ? _sources
-            : _sources.Where(x =>
-                x.Number?.Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase) == true
-                || x.RefKey.ToString().Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<ReceivingSourceView> FilteredSources
+    {
+        get
+        {
+            var matches = string.IsNullOrWhiteSpace(_sourceFilter) ? _sources
+                : _sources.Where(x =>
+                    x.Number?.Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase) == true
+                    || x.RefKey.ToString().Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase));
+            return DocumentRefKey is Guid requestedRefKey && _activeSourceRefKey == requestedRefKey
+                ? matches.OrderByDescending(x => x.RefKey == requestedRefKey) : matches;
+        }
+    }
 
     private IEnumerable<ReceivingSourceView> SelectedSources =>
         _sources.Where(x => x.LinkedOrderId is null && _selected.Contains(x.RefKey));
@@ -84,9 +94,9 @@ public partial class Sources
         source.Lines.OrderBy(line => SourceSkuName(source, line), StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(line => line.LineNumber).ToArray();
 
-    private string SourceRowClass(ReceivingSourceView source, int _) =>
-        _selected.Contains(source.RefKey) ? "source-row-selected"
-            : _activeSourceRefKey == source.RefKey ? "source-row-active" : "";
+    private string SourceRowStyle(ReceivingSourceView source, int _) =>
+        _selected.Contains(source.RefKey) || _activeSourceRefKey == source.RefKey
+            ? "background-color: var(--mud-palette-background-gray);" : "";
 
     private void OnSourceRowClick(TableRowClickEventArgs<ReceivingSourceView> args)
     {
@@ -110,6 +120,19 @@ public partial class Sources
 
     protected override Task OnInitializedAsync() => ReloadAsync();
 
+    protected override void OnParametersSet()
+    {
+        if (DocumentRefKey == _appliedDocumentRefKey)
+            return;
+        _appliedDocumentRefKey = DocumentRefKey;
+        _activeSourceRefKey = DocumentRefKey;
+        _selected.Clear();
+        _pendingCreate = null;
+        _sourceFilter = DocumentRefKey is Guid refKey
+            ? _sources.FirstOrDefault(x => x.RefKey == refKey)?.Number
+            : null;
+    }
+
     private async Task ReloadAsync()
     {
         _busy = true;
@@ -119,6 +142,10 @@ public partial class Sources
             var user = (await Authentication.GetAuthenticationStateAsync()).User;
             _canManage = user.IsInRole(ApplicationRoles.Manager);
             _sources = await ReceivingSources.ListAllAsync();
+            if (DocumentRefKey is Guid requestedRefKey && _activeSourceRefKey == requestedRefKey
+                && string.IsNullOrWhiteSpace(_sourceFilter))
+                _sourceFilter = _sources.FirstOrDefault(x => x.RefKey == requestedRefKey)?.Number
+                    ?? requestedRefKey.ToString();
             _selected.IntersectWith(_sources.Where(x => x.LinkedOrderId is null)
                 .Select(x => x.RefKey));
             if (_activeSourceRefKey is Guid refKey && _sources.All(x => x.RefKey != refKey))

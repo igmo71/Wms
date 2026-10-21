@@ -30,4 +30,30 @@ public class ApplicationUserQueryService(IDbContextFactory<ApplicationDbContext>
                     : x.DisplayName,
                 ct);
     }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetDisplayNamesAsync(
+        IEnumerable<string?> userIds,
+        CancellationToken ct = default)
+    {
+        var ids = userIds
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+            return new Dictionary<string, string>();
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        return await dbContext.Users
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => string.IsNullOrWhiteSpace(x.DisplayName)
+                    ? "Имя не указано"
+                    : x.DisplayName,
+                ct);
+    }
 }

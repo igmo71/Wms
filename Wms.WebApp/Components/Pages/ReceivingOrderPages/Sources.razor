@@ -4,7 +4,6 @@
 
 <PageTitle>Документы 1С для приёмки</PageTitle>
 
-<div class="receiving-sources-page">
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center">
         <MudText Typo="Typo.h5">Документы 1С для приёмки</MudText>
@@ -33,8 +32,8 @@
         else
         {
             <MudTable T="ReceivingSourceView" Items="FilteredSources" Dense="true" Hover="true"
-                      Class="source-list" Elevation="0" RowsPerPage="15" OnRowClick="OnSourceRowClick"
-                      RowClassFunc="SourceRowClass">
+                      Elevation="0" RowsPerPage="15" OnRowClick="OnSourceRowClick"
+                      RowClass="cursor-pointer" RowStyleFunc="SourceRowStyle">
                 <HeaderContent>
                     <MudTh>Документ 1С</MudTh>
                     <MudTh>Отправитель / склад</MudTh>
@@ -107,7 +106,7 @@
                 @if (SelectedSources.Any(x => x.HasUnknownSku))
                 {
                     <MudAlert Severity="Severity.Warning" Class="mt-2">
-                        В источниках есть строки без определённого SKU или количества.
+                        В документах 1С есть строки без определённого SKU или количества.
                     </MudAlert>
                 }
                 @if (SelectedSources.Select(x => x.WarehouseId).Distinct().Count() != 1)
@@ -171,4 +170,3 @@
     </MudItem>
     </MudGrid>
 </MudStack>
-</div>

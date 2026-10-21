@@ -48,16 +48,18 @@ with their WMS order link; only a Manager can create an order from that page.
 The source list and its SKU table sit side by side on wide screens. Clicking any
 source row shows the lines of its latest saved 1C version, even when linked to
 an order, and clears checked sources. Checking free sources instead shows their
-combined SKU plan and the Manager's create action. The active row has a darker
-gray tint; checked rows use a lighter gray tint. On narrow screens the tables
+combined SKU plan and the Manager's create action. The active row and checked
+rows share the theme's subtle gray background. On narrow screens the tables
 stack vertically. The WMS order column contains a link for linked sources and
 a selection checkbox for free sources when the user is a Manager. Both SKU
-tables sort by displayed nomenclature name.
-The Web order card uses the WMS number as its heading and shows the actual
-creation time separately; its route continues to use the internal ID.
+tables sort by displayed nomenclature name. A document number on the Web order
+card links to this page with that document highlighted and its lines visible.
+The Web order card shows the WMS number and creation time in its heading;
+its route continues to use the internal ID.
 Receiving lists and cards show synchronized warehouse and SKU names, local
 receiving and putaway addresses, and a synchronized partner name for a 1C
-partner sender. The raw 1C partner type is labelled "партнёр 1С". If a
+partner sender. The Web order card shows the sender name without the partner-type
+suffix. If a
 reference has no local name, its ID remains visible so the operator can
 identify the unresolved record. Receiving tables use MudBlazor table controls.
 Web Managers can select several free sources of one warehouse, inspect their
@@ -75,14 +77,40 @@ the command ID for a retry after an uncertain response and reloads the saved
 status and cycle snapshots after success.
 The order card separates current plan/fact discrepancies from immutable cycle
 completion snapshots and shows source check failures and unknown-plan reasons.
+The order heading shows the number and creation time on the first row. A bordered,
+evenly spaced second row shows the warehouse name, status, receiving location,
+and receiving number. Documents, link history, plan/fact, receiving LPNs, and
+receivings use the same expandable panel style with raised headers. Document,
+LPN, and receiving counts appear in muted badges. The LPN panel starts open; the other sections start
+closed. Each receiving card shows its location and completing user in the header,
+with space above the first card. Expanding it immediately shows its SKU plan/fact
+table without a separate label. The plan/fact table sorts
+SKU by displayed name. Rows with known, equal plan/fact use the theme's subtle success
+hover color; rows with known, differing plan/fact use the warning hover color;
+rows without a checked fact or known plan remain unshaded. Receivings and their
+SKU lists follow the LPN panel.
+LPN cards sort by code. Each SKU line includes placed and remaining quantity;
+putaways appear below in a compact table with quantity, cell, date, and the
+user's display name. A deleted LPN has no separate pre-deletion composition
+label. The LPN delete button opens the existing preview and confirmation flow.
+Deletion history starts collapsed, shows the confirming user's
+name, and uses a dash for missing addresses; the original inventory movement
+ID remains internal.
+User-facing order screens call linked sources "Документы 1С" and receiving
+cycles "Приёмки". Receiving history shows the completing user's display
+name and a snapshot table with short plan and fact headers, without a version
+list below the SKU rows. Link history shows the actor's display name.
 A Manager can manually recheck every linked source from the card. The order
 list highlights completed orders whose current discrepancy differs from their
 latest completion snapshot.
-The Web order card shows a compact count and numbers of linked 1C sources,
-the latest check summary, and expandable source details with errors. It offers
-manual rechecking. A Manager opens a separate source-composition dialog to
-find a free document by number or `Ref_Key`, or select a linked document for
-detachment. The dialog shows the document, warehouse, changed SKU plans, and
+The Web order card shows linked documents in columns for number, date, sender,
+warehouse, warehouse operation, and business operation, without a duplicate
+summary above it. The recheck button shows the latest
+attempt time across linked documents and rechecks all currently linked documents;
+the action has a clarifying tooltip. A Manager opens a separate source-composition dialog to
+filter free and linked documents by number as they type, clear either search,
+then select one for attachment or detachment. The dialog shows the document,
+warehouse, changed SKU plans, and
 fact-preservation warning before confirmation; a stale preview requires a new
 selection. An uncertain command response keeps its request ID for a repeat
 while the dialog remains open. After success the card reloads plan, fact, and links. The Web

@@ -13,12 +13,12 @@
             }
             @if (_preview is null)
             {
-                <MudText Typo="Typo.subtitle1">Добавить свободный документ 1С</MudText>
-                <MudTextField T="string" @bind-Value="_search" Immediate="true"
-                              Label="Поиск по номеру или Ref_Key" />
+                <MudText Typo="Typo.subtitle1">Прикрепить документ 1С</MudText>
+                <MudTextField T="string" @bind-Value="_attachSearch" Immediate="true"
+                              Placeholder="Поиск по номеру" Clearable="true" />
                 @if (!MatchingFreeSources.Any())
                 {
-                    <MudText>Свободных документов по запросу нет. Можно указать Ref_Key для свежей сверки 1С.</MudText>
+                    <MudText>Свободных документов с таким номером нет.</MudText>
                 }
                 else
                 {
@@ -35,31 +35,35 @@
                         </RowTemplate>
                     </MudTable>
                 }
-                <MudStack Row="true" AlignItems="AlignItems.Center">
-                    <MudTextField T="string" @bind-Value="_manualRefKey" Label="Ref_Key документа 1С" />
-                    <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="PreviewByRefKeyAsync">Проверить</MudButton>
-                </MudStack>
-
                 <MudDivider />
-                <MudText Typo="Typo.subtitle1">Открепить связанный документ</MudText>
+                <MudText Typo="Typo.subtitle1">Открепить документ 1С</MudText>
                 @if (_linkedSources.Count == 0)
                 {
-                    <MudText>У ордера нет действующих источников.</MudText>
+                    <MudText>У ордера нет действующих документов 1С.</MudText>
                 }
                 else
                 {
-                    <MudTable T="ReceivingSourceView" Items="_linkedSources" Dense="true" Hover="true" Elevation="0">
-                        <HeaderContent>
-                            <MudTh>Документ</MudTh><MudTh>Склад</MudTh><MudTh>Сверка</MudTh><MudTh></MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Документ">@(context.Number ?? context.RefKey.ToString())</MudTd>
-                            <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
-                            <MudTd DataLabel="Сверка">@(context.LastAttemptError ?? context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</MudTd>
-                            <MudTd><MudButton Variant="Variant.Text" Disabled="_busy"
-                                              OnClick="() => PreviewAsync(ReceivingSourceChangeKind.Detach, context.RefKey)">Выбрать</MudButton></MudTd>
-                        </RowTemplate>
-                    </MudTable>
+                    <MudTextField T="string" @bind-Value="_detachSearch" Immediate="true"
+                                  Placeholder="Поиск по номеру" Clearable="true" />
+                    @if (!MatchingLinkedSources.Any())
+                    {
+                        <MudText>Присоединённых документов с таким номером нет.</MudText>
+                    }
+                    else
+                    {
+                        <MudTable T="ReceivingSourceView" Items="MatchingLinkedSources" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Документ</MudTh><MudTh>Склад</MudTh><MudTh>Сверка</MudTh><MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Документ">@(context.Number ?? context.RefKey.ToString())</MudTd>
+                                <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                                <MudTd DataLabel="Сверка">@(context.LastAttemptError ?? context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Нет")</MudTd>
+                                <MudTd><MudButton Variant="Variant.Text" Disabled="_busy"
+                                                  OnClick="() => PreviewAsync(ReceivingSourceChangeKind.Detach, context.RefKey)">Выбрать</MudButton></MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
                 }
             }
             else
@@ -68,7 +72,6 @@
                     @(_preview.Kind == ReceivingSourceChangeKind.Attach ? "Прикрепить" : "Открепить")
                     документ @(_preview.SourceNumber ?? _preview.SourceRefKey.ToString())
                 </MudText>
-                <MudText Typo="Typo.body2">Ref_Key: @_preview.SourceRefKey</MudText>
                 <MudText Typo="Typo.body2">Склад: @(_preview.SourceWarehouseName ?? _preview.SourceWarehouseId?.ToString() ?? "неизвестен")</MudText>
                 @if (_preview.SourcePosted != true || _preview.SourceDeletionMark != false)
                 {
@@ -98,7 +101,7 @@
                 }
                 @if (_preview.PlanChanges.Any(x => x.ProjectedExcess > 0))
                 {
-                    <MudAlert Severity="Severity.Warning">После изменения источников принятый факт превысит новый план. Проверьте расхождение в ордере.</MudAlert>
+                    <MudAlert Severity="Severity.Warning">После изменения состава документов 1С принятый факт превысит новый план. Проверьте расхождение в ордере.</MudAlert>
                 }
                 @if (_preview.HasUnknownSku)
                 {

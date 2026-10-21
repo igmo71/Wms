@@ -1,34 +1,35 @@
 @using Wms.Application.Receiving
 
-<MudPaper Class="pa-4">
-    <MudText Typo="Typo.h6" Class="mb-2">Текущий план и факт</MudText>
+<MudExpansionPanels Outlined="true" Elevation="0">
+<MudExpansionPanel Text="План - Факт" HeaderClass="mud-elevation-1" @bind-Expanded="_expanded">
     @if (Order.HasNewDiscrepancyAfterCompletion)
     {
         <MudAlert Severity="Severity.Warning" Class="mb-3">
-            После последнего завершения появилось новое расхождение. Прежнее решение показано в истории циклов ниже.
+            После последнего завершения появилось новое расхождение. Данные предыдущей приёмки показаны ниже.
         </MudAlert>
     }
     @if (Order.CurrentItems.Any(x => x.PlanQuantity is decimal plan
         && x.FactQuantity is decimal fact && fact > plan))
     {
         <MudAlert Severity="Severity.Warning" Class="mb-3">
-            Принятый факт превышает текущий план. Проверьте состав источников и приёмные LPN.
+            Принятый факт превышает текущий план. Проверьте состав документов 1С и приёмные LPN.
         </MudAlert>
     }
     @if (Sources.Any(x => x.LastAttemptError is not null))
     {
         <MudAlert Severity="Severity.Warning" Class="mb-3">
-            Свежая сверка не всех источников подтверждена. Текущий план основан на последних успешных версиях.
+            Свежая сверка не всех документов 1С подтверждена. Текущий план основан на последних успешных версиях.
         </MudAlert>
     }
-    <MudTable T="ReceivingWorkItemView" Items="Order.CurrentItems" Dense="true" Hover="true" Striped="true" Elevation="0">
-        <HeaderContent><MudTh>SKU</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Текущее расхождение</MudTh></HeaderContent>
+    <MudTable T="ReceivingWorkItemView" Items="SortedItems" Dense="true" Hover="true" Elevation="0"
+              RowStyleFunc="PlanRowStyle">
+        <HeaderContent><MudTh>Номенклатура</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Расхождение</MudTh></HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
+            <MudTd DataLabel="Номенклатура">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
             <MudTd DataLabel="Код">@context.SkuCode</MudTd>
             <MudTd DataLabel="План">@Format(context.PlanQuantity) @context.UnitOfMeasure</MudTd>
             <MudTd DataLabel="Факт">@(context.FactQuantity is null ? "Не проверено" : Format(context.FactQuantity) + " " + context.UnitOfMeasure)</MudTd>
-            <MudTd DataLabel="Текущее расхождение">
+            <MudTd DataLabel="Расхождение">
                 @Difference(context)
                 @if (context.PlanQuantity is null)
                 {
@@ -37,11 +38,23 @@
             </MudTd>
         </RowTemplate>
     </MudTable>
-</MudPaper>
+</MudExpansionPanel>
+</MudExpansionPanels>
 
 @code {
     [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
+
+    private bool _expanded;
+
+    private IReadOnlyList<ReceivingWorkItemView> SortedItems => Order.CurrentItems
+        .OrderBy(item => item.SkuName ?? item.SkuId.ToString(), StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(item => item.SkuId).ToArray();
+
+    private static string PlanRowStyle(ReceivingWorkItemView item, int _) =>
+        item.PlanQuantity is not decimal plan || item.FactQuantity is not decimal fact ? ""
+            : plan == fact ? "background-color: var(--mud-palette-success-hover);"
+            : "background-color: var(--mud-palette-warning-hover);";
 
     private static string Format(decimal? quantity) =>
         quantity?.ToString("0.###") ?? "Неизвестно";
@@ -62,6 +75,6 @@
                 .Select(line => $"{source.Number ?? source.RefKey.ToString()}, строка {line.LineNumber}: {line.Error}"))
             .ToArray();
         return reasons.Length > 0 ? string.Join("; ", reasons)
-            : "Проверьте состояние источников и допустимость суммы количеств.";
+            : "Проверьте состояние документов 1С и допустимость суммы количеств.";
     }
 }

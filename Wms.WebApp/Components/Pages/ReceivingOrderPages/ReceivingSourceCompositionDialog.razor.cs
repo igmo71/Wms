@@ -21,8 +21,8 @@ public partial class ReceivingSourceCompositionDialog
     private IReadOnlyList<ReceivingSourceView> _linkedSources = [];
     private ReceivingSourceCompositionPreview? _preview;
     private Guid? _pendingRequestId;
-    private string? _search;
-    private string? _manualRefKey;
+    private string? _attachSearch;
+    private string? _detachSearch;
     private string? _error;
     private bool _busy;
 
@@ -30,11 +30,21 @@ public partial class ReceivingSourceCompositionDialog
     {
         get
         {
-            var term = _search?.Trim();
+            var term = _attachSearch?.Trim();
             return _freeSources.Where(source => source.WarehouseId == WarehouseId
                 && (string.IsNullOrEmpty(term)
-                    || source.Number?.Contains(term, StringComparison.OrdinalIgnoreCase) == true
-                    || source.RefKey.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)))
+                    || source.Number?.Contains(term, StringComparison.OrdinalIgnoreCase) == true))
+                .Take(20);
+        }
+    }
+
+    private IEnumerable<ReceivingSourceView> MatchingLinkedSources
+    {
+        get
+        {
+            var term = _detachSearch?.Trim();
+            return _linkedSources.Where(source => string.IsNullOrEmpty(term)
+                || source.Number?.Contains(term, StringComparison.OrdinalIgnoreCase) == true)
                 .Take(20);
         }
     }
@@ -65,16 +75,6 @@ public partial class ReceivingSourceCompositionDialog
         {
             _error = exception.Message;
         }
-    }
-
-    private Task PreviewByRefKeyAsync()
-    {
-        if (!Guid.TryParse(_manualRefKey?.Trim(), out var refKey) || refKey == Guid.Empty)
-        {
-            _error = "Укажите корректный Ref_Key документа 1С.";
-            return Task.CompletedTask;
-        }
-        return PreviewAsync(ReceivingSourceChangeKind.Attach, refKey);
     }
 
     private async Task PreviewAsync(ReceivingSourceChangeKind kind, Guid refKey)

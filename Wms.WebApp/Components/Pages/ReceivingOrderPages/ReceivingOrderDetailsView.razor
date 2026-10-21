@@ -1,8 +1,12 @@
 @using Wms.Application.Receiving
 
-<MudPaper Class="pa-4">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
-        <MudText Typo="Typo.h6">Источники 1С · @Sources.Count</MudText>
+<MudExpansionPanels Outlined="true" Elevation="0">
+<MudExpansionPanel HeaderClass="mud-elevation-1" @bind-Expanded="_showDocuments">
+    <TitleContent>
+        <MudBadge Content="@Sources.Count" Color="Color.Default" Origin="Origin.CenterRight" BadgeClass="ms-3" Class="me-4">Документы 1С</MudBadge>
+    </TitleContent>
+    <ChildContent>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2 mb-2">
         <MudSpacer />
         @if (CanManage)
         {
@@ -11,37 +15,28 @@
                        OnClick="() => OnChangeComposition.InvokeAsync()">
                 Изменить состав
             </MudButton>
-            <MudButton Variant="Variant.Outlined" Disabled="Busy" OnClick="() => OnRefresh.InvokeAsync()">
-                Повторить сверку всех источников
-            </MudButton>
+            <MudTooltip Text="Показано время последней попытки среди документов ордера. Нажмите, чтобы заново сверить каждый присоединённый документ с 1С.">
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh"
+                           Disabled="Busy" OnClick="() => OnRefresh.InvokeAsync()">
+                    Последняя сверка: @LastAttemptText
+                </MudButton>
+            </MudTooltip>
         }
     </MudStack>
     @if (Sources.Count == 0)
     {
-        <MudAlert Severity="Severity.Warning">Действующих источников нет. Текущий план известных SKU равен нулю.</MudAlert>
-    }
-    else
-    {
-        <MudText Typo="Typo.body2">Документы: @string.Join(", ", Sources.Select(source => source.Number ?? source.RefKey.ToString()))</MudText>
-        <MudText Typo="Typo.body2" Color="@(Sources.Any(source => source.LastAttemptError is not null) ? Color.Warning : Color.Default)">
-            Сверка: @(Sources.Count(source => source.LastSuccessfulCheckAtUtc is not null)) из @Sources.Count с успешной версией;
-            ошибок последней попытки: @(Sources.Count(source => source.LastAttemptError is not null));
-            последняя попытка: @(Sources.Max(source => source.LastAttemptAtUtc)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет").
-        </MudText>
-        <MudButton Variant="Variant.Text" OnClick="() => _showSourceDetails = !_showSourceDetails">
-            @(_showSourceDetails ? "Скрыть подробности" : "Подробности источников")
-        </MudButton>
+        <MudAlert Severity="Severity.Warning">Действующих документов 1С нет. Текущий план известных SKU равен нулю.</MudAlert>
     }
     @if (RefreshResult is { } result)
     {
         <MudAlert Severity="@(result.AllSucceeded ? Severity.Success : Severity.Warning)" Class="mb-2">
             @if (!result.HasSources)
             {
-                <span>Сверять нечего: у ордера нет действующих источников.</span>
+                <span>Сверять нечего: у ордера нет действующих документов 1С.</span>
             }
             else if (result.AllSucceeded)
             {
-                <span>Все источники успешно сверены.</span>
+                <span>Все документы 1С успешно сверены.</span>
             }
             else
             {
@@ -49,40 +44,28 @@
             }
         </MudAlert>
     }
-    @if (Sources.Count > 0 && _showSourceDetails)
+    @if (Sources.Count > 0)
     {
         <MudTable T="ReceivingSourceView" Items="Sources" Dense="true" Hover="true" Striped="true" Elevation="0">
-            <HeaderContent><MudTh>Документ</MudTh><MudTh>Склад 1С</MudTh><MudTh>Реквизиты источника</MudTh><MudTh>Состояние</MudTh></HeaderContent>
+            <HeaderContent><MudTh>Номер</MudTh><MudTh>Дата</MudTh><MudTh>Отправитель</MudTh><MudTh>Склад</MudTh><MudTh>Складская операция</MudTh><MudTh>Хозяйственная операция</MudTh></HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Документ">
-                    <MudText>@(context.Number ?? context.RefKey.ToString())</MudText>
-                    <MudText Typo="Typo.caption">Сверен: @(context.LastSuccessfulCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет")</MudText>
-                    <MudText Typo="Typo.caption">Версия: @(context.VersionId?.ToString() ?? "нет")</MudText>
-                </MudTd>
-                <MudTd DataLabel="Склад 1С">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
-                <MudTd DataLabel="Реквизиты источника">
-                    <MudText Typo="Typo.body2">Дата: @SourceDate(context.Date) · Отправитель: @SenderDisplay(context)</MudText>
-                    <MudText Typo="Typo.body2">Складская операция: @(context.WarehouseOperation ?? "—") · Хозяйственная операция: @(context.BusinessOperation ?? "—")</MudText>
-                    <MudText Typo="Typo.body2">Основание: @BasisDisplay(context)</MudText>
-                    @foreach (var line in context.Lines.Where(x => x.Error is not null))
-                    {
-                        <MudText Color="Color.Warning" Typo="Typo.caption">Строка @line.LineNumber · SKU @SourceSkuName(context, line): @line.Error</MudText>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Состояние">@SourceState(context)</MudTd>
+                <MudTd DataLabel="Номер"><MudLink Href="@($"receiving-sources?document={context.RefKey}")">@(context.Number ?? context.RefKey.ToString())</MudLink></MudTd>
+                <MudTd DataLabel="Дата">@SourceDate(context.Date)</MudTd>
+                <MudTd DataLabel="Отправитель">@(context.SenderName ?? context.Sender ?? "—")</MudTd>
+                <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="Складская операция">@(context.WarehouseOperation ?? "—")</MudTd>
+                <MudTd DataLabel="Хозяйственная операция">@(context.BusinessOperation ?? "—")</MudTd>
             </RowTemplate>
         </MudTable>
     }
-</MudPaper>
+    </ChildContent>
+</MudExpansionPanel>
+</MudExpansionPanels>
 
 @if (CanManage && SourceHistory.Count > 0)
 {
-    <MudPaper Class="pa-4 mt-3">
-        <MudButton Variant="Variant.Text" OnClick="() => _showSourceHistory = !_showSourceHistory">
-            @(_showSourceHistory ? "Скрыть историю связей" : "История связей с документами 1С")
-        </MudButton>
-        @if (_showSourceHistory)
-        {
+    <MudExpansionPanels Outlined="true" Elevation="0" Class="mt-3">
+    <MudExpansionPanel Text="История связей с документами 1С" HeaderClass="mud-elevation-1" @bind-Expanded="_showSourceHistory">
             <MudTable T="ReceivingSourceChangeHistoryView" Items="SourceHistory" Dense="true" Hover="true" Elevation="0">
                 <HeaderContent><MudTh>Время</MudTh><MudTh>Действие</MudTh><MudTh>Документ 1С</MudTh><MudTh>Исполнитель</MudTh></HeaderContent>
                 <RowTemplate>
@@ -92,48 +75,11 @@
                     <MudTd DataLabel="Исполнитель">@context.Actor</MudTd>
                 </RowTemplate>
             </MudTable>
-        }
-    </MudPaper>
+    </MudExpansionPanel>
+    </MudExpansionPanels>
 }
 
 <ReceivingOrderDiscrepancies Order="Order" Sources="Sources" />
-
-<MudPaper Class="pa-4">
-    <MudText Typo="Typo.h6" Class="mb-2">История циклов и снимки решений</MudText>
-    @foreach (var cycle in Order.Cycles)
-    {
-        <MudPaper Class="pa-3 mb-2" Outlined="true">
-            <MudText Typo="Typo.subtitle1">
-                Цикл @cycle.Number · @(cycle.CompletedAtUtc is null ? "Не завершён" : $"Завершён {cycle.CompletedAtUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}")
-            </MudText>
-            <MudText Typo="Typo.caption">Место приёмки: @(cycle.ReceivingLocationAddress ?? cycle.ReceivingLocationId?.ToString() ?? "не выбрано") · Завершил: @(cycle.CompletedBy ?? "—")</MudText>
-            @if (cycle.CompletedAtUtc is not null)
-            {
-                @if (cycle.SourceCheckFailed)
-                {
-                    <MudAlert Severity="Severity.Warning" Class="mt-2">При завершении свежая сверка источников не удалась.</MudAlert>
-                }
-                <MudTable T="ReceivingWorkCycleItemView" Items="cycle.Items" Dense="true" Hover="true" Elevation="0" Class="mt-2">
-                    <HeaderContent><MudTh>SKU</MudTh><MudTh>План на момент завершения</MudTh><MudTh>Факт на момент завершения</MudTh></HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
-                        <MudTd DataLabel="План">@Format(context.PlanQuantity)</MudTd>
-                        <MudTd DataLabel="Факт">@(context.FactQuantity?.ToString("0.###") ?? "Не проверено")</MudTd>
-                    </RowTemplate>
-                </MudTable>
-                <MudText Typo="Typo.caption" Class="mt-2">Версии источников:</MudText>
-                @if (cycle.Sources.Count == 0)
-                {
-                    <MudText Typo="Typo.caption">Источников не было.</MudText>
-                }
-                @foreach (var source in cycle.Sources)
-                {
-                    <MudText Typo="Typo.caption">@source.RefKey · версия @source.VersionId</MudText>
-                }
-            }
-        </MudPaper>
-    }
-</MudPaper>
 
 @code {
     [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
@@ -146,59 +92,14 @@
     [Parameter] public EventCallback OnRefresh { get; set; }
     [Parameter] public EventCallback OnChangeComposition { get; set; }
 
-    private bool _showSourceDetails;
+    private string LastAttemptText => Sources.Count == 0 ? "нет"
+        : Sources.Max(source => source.LastAttemptAtUtc)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет";
+
+    private bool _showDocuments;
     private bool _showSourceHistory;
-
-    private string SkuName(Guid skuId) =>
-        Order.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();
-
-    private static string SenderDisplay(ReceivingSourceView source)
-    {
-        var name = source.SenderName ?? source.Sender ?? "—";
-        return source.SenderType == "StandardODATA.Catalog_Партнеры"
-            ? $"{name} (партнёр 1С)" : name;
-    }
 
     private static string SourceDate(string? value) =>
         DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out var date)
             ? date.ToString("dd.MM.yyyy") : value ?? "—";
-
-    private static string BasisDisplay(ReceivingSourceView source)
-    {
-        var type = source.BasisDocumentType switch
-        {
-            "StandardODATA.Document_ПриобретениеТоваровУслуг" => "приобретение товаров и услуг 1С",
-            null => null,
-            _ => "документ 1С"
-        };
-        return (source.BasisDocument ?? "—") + (type is null ? "" : $" ({type})");
-    }
-
-    private static string SourceSkuName(
-        ReceivingSourceView source, ReceivingSourceLineView line)
-    {
-        if (line.StockKeepingUnitId is Guid skuId
-            && source.SkuNames.TryGetValue(skuId, out var name))
-            return name;
-        return line.StockKeepingUnitId?.ToString()
-            ?? line.SourceSkuRefKey?.ToString() ?? "неизвестен";
-    }
-
-    private static string Format(decimal? quantity) =>
-        quantity?.ToString("0.###") ?? "Неизвестно";
-
-    private string SourceState(ReceivingSourceView source)
-    {
-        var state = source.Posted == false ? "Не проведён; вклад в план равен нулю"
-            : source.DeletionMark == true ? "Помечен удалённым; вклад в план равен нулю"
-            : source.WarehouseId is Guid warehouseId && warehouseId != Order.WarehouseId
-                ? "Склад источника отличается от склада WMS; вклад в план равен нулю"
-            : source.WarehouseId is null || source.Posted is null
-                || source.DeletionMark is null
-                ? "Реквизиты источника неизвестны; план не подтверждён"
-            : "Актуален";
-        return source.LastAttemptError is null ? state
-            : $"Сверка {source.LastAttemptAtUtc?.ToLocalTime():dd.MM.yyyy HH:mm} не удалась: {source.LastAttemptError}. {state}";
-    }
 }

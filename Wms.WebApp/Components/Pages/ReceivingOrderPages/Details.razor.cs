@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using Wms.Application.Receiving;
+using Wms.Application.Users;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain.Enums;
@@ -23,11 +24,15 @@ public partial class Details
     [Inject] private PreviewReceivingLpnDeletion PreviewDeletion { get; set; } = null!;
     [Inject] private DeleteReceivingLpn DeleteLpn { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService UserNames { get; set; } = null!;
 
     private ReceivingWorkOrderView? _order;
     private IReadOnlyList<ReceivingSourceView> _sources = [];
     private IReadOnlyList<ReceivingSourceChangeHistoryView> _sourceHistory = [];
     private IReadOnlyDictionary<Guid, string> _sourceNames = new Dictionary<Guid, string>();
+    private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
+    private bool _showLpns = true;
+    private bool _showStages;
     private IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>
         _deletionHistory = new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
     private string? _userId;
@@ -81,7 +86,7 @@ public partial class Details
                 { x => x.UserId, _userId }
             };
             var dialog = await DialogService.ShowAsync<ReceivingSourceCompositionDialog>(
-                "Изменить состав источников", parameters,
+                "Изменить состав ордера WMS", parameters,
                 new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
             var result = await dialog.Result;
             if (result is null || result.Canceled
@@ -90,8 +95,8 @@ public partial class Details
             await ReloadAsync();
             if (_error is null)
                 _sourceChangeMessage = kind == ReceivingSourceChangeKind.Attach
-                    ? "Источник добавлен. Текущий план пересчитан; факт сохранён."
-                    : "Источник откреплён. Текущий план пересчитан; факт сохранён.";
+                    ? "Документ 1С добавлен. Текущий план пересчитан; факт сохранён."
+                    : "Документ 1С откреплён. Текущий план пересчитан; факт сохранён.";
         }
         catch (Exception exception) { _error = exception.Message; }
         finally { _busy = false; }
@@ -122,7 +127,7 @@ public partial class Details
             _pendingCompleteRequestId = null;
             await ReloadAsync();
             if (_error is null)
-                _lifecycleMessage = "Ордер завершён. План, факт и версии источников сохранены в снимке цикла.";
+                _lifecycleMessage = "Ордер завершён. План, факт и версии документов 1С сохранены для этой приёмки.";
         }
         catch (Exception exception) { _error = exception.Message; }
         finally { _busy = false; }
@@ -150,7 +155,7 @@ public partial class Details
             _pendingReopenRequestId = null;
             await ReloadAsync();
             if (_error is null)
-                _lifecycleMessage = "Открыт новый цикл. Первый участник заново выбирает место приёмки.";
+                _lifecycleMessage = "Начата новая приёмка. Первый участник заново выбирает место приёмки.";
         }
         catch (Exception exception) { _error = exception.Message; }
         finally { _busy = false; }
@@ -200,16 +205,23 @@ public partial class Details
             _sourceHistory = !_canManage || _order is null ? [] : await Orders.GetSourceChangeHistoryAsync(
                 Id, CancellationToken.None);
             IReadOnlyList<ReceivingSourceView> sourceViews = _order is null ? [] : await Sources.GetByRefKeysAsync(
-                _order.SourceRefKeys.Concat(_sourceHistory.Select(x => x.SourceRefKey))
+                _order.SourceRefKeys
+                    .Concat(_sourceHistory.Select(x => x.SourceRefKey))
                     .Distinct().ToArray());
             var activeRefKeys = _order?.SourceRefKeys.ToHashSet() ?? new HashSet<Guid>();
             _sources = sourceViews.Where(x => activeRefKeys.Contains(x.RefKey)).ToArray();
             _sourceNames = sourceViews.ToDictionary(x => x.RefKey,
-                x => x.Number ?? x.RefKey.ToString());
+                x => x.Number ?? "Документ 1С без номера");
             _deletionHistory = _canManage && _order?.Lpns.Any(x =>
                 x.Status == LicensePlateNumberStatus.Deleted) == true
                 ? await Orders.GetDeletionHistoryAsync(Id, CancellationToken.None)
                 : new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
+            _userNames = _order is null
+                ? new Dictionary<string, string>()
+                : await UserNames.GetDisplayNamesAsync(_order.Cycles.Select(x => x.CompletedBy)
+                    .Concat(_order.Lpns.SelectMany(lpn => lpn.Putaways.Select(x => x.CreatedBy)))
+                    .Concat(_deletionHistory.Values.SelectMany(history =>
+                        history.Select(x => x.ConfirmedBy))));
         }
         catch (Exception exception)
         {
@@ -332,4 +344,17 @@ public partial class Details
 
     private string SkuName(Guid skuId) =>
         _order?.Items.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();
+
+    private string UserName(string? userId) => string.IsNullOrWhiteSpace(userId)
+        ? "—" : _userNames.TryGetValue(userId, out var name) && name != userId
+            ? name : "Пользователь не найден";
+
+    private static string StageTitle(ReceivingWorkCycleView cycle) =>
+        $"Приёмка {cycle.Number} · " + (cycle.CompletedAtUtc is null
+            ? "Не завершена" : $"Завершена {cycle.CompletedAtUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm}");
+
+    private IReadOnlyList<ReceivingWorkCycleItemView> SortedCycleItems(ReceivingWorkCycleView cycle) =>
+        cycle.Items.OrderBy(item => SkuName(item.SkuId), StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(item => item.SkuId).ToArray();
+
 }

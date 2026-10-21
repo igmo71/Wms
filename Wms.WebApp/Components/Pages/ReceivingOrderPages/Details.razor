@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Domain.Enums
 @using Wms.Common
+@using Wms.Application.Receiving
 
 <PageTitle>@(_order is null ? "Приходный ордер WMS" : $"Ордер WMS {_order.Number}")</PageTitle>
 
@@ -16,28 +17,19 @@ else if (_order is null)
 else
 {
     <MudStack Spacing="3">
-        <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Ордер WMS @_order.Number</MudText>
-            <MudSpacer />
-            <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
-        </MudStack>
-        @if (!string.IsNullOrWhiteSpace(_error))
-        {
-            <MudAlert Severity="Severity.Error">@_error</MudAlert>
-        }
-        @if (!string.IsNullOrWhiteSpace(_lifecycleMessage))
-        {
-            <MudAlert Severity="Severity.Success">@_lifecycleMessage</MudAlert>
-        }
-        @if (!string.IsNullOrWhiteSpace(_sourceChangeMessage))
-        {
-            <MudAlert Severity="Severity.Success">@_sourceChangeMessage</MudAlert>
-        }
         <MudPaper Class="pa-4">
-            <MudText>Создан: @_order.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudText>
-            <MudText>Склад: @(_order.WarehouseName ?? _order.WarehouseId.ToString()) · Статус: @_order.Status.GetDisplayName()</MudText>
-            <MudText>Цикл: @_order.ActiveCycleNumber · Место приёмки: @(_order.ReceivingLocationAddress ?? _order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText>
-            <MudText Typo="Typo.caption">Завершение ордера не проводит товар. Приход возникает при закрытии каждой LPN.</MudText>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.h5">Ордер WMS @_order.Number от @_order.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudText>
+                <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
+            </MudStack>
+            <MudPaper Outlined="true" Class="pa-2 my-2">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">@(_order.WarehouseName ?? _order.WarehouseId.ToString())</MudText></MudItem>
+                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">@_order.Status.GetDisplayName()</MudText></MudItem>
+                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">Место приёмки: @(_order.ReceivingLocationAddress ?? _order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText></MudItem>
+                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">Приёмка: @_order.ActiveCycleNumber</MudText></MudItem>
+                </MudGrid>
+            </MudPaper>
             @if (_order.Status == ReceivingOrderStatus.InReceiving && _canManage)
             {
                 @if (_order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
@@ -50,11 +42,24 @@ else
             }
             @if (_order.Status == ReceivingOrderStatus.Received && _canManage)
             {
-                <MudText Class="mt-2">Повторное открытие создаст новый цикл без места приёмки и участников. Прежний снимок сохранится.</MudText>
+                <MudText Class="mt-2">Повторное открытие создаст новую приёмку без места приёмки и участников. Прежние данные сохранятся.</MudText>
                 <MudButton Class="mt-2" Variant="Variant.Outlined" Disabled="_busy"
-                           OnClick="ReopenOrderAsync">Открыть новый цикл</MudButton>
+                           OnClick="ReopenOrderAsync">Начать новую приёмку</MudButton>
             }
         </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        @if (!string.IsNullOrWhiteSpace(_lifecycleMessage))
+        {
+            <MudAlert Severity="Severity.Success">@_lifecycleMessage</MudAlert>
+        }
+        @if (!string.IsNullOrWhiteSpace(_sourceChangeMessage))
+        {
+            <MudAlert Severity="Severity.Success">@_sourceChangeMessage</MudAlert>
+        }
 
         <ReceivingOrderDetailsView Order="_order" Sources="_sources"
                                    SourceHistory="_sourceHistory" SourceNames="_sourceNames"
@@ -62,8 +67,12 @@ else
                                    RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
                                    OnChangeComposition="OpenSourceCompositionAsync" />
 
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-2">Приёмные LPN</MudText>
+        <MudExpansionPanels Outlined="true" Elevation="0">
+        <MudExpansionPanel HeaderClass="mud-elevation-1" @bind-Expanded="_showLpns">
+            <TitleContent>
+                <MudBadge Content="@_order.Lpns.Count" Color="Color.Default" Origin="Origin.CenterRight" BadgeClass="ms-3" Class="me-4">Приёмные LPN</MudBadge>
+            </TitleContent>
+            <ChildContent>
             @if (_order.Lpns.Count == 0)
             {
                 <MudText>Палет пока нет.</MudText>
@@ -80,24 +89,31 @@ else
                             {
                                 <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="() => PrepareCorrection(lpn)">Исправить количество</MudButton>
                             }
-                            <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="_busy" OnClick="() => PreviewDeletionAsync(lpn.Id)">Предпросмотр удаления</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Close"
+                                       Disabled="_busy" OnClick="() => PreviewDeletionAsync(lpn.Id)">Удалить</MudButton>
                         }
                     </MudStack>
                     @foreach (var item in lpn.Items)
                     {
-                        @if (lpn.Status == LicensePlateNumberStatus.Deleted)
-                        {
-                            <MudText Typo="Typo.caption">Состав до удаления</MudText>
-                        }
-                        <MudText>@(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · Срок годности: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudText>
-                        @if (lpn.Status != LicensePlateNumberStatus.Deleted)
-                        {
-                            <MudText Typo="Typo.caption">Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</MudText>
-                        }
+                        <MudText>
+                            @(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · Срок годности: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")
+                            @if (lpn.Status != LicensePlateNumberStatus.Deleted)
+                            {
+                                <span> · Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</span>
+                            }
+                        </MudText>
                     }
-                    @foreach (var putaway in lpn.Putaways)
+                    @if (lpn.Putaways.Count > 0)
                     {
-                        <MudText Typo="Typo.caption">@(lpn.Status == LicensePlateNumberStatus.Deleted ? "Историческое размещение" : "Размещено") @Format(putaway.Quantity) → @(putaway.DestinationAddress ?? putaway.DestinationStorageLocationId.ToString()) · @putaway.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <MudTable T="ReceivingWorkPutawayView" Items="lpn.Putaways" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent><MudTh>Количество</MudTh><MudTh>Ячейка</MudTh><MudTh>Дата</MudTh><MudTh>Пользователь</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                                <MudTd DataLabel="Ячейка">@(context.DestinationAddress ?? context.DestinationStorageLocationId.ToString())</MudTd>
+                                <MudTd DataLabel="Дата">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                                <MudTd DataLabel="Пользователь">@UserName(context.CreatedBy)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
                     }
                     @if (_canManage && _correctionLpnId == lpn.Id)
                     {
@@ -115,8 +131,8 @@ else
                         <MudTable Items="preview.Reversals" Dense="true" Hover="true" Elevation="0">
                             <HeaderContent><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
                             <RowTemplate>
-                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "Вне склада")</MudTd>
-                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "Вне склада")</MudTd>
+                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "—")</MudTd>
+                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "—")</MudTd>
                                 <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
                                 <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
                                 <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
@@ -154,24 +170,79 @@ else
                     @if (_canManage && lpn.Status == LicensePlateNumberStatus.Deleted
                         && _deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
                     {
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2">История удаления · обратные движения</MudText>
-                        <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent><MudTh>Время</MudTh><MudTh>Пользователь</MudTh><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh><MudTh>Исходное движение</MudTh></HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Время">@(context.PostedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
-                                <MudTd DataLabel="Пользователь">@context.ConfirmedBy</MudTd>
-                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "Вне склада")</MudTd>
-                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "Вне склада")</MudTd>
-                                <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
-                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
-                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
-                                <MudTd DataLabel="Исходное движение">@context.OriginalMovementId</MudTd>
-                            </RowTemplate>
-                        </MudTable>
+                        <MudExpansionPanels Outlined="true" Elevation="0" Class="mt-2">
+                            <MudExpansionPanel Text="История" HeaderClass="mud-elevation-1">
+                                <ChildContent>
+                                    <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
+                                        <HeaderContent><MudTh>Время</MudTh><MudTh>Пользователь</MudTh><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Время">@(context.PostedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
+                                            <MudTd DataLabel="Пользователь">@UserName(context.ConfirmedBy)</MudTd>
+                                            <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "—")</MudTd>
+                                            <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "—")</MudTd>
+                                            <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
+                                            <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                                            <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                </ChildContent>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
                     }
                 </MudPaper>
             }
-        </MudPaper>
+            </ChildContent>
+        </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudExpansionPanels Outlined="true" Elevation="0">
+        <MudExpansionPanel HeaderClass="mud-elevation-1" @bind-Expanded="_showStages">
+            <TitleContent>
+                <MudBadge Content="@_order.Cycles.Count" Color="Color.Default" Origin="Origin.CenterRight" BadgeClass="ms-3" Class="me-4">Приёмки</MudBadge>
+            </TitleContent>
+            <ChildContent>
+            @if (_order.Cycles.Count == 0)
+            {
+                <MudText>Приёмок пока нет.</MudText>
+            }
+            @foreach (var cycle in _order.Cycles)
+            {
+                <MudExpansionPanels Outlined="true" Elevation="0" Class="mt-3 mb-2">
+                <MudExpansionPanel HeaderClass="mud-elevation-1">
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="3">
+                            <MudText Typo="Typo.subtitle1">@StageTitle(cycle)</MudText>
+                            <MudText Typo="Typo.body2">
+                                Место приёмки: @(cycle.ReceivingLocationAddress ?? cycle.ReceivingLocationId?.ToString() ?? "не выбрано")
+                                @if (cycle.CompletedAtUtc is not null)
+                                {
+                                    <span> · Завершил: @UserName(cycle.CompletedBy)</span>
+                                }
+                            </MudText>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                    @if (cycle.CompletedAtUtc is not null)
+                    {
+                        @if (cycle.SourceCheckFailed)
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mt-2">При завершении свежая сверка документов 1С не удалась.</MudAlert>
+                        }
+                        <MudTable T="ReceivingWorkCycleItemView" Items="SortedCycleItems(cycle)" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent><MudTh>Номенклатура</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Номенклатура">@SkuName(context.SkuId)</MudTd>
+                                <MudTd DataLabel="План">@(context.PlanQuantity?.ToString("0.###") ?? "Неизвестно")</MudTd>
+                                <MudTd DataLabel="Факт">@(context.FactQuantity?.ToString("0.###") ?? "Не проверено")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    </ChildContent>
+                </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+            </ChildContent>
+        </MudExpansionPanel>
+        </MudExpansionPanels>
     </MudStack>
 }
