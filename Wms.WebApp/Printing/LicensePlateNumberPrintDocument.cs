@@ -26,7 +26,7 @@ public static class LicensePlateNumberPrintDocument
             @media print{body{background:white}header{display:none}.sheet{margin:0;break-after:page}.sheet:last-child{break-after:auto}}
             </style></head><body><header><h1>Этикетки LPN</h1>
             <p>А4, книжная ориентация, масштаб 100%, без полей и колонтитулов. 10 этикеток на листе.</p>
-            <p>Повторная печать использует те же коды. Не наклеивайте копии одного кода на разные палеты.</p>
+            <p>Повторная печать использует те же коды. Не наклеивайте копии одного кода на разные LPN.</p>
             <button onclick="window.print()">Печать</button></header>
             """);
         var writer = new BarcodeWriterSvg

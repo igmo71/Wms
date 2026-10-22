@@ -139,7 +139,10 @@ public sealed class GetReceivingSources(
             });
         }
         var warehouseIds = results.Where(x => x.WarehouseId.HasValue)
-            .Select(x => x.WarehouseId!.Value).Distinct().ToArray();
+            .Select(x => x.WarehouseId!.Value)
+            .Concat(results.Where(x => x.SenderType == "StandardODATA.Catalog_Склады"
+                    && Guid.TryParse(x.Sender, out _))
+                .Select(x => Guid.Parse(x.Sender!))).Distinct().ToArray();
         var skuIds = results.SelectMany(x => x.PlanBySku.Keys
             .Concat(x.Lines.Where(line => line.StockKeepingUnitId.HasValue)
                 .Select(line => line.StockKeepingUnitId!.Value))).Distinct().ToArray();
@@ -155,7 +158,11 @@ public sealed class GetReceivingSources(
             SenderName = source.SenderType == "StandardODATA.Catalog_Партнеры"
                 && Guid.TryParse(source.Sender, out var partnerId)
                 && references.Partners.TryGetValue(partnerId, out var partnerName)
-                    ? partnerName : null,
+                    ? partnerName : source.SenderType == "StandardODATA.Catalog_Склады"
+                        && Guid.TryParse(source.Sender, out var senderWarehouseId)
+                        && references.Warehouses.TryGetValue(senderWarehouseId,
+                            out var senderWarehouseName)
+                            ? senderWarehouseName : null,
             SkuNames = references.Skus
         }).ToArray();
     }

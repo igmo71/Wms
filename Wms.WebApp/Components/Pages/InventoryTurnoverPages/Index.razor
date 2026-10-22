@@ -51,7 +51,7 @@
                          ValueChanged="OnStockKeepingUnitChangedAsync"
                          SearchFunc="SearchStockKeepingUnitsAsync"
                          ToStringFunc="stockKeepingUnit => stockKeepingUnit?.Name ?? string.Empty"
-                         Label="Номенклатура"
+                         Label="SKU"
                          Clearable="true"
                          Class="ml-4" />
     </MudStack>
@@ -72,7 +72,7 @@
         <PropertyColumn Property="x => x.StorageLocation!.Code" Title="Ячейка хранения" Sortable="true">
             <CellTemplate>@StorageLocationDisplay.Format(context.Item.StorageLocation)</CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
+        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="SKU" Sortable="true" />
         <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
         <PropertyColumn Property="x => x.QuantityDelta" Title="Изменение" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес изменения" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightDeltaKg)</CellTemplate></TemplateColumn>

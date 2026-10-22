@@ -1,0 +1,54 @@
+<ContentPage x:Class="Wms.Mobile.ReceivingOrderSourcesPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Документы 1С">
+    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
+        <RefreshView x:Name="SourcesRefreshView" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label x:Name="ScanHintLabel" FontSize="12"
+                           Text="Сканируйте документ 1С. Он сразу прикрепится к ордеру." />
+                    <Label x:Name="EmptyLabel" Text="Документы 1С не прикреплены."
+                           IsVisible="False" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SourceRows, Source={x:Reference Page}}"
+                                         Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingSourceCompactRow">
+                                <Border Padding="8,6" Stroke="#D4D4D4"
+                                        BackgroundColor="{Binding BackgroundColor}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                        <VerticalStackLayout Spacing="2">
+                                            <VerticalStackLayout.GestureRecognizers>
+                                                <TapGestureRecognizer CommandParameter="{Binding RefKey}"
+                                                                      Tapped="OnSourceTapped" />
+                                            </VerticalStackLayout.GestureRecognizers>
+                                            <Label Text="{Binding FirstLine}" FontAttributes="Bold" />
+                                            <Label Text="{Binding SecondLine}" FontSize="12" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="×" FontSize="22"
+                                                Padding="0" WidthRequest="40" HeightRequest="40"
+                                                SemanticProperties.Description="Открепить документ 1С"
+                                                IsVisible="{Binding CanDetach}"
+                                                CommandParameter="{Binding RefKey}"
+                                                Clicked="OnDetachClicked" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="1" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="DoneButton" Text="Готово" Clicked="OnDoneClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

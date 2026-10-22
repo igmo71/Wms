@@ -306,6 +306,7 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
                 Fail ? OperationError.Failure("1С недоступна.")
                     : new ReceivingSourceRead(refKey, $$"""
                         {"value":[{"Ref_Key":"{{key}}","Склад_Key":"{{WarehouseId}}",
+                        "Отправитель":"11111111-1111-1111-1111-111111111111",
                         "Posted":true,"DeletionMark":false,"Number":"Close",
                         "Товары":[{"LineNumber":"1","Номенклатура_Key":"{{skuId}}",
                         "Количество":{{Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}]}]}

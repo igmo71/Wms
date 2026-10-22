@@ -64,8 +64,10 @@ public sealed class SynchronizeReceivingSource(
 
         var fingerprint = Convert.ToHexString(SHA256.HashData(
             Encoding.UTF8.GetBytes(response.RawResponseJson)));
-        return await store.SaveSuccessfulAsync(parsed.Value!, response.RawResponseJson, fingerprint,
+        var saved = await store.SaveSuccessfulAsync(parsed.Value!, response.RawResponseJson, fingerprint,
             clock.GetUtcNow(), audit, ct);
+        return !saved.IsSuccess && saved.Error!.Message == ReceivingSourceSenderPolicy.ChangedMessage
+            ? await FailAsync(refKey, saved.Error!, audit, ct) : saved;
     }
 
     private async Task<OperationResult<ReceivingSourceVersion>> FailAsync(

@@ -7,37 +7,12 @@
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
         <VerticalStackLayout Spacing="3">
             <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
-            <Label x:Name="CreatedAtLabel" FontSize="12" />
             <Label x:Name="StatusLabel" FontSize="13" />
-            <Label x:Name="LocationLabel" FontSize="12" />
         </VerticalStackLayout>
         <RefreshView x:Name="OrderRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="8">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Button x:Name="SourceScanButton" Text="Добавить источник сканированием"
-                            Clicked="OnSourceScanClicked" />
-                    <VerticalStackLayout x:Name="SourcesPanel" Spacing="4">
-                        <Label Text="Источники 1С" FontAttributes="Bold" />
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding SourceRows, Source={x:Reference Page}}" Spacing="4">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="local:ReceivingLinkedSourceRow">
-                                    <Border Padding="8" Stroke="#D4D4D4">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                            <VerticalStackLayout>
-                                                <Label Text="{Binding Number}" FontAttributes="Bold" />
-                                                <Label Text="{Binding RefKey}" FontSize="10" />
-                                                <Label Text="{Binding Details}" FontSize="11" />
-                                            </VerticalStackLayout>
-                                            <Button Grid.Column="1" Text="Открепить" FontSize="11"
-                                                    IsVisible="{Binding CanDetach}"
-                                                    CommandParameter="{Binding RefKey}" Clicked="OnDetachSourceClicked" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-                    </VerticalStackLayout>
                     <VerticalStackLayout x:Name="LocationPanel" Spacing="5" IsVisible="False">
                         <Label Text="Выберите место приёмки сканированием или поиском" />
                         <SearchBar x:Name="LocationSearch" Placeholder="Адрес или название"
@@ -59,15 +34,19 @@
                     <VerticalStackLayout x:Name="ProductsPanel" BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingWorkItemRow">
-                                <Border Padding="8" Stroke="#D4D4D4" BackgroundColor="{Binding BackgroundColor}">
-                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                                        <VerticalStackLayout>
+                                <Border Stroke="#D4D4D4" BackgroundColor="{Binding BackgroundColor}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                        <VerticalStackLayout Padding="8,6">
+                                            <VerticalStackLayout.GestureRecognizers>
+                                                <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnSkuTapped" />
+                                            </VerticalStackLayout.GestureRecognizers>
                                             <Label Text="{Binding Name}" FontAttributes="Bold" />
                                             <Label Text="{Binding PlanAndFact}" FontSize="12" />
                                         </VerticalStackLayout>
-                                        <Button Grid.Column="1" Text="Детали" FontSize="11"
-                                                CommandParameter="{Binding SkuId}" Clicked="OnSkuClicked" />
-                                        <Button Grid.Column="2" Text="Проверено: 0" FontSize="11"
+                                        <Button Grid.Column="1" Text="0" FontSize="14"
+                                                WidthRequest="44" HeightRequest="40" Padding="0"
+                                                Margin="0,4,8,4"
+                                                SemanticProperties.Description="Подтвердить отсутствие SKU"
                                                 IsVisible="{Binding CanConfirmZero}"
                                                 CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
                                     </Grid>
@@ -102,9 +81,12 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
             <Button x:Name="JoinButton" Text="Начать или присоединиться" Clicked="OnJoinClicked" />
-            <Grid x:Name="TabsGrid" ColumnDefinitions="*,*" ColumnSpacing="5">
-                <Button Text="Номенклатура" Clicked="OnItemsTabClicked" />
+            <Grid x:Name="TabsGrid" ColumnDefinitions="*,*,*" ColumnSpacing="5">
+                <Button Text="SKU" Clicked="OnItemsTabClicked" />
                 <Button Grid.Column="1" Text="LPN" Clicked="OnLpnsTabClicked" />
+                <Button Grid.Column="2" x:Name="SourcesButton" Text="📄 1С"
+                        SemanticProperties.Description="Документы 1С"
+                        Clicked="OnSourcesClicked" />
             </Grid>
         </VerticalStackLayout>
     </Grid>

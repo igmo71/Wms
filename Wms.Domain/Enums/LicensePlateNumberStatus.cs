@@ -4,18 +4,18 @@ namespace Wms.Domain.Enums;
 
 public enum LicensePlateNumberStatus
 {
-    [Display(Name = "Свободна")]
+    [Display(Name = "Свободен")]
     Available = 0,
 
-    [Display(Name = "Открыта")]
+    [Display(Name = "Открыт")]
     Open = 1,
 
-    [Display(Name = "Закрыта")]
+    [Display(Name = "Закрыт")]
     Closed = 2,
 
-    [Display(Name = "Отменена")]
+    [Display(Name = "Отменён")]
     Cancelled = 3,
 
-    [Display(Name = "Удалена")]
+    [Display(Name = "Удалён")]
     Deleted = 4
 }

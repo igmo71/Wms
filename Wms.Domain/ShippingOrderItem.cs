@@ -93,7 +93,7 @@ public class ShippingOrderItem
 
         if (snapshot.StockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
+            return OperationError.Invalid("Идентификатор SKU обязателен.");
         }
 
         if (!WarehouseQuantity.IsNonNegative(snapshot.PlanQuantity))

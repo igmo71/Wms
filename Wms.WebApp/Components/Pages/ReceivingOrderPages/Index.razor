@@ -32,7 +32,7 @@
         else
         {
             <MudTable T="ReceivingWorkOrderView" Items="FilteredOrders" Dense="true" Hover="true"
-                      Striped="true" Elevation="0" RowsPerPage="15">
+                      Elevation="0" RowsPerPage="15" RowStyleFunc="OrderRowStyle">
                 <HeaderContent><MudTh>Номер WMS</MudTh><MudTh>Создан</MudTh><MudTh>Склад</MudTh><MudTh>Статус</MudTh><MudTh>Документов 1С</MudTh><MudTh>Строк</MudTh><MudTh>Расхождения и непроверенные SKU</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Номер WMS"><MudLink Href="@($"receiving-orders/{context.Id}")">@context.Number</MudLink></MudTd>

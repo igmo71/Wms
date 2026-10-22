@@ -41,7 +41,7 @@ public class InventoryCountItem
         if (lineNumber <= 0)
             return OperationError.Invalid("Номер строки должен быть положительным.");
         if (stockKeepingUnitId == Guid.Empty)
-            return OperationError.Invalid("Номенклатура строки инвентаризации обязательна.");
+            return OperationError.Invalid("SKU строки инвентаризации обязателен.");
 
         var quantitiesResult = ValidateQuantities(expectedQuantity, countedQuantity);
         if (!quantitiesResult.IsSuccess)

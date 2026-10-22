@@ -1045,6 +1045,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("ReceivingLocationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("SenderId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset?>("StartedAtUtc")
                         .HasColumnType("datetimeoffset");
 

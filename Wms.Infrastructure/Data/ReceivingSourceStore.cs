@@ -105,6 +105,11 @@ public sealed class ReceivingSourceStore(
             .SingleOrDefaultAsync(x => x.Id == id, ct);
         if (order is null)
             return OperationError.Conflict("Связанный приходный ордер не найден.");
+        if (order.SenderId is not Guid senderId)
+            return OperationError.Conflict("Отправитель связанного ордера не установлен. Требуется проверка данных ордера.");
+        var senderCheck = ReceivingSourceSenderPolicy.RequireSame(senderId, currentSource);
+        if (!senderCheck.IsSuccess)
+            return OperationError.Conflict(ReceivingSourceSenderPolicy.ChangedMessage);
         var otherIds = await context.ReceivingOrderSourceLinks.AsNoTracking()
             .Where(x => x.ReceivingOrderId == id && x.DetachedAtUtc == null
                 && x.ReceivingSourceDocumentId != currentDocument.Id)
@@ -131,6 +136,9 @@ public sealed class ReceivingSourceStore(
             var parsed = parser.Parse(document.RefKey, version.SnapshotJson);
             if (!parsed.IsSuccess)
                 return parsed.Error!;
+            var otherSenderCheck = ReceivingSourceSenderPolicy.RequireSame(senderId, parsed.Value!);
+            if (!otherSenderCheck.IsSuccess)
+                return OperationError.Conflict(ReceivingSourceSenderPolicy.ChangedMessage);
             sources.Add((parsed.Value!, version.CalculatePlan()));
         }
 

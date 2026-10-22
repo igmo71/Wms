@@ -60,7 +60,7 @@ public class InventoryMovement
 
         if (stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
+            return OperationError.Invalid("Идентификатор SKU обязателен.");
         }
 
         if (licensePlateNumberId == Guid.Empty)
@@ -162,7 +162,7 @@ public class InventoryMovement
 
         if (stockKeepingUnitId == Guid.Empty)
         {
-            return OperationError.Invalid("Идентификатор номенклатуры обязателен.");
+            return OperationError.Invalid("Идентификатор SKU обязателен.");
         }
 
         var stateResult = ValidateState(sourceStorageLocationId, destinationStorageLocationId, quantity);

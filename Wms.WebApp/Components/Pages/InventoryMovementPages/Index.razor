@@ -31,7 +31,7 @@
                          Label="Ячейка хранения" Clearable="true" Class="ml-4" />
         <MudAutocomplete T="StockKeepingUnit" Value="_stockKeepingUnit" ValueChanged="OnStockKeepingUnitChangedAsync"
                          SearchFunc="SearchStockKeepingUnitsAsync" ToStringFunc="stockKeepingUnit => stockKeepingUnit?.Name ?? string.Empty"
-                         Label="Номенклатура" Clearable="true" Class="ml-4" />
+                         Label="SKU" Clearable="true" Class="ml-4" />
     </MudStack>
 </MudPaper>
 
@@ -46,7 +46,7 @@
         <PropertyColumn Property="x => x.DestinationStorageLocation == null ? string.Empty : x.DestinationStorageLocation.Code" Title="В ячейку" Sortable="true">
             <CellTemplate>@StorageLocationDisplay.FormatOrDash(context.Item.DestinationStorageLocation)</CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
+        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="SKU" Sortable="true" />
         <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
         <PropertyColumn Property="x => x.Quantity" Title="Количество" Format="N3" Sortable="true" />
         <TemplateColumn Title="Вес" Sortable="false"><CellTemplate>@WeightDisplay.Format(context.Item.WeightKg)</CellTemplate></TemplateColumn>

@@ -86,7 +86,7 @@ public partial class LicensePlateNumberPutawayPage : ContentPage
             await Navigation.PushAsync(page);
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование палеты."; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование LPN."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 

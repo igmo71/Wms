@@ -293,7 +293,7 @@ public sealed class InventoryCountCommandService(
         if (!countResult.IsSuccess)
             return countResult.Error!;
         if (!await IsActiveSkuAsync(dbContext, stockKeepingUnitId, ct))
-            return OperationError.NotFound($"Номенклатура '{stockKeepingUnitId}' не найдена или недоступна.");
+            return OperationError.NotFound($"SKU '{stockKeepingUnitId}' не найден или недоступен.");
 
         var inventoryCount = countResult.Value!;
         var itemExists = inventoryCount.Items.Any(
@@ -334,7 +334,7 @@ public sealed class InventoryCountCommandService(
         if (!countResult.IsSuccess)
             return countResult.Error!;
         if (!await IsActiveSkuAsync(dbContext, stockKeepingUnitId, ct))
-            return OperationError.NotFound($"Номенклатура '{stockKeepingUnitId}' не найдена или недоступна.");
+            return OperationError.NotFound($"SKU '{stockKeepingUnitId}' не найден или недоступен.");
 
         var inventoryCount = countResult.Value!;
         var itemExists = inventoryCount.Items.Any(

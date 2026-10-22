@@ -34,7 +34,7 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
         _lpn = lpn;
         CodeLabel.Text = lpn.Code;
         StatusLabel.Text = lpn.Status == MobileLicensePlateNumberStatus.Closed
-            ? "Закрыта: доступна для размещения" : "Размещение доступно только после закрытия LPN";
+            ? "Закрыт: доступен для размещения" : "Размещение доступно только после закрытия LPN";
         Items = lpn.Items.Select(x => new ReceivingPutawayItemRow(x.Id,
             x.SkuName ?? x.SkuId.ToString(),
             $"Принято {x.Quantity:0.###} · размещено {x.PlacedQuantity:0.###} · осталось {x.RemainingQuantity:0.###} {x.UnitOfMeasure ?? "—"} · срок {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}")).ToArray();

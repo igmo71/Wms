@@ -105,7 +105,7 @@
                 }
                 @if (_preview.HasUnknownSku)
                 {
-                    <MudAlert Severity="Severity.Warning">В составе остаются строки с неизвестной номенклатурой или количеством.</MudAlert>
+                    <MudAlert Severity="Severity.Warning">В составе остаются строки с неизвестным SKU или количеством.</MudAlert>
                 }
                 <MudAlert Severity="Severity.Info">@_preview.FactPreservationWarning</MudAlert>
                 <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="BackToSelection">Выбрать другой документ</MudButton>

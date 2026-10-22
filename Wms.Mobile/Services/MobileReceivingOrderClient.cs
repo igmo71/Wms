@@ -13,11 +13,6 @@ public sealed class MobileReceivingOrderClient
         Guid warehouseId, CancellationToken ct = default) =>
         GetListAsync<MobileReceivingWorkOrderResponse>($"{Route}?warehouseId={warehouseId:D}", ct);
 
-    public Task<IReadOnlyList<MobileReceivingSourceResponse>> GetUnlinkedSourcesAsync(
-        Guid warehouseId, CancellationToken ct = default) =>
-        GetListAsync<MobileReceivingSourceResponse>(
-            $"{Route}/sources/unlinked?warehouseId={warehouseId:D}", ct);
-
     public Task<MobileReceivingWorkOrderResponse> GetAsync(
         Guid orderId, CancellationToken ct = default) =>
         GetAsync<MobileReceivingWorkOrderResponse>($"{Route}/{orderId:D}", ct);

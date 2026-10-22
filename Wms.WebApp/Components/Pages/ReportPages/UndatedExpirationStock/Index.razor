@@ -37,7 +37,7 @@
         <PropertyColumn Property="x => x.LocationCode" Title="Ячейка" Sortable="false">
             <CellTemplate>@StorageLocationAddress.Format(context.Item.LocationCode)</CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.SkuName" Title="Номенклатура" Sortable="false">
+        <PropertyColumn Property="x => x.SkuName" Title="SKU" Sortable="false">
             <CellTemplate>@(context.Item.SkuName ?? context.Item.SkuId.ToString())</CellTemplate>
         </PropertyColumn>
         <PropertyColumn Property="x => x.SkuCode" Title="Код" Sortable="false" />

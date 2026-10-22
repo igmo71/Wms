@@ -147,7 +147,7 @@ else
                         </CellTemplate>
                     </HierarchyColumn>
                     <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
-                    <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="Номенклатура" />
+                    <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="SKU" />
                     <TemplateColumn Title="Ед изм"><CellTemplate>@(context.Item.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</CellTemplate></TemplateColumn>
                     <PropertyColumn Property="x => x.PlanQuantity" Title="План" Format="N3" />
                     <PropertyColumn Property="x => x.FactQuantity" Title="Факт" Format="N3" />

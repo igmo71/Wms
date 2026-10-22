@@ -5,6 +5,10 @@ The receiving workspace and numbering decisions are in
 
 ## Client behavior
 
+Web and Mobile use `SKU` and `LPN` in user-facing labels and messages. LPN
+status wording treats the number as masculine (for example, «Открыт» and
+«Закрыт»). Integration identifiers and 1C field names retain their source names.
+
 Mobile is online-only. Urovo ScanWedge intent input and the ML Kit camera
 fallback implement one scanner boundary; operational screens prefer the
 embedded scanner when available. Manual SKU search, where present, uses name,
@@ -22,19 +26,38 @@ can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
 Independent putaway starts from its own LPN screen. The Mobile receiving queue
-lists free 1C sources and WMS orders for the selected warehouse. Scanning a
-document selects a free source or opens its linked order; several selected
-sources create one WMS order. A participant scans an issued LPN, selects or
+lists WMS orders for the selected warehouse. «Создать ордер» opens an initially
+empty document screen. The first successful scan creates an order with that
+document; each later scan immediately attaches another document and recalculates
+its plan. Scanning on the queue opens the linked order directly or creates an
+order from a free document and opens the document screen with that first row.
+The queue accepts the device scanner without opening a document list; a compact
+button starts the camera fallback when no embedded scanner is available.
+The server rejects a document with a different sender ID. On the empty creation
+screen, a scan of an already linked document offers to open its order. Returning
+before the first scan creates nothing; returning after creation leaves the order in the
+queue. «Готово» opens its SKU view. A participant scans an issued LPN, selects or
 globally scans its SKU, enters a positive quantity and may close it. WMS orders
 carry their own number and factual creation time in Mobile V1 responses, while
 their IDs remain the keys for commands; 1C numbers belong to individual sources. The
-queue and order page display that number and the separate local creation time.
+queue shows the number and separate local creation time. The order page uses the
+number as its heading and places status and receiving location on one line; it
+omits creation time and warehouse from the compact heading. Each SKU card opens
+its details on tap and keeps a compact zero-confirmation action when eligible.
 The order page offers zero checking and direct putaway of closed LPNs before order
 completion. Closing and putaway use separate retry-safe commands.
-The active Mobile order has a document-scan mode for adding a source and shows
-linked documents with a detach action before the first posted LPN. Each change
-reloads the order plan. An uncertain response keeps the original barcode or
-source ID and command ID for explicit retry.
+The active Mobile order has a bottom «📄 1С» button opening a separate document
+screen. The order screen itself stays focused on SKU and LPN. Each document row
+shows number and date, then sender name and warehouse operation, with no field
+labels; a tap reveals other source details and any latest check error. A failed
+check marks its row with a warning symbol. Scanning immediately attaches one
+document and recalculates the order plan. Consecutive scans attach consecutive
+documents, and the newest row is highlighted gray. A sender mismatch stays on
+the document screen with a clear error. A cross on the document row detaches it
+before the first posted LPN; detaching the last document keeps the empty order.
+«Готово» and Back return to the SKU view; neither
+performs an additional save. An uncertain response retains the original barcode
+or source ID and command ID for explicit retry, including the first create scan.
 The Mobile quantity page shows the date field when the current SKU flag is on
 or a date was already saved on the open LPN. It retains and displays that saved
 date after the flag is turned off. If closing is rejected after the flag or
@@ -100,9 +123,11 @@ User-facing order screens call linked sources "Документы 1С" and recei
 cycles "Приёмки". Receiving history shows the completing user's display
 name and a snapshot table with short plan and fact headers, without a version
 list below the SKU rows. Link history shows the actor's display name.
-A Manager can manually recheck every linked source from the card. The order
-list highlights completed orders whose current discrepancy differs from their
-latest completion snapshot.
+A Manager can manually recheck every linked source from the card. In the Web
+order list, ready orders have no color; active and completed orders use a subtle
+warning row color when current SKU plan or fact is unknown or differs, and a
+subtle success color otherwise. The list also marks completed orders whose
+current discrepancy differs from their latest completion snapshot.
 The Web order card shows linked documents in columns for number, date, sender,
 warehouse, warehouse operation, and business operation, without a duplicate
 summary above it. The recheck button shows the latest

@@ -121,7 +121,7 @@ public static class ShippingOrderSynchronizationComparer
             }
 
             ShippingOrderItemImportSnapshot externalItem = externalLines[0];
-            comparison.AddIfDifferent($"{prefix}.sku", $"Строка {lineNumber}: номенклатура", localItem!.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
+            comparison.AddIfDifferent($"{prefix}.sku", $"Строка {lineNumber}: SKU", localItem!.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.quantity", $"Строка {lineNumber}: количество", localItem.PlanQuantity, externalItem.Quantity, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.packageQuantity", $"Строка {lineNumber}: количество упаковок", localItem.PlanQuantity, externalItem.PlanQuantity, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.action", $"Строка {lineNumber}: действие", ShippingOrderAction.PickUp, externalItem.Action, OrderSynchronizationLevel.Blocking);
@@ -141,7 +141,7 @@ public static class ShippingOrderSynchronizationComparer
 
         if (localItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
         {
-            comparison.Add("items.mapping", "Сопоставление отгружаемых строк", "Однозначные строки", "В WMS повторяется номенклатура", OrderSynchronizationLevel.Blocking);
+            comparison.Add("items.mapping", "Сопоставление отгружаемых строк", "Однозначные строки", "В WMS повторяется один и тот же SKU", OrderSynchronizationLevel.Blocking);
             return;
         }
 
@@ -155,7 +155,7 @@ public static class ShippingOrderSynchronizationComparer
         {
             if (!localBySku.ContainsKey(externalSku))
             {
-                comparison.Add($"items.sku[{externalSku:N}]", "Неожиданная номенклатура в отгружаемых строках", null, externalSku, OrderSynchronizationLevel.Blocking);
+                comparison.Add($"items.sku[{externalSku:N}]", "Неожиданный SKU в отгружаемых строках", null, externalSku, OrderSynchronizationLevel.Blocking);
             }
         }
 
@@ -221,7 +221,7 @@ public static class ShippingOrderSynchronizationComparer
         if (localItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1)
             || localBaseItems.GroupBy(x => x.StockKeepingUnitId).Any(x => x.Count() > 1))
         {
-            comparison.Add("baseItems.mapping", "Сопоставление строк основания", "Однозначные строки", "В WMS повторяется номенклатура", OrderSynchronizationLevel.Blocking);
+            comparison.Add("baseItems.mapping", "Сопоставление строк основания", "Однозначные строки", "В WMS повторяется один и тот же SKU", OrderSynchronizationLevel.Blocking);
             return;
         }
 
@@ -233,7 +233,7 @@ public static class ShippingOrderSynchronizationComparer
         if (localBaseItems.Any(x => !factsBySku.ContainsKey(x.StockKeepingUnitId))
             || localItems.Any(x => localBaseItems.All(baseItem => baseItem.StockKeepingUnitId != x.StockKeepingUnitId)))
         {
-            comparison.Add("baseItems.mapping", "Сопоставление строк основания", "Одинаковая номенклатура", "Строки WMS не сопоставляются", OrderSynchronizationLevel.Blocking);
+            comparison.Add("baseItems.mapping", "Сопоставление строк основания", "Одинаковый SKU", "Строки WMS не сопоставляются", OrderSynchronizationLevel.Blocking);
         }
 
         CompareBaseItems(comparison, expectedItems, externalItems, factsBySku);
@@ -274,7 +274,7 @@ public static class ShippingOrderSynchronizationComparer
             decimal expectedQuantity = targetQuantities is null
                 ? expectedItem!.PlanQuantity
                 : targetQuantities[expectedItem!.StockKeepingUnitId];
-            comparison.AddIfDifferent($"{prefix}.sku", $"Строка основания {lineNumber}: номенклатура", expectedItem.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
+            comparison.AddIfDifferent($"{prefix}.sku", $"Строка основания {lineNumber}: SKU", expectedItem.StockKeepingUnitId, externalItem.StockKeepingUnitId, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.planQuantity", $"Строка основания {lineNumber}: количество", expectedQuantity, externalItem.PlanQuantity, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.baseOrderId", $"Строка основания {lineNumber}: документ", expectedItem.BaseOrderId, externalItem.BaseOrderId, OrderSynchronizationLevel.Blocking);
             comparison.AddIfDifferent($"{prefix}.baseOrderType", $"Строка основания {lineNumber}: тип документа", expectedItem.BaseOrderType, externalItem.BaseOrderType, OrderSynchronizationLevel.Blocking);

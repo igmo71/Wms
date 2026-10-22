@@ -23,9 +23,9 @@
     }
     <MudTable T="ReceivingWorkItemView" Items="SortedItems" Dense="true" Hover="true" Elevation="0"
               RowStyleFunc="PlanRowStyle">
-        <HeaderContent><MudTh>Номенклатура</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Расхождение</MudTh></HeaderContent>
+        <HeaderContent><MudTh>SKU</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Расхождение</MudTh></HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Номенклатура">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
+            <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
             <MudTd DataLabel="Код">@context.SkuCode</MudTd>
             <MudTd DataLabel="План">@Format(context.PlanQuantity) @context.UnitOfMeasure</MudTd>
             <MudTd DataLabel="Факт">@(context.FactQuantity is null ? "Не проверено" : Format(context.FactQuantity) + " " + context.UnitOfMeasure)</MudTd>

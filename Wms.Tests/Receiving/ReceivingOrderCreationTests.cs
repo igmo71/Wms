@@ -365,6 +365,7 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
             x.CommandType == "receiving.order.change-sources" && x.ResultResourceId == orderId));
         Assert.Equal(2, await verify.WarehouseAuditEvents.CountAsync(x =>
             x.ReceivingOrderId == orderId && x.CommandType == "receiving.order.change-sources"));
+
     }
 
     [Fact]
@@ -487,6 +488,24 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
             x.CommandType == "receiving.order.change-sources" && x.ResultResourceId == orderId));
         Assert.Equal(2, await verify.WarehouseAuditEvents.CountAsync(x =>
             x.ReceivingOrderId == orderId && x.CommandType == "receiving.order.change-sources"));
+
+        var lastDetachToken = Value(await preview.ExecuteAsync(
+            new PreviewReceivingOrderSourceChangeRequest(orderId, secondKey,
+                ReceivingSourceChangeKind.Detach, "manager"))).StateToken;
+        Assert.Equal(orderId, Value(await change.ExecuteAsync(
+            new ChangeReceivingOrderSourcesRequest(Guid.NewGuid(), orderId,
+                secondKey, "manager", ReceivingSourceChangeKind.Detach,
+                ReceivingSourceChangeChannel.Web, lastDetachToken))));
+        await using (var empty = database.CreateDbContext())
+            Assert.NotNull((await empty.ReceivingOrders.SingleAsync(x => x.Id == orderId))
+                .SenderId);
+        responses[firstKey] = Source(firstKey, warehouseId, $$"""
+            [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":2}]
+            """, senderId: Guid.NewGuid());
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        Error(await preview.ExecuteAsync(
+            new PreviewReceivingOrderSourceChangeRequest(orderId, firstKey,
+                ReceivingSourceChangeKind.Attach, "manager")), OperationErrorType.Conflict);
     }
 
     [Fact]
@@ -606,8 +625,83 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         Assert.False(await updated.InventoryMovements.AnyAsync(x => x.RecorderId == first));
     }
 
-    private static string Source(Guid refKey, Guid warehouseId, string items, bool posted = true) => $$"""
+    [Fact]
+    public async Task Sender_is_shared_by_sources_and_changed_linked_sender_preserves_plan()
+    {
+        var warehouseId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var firstKey = Guid.NewGuid();
+        var secondKey = Guid.NewGuid();
+        var firstSender = Guid.NewGuid();
+        var secondSender = Guid.NewGuid();
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.Warehouses.Add(new Warehouse { Id = warehouseId, Name = "Sender warehouse" });
+            seed.StockKeepingUnits.Add(new StockKeepingUnit { Id = skuId, Name = "Sender SKU" });
+            await seed.SaveChangesAsync();
+        }
+
+        string Document(Guid key, Guid sender, int quantity) =>
+            Source(key, warehouseId, $$"""
+                [{"LineNumber":"1","Номенклатура_Key":"{{skuId}}","Количество":{{quantity}}}]
+                """, senderId: sender);
+        var responses = new Dictionary<Guid, string>
+        {
+            [firstKey] = Document(firstKey, firstSender, 2),
+            [secondKey] = Document(secondKey, secondSender, 3)
+        };
+        var parser = new ReceivingSourceParser();
+        var synchronize = new SynchronizeReceivingSource(new StubReader(responses), parser,
+            new ReceivingSourceStore(database, parser), TimeProvider.System);
+        Assert.True((await synchronize.ExecuteAsync(firstKey)).IsSuccess);
+        Assert.True((await synchronize.ExecuteAsync(secondKey)).IsSuccess);
+        var create = new CreateReceivingOrder(new ReceivingOrderStore(database), parser,
+            TimeProvider.System);
+        var mixedCreate = await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            Guid.NewGuid(), [firstKey, secondKey], "manager"));
+        Error(mixedCreate, OperationErrorType.Conflict);
+
+        var orderId = Value(await create.ExecuteAsync(new CreateReceivingOrderRequest(
+            Guid.NewGuid(), [firstKey], "manager")));
+        var sourceStore = new ReceivingOrderSourceChangeStore(database);
+        var permission = new WarehousePermission(new ManagerPermission());
+        var preview = new PreviewReceivingOrderSourceChange(sourceStore, parser,
+            synchronize, new ReceivingReferenceNameStore(database), permission);
+        var rejectedPreview = await preview.ExecuteAsync(
+            new PreviewReceivingOrderSourceChangeRequest(orderId, secondKey,
+                ReceivingSourceChangeKind.Attach, "manager"));
+        Error(rejectedPreview, OperationErrorType.Conflict);
+
+        var change = new ChangeReceivingOrderSources(
+            new CommandExecutor(new CommandExecutionStore(database)), sourceStore,
+            new ReceivingWorkQueryStore(database), parser, synchronize, permission,
+            TimeProvider.System);
+        var rejectedAttach = await change.ExecuteAsync(
+            new ChangeReceivingOrderSourcesRequest(Guid.NewGuid(), orderId,
+                secondKey, "manager", ReceivingSourceChangeKind.Attach,
+                ReceivingSourceChangeChannel.Mobile));
+        Error(rejectedAttach, OperationErrorType.Conflict);
+
+        await using var before = database.CreateDbContext();
+        var acceptedVersion = await before.ReceivingSourceDocuments
+            .Where(x => x.RefKey == firstKey)
+            .Select(x => x.LastSuccessfulVersionId).SingleAsync();
+        responses[firstKey] = Document(firstKey, secondSender, 9);
+        var changed = await synchronize.ExecuteAsync(firstKey);
+        Error(changed, OperationErrorType.Conflict);
+        await using var after = database.CreateDbContext();
+        var source = await after.ReceivingSourceDocuments.SingleAsync(x => x.RefKey == firstKey);
+        Assert.Equal(acceptedVersion, source.LastSuccessfulVersionId);
+        Assert.Contains("Отправитель", source.LastAttemptError);
+        Assert.Equal(2m, (await after.ReceivingOrderItems.SingleAsync(x =>
+            x.ReceivingOrderId == orderId && x.StockKeepingUnitId == skuId))
+            .CurrentPlanQuantity);
+    }
+
+    private static string Source(Guid refKey, Guid warehouseId, string items, bool posted = true,
+        Guid? senderId = null) => $$"""
         {"value":[{"Ref_Key":"{{refKey}}","Склад_Key":"{{warehouseId}}",
+         "Отправитель":"{{senderId ?? Guid.Parse("11111111-1111-1111-1111-111111111111")}}",
          "Posted":{{posted.ToString().ToLowerInvariant()}},"DeletionMark":false,"Number":"Test","Товары":{{items}}}]}
         """;
 

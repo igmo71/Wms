@@ -47,10 +47,10 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
     {
         var lpn = await query.GetLpnAsync(lpnId, null, ct);
         if (lpn is null)
-            return MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найдена."));
+            return MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найден."));
         if (lpn.Status != LicensePlateNumberStatus.Closed)
             return MobileEndpointResults.CommandProblem(
-                OperationError.Conflict("Размещать можно только закрытую LPN."));
+                OperationError.Conflict("Размещать можно только закрытый LPN."));
         var item = MobileReceivingOrderEndpoints.MapLpn(lpn).Items
             .SingleOrDefault(x => x.Id == itemId && x.RemainingQuantity > 0);
         if (item is null)
@@ -75,7 +75,7 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
     {
         var lpn = await query.GetLpnAsync(lpnId, null, ct);
         if (lpn is null)
-            return MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найдена."));
+            return MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найден."));
         var sku = await search.ResolveBarcodeAsync(lpn.OrderId, request.Barcode, ct);
         if (!sku.IsSuccess)
             return MobileEndpointResults.CommandProblem(sku.Error!);
@@ -105,6 +105,6 @@ internal static class MobileLicensePlateNumberPutawayEndpoints
 
     private static IResult MapLpn(ReceivingWorkLpnView? lpn) =>
         lpn is null
-            ? MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найдена."))
+            ? MobileEndpointResults.CommandProblem(OperationError.NotFound("LPN не найден."))
             : TypedResults.Ok(MobileReceivingOrderEndpoints.MapLpn(lpn));
 }

@@ -138,7 +138,7 @@
                                                      Clearable="true"
                                                      Margin="Margin.Dense"
                                                      Disabled="@(!CanUseTransit || InputsLocked)" />
-                                    <MudSelect T="Guid?" @bind-Value="_pickSkuId" Label="Номенклатура"
+                                    <MudSelect T="Guid?" @bind-Value="_pickSkuId" Label="SKU"
                                                Disabled="@(!CanUseTransit || InputsLocked || _pickSource is null)" Clearable="true" Margin="Margin.Dense">
                                         @foreach (var balance in _pickSourceBalances)
                                         {
@@ -163,7 +163,7 @@
                             <MudPaper Class="pa-4" Elevation="0" Outlined="true">
                                 <MudText Typo="Typo.h6">Разместить с тележки</MudText>
                                 <MudStack Spacing="2" Class="mt-3">
-                                    <MudSelect T="Guid?" @bind-Value="_putSkuId" Label="Номенклатура"
+                                    <MudSelect T="Guid?" @bind-Value="_putSkuId" Label="SKU"
                                                Disabled="@(!CanPutAnything || InputsLocked)" Clearable="true" Margin="Margin.Dense">
                                         @foreach (var balance in _transitBalances)
                                         {
@@ -197,12 +197,12 @@
                                 <MudText Typo="Typo.h6" GutterBottom="true">Остаток на тележке</MudText>
                                 <MudTable Items="_transitBalances" Dense="true" Hover="true">
                                     <HeaderContent>
-                                        <MudTh>Номенклатура</MudTh>
+                                        <MudTh>SKU</MudTh>
                                         <MudTh>Количество</MudTh>
                                         <MudTh>Вес</MudTh>
                                     </HeaderContent>
                                     <RowTemplate>
-                                        <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit.Name · @(context.StockKeepingUnit.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
+                                        <MudTd DataLabel="SKU">@context.StockKeepingUnit.Name · @(context.StockKeepingUnit.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
                                         <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
                                         <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                                     </RowTemplate>
@@ -226,7 +226,7 @@
                                                    ToStringFunc="StorageLocationDisplay.Format" Label="В ячейку"
                                                      Clearable="true" Margin="Margin.Dense"
                                                      Disabled="@(!CanEdit || InputsLocked)" />
-                                    <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
+                                    <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="SKU"
                                                Disabled="@(!CanEdit || InputsLocked || _directSource is null)" Clearable="true" Margin="Margin.Dense">
                                         @foreach (var balance in _directSourceBalances)
                                         {
@@ -265,7 +265,7 @@
                                              ToStringFunc="StorageLocationDisplay.Format" Label="В ячейку"
                                              Clearable="true" Margin="Margin.Dense"
                                              Disabled="@(!CanEdit || InputsLocked)" />
-                            <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="Номенклатура"
+                            <MudSelect T="Guid?" @bind-Value="_directSkuId" Label="SKU"
                                        Disabled="@(!CanEdit || InputsLocked || _directSource is null)" Clearable="true" Margin="Margin.Dense">
                                 @foreach (var balance in _directSourceBalances)
                                 {
@@ -296,7 +296,7 @@
                     <MudTh>Время</MudTh>
                     <MudTh>Из ячейки</MudTh>
                     <MudTh>В ячейку</MudTh>
-                    <MudTh>Номенклатура</MudTh>
+                    <MudTh>SKU</MudTh>
                     <MudTh>Количество</MudTh>
                     <MudTh>Вес</MudTh>
                 </HeaderContent>
@@ -305,7 +305,7 @@
                     <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
                     <MudTd DataLabel="Из ячейки">@StorageLocationDisplay.FormatOrDash(context.SourceStorageLocation)</MudTd>
                     <MudTd DataLabel="В ячейку">@StorageLocationDisplay.FormatOrDash(context.DestinationStorageLocation)</MudTd>
-                    <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
+                    <MudTd DataLabel="SKU">@context.StockKeepingUnit?.Name · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
                     <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                 </RowTemplate>

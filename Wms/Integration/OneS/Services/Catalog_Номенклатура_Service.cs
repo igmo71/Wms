@@ -30,7 +30,7 @@ public class Catalog_Номенклатура_Service(
         var fetchedItem = serviceResult.Value?.Value?[0];
 
         if (fetchedItem is null)
-            return OperationError.Failure("1С вернула некорректный ответ: позиция номенклатуры отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: SKU отсутствует.");
 
         var mapResult = MapToStockKeepingUnit(fetchedItem, unitResult.Value!);
 
@@ -62,7 +62,7 @@ public class Catalog_Номенклатура_Service(
             return serviceResult.Error!;
 
         if (serviceResult.Value is not int totalItems)
-            return OperationError.Failure("1С вернула некорректный ответ: количество позиций номенклатуры отсутствует.");
+            return OperationError.Failure("1С вернула некорректный ответ: количество SKU отсутствует.");
 
         int batchSize = Catalog_Номенклатура.BatchSize;
 
@@ -92,7 +92,7 @@ public class Catalog_Номенклатура_Service(
                     var fetchedItems = batchResult.Value?.Value;
 
                     if (fetchedItems is null)
-                        return OperationError.Failure("1С вернула некорректный ответ: пакет номенклатуры отсутствует.");
+                        return OperationError.Failure("1С вернула некорректный ответ: пакет SKU отсутствует.");
 
                     if (fetchedItems.Count == 0)
                         return new StockKeepingUnitImportSummary(0, 0);
@@ -132,7 +132,7 @@ public class Catalog_Номенклатура_Service(
                 batchResults.Sum(x => x.Value!.InvalidWeightCount),
                 batchResults.Sum(x => x.Value!.InvalidVolumeCount))
             : OperationError.Failure(
-                $"Не удалось полностью обновить номенклатуру. Часть данных могла быть обновлена. {failedResult.Error?.Message}");
+                $"Не удалось полностью обновить SKU. Часть данных могла быть обновлена. {failedResult.Error?.Message}");
     }
 
     private static StockKeepingUnitMapResult MapToStockKeepingUnit(

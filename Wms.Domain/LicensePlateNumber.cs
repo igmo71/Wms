@@ -58,7 +58,7 @@ public sealed class LicensePlateNumber
     public OperationResult CancelOpen(string userId, DateTimeOffset cancelledAtUtc, bool canManage)
     {
         if (Status != LicensePlateNumberStatus.Open)
-            return OperationError.Invalid("Отменить можно только открытую LPN.");
+            return OperationError.Invalid("Отменить можно только открытый LPN.");
         if (string.IsNullOrWhiteSpace(userId) || cancelledAtUtc == default)
             return OperationError.Invalid("Для отмены LPN обязательны пользователь и время.");
         if (!canManage && !string.Equals(ResponsibleUserId, userId, StringComparison.Ordinal))
@@ -86,7 +86,7 @@ public sealed class LicensePlateNumber
 
         var activeItems = _items.Where(x => !x.IsDeleted).Take(2).ToList();
         if (activeItems.Count > 1)
-            return OperationError.Conflict("Приёмная LPN содержит несколько активных позиций.");
+            return OperationError.Conflict("Приёмный LPN содержит несколько активных позиций.");
         var active = activeItems.SingleOrDefault();
         if (active is not null && active.StockKeepingUnitId != stockKeepingUnitId)
         {
@@ -116,7 +116,7 @@ public sealed class LicensePlateNumber
             return OperationError.Invalid("Цикл и исходное место приёмки LPN обязательны.");
         var activeItems = _items.Where(x => !x.IsDeleted).Take(2).ToList();
         if (activeItems.Count > 1)
-            return OperationError.Conflict("Приёмная LPN содержит несколько активных позиций.");
+            return OperationError.Conflict("Приёмный LPN содержит несколько активных позиций.");
         var active = activeItems.SingleOrDefault();
         if (active is null || !WarehouseQuantity.IsPositive(active.Quantity))
             return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
@@ -137,13 +137,13 @@ public sealed class LicensePlateNumber
     {
         if (Status != LicensePlateNumberStatus.Closed || ReceivingCycleId is null
             || OriginalReceivingLocationId is null)
-            return OperationError.Conflict("Исправить можно только закрытую приёмную LPN.");
+            return OperationError.Conflict("Исправить можно только закрытый приёмный LPN.");
         if (_putaways.Count != 0)
             return OperationError.Conflict("После первого размещения количество LPN изменить нельзя.");
 
         var active = _items.Where(x => !x.IsDeleted).Take(2).ToArray();
         if (active.Length != 1)
-            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+            return OperationError.Conflict("Приёмный LPN должен содержать один действующий SKU.");
         if (active[0].Quantity == quantity)
             return OperationError.Invalid("Количество LPN не изменилось.");
 
@@ -157,7 +157,7 @@ public sealed class LicensePlateNumber
     {
         if (Status != LicensePlateNumberStatus.Closed || ReceivingCycleId is null
             || OriginalReceivingLocationId is null)
-            return OperationError.Conflict("Удалить можно только закрытую приёмную LPN.");
+            return OperationError.Conflict("Удалить можно только закрытый приёмный LPN.");
         if (string.IsNullOrWhiteSpace(userId) || occurredAtUtc == default)
             return OperationError.Invalid("Для удаления LPN обязательны пользователь и время.");
 

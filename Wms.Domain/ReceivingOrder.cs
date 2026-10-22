@@ -21,6 +21,7 @@ public class ReceivingOrder
     public int ActiveCycleNumber { get; private set; }
     public long OperationalRevision { get; private set; }
     public Guid WarehouseId { get; private set; }
+    public Guid? SenderId { get; private set; }
     public Warehouse? Warehouse { get; private set; }
     public Guid? ReceivingLocationId { get; private set; }
     public StorageLocation? ReceivingLocation { get; private set; }
@@ -50,6 +51,25 @@ public class ReceivingOrder
     }
 
     public void RecordSourceCompositionChange() => AdvanceOperationalRevision();
+
+    public OperationResult SetSender(Guid senderId)
+    {
+        if (senderId == Guid.Empty)
+            return OperationError.Invalid("Идентификатор отправителя обязателен.");
+        if (SenderId is Guid current && current != senderId)
+            return OperationError.Conflict("У ордера уже установлен другой отправитель.");
+        SenderId = senderId;
+        return OperationResult.Success();
+    }
+
+    public OperationResult ClearSender()
+    {
+        if (_licensePlateNumbers.Any(x => x.Status is LicensePlateNumberStatus.Closed
+            or LicensePlateNumberStatus.Deleted))
+            return OperationError.Conflict("После первого проведённого LPN отправителя ордера нельзя изменить.");
+        SenderId = null;
+        return OperationResult.Success();
+    }
 
     public OperationResult<ReceivingCycle> CompleteCurrentCycle(
         string userId, DateTimeOffset completedAtUtc, bool canManage,
@@ -258,7 +278,7 @@ public class ReceivingOrder
 
         var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
         if (active.Length != 1 || !WarehouseQuantity.IsPositive(active[0].Quantity))
-            return OperationError.Invalid("Закрыть можно только положительную монопалету.");
+            return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
         var orderItem = _items.SingleOrDefault(x =>
             x.StockKeepingUnitId == active[0].StockKeepingUnitId);
         if (orderItem is null)
@@ -292,13 +312,13 @@ public class ReceivingOrder
         LicensePlateNumber lpn, decimal quantity, string userId, DateTimeOffset occurredAtUtc)
     {
         if (lpn is null || lpn.ReceivingOrderId != Id || !_licensePlateNumbers.Contains(lpn))
-            return OperationError.NotFound("LPN не найдена в приходном ордере.");
+            return OperationError.NotFound("LPN не найден в приходном ордере.");
         if (!WarehouseQuantity.IsNonNegative(quantity))
             return OperationError.Invalid("Новое количество LPN должно быть неотрицательным.");
 
         var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
         if (active.Length != 1)
-            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+            return OperationError.Conflict("Приёмный LPN должен содержать один действующий SKU.");
         var orderItem = _items.SingleOrDefault(x =>
             x.StockKeepingUnitId == active[0].StockKeepingUnitId);
         if (orderItem is null)
@@ -333,10 +353,10 @@ public class ReceivingOrder
         string userId, DateTimeOffset occurredAtUtc)
     {
         if (lpn is null || lpn.ReceivingOrderId != Id || !_licensePlateNumbers.Contains(lpn))
-            return OperationError.NotFound("LPN не найдена в приходном ордере.");
+            return OperationError.NotFound("LPN не найден в приходном ордере.");
         var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
         if (active.Length != 1)
-            return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+            return OperationError.Conflict("Приёмный LPN должен содержать один действующий SKU.");
         var orderItem = _items.SingleOrDefault(x =>
             x.StockKeepingUnitId == active[0].StockKeepingUnitId);
         if (orderItem is null)
@@ -379,7 +399,7 @@ public class ReceivingOrder
         if (_licensePlateNumbers.Any(lpn =>
                 (lpn.Status is LicensePlateNumberStatus.Open or LicensePlateNumberStatus.Closed)
                 && lpn.Items.Any(x => !x.IsDeleted && x.StockKeepingUnitId == skuId)))
-            return OperationError.Conflict("Для SKU уже есть действующая LPN.");
+            return OperationError.Conflict("Для SKU уже есть действующий LPN.");
         if (item.FactQuantity == 0m)
             return false;
         item.SetAggregatedLpnFact(0m);

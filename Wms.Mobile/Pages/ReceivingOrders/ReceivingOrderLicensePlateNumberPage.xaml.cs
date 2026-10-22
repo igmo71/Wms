@@ -89,10 +89,10 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         CodeLabel.Text = lpn.Code;
         StatusLabel.Text = lpn.Status switch
         {
-            MobileLicensePlateNumberStatus.Open => "Открыта",
-            MobileLicensePlateNumberStatus.Closed => "Закрыта: приход проведён",
-            MobileLicensePlateNumberStatus.Cancelled => "Отменена",
-            MobileLicensePlateNumberStatus.Deleted => "Удалена",
+            MobileLicensePlateNumberStatus.Open => "Открыт",
+            MobileLicensePlateNumberStatus.Closed => "Закрыт: приход проведён",
+            MobileLicensePlateNumberStatus.Cancelled => "Отменён",
+            MobileLicensePlateNumberStatus.Deleted => "Удалён",
             _ => lpn.Status.ToString()
         };
         ItemRows = lpn.Items.Select(x => new ReceivingLpnItemRow(x.SkuId,
@@ -135,7 +135,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         if (Lpn.Status != MobileLicensePlateNumberStatus.Open)
         {
-            ErrorLabel.Text = "Закрытую LPN нельзя изменить. Для размещения откройте экран размещения.";
+            ErrorLabel.Text = "Закрытый LPN нельзя изменить. Для размещения откройте экран размещения.";
             return;
         }
         SetBusy(true);

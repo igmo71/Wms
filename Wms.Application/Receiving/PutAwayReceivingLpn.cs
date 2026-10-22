@@ -43,7 +43,7 @@ public sealed class PutAwayReceivingLpn(
                 var lpn = await store.LoadLpnForPutawayAsync(
                     session, command.LpnId, operationCt);
                 if (lpn is null)
-                    return OperationError.NotFound("LPN не найдена.");
+                    return OperationError.NotFound("LPN не найден.");
                 if (lpn.ReceivingOrderId is not Guid orderId)
                     return OperationError.Conflict("LPN не относится к приходному ордеру.");
                 var order = await store.LoadOrderAsync(session, orderId, operationCt);

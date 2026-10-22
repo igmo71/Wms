@@ -21,7 +21,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
         _services = services;
     }
 
-    public IReadOnlyList<ReceivingOrderSkuPalletRow> PalletRows { get; private set; } = [];
+    public IReadOnlyList<ReceivingOrderSkuLpnRow> LpnRows { get; private set; } = [];
 
     public void Show(Guid orderId, Guid skuId, ReceivingOrderReceivingProcess process)
     {
@@ -56,16 +56,16 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
             PlanLabel.Text = item.PlanQuantity?.ToString("0.###") ?? "?";
             FactLabel.Text = item.FactQuantity?.ToString("0.###") ?? "?";
             UnitLabel.Text = item.UnitOfMeasure ?? "—";
-            PalletRows = order.Lpns.Where(x => x.Status is not
+            LpnRows = order.Lpns.Where(x => x.Status is not
                 (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
                 .Select(x => new { Lpn = x, Item = x.Items.SingleOrDefault(y => y.SkuId == _skuId) })
                 .Where(x => x.Item is not null)
-                .Select(x => new ReceivingOrderSkuPalletRow(x.Lpn.Id, x.Lpn.Code,
-                    x.Lpn.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыта" : "Открыта",
+                .Select(x => new ReceivingOrderSkuLpnRow(x.Lpn.Id, x.Lpn.Code,
+                    x.Lpn.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыт" : "Открыт",
                     x.Lpn.ResponsibleUserId ?? "—",
                     $"{x.Item!.Quantity:0.###} {item.UnitOfMeasure ?? "—"}"))
                 .ToArray();
-            OnPropertyChanged(nameof(PalletRows));
+            OnPropertyChanged(nameof(LpnRows));
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить SKU."; }
@@ -73,7 +73,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
         finally { _busy = false; }
     }
 
-    private async void OnPalletTapped(object? sender, TappedEventArgs e)
+    private async void OnLpnTapped(object? sender, TappedEventArgs e)
     {
         if (_busy || _process.HasPendingCommand || e.Parameter is not Guid id) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
@@ -82,5 +82,5 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
     }
 }
 
-public sealed record ReceivingOrderSkuPalletRow(Guid LicensePlateNumberId,
+public sealed record ReceivingOrderSkuLpnRow(Guid LicensePlateNumberId,
     string Code, string StatusName, string ResponsibleUserName, string QuantityText);

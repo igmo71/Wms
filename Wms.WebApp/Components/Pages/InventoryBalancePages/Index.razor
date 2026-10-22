@@ -39,7 +39,7 @@
                          ValueChanged="OnStockKeepingUnitChangedAsync"
                          SearchFunc="SearchStockKeepingUnitsAsync"
                          ToStringFunc="stockKeepingUnit => stockKeepingUnit?.Name ?? string.Empty"
-                         Label="Номенклатура"
+                         Label="SKU"
                          Clearable="true"
                          Class="ml-4" />
     </MudStack>
@@ -59,7 +59,7 @@
         <PropertyColumn Property="x => x.StorageLocation!.Code" Title="Ячейка хранения" Sortable="true">
             <CellTemplate>@StorageLocationDisplay.Format(context.Item.StorageLocation)</CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="Номенклатура" Sortable="true" />
+        <PropertyColumn Property="x => x.StockKeepingUnit!.Name" Title="SKU" Sortable="true" />
         <PropertyColumn Property="x => x.StockKeepingUnit!.Code" Title="Код" Sortable="false" />
         <PropertyColumn Property="x => x.ExpirationDate" Title="Срок годности" Sortable="true">
             <CellTemplate>@(context.Item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</CellTemplate>

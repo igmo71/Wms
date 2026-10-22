@@ -41,6 +41,7 @@ public static class MauiProgram
         builder.Services.AddTransient<InventoryCountPage>();
         builder.Services.AddTransient<ReceivingOrderPage>();
         builder.Services.AddTransient<ReceivingOrderReceivingPage>();
+        builder.Services.AddTransient<ReceivingOrderSourcesPage>();
         builder.Services.AddTransient<ReceivingOrderSkuDistributionPage>();
         builder.Services.AddTransient<ReceivingOrderLicensePlateNumberPage>();
         builder.Services.AddTransient<ReceivingOrderLicensePlateNumberQuantityPage>();

@@ -40,13 +40,13 @@ else
         <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudText Typo="Typo.h6" GutterBottom="true">История движений</MudText>
             <MudTable Items="_movements" Dense="true" Hover="true" Striped="true">
-                <HeaderContent><MudTh>№</MudTh><MudTh>Время</MudTh><MudTh>Из ячейки</MudTh><MudTh>В ячейку</MudTh><MudTh>Номенклатура</MudTh><MudTh>Количество</MudTh><MudTh>Вес</MudTh></HeaderContent>
+                <HeaderContent><MudTh>№</MudTh><MudTh>Время</MudTh><MudTh>Из ячейки</MudTh><MudTh>В ячейку</MudTh><MudTh>SKU</MudTh><MudTh>Количество</MudTh><MudTh>Вес</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="№">@context.RecorderLineNumber</MudTd>
                     <MudTd DataLabel="Время">@FormatDateTimeOffset(context.PostedAtUtc)</MudTd>
                     <MudTd DataLabel="Из ячейки">@StorageLocationDisplay.FormatOrDash(context.SourceStorageLocation)</MudTd>
                     <MudTd DataLabel="В ячейку">@StorageLocationDisplay.FormatOrDash(context.DestinationStorageLocation)</MudTd>
-                    <MudTd DataLabel="Номенклатура">@context.StockKeepingUnit?.Name · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
+                    <MudTd DataLabel="SKU">@context.StockKeepingUnit?.Name · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")</MudTd>
                     <MudTd DataLabel="Количество">@FormatQuantity(context.Quantity)</MudTd>
                     <MudTd DataLabel="Вес">@WeightDisplay.Format(context.WeightKg)</MudTd>
                 </RowTemplate>

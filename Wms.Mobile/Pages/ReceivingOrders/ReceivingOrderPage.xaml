@@ -10,30 +10,12 @@
                 <VerticalStackLayout Spacing="10">
                     <Picker x:Name="WarehousePicker" Title="Выберите склад"
                             ItemDisplayBinding="{Binding Name}" SelectedIndexChanged="OnWarehouseChanged" />
-                    <Label Text="Отсканируйте документ 1С или выберите несколько источников ниже." />
+                    <Label Text="Сканируйте документ 1С или создайте ордер." FontSize="13" />
+                    <Button x:Name="CameraButton" Text="Сканировать документ 1С"
+                            IsVisible="False" IsEnabled="False" Clicked="OnCameraClicked"
+                            HeightRequest="42" />
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Label x:Name="SelectionLabel" FontSize="13" />
-                    <Label FontAttributes="Bold" Text="Свободные документы 1С" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SourceRows, Source={x:Reference Page}}" Spacing="5">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:ReceivingSourceRow">
-                                <Border Padding="9" Stroke="#D4D4D4">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer CommandParameter="{Binding RefKey}" Tapped="OnSourceTapped" />
-                                    </Border.GestureRecognizers>
-                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
-                                        <Label Text="{Binding SelectionMark}" FontSize="20" />
-                                        <VerticalStackLayout Grid.Column="1">
-                                            <Label Text="{Binding Number}" FontAttributes="Bold" />
-                                            <Label Text="{Binding PlanText}" FontSize="12" />
-                                            <Label Text="{Binding Warning}" FontSize="12" TextColor="DarkOrange" />
-                                        </VerticalStackLayout>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
-                    <Label FontAttributes="Bold" Text="Ордера WMS" />
+                    <Label FontAttributes="Bold" Text="Приходные ордера" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding OrderRows, Source={x:Reference Page}}" Spacing="5">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingWorkOrderRow">
@@ -56,8 +38,8 @@
         <VerticalStackLayout Grid.Row="1" Spacing="5">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
-            <Button x:Name="CreateButton" Text="Создать ордер из выбранных документов"
-                    Clicked="OnCreateClicked" HeightRequest="46" />
+            <Button x:Name="CreateButton" Text="Создать ордер"
+                    Clicked="OnCreateClicked" HeightRequest="46" IsEnabled="False" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

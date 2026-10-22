@@ -12,8 +12,9 @@ number, and fixed warehouse. The number starts from the local second of creation
 if occupied, creation takes the next free second under a transaction lock. The
 actual `CreatedAtUtc` remains unchanged by a number collision. It may combine
 several distinct 1C documents identified by `Ref_Key`. Web can create the order
-from free sources; Mobile can select free documents or scan one into an
-unfinished order. A linked document opens its WMS order. Active source links
+from free sources; Mobile creates it from the first scanned document and attaches
+subsequent scans to the unfinished order. A linked document can open its WMS order.
+The mobile queue does not load a list of free 1C documents. Active source links
 retain history. Repeating the same complete selection returns the existing
 order. Creation records the acting user, source versions, and command receipt
 with an audit event in the same transaction. Repeating the same request ID
@@ -23,8 +24,15 @@ required number column and unique index without historical backfill.
 Receiving notifications update only the 1C source mirror and the current plan
 of an already linked WMS order; they never create a WMS order.
 The latest successful version supplies each source's own number, date, sender,
-warehouse and business operations, and basis document in order details; these
-fields do not become shared order attributes.
+warehouse and business operations, and basis document in order details. Their
+display values remain properties of individual sources.
+The order also stores the common 1C sender GUID independently of the sender
+reference type. Creation and attachment require a valid sender GUID and reject
+documents from a different sender. After the first posted receiving LPN the
+sender stays fixed even if all sources are detached, the LPN is deleted, or the
+order is reopened. Before the first posted LPN, detaching the last source clears
+the sender so another sender may be selected. Existing orders without a
+confirmed sender need separate data review before new attachment.
 
 Successful source checks retain separate source lines and immutable versions.
 The current plan sums known contributions by SKU. An unposted, deleted, or
@@ -39,6 +47,9 @@ fact. Newly known rows are added. An identical check does not advance
 the order revision. A failed check records the error and retains the last
 successful version and plan. Source changes do not rewrite the WMS warehouse,
 fact, LPNs, movements, or lifecycle status.
+If a linked 1C document changes its sender or loses a valid sender GUID,
+its new version is rejected as a failed check; the previously accepted version
+and plan remain in force.
 
 An Operator or Manager may attach a freshly checked source through Mobile to an
 unfinished order when its warehouse matches. An Operator may detach one through
@@ -75,8 +86,8 @@ The WMS order lifecycle is ready for receiving, in receiving, or received.
 Joining checks linked sources and their posting, deletion mark, and warehouse.
 The first current-cycle participant selects an active unlocked Receiving
 location in the fixed warehouse. Later participants use that same location.
-Joining does not write to 1C. Mobile offers free sources and WMS orders for the
-selected warehouse; the order screen shows plan and fact separately.
+Joining does not write to 1C. Mobile lists WMS orders for the selected warehouse;
+the order screen shows plan and fact separately.
 
 A participant binds an issued label to an open receiving LPN. Its order,
 creator, responsible user, creation time, and original receiving location are

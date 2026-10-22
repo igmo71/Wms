@@ -12,12 +12,10 @@ public partial class ReceivingOrderPage : ContentPage
     private readonly MobileWarehouseSelection _selection;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
-    private readonly HashSet<Guid> _selected = [];
-    private (Guid RequestId, Guid[] SourceRefKeys)? _pendingCreate;
-    private IReadOnlyList<MobileReceivingSourceResponse> _sources = [];
     private bool _loaded;
     private bool _visible;
     private bool _busy;
+    private bool _cameraRequested;
     private long _scanGeneration;
 
     public ReceivingOrderPage(MobileReceivingOrderClient orders,
@@ -34,7 +32,6 @@ public partial class ReceivingOrderPage : ContentPage
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<ReceivingSourceRow> SourceRows { get; private set; } = [];
     public IReadOnlyList<ReceivingWorkOrderRow> OrderRows { get; private set; } = [];
     private MobileWarehouseResponse? Warehouse => WarehousePicker.SelectedItem as MobileWarehouseResponse;
 
@@ -43,6 +40,7 @@ public partial class ReceivingOrderPage : ContentPage
         base.OnAppearing();
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
+        CameraButton.IsVisible = _scanner.ActiveSource == BarcodeScanSource.Camera;
         if (!_loaded)
         {
             try
@@ -64,6 +62,7 @@ public partial class ReceivingOrderPage : ContentPage
     protected override void OnDisappearing()
     {
         _visible = false;
+        _cameraRequested = false;
         Interlocked.Increment(ref _scanGeneration);
         _scanner.ScanReceived -= OnScanReceived;
         CameraScannerView.Stop();
@@ -73,8 +72,6 @@ public partial class ReceivingOrderPage : ContentPage
     private async void OnWarehouseChanged(object? sender, EventArgs e)
     {
         if (Warehouse is { } warehouse) _selection.Select(warehouse.Id);
-        _selected.Clear();
-        _pendingCreate = null;
         await RefreshAsync();
     }
 
@@ -90,19 +87,23 @@ public partial class ReceivingOrderPage : ContentPage
         SetBusy(true);
         try
         {
-            _sources = await _orders.GetUnlinkedSourcesAsync(warehouse.Id);
             var orders = await _orders.GetOrdersAsync(warehouse.Id);
-            _selected.IntersectWith(_sources.Select(x => x.RefKey));
             OrderRows = orders.Select(x => new ReceivingWorkOrderRow(
                 x.Id, x.Number,
                 $"Создан: {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}",
                 StatusText(x.Status))).ToArray();
             OnPropertyChanged(nameof(OrderRows));
-            ShowSelection();
+            ErrorLabel.Text = string.Empty;
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить документы и ордера."; }
-        finally { SetBusy(false); }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить ордера."; }
+        finally
+        {
+            SetBusy(false);
+            if (Warehouse is { } current && current.Id != warehouse.Id)
+                await RefreshAsync();
+            await UpdateCameraAsync();
+        }
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
@@ -118,88 +119,67 @@ public partial class ReceivingOrderPage : ContentPage
     private async Task ResolveAsync(string barcode)
     {
         if (!_visible || _busy || Warehouse is not { } warehouse) return;
+        _cameraRequested = false;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try
         {
             var resolved = await _orders.ResolveDocumentAsync(warehouse.Id, barcode);
-            if (resolved.Order is { } order)
+            if (resolved.Order is { } linkedOrder)
             {
-                await OpenOrderAsync(order);
+                await OpenOrderAsync(linkedOrder);
                 return;
             }
             if (resolved.Source is { } source)
             {
-                _pendingCreate = null;
-                _selected.Add(source.RefKey);
-                _sources = await _orders.GetUnlinkedSourcesAsync(warehouse.Id);
-                ShowSelection();
+                var page = _services.GetRequiredService<ReceivingOrderSourcesPage>();
+                page.ShowForCreation(warehouse.Id, source.RefKey);
+                await Navigation.PushAsync(page);
+                return;
             }
+            ErrorLabel.Text = "Документ 1С не найден.";
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен. Повторите сканирование."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private void OnSourceTapped(object? sender, TappedEventArgs e)
+    private async void OnCameraClicked(object? sender, EventArgs e)
     {
-        if (_busy || e.Parameter is not Guid id) return;
-        _pendingCreate = null;
-        if (!_selected.Add(id)) _selected.Remove(id);
-        ShowSelection();
+        if (_busy || Warehouse is null || _scanner.ActiveSource != BarcodeScanSource.Camera)
+            return;
+        _cameraRequested = !_cameraRequested;
+        await UpdateCameraAsync();
     }
 
-    private void ShowSelection()
+    private async Task UpdateCameraAsync()
     {
-        SourceRows = _sources.Select(x => new ReceivingSourceRow(
-            x.RefKey, x.Number ?? x.RefKey.ToString(),
-            _selected.Contains(x.RefKey) ? "☑" : "□",
-            x.PlanBySku.Count == 0 ? "План отсутствует"
-                : string.Join("; ", x.PlanBySku.Select(p =>
-                    $"{(x.SkuNames.TryGetValue(p.Key, out var skuName) ? skuName : p.Key.ToString())}: {(p.Value?.ToString("0.###") ?? "неизвестно")}")),
-            x.LastAttemptError ?? (x.HasUnknownSku ? "Есть неопределённые строки" : string.Empty))).ToArray();
-        OnPropertyChanged(nameof(SourceRows));
-        var selectedSources = _sources.Where(x => _selected.Contains(x.RefKey)).ToArray();
-        var plan = selectedSources.SelectMany(x => x.PlanBySku)
-            .GroupBy(x => x.Key).Select(group =>
-                $"{(selectedSources.SelectMany(x => x.SkuNames).FirstOrDefault(x => x.Key == group.Key).Value ?? group.Key.ToString())}: {(group.Any(x => x.Value is null) ? "неизвестно" : group.Sum(x => x.Value!.Value).ToString("0.###"))}");
-        SelectionLabel.Text = selectedSources.Length == 0 ? "Документы не выбраны."
-            : $"Выбрано: {selectedSources.Length}. Суммарный план: {string.Join("; ", plan)}";
-        CreateButton.IsEnabled = !_busy && (_pendingCreate is not null || selectedSources.Length > 0);
+        CameraButton.Text = _cameraRequested ? "Закрыть камеру" : "Сканировать документ 1С";
+        if (_visible && !_busy && _cameraRequested && Warehouse is not null
+            && _scanner.ActiveSource == BarcodeScanSource.Camera)
+            await CameraScannerView.StartAsync();
+        else CameraScannerView.Stop();
     }
 
     private async void OnCreateClicked(object? sender, EventArgs e)
     {
-        if (_busy || (_selected.Count == 0 && _pendingCreate is null)) return;
-        SetBusy(true);
-        ErrorLabel.Text = string.Empty;
-        try
-        {
-            _pendingCreate ??= (Guid.NewGuid(), _selected.ToArray());
-            var pending = _pendingCreate.Value;
-            var result = await _orders.CreateOrderAsync(
-                pending.RequestId, pending.SourceRefKeys);
-            await OpenOrderAsync(await _orders.GetAsync(result.ResourceId));
-            _pendingCreate = null;
-            _selected.Clear();
-        }
-        catch (MobileApiException ex)
-        {
-            _pendingCreate = null;
-            ErrorLabel.Text = ex.Message;
-        }
-        catch (HttpRequestException) { ErrorLabel.Text = "Результат создания не подтверждён. Повторите те же документы."; }
-        finally { SetBusy(false); await UpdateCameraAsync(); }
+        if (_busy || Warehouse is not { } warehouse) return;
+        var page = _services.GetRequiredService<ReceivingOrderSourcesPage>();
+        page.ShowForCreation(warehouse.Id);
+        await Navigation.PushAsync(page);
     }
 
     private async void OnOrderTapped(object? sender, TappedEventArgs e)
     {
         if (_busy || e.Parameter is not Guid id) return;
         SetBusy(true);
-        try { await OpenOrderAsync(await _orders.GetAsync(id)); }
+        try
+        {
+            await OpenOrderAsync(await _orders.GetAsync(id));
+        }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Сервер WMS недоступен."; }
-        finally { SetBusy(false); await UpdateCameraAsync(); }
+        finally { SetBusy(false); }
     }
 
     private async Task OpenOrderAsync(MobileReceivingWorkOrderResponse order)
@@ -214,14 +194,10 @@ public partial class ReceivingOrderPage : ContentPage
         Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
         ProgressIndicator.IsVisible = busy;
-        CreateButton.IsEnabled = !busy && (_pendingCreate is not null || _selected.Count > 0);
-    }
-
-    private async Task UpdateCameraAsync()
-    {
-        if (_visible && !_busy && _scanner.ActiveSource == BarcodeScanSource.Camera)
-            await CameraScannerView.StartAsync();
-        else CameraScannerView.Stop();
+        CreateButton.IsEnabled = !busy && Warehouse is not null;
+        CameraButton.IsEnabled = !busy && Warehouse is not null;
+        WarehousePicker.IsEnabled = !busy;
+        if (busy) CameraScannerView.Stop();
     }
 
     private static string StatusText(MobileReceivingOrderStatus status) => status switch
@@ -233,7 +209,5 @@ public partial class ReceivingOrderPage : ContentPage
     };
 }
 
-public sealed record ReceivingSourceRow(Guid RefKey, string Number,
-    string SelectionMark, string PlanText, string Warning);
 public sealed record ReceivingWorkOrderRow(
     Guid Id, string Number, string CreatedAtText, string StatusText);

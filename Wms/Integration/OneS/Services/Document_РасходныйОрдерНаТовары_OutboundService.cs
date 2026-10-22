@@ -66,7 +66,7 @@ internal sealed class Document_РасходныйОрдерНаТовары_Outb
             return OperationError.NotFound("Расходный ордер не найден в 1С.");
 
         if (HasAmbiguousSkuLines(shippingOrder))
-            return OperationError.Conflict("Расходный ордер содержит несколько строк одной номенклатуры и не может быть безопасно обновлён.");
+            return OperationError.Conflict("Расходный ордер содержит несколько строк одного SKU и не может быть безопасно обновлён.");
 
         // A mobile retry can arrive after 1C accepted this target table state but
         // before WMS committed its local transition and command receipt.

@@ -41,7 +41,7 @@
         <VerticalStackLayout Grid.Row="1" Spacing="5">
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
-            <Button x:Name="NextLpnButton" Text="Следующая LPN" Clicked="OnNextLpnClicked" IsVisible="False" />
+            <Button x:Name="NextLpnButton" Text="Следующий LPN" Clicked="OnNextLpnClicked" IsVisible="False" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

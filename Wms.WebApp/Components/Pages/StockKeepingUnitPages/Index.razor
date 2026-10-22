@@ -3,9 +3,9 @@
 @using Wms.Common
 @using Wms.Domain
 
-<PageTitle>Номенклатура</PageTitle>
+<PageTitle>SKU</PageTitle>
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h5">Номенклатура</MudText>
+    <MudText Typo="Typo.h5">SKU</MudText>
     <MudSpacer />
     <AuthorizeView Roles="@ApplicationRoles.Manager">
         <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_isImporting" OnClick="RefreshFromOneCAsync">

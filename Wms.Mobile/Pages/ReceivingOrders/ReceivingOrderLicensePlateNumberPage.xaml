@@ -56,7 +56,7 @@
             <Button x:Name="RetryButton" Text="Повторить команду" Clicked="OnRetryClicked" IsVisible="False" />
             <Button x:Name="SearchButton" Text="Выбрать SKU вручную" Clicked="OnManualSearchClicked" />
             <Button x:Name="CloseButton" Text="Закрыть LPN и провести приход" Clicked="OnCloseClicked" />
-            <Button x:Name="CancelButton" Text="Отменить открытую LPN" Clicked="OnCancelClicked" />
+            <Button x:Name="CancelButton" Text="Отменить открытый LPN" Clicked="OnCancelClicked" />
             <Button x:Name="PutawayButton" Text="Разместить LPN" Clicked="OnPutawayClicked" />
         </VerticalStackLayout>
     </Grid>

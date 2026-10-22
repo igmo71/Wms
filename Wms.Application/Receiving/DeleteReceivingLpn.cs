@@ -42,7 +42,7 @@ public sealed class DeleteReceivingLpn(
                 var state = await store.LoadForDeletionAsync(
                     session, command.OrderId, command.LpnId, operationCt);
                 if (state is null)
-                    return OperationError.NotFound("LPN не найдена в ордере.");
+                    return OperationError.NotFound("LPN не найден в ордере.");
                 var calculated = ReceivingLpnDeletionPreviewFactory.Create(state);
                 if (!calculated.IsSuccess)
                     return calculated.Error!;

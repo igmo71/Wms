@@ -44,6 +44,7 @@ public sealed class ReceivingSynchronizationTests(SqlDatabase database)
                 : "[]";
             return $$"""
                 {"value":[{"Ref_Key":"{{key}}","Склад_Key":"{{warehouseId}}",
+                "Отправитель":"11111111-1111-1111-1111-111111111111",
                 "Posted":{{posted.ToString().ToLowerInvariant()}},
                 "DeletionMark":{{deleted.ToString().ToLowerInvariant()}},
                 "Number":"Source", "Товары":{{lines}}}]}

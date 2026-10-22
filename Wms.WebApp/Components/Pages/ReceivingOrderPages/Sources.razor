@@ -94,11 +94,11 @@
             {
                 <MudTable T="SourcePlanRow" Items="SelectedPlan" Dense="true" Elevation="0" RowsPerPage="15">
                     <HeaderContent>
-                        <MudTh>Номенклатура</MudTh>
+                        <MudTh>SKU</MudTh>
                         <MudTh>План</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Номенклатура">@SkuName(context.SkuId)</MudTd>
+                        <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
                         <MudTd DataLabel="План">@(context.Quantity?.ToString("0.###") ?? "Неизвестно")</MudTd>
                     </RowTemplate>
                     <PagerContent><MudTablePager /></PagerContent>
@@ -131,19 +131,19 @@
                 }
                 else if (source.Lines.Count == 0)
                 {
-                    <MudText>В последней сохранённой версии нет строк номенклатуры.</MudText>
+                    <MudText>В последней сохранённой версии нет строк SKU.</MudText>
                 }
                 else
                 {
                     <MudTable T="ReceivingSourceLineView" Items="SortedSourceLines(source)" Dense="true" Elevation="0" RowsPerPage="15">
                         <HeaderContent>
                             <MudTh>№</MudTh>
-                            <MudTh>Номенклатура</MudTh>
+                            <MudTh>SKU</MudTh>
                             <MudTh>Количество 1С</MudTh>
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="№">@context.LineNumber</MudTd>
-                            <MudTd DataLabel="Номенклатура">
+                            <MudTd DataLabel="SKU">
                                 <MudText>@SourceSkuName(source, context)</MudText>
                                 @if (context.Error is not null)
                                 {

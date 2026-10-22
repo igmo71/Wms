@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Wms.Application.Receiving;
+using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 
@@ -18,6 +19,12 @@ public partial class Index
     private IEnumerable<ReceivingWorkOrderView> FilteredOrders =>
         string.IsNullOrWhiteSpace(_orderFilter) ? _orders
             : _orders.Where(x => x.Number.Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static string OrderRowStyle(ReceivingWorkOrderView order, int _) =>
+        order.Status == ReceivingOrderStatus.ReadyForReceiving ? ""
+            : order.CurrentDiscrepancyCount > 0
+                ? "background-color: var(--mud-palette-warning-hover);"
+                : "background-color: var(--mud-palette-success-hover);";
 
     protected override Task OnInitializedAsync() => ReloadAsync();
 

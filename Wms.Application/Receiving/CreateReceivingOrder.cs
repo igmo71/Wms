@@ -37,6 +37,7 @@ public sealed class CreateReceivingOrder(
             return OperationError.NotFound("Не все выбранные документы 1С найдены в WMS.");
 
         Guid? warehouseId = null;
+        Guid? senderId = null;
         var plans = new Dictionary<Guid, decimal?>();
         var expectations = new List<ReceivingSourceExpectation>(states.Count);
         foreach (var state in states)
@@ -54,6 +55,12 @@ public sealed class CreateReceivingOrder(
             if (warehouseId is not null && warehouseId != sourceWarehouse)
                 return OperationError.Conflict("Источники относятся к разным складам.");
             warehouseId = sourceWarehouse;
+            var sourceSender = ReceivingSourceSenderPolicy.GetId(document);
+            if (!sourceSender.IsSuccess)
+                return sourceSender.Error!;
+            if (senderId is not null && senderId != sourceSender.Value)
+                return OperationError.Conflict(ReceivingSourceSenderPolicy.MismatchMessage);
+            senderId = sourceSender.Value;
 
             var sourcePlan = state.Version.CalculatePlan();
             foreach (var (skuId, quantity) in sourcePlan.QuantitiesBySku)
@@ -87,6 +94,9 @@ public sealed class CreateReceivingOrder(
         if (!created.IsSuccess)
             return created.Error!;
         var order = created.Value!;
+        var assignedSender = order.SetSender(senderId!.Value);
+        if (!assignedSender.IsSuccess)
+            return assignedSender.Error!;
 
         var links = new List<ReceivingOrderSourceLink>(states.Count);
         foreach (var state in states)

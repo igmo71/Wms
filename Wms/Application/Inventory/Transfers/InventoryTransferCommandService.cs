@@ -191,7 +191,7 @@ public class InventoryTransferCommandService(
             ct))
         {
             return OperationError.NotFound(
-                $"Активная номенклатура '{stockKeepingUnitId}' не найдена.");
+                $"Активный SKU '{stockKeepingUnitId}' не найден.");
         }
 
         var route = routeResult.Value!;

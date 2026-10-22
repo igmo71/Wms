@@ -13,12 +13,12 @@
                     <Label x:Name="PlanLabel" Grid.Column="1" FontAttributes="Bold" />
                     <Label Grid.Row="1" Text="Факт" />
                     <Label x:Name="FactLabel" Grid.Row="1" Grid.Column="1" FontAttributes="Bold" />
-                    <Label Grid.Row="2" Text="В этой палете" />
+                    <Label Grid.Row="2" Text="В этом LPN" />
                     <Label x:Name="CurrentLabel" Grid.Row="2" Grid.Column="1" FontAttributes="Bold" />
                     <Label Grid.Row="3" Text="Единица измерения" />
                     <Label x:Name="UnitLabel" Grid.Row="3" Grid.Column="1" FontAttributes="Bold" />
                 </Grid>
-                <Label Margin="0,8,0,0" Text="Количество в палете" />
+                <Label Margin="0,8,0,0" Text="Количество в LPN" />
                 <Entry x:Name="QuantityEntry" FontSize="22" Keyboard="Numeric" Placeholder="0"
                        Completed="OnQuantityCompleted" />
                 <VerticalStackLayout x:Name="ExpirationPanel" IsVisible="False" Spacing="3">

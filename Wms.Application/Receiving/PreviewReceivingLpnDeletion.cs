@@ -51,7 +51,7 @@ public sealed class PreviewReceivingLpnDeletion(
             return access.Error!;
         var state = await store.LoadPreviewAsync(orderId, lpnId, ct);
         return state is null
-            ? OperationError.NotFound("Закрытая LPN не найдена в ордере.")
+            ? OperationError.NotFound("Закрытый LPN не найден в ордере.")
             : ReceivingLpnDeletionPreviewFactory.Create(state);
     }
 }
@@ -68,7 +68,7 @@ internal static class ReceivingLpnDeletionPreviewFactory
         var lpn = state.Lpn;
         if (lpn.ReceivingOrderId != order.Id || lpn.Status != LicensePlateNumberStatus.Closed
             || lpn.ReceivingCycleId is null || lpn.OriginalReceivingLocationId is not Guid receivingId)
-            return OperationError.Conflict("Удалить можно только закрытую приёмную LPN.");
+            return OperationError.Conflict("Удалить можно только закрытый приёмный LPN.");
 
         var active = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
         if (active.Length != 1 || order.Items.All(x =>
@@ -100,7 +100,7 @@ internal static class ReceivingLpnDeletionPreviewFactory
                 || movement.StockKeepingUnitId != active[0].StockKeepingUnitId
                 || movement.ExpirationDate != active[0].ExpirationDate
                 || !(isPutaway || isReceiptOrCorrection))
-                return OperationError.Conflict("История движений LPN не соответствует её исходным данным.");
+                return OperationError.Conflict("История движений не соответствует исходным данным LPN.");
         }
 
         var locations = state.Locations.ToDictionary(x => x.Id);

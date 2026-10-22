@@ -135,6 +135,10 @@ public sealed class ChangeReceivingOrderSources(
                         return OperationError.Conflict("Склад источника не подтверждён.");
                     if (warehouseId != order.WarehouseId)
                         return OperationError.Conflict("Склад источника отличается от склада ордера.");
+                    var sender = ReceivingSourceSenderPolicy.CheckAttachment(
+                        state, targetParsed.Value, parser);
+                    if (!sender.IsSuccess)
+                        return sender.Error!;
                 }
 
                 var included = request.Kind == ReceivingSourceChangeKind.Attach
@@ -162,6 +166,10 @@ public sealed class ChangeReceivingOrderSources(
                 var now = clock.GetUtcNow();
                 if (request.Kind == ReceivingSourceChangeKind.Attach)
                 {
+                    var sender = ReceivingSourceSenderPolicy.GetId(targetParsed.Value!);
+                    var assigned = order.SetSender(sender.Value);
+                    if (!assigned.IsSuccess)
+                        return assigned.Error!;
                     var link = ReceivingOrderSourceLink.Create(
                         order.Id, target.Source.Id, now);
                     if (!link.IsSuccess)
@@ -173,6 +181,12 @@ public sealed class ChangeReceivingOrderSources(
                     var detached = state.TargetLink!.Detach(now);
                     if (!detached.IsSuccess)
                         return detached.Error!;
+                    if (included.Length == 0 && !state.HasPostedLpn)
+                    {
+                        var cleared = order.ClearSender();
+                        if (!cleared.IsSuccess)
+                            return cleared.Error!;
+                    }
                 }
 
                 order.RecordSourceCompositionChange();

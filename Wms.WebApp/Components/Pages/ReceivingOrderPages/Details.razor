@@ -75,7 +75,7 @@ else
             <ChildContent>
             @if (_order.Lpns.Count == 0)
             {
-                <MudText>Палет пока нет.</MudText>
+                <MudText>LPN пока нет.</MudText>
             }
             @foreach (var lpn in _order.Lpns)
             {
@@ -229,9 +229,9 @@ else
                             <MudAlert Severity="Severity.Warning" Class="mt-2">При завершении свежая сверка документов 1С не удалась.</MudAlert>
                         }
                         <MudTable T="ReceivingWorkCycleItemView" Items="SortedCycleItems(cycle)" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent><MudTh>Номенклатура</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh></HeaderContent>
+                            <HeaderContent><MudTh>SKU</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh></HeaderContent>
                             <RowTemplate>
-                                <MudTd DataLabel="Номенклатура">@SkuName(context.SkuId)</MudTd>
+                                <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
                                 <MudTd DataLabel="План">@(context.PlanQuantity?.ToString("0.###") ?? "Неизвестно")</MudTd>
                                 <MudTd DataLabel="Факт">@(context.FactQuantity?.ToString("0.###") ?? "Не проверено")</MudTd>
                             </RowTemplate>

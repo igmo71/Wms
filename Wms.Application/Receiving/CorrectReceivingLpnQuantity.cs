@@ -42,11 +42,11 @@ public sealed class CorrectReceivingLpnQuantity(
                     return OperationError.NotFound("Приходный ордер не найден.");
                 var lpn = await store.LoadLpnForPutawayAsync(session, command.LpnId, operationCt);
                 if (lpn is null || lpn.ReceivingOrderId != order.Id)
-                    return OperationError.NotFound("LPN не найдена в ордере.");
+                    return OperationError.NotFound("LPN не найден в ордере.");
 
                 var activeItems = lpn.Items.Where(x => !x.IsDeleted).Take(2).ToArray();
                 if (activeItems.Length != 1)
-                    return OperationError.Conflict("Приёмная LPN должна содержать один действующий SKU.");
+                    return OperationError.Conflict("Приёмный LPN должен содержать один действующий SKU.");
                 var item = activeItems[0];
                 var orderItem = order.Items.SingleOrDefault(x =>
                     x.StockKeepingUnitId == item.StockKeepingUnitId);

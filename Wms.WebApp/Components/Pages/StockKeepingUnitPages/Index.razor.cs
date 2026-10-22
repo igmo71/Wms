@@ -149,7 +149,7 @@ public partial class Index
             if (!result.IsSuccess)
             {
                 _importFailed = true;
-                _importMessage = result.Error?.Message ?? "Не удалось обновить номенклатуру из 1С.";
+                _importMessage = result.Error?.Message ?? "Не удалось обновить SKU из 1С.";
                 return;
             }
 
@@ -158,20 +158,20 @@ public partial class Index
             if (summary.HasWarnings)
             {
                 _importWarning = true;
-                _importMessage = $"Номенклатура обновлена, но часть физических свойств не импортирована: " +
+                _importMessage = $"SKU обновлены, но часть физических свойств не импортирована: " +
                     $"вес — {summary.InvalidWeightCount}, объём — {summary.InvalidVolumeCount}. " +
                     "Подробности записаны в журнал.";
             }
             else
             {
                 _importSucceeded = true;
-                _importMessage = "Номенклатура и единицы измерения успешно обновлены из 1С.";
+                _importMessage = "SKU и единицы измерения успешно обновлены из 1С.";
             }
         }
         catch
         {
             _importFailed = true;
-            _importMessage = "Не удалось обновить номенклатуру из 1С.";
+            _importMessage = "Не удалось обновить SKU из 1С.";
         }
         finally
         {

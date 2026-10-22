@@ -87,6 +87,10 @@ public sealed class PreviewReceivingOrderSourceChange(
                 return OperationError.Conflict("Склад источника не подтверждён.");
             if (warehouseId != order.WarehouseId)
                 return OperationError.Conflict("Склад источника отличается от склада ордера.");
+            var sender = ReceivingSourceSenderPolicy.CheckAttachment(
+                state, targetParsed.Value, parser);
+            if (!sender.IsSuccess)
+                return sender.Error!;
         }
 
         var included = request.Kind == ReceivingSourceChangeKind.Attach

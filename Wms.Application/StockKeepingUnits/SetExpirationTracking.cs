@@ -33,7 +33,7 @@ public sealed class SetExpirationTracking(
     {
         if (request is null || request.SkuId == Guid.Empty)
             return Task.FromResult<OperationResult<Guid>>(
-                OperationError.Invalid("Выберите номенклатуру."));
+                OperationError.Invalid("Выберите SKU."));
 
         var hash = CommandExecutor.ComputeHash($"{request.SkuId:N}:{request.Enabled}");
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
@@ -44,7 +44,7 @@ public sealed class SetExpirationTracking(
                     return access.Error!;
                 var sku = await store.LoadForChangeAsync(session, request.SkuId, operationCt);
                 if (sku is null)
-                    return OperationError.NotFound("Номенклатура не найдена.");
+                    return OperationError.NotFound("SKU не найден.");
 
                 var before = sku.TracksExpirationDate;
                 sku.SetExpirationTracking(request.Enabled);

@@ -17,6 +17,9 @@ without hiding valid quantities of other SKUs. A failed read or unreadable
 response records the attempt error without replacing the last successful
 version. For linked WMS orders, successful checks recalculate only the current
 plan as described in [receiving.md](receiving.md).
+Linked-source checks also enforce the order's stored sender GUID. A changed or
+invalid sender is recorded as a failed check without replacing the accepted
+version or plan.
 The 1C sender type `StandardODATA.Catalog_Партнеры` denotes a reference to the
 partner catalog. Receiving views resolve its reference to the locally imported
 partner name when available; the source snapshot retains the original ID and

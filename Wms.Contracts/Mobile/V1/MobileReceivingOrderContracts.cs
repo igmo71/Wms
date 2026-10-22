@@ -84,6 +84,7 @@ public sealed record MobileReceivingLinkedSourceResponse(
     string? BasisDocument, string? BasisDocumentType)
 {
     public string? SenderName { get; init; }
+    public string? LastAttemptError { get; init; }
 }
 public sealed record MobileReceivingDocumentResolutionResponse(
     MobileReceivingSourceResponse? Source, MobileReceivingWorkOrderResponse? Order);

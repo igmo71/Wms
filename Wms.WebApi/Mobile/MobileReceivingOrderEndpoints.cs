@@ -16,8 +16,6 @@ internal static class MobileReceivingOrderEndpoints
             .WithTags("Mobile Receiving Orders")
             .RequireAuthorization(MobileAuthorization.ReceivingWorkerPolicy);
 
-        group.MapGet("/sources/unlinked", GetSourcesAsync)
-            .WithMobileResponses<IReadOnlyList<MobileReceivingSourceResponse>>();
         group.MapPost("/sources/resolve", ResolveDocumentAsync)
             .WithMobileResponses<MobileReceivingDocumentResolutionResponse>();
         group.MapPost("", CreateOrderAsync)
@@ -53,16 +51,6 @@ internal static class MobileReceivingOrderEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetSourcesAsync(
-        Guid warehouseId, GetReceivingSources sources, CancellationToken ct)
-    {
-        if (warehouseId == Guid.Empty)
-            return MobileEndpointResults.CommandProblem(OperationError.Invalid("Выберите склад."));
-        var available = await sources.ListUnlinkedAsync(ct);
-        return TypedResults.Ok<IReadOnlyList<MobileReceivingSourceResponse>>(
-            available.Where(x => x.WarehouseId == warehouseId).Select(MapSource).ToArray());
-    }
-
     private static async Task<IResult> ResolveDocumentAsync(
         MobileReceivingResolveDocumentRequest request, Guid warehouseId,
         ClaimsPrincipal principal, SynchronizeReceivingSource synchronize,
@@ -86,7 +74,7 @@ internal static class MobileReceivingOrderEndpoints
                 ? TypedResults.Ok(new MobileReceivingDocumentResolutionResponse(null, MapOrder(linked)))
                 : MobileEndpointResults.CommandProblem(
                     OperationError.Conflict("Документ относится к другому складу."));
-        var source = (await sources.ListUnlinkedAsync(ct))
+        var source = (await sources.GetByRefKeysAsync([decoded.Value], ct))
             .SingleOrDefault(x => x.RefKey == decoded.Value);
         if (source is null)
             return MobileEndpointResults.CommandProblem(
@@ -153,7 +141,8 @@ internal static class MobileReceivingOrderEndpoints
                 x.WarehouseOperation, x.BusinessOperation,
                 x.BasisDocument, x.BasisDocumentType)
             {
-                SenderName = x.SenderName
+                SenderName = x.SenderName,
+                LastAttemptError = x.LastAttemptError
             }).ToArray());
     }
 

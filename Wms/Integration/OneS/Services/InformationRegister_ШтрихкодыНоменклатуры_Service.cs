@@ -24,12 +24,12 @@ public class InformationRegister_ШтрихкодыНоменклатуры_Serv
 
         if (fetchedItems is null)
         {
-            return OperationError.Failure("1С вернула некорректный ответ: штрихкоды номенклатуры отсутствуют.");
+            return OperationError.Failure("1С вернула некорректный ответ: штрихкоды SKU отсутствуют.");
         }
 
         if (!Guid.TryParse(refKey, out var skuId))
         {
-            return OperationError.Invalid("Некорректный идентификатор номенклатуры в уведомлении 1С.");
+            return OperationError.Invalid("Некорректный идентификатор SKU в уведомлении 1С.");
         }
 
         await skuBarcodeService.DeleteRangeAsync(skuId, ct);

@@ -15,6 +15,7 @@ internal class ReceivingOrderConfiguration : IEntityTypeConfiguration<ReceivingO
             "CK_ReceivingOrders_NumberFormat",
             "LEN([Number]) = 13 AND [Number] LIKE '[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]'"));
         builder.Property(x => x.OperationalRevision).IsConcurrencyToken();
+        builder.Property(x => x.SenderId);
 
         builder.Property(x => x.StartedBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.CompletedBy).HasMaxLength(DefaultConfiguration.Guid);

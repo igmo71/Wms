@@ -61,10 +61,10 @@ public sealed class CloseReceivingLpn(
                     return OperationError.NotFound("Приходный ордер не найден.");
                 var lpn = await store.LoadLpnAsync(session, command.LpnId, operationCt);
                 if (lpn is null || lpn.ReceivingOrderId != order.Id)
-                    return OperationError.NotFound("LPN не найдена в ордере.");
+                    return OperationError.NotFound("LPN не найден в ордере.");
                 var item = lpn.Items.SingleOrDefault(x => !x.IsDeleted);
                 if (item is null)
-                    return OperationError.Invalid("Закрыть можно только положительную монопалету.");
+                    return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
                 var orderItem = order.Items.SingleOrDefault(x =>
                     x.StockKeepingUnitId == item.StockKeepingUnitId);
                 if (orderItem is null)
