@@ -5,7 +5,10 @@
              xmlns:local="clr-namespace:Wms.Mobile"
              Title="Приёмка › Документы 1С">
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
-        <Label x:Name="NumberLabel" Text="Новый ордер" FontSize="21" FontAttributes="Bold" />
+        <HorizontalStackLayout Spacing="8">
+            <Label x:Name="NumberLabel" Text="Новый ордер" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="OrderStatusIcon" FontSize="21" VerticalTextAlignment="Center" IsVisible="False" />
+        </HorizontalStackLayout>
         <RefreshView x:Name="SourcesRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="8">
@@ -26,7 +29,13 @@
                                                 <TapGestureRecognizer CommandParameter="{Binding RefKey}"
                                                                       Tapped="OnSourceTapped" />
                                             </VerticalStackLayout.GestureRecognizers>
-                                            <Label Text="{Binding FirstLine}" FontAttributes="Bold" />
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
+                                                <Label Text="{Binding WarningGlyph}" FontAttributes="Bold"
+                                                       IsVisible="{Binding HasWarning}"
+                                                       SemanticProperties.Description="{Binding WarningDescription}" />
+                                                <Label Grid.Column="1" Text="{Binding FirstLine}"
+                                                       FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                            </Grid>
                                             <Label Text="{Binding SecondLine}" FontSize="12" />
                                         </VerticalStackLayout>
                                         <Button Grid.Column="1" Text="×" FontSize="22"

@@ -127,9 +127,10 @@ and fact can change independently of those snapshots.
 
 ## Putaway and corrections
 
-Mobile starts putaway from a closed receiving LPN, including before order
-completion. It selects SKU, confirms a positive quantity, and scans a
-destination. The command moves that quantity from the LPN's original Receiving
+Mobile starts putaway from its independent LPN screen by scanning a closed
+receiving LPN, including before order completion. Receiving screens do not
+offer putaway actions. The operator selects SKU, confirms a positive quantity,
+and scans a destination. The command moves that quantity from the LPN's original Receiving
 location to an active unlocked Storage location in the same warehouse. It
 checks both the unplaced quantity of that LPN and physical source balance,
 retains its SKU and expiration date, and commits the linked movement, history,

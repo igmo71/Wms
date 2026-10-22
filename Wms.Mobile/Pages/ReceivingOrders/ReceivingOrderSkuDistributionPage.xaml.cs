@@ -54,16 +54,22 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
             SkuNameLabel.Text = item.SkuName ?? item.SkuId.ToString();
             SkuCodeLabel.Text = item.SkuCode;
             PlanLabel.Text = item.PlanQuantity?.ToString("0.###") ?? "?";
-            FactLabel.Text = item.FactQuantity?.ToString("0.###") ?? "?";
+            FactLabel.Text = ReceivingStatusSymbols.FactText(item.PlanQuantity, item.FactQuantity);
+            SemanticProperties.SetDescription(FactLabel,
+                ReceivingStatusSymbols.FactDescription(item.PlanQuantity, item.FactQuantity));
             UnitLabel.Text = item.UnitOfMeasure ?? "—";
             LpnRows = order.Lpns.Where(x => x.Status is not
                 (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
                 .Select(x => new { Lpn = x, Item = x.Items.SingleOrDefault(y => y.SkuId == _skuId) })
                 .Where(x => x.Item is not null)
-                .Select(x => new ReceivingOrderSkuLpnRow(x.Lpn.Id, x.Lpn.Code,
-                    x.Lpn.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыт" : "Открыт",
-                    x.Lpn.ResponsibleUserId ?? "—",
-                    $"{x.Item!.Quantity:0.###} {item.UnitOfMeasure ?? "—"}"))
+                .Select(x =>
+                {
+                    var status = ReceivingStatusSymbols.ForLpn(x.Lpn.Status);
+                    return new ReceivingOrderSkuLpnRow(x.Lpn.Id, x.Lpn.Code,
+                        status.Glyph, $"Статус LPN: {status.Description}",
+                        x.Lpn.ResponsibleUserId ?? "—",
+                        $"{x.Item!.Quantity:0.###} {item.UnitOfMeasure ?? "—"}");
+                })
                 .ToArray();
             OnPropertyChanged(nameof(LpnRows));
         }
@@ -83,4 +89,5 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 }
 
 public sealed record ReceivingOrderSkuLpnRow(Guid LicensePlateNumberId,
-    string Code, string StatusName, string ResponsibleUserName, string QuantityText);
+    string Code, string StatusGlyph, string StatusDescription,
+    string ResponsibleUserName, string QuantityText);

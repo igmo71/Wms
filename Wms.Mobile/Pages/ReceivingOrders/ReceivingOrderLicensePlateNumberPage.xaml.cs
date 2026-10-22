@@ -49,6 +49,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         await RefreshAsync();
+        if (SearchPanel.IsVisible) await SearchAsync();
         await UpdateCameraAsync();
     }
 
@@ -87,26 +88,39 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             return;
         }
         CodeLabel.Text = lpn.Code;
-        StatusLabel.Text = lpn.Status switch
+        var status = ReceivingStatusSymbols.ForLpn(lpn.Status);
+        StatusIcon.Text = status.Glyph;
+        SemanticProperties.SetDescription(StatusIcon, $"Статус LPN: {status.Description}");
+        ItemRows = lpn.Items.Select(x =>
         {
-            MobileLicensePlateNumberStatus.Open => "Открыт",
-            MobileLicensePlateNumberStatus.Closed => "Закрыт: приход проведён",
-            MobileLicensePlateNumberStatus.Cancelled => "Отменён",
-            MobileLicensePlateNumberStatus.Deleted => "Удалён",
-            _ => lpn.Status.ToString()
-        };
-        ItemRows = lpn.Items.Select(x => new ReceivingLpnItemRow(x.SkuId,
-            x.SkuName ?? x.SkuId.ToString(),
-            $"{x.Quantity:0.###} {x.UnitOfMeasure ?? "—"} · срок: {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"} · размещено: {x.PlacedQuantity:0.###}")).ToArray();
+            var orderItem = order.Items.FirstOrDefault(item => item.SkuId == x.SkuId);
+            var plan = orderItem?.PlanQuantity;
+            var fact = orderItem?.FactQuantity;
+            var unit = string.IsNullOrWhiteSpace(x.UnitOfMeasure) ? "—" : x.UnitOfMeasure;
+            return new ReceivingLpnItemRow(x.SkuId,
+                !string.IsNullOrWhiteSpace(x.SkuName) ? x.SkuName
+                    : !string.IsNullOrWhiteSpace(x.SkuCode) ? x.SkuCode : x.SkuId.ToString(),
+                $"LPN: {x.Quantity:0.###}",
+                $"Срок: {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}",
+                orderItem?.TracksExpirationDate == true,
+                $"{Format(plan)} {unit}", ReceivingStatusSymbols.FactText(plan, fact),
+                ReceivingStatusSymbols.FactDescription(plan, fact),
+                fact is null, plan is decimal expected && fact == expected,
+                plan is decimal planned && fact is decimal actual && planned != actual);
+        }).ToArray();
         OnPropertyChanged(nameof(ItemRows));
         var editable = lpn.Status == MobileLicensePlateNumberStatus.Open
             && order.IsParticipant;
-        SearchButton.IsVisible = editable;
+        ScanHintLabel.IsVisible = editable;
+        ActionsGrid.IsVisible = editable;
         CloseButton.IsVisible = editable && lpn.Items.Any(x => x.Quantity > 0);
-        CancelButton.IsVisible = editable;
-        PutawayButton.IsVisible = lpn.Status == MobileLicensePlateNumberStatus.Closed
-            && lpn.Items.Any(x => x.RemainingQuantity > 0);
-        if (!editable) SearchPanel.IsVisible = false;
+        Grid.SetColumnSpan(SearchButton, CloseButton.IsVisible ? 1 : 2);
+        Grid.SetColumn(CancelButton, CloseButton.IsVisible ? 1 : 2);
+        if (!editable)
+        {
+            SearchPanel.IsVisible = false;
+            UpdateSearchButton();
+        }
         UpdateRecovery();
     }
 
@@ -123,6 +137,11 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async Task HandleScanAsync(string barcode)
     {
         if (!_visible || _busy || _process.HasPendingCommand || Lpn is null) return;
+        if (_order?.IsParticipant != true)
+        {
+            ErrorLabel.Text = "Сначала присоединитесь к приёмке.";
+            return;
+        }
         if (barcode.Trim().StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
         {
             await ExecuteAsync(async () =>
@@ -135,7 +154,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         if (Lpn.Status != MobileLicensePlateNumberStatus.Open)
         {
-            ErrorLabel.Text = "Закрытый LPN нельзя изменить. Для размещения откройте экран размещения.";
+            ErrorLabel.Text = "Закрытый LPN нельзя изменить.";
             return;
         }
         SetBusy(true);
@@ -152,16 +171,24 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async void OnItemTapped(object? sender, TappedEventArgs e)
     {
-        if (e.Parameter is Guid skuId && Lpn?.Status == MobileLicensePlateNumberStatus.Open)
+        if (e.Parameter is Guid skuId && _order?.IsParticipant == true
+            && Lpn?.Status == MobileLicensePlateNumberStatus.Open)
             await SelectSkuAsync(skuId, true);
     }
 
     private async void OnManualSearchClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand) return;
+        if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true) return;
         SearchPanel.IsVisible = !SearchPanel.IsVisible;
-        SearchButton.Text = SearchPanel.IsVisible ? "Скрыть поиск" : "Выбрать SKU вручную";
+        UpdateSearchButton();
         if (SearchPanel.IsVisible) await SearchAsync();
+    }
+
+    private void UpdateSearchButton()
+    {
+        SearchButton.Text = SearchPanel.IsVisible ? "✕ SKU" : "🔍 SKU";
+        SemanticProperties.SetDescription(SearchButton,
+            SearchPanel.IsVisible ? "Скрыть подбор SKU" : "Выбрать SKU вручную");
     }
 
     private async void OnScopeClicked(object? sender, EventArgs e)
@@ -175,15 +202,38 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async Task SearchAsync()
     {
-        if (_busy || _process.HasPendingCommand || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
+        if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true
+            || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
         SetBusy(true);
         try
         {
             var results = await _orders.SearchSkuAsync(_orderId, SkuSearch.Text, _catalogSearch);
-            CandidateRows = results.Select(x => new ReceivingSkuChoiceRow(x.SkuId,
-                $"{x.Name ?? x.SkuId.ToString()} · {x.Code}",
-                $"{(x.IsInOrder ? "План" : "Вне плана")}: {x.CurrentPlanQuantity?.ToString("0.###") ?? "?"}",
-                x.IsInOrder)).ToArray();
+            CandidateRows = results.Select(x =>
+            {
+                var orderItem = _order?.Items.FirstOrDefault(item => item.SkuId == x.SkuId);
+                var name = !string.IsNullOrWhiteSpace(x.Name) ? x.Name
+                    : !string.IsNullOrWhiteSpace(x.Code) ? x.Code : x.SkuId.ToString();
+                var details = string.Join(" · ", new[]
+                {
+                    x.Code == name ? null : x.Code,
+                    x.IsInOrder ? null : "Вне плана"
+                }.Where(part => !string.IsNullOrWhiteSpace(part)));
+                var unit = string.IsNullOrWhiteSpace(orderItem?.UnitOfMeasure)
+                    ? string.Empty : $" {orderItem.UnitOfMeasure}";
+                var plan = x.IsInOrder ? x.CurrentPlanQuantity : null;
+                var fact = x.FactQuantity;
+                return new ReceivingSkuChoiceRow(x.SkuId, name, details,
+                    $"{Format(plan)}{unit}", ReceivingStatusSymbols.FactText(plan, fact),
+                    ReceivingStatusSymbols.FactDescription(plan, fact), x.IsInOrder,
+                    fact is null,
+                    x.IsInOrder && plan is decimal expected && fact == expected,
+                    x.IsInOrder && plan is decimal planned && fact is decimal actual && planned != actual);
+            })
+                .OrderBy(x => x.Name, StringComparer.Create(
+                    System.Globalization.CultureInfo.GetCultureInfo("ru-RU"), ignoreCase: true))
+                .ThenBy(x => x.Details, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.SkuId)
+                .ToArray();
             OnPropertyChanged(nameof(CandidateRows));
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
@@ -200,7 +250,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async Task SelectSkuAsync(Guid skuId, bool inOrder)
     {
-        if (_busy || _process.HasPendingCommand || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
+        if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true
+            || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
         if (!inOrder)
         {
             if (!await DisplayAlertAsync("SKU вне плана", "Добавить SKU в ордер с планом 0?", "Добавить", "Назад")) return;
@@ -239,14 +290,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         await ExecuteAsync(async () => Apply(await _process.CancelLpnAsync(_orderId, _lpnId)));
         if (!_process.HasPendingCommand && Lpn?.Status == MobileLicensePlateNumberStatus.Cancelled)
             await Navigation.PopAsync();
-    }
-
-    private async void OnPutawayClicked(object? sender, EventArgs e)
-    {
-        if (Lpn is not { Status: MobileLicensePlateNumberStatus.Closed } lpn || _busy) return;
-        var page = _services.GetRequiredService<LicensePlateNumberPutawayDetailsPage>();
-        page.Show(lpn);
-        await Navigation.PushAsync(page);
     }
 
     private async Task ExecuteAsync(Func<Task> action, bool refreshOnConflict = false)
@@ -309,6 +352,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         SearchButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         CloseButton.IsEnabled = SearchButton.IsEnabled;
         CancelButton.IsEnabled = SearchButton.IsEnabled;
+        ScopeButton.IsEnabled = SearchButton.IsEnabled;
+        SkuSearch.IsEnabled = SearchButton.IsEnabled;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
@@ -334,7 +379,17 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
     }
+
+    private static string Format(decimal? value) => value?.ToString("0.###") ?? "?";
 }
 
-public sealed record ReceivingLpnItemRow(Guid SkuId, string Name, string Details);
-public sealed record ReceivingSkuChoiceRow(Guid SkuId, string Name, string Plan, bool IsInOrder);
+public sealed record ReceivingLpnItemRow(Guid SkuId, string Name, string LpnQuantityText,
+    string ExpirationText, bool ShowsExpiration, string PlanText, string FactText,
+    string FactDescription,
+    bool IsUnchecked, bool IsMatched, bool IsDifferent);
+public sealed record ReceivingSkuChoiceRow(Guid SkuId, string Name, string Details,
+    string PlanText, string FactText, string FactDescription, bool IsInOrder,
+    bool IsUnchecked, bool IsMatched, bool IsDifferent)
+{
+    public bool HasDetails => !string.IsNullOrEmpty(Details);
+}

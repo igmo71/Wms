@@ -76,16 +76,12 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     {
         _order = order;
         NumberLabel.Text = order.Number;
-        var status = order.Status switch
-        {
-            MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
-            MobileReceivingOrderStatus.InReceiving => "В работе",
-            MobileReceivingOrderStatus.Received => "Принят",
-            _ => order.Status.ToString()
-        };
-        StatusLabel.Text = order.ReceivingLocationId is Guid id
-            ? $"{status} · Место: {order.ReceivingLocationAddress ?? id.ToString()}"
-            : $"{status} · Место не выбрано";
+        var status = ReceivingStatusSymbols.ForOrder(order.Status);
+        StatusIcon.Text = status.Glyph;
+        SemanticProperties.SetDescription(StatusIcon, $"Статус ордера: {status.Description}");
+        LocationLabel.Text = order.ReceivingLocationId is Guid id
+            ? $"Место: {order.ReceivingLocationAddress ?? id.ToString()}"
+            : "Место не выбрано";
         JoinButton.Text = order.Status == MobileReceivingOrderStatus.ReadyForReceiving
             ? "Начать" : "Присоединиться";
         JoinButton.IsVisible = !order.IsParticipant
@@ -96,12 +92,14 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
         LpnRows = order.Lpns.Where(x => x.Status is not
             (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
-            .Select(x => new ReceivingWorkLpnRow(x.Id, x.Code,
-                $"{(x.Status == MobileLicensePlateNumberStatus.Closed ? "Закрыт" : "Открыт")} · "
-                + string.Join("; ", x.Items.Select(y =>
-                    $"{y.SkuName ?? y.SkuId.ToString()}: {y.Quantity:0.###} {y.UnitOfMeasure ?? "—"}")),
-                x.Status == MobileLicensePlateNumberStatus.Closed
-                    && x.Items.Any(y => y.RemainingQuantity > 0))).ToArray();
+            .Select(x =>
+            {
+                var lpnStatus = ReceivingStatusSymbols.ForLpn(x.Status);
+                return new ReceivingWorkLpnRow(x.Id, x.Code,
+                    string.Join("; ", x.Items.Select(y =>
+                        $"{y.SkuName ?? y.SkuId.ToString()}: {y.Quantity:0.###} {y.UnitOfMeasure ?? "—"}")),
+                    lpnStatus.Glyph, $"Статус LPN: {lpnStatus.Description}");
+            }).ToArray();
         OnPropertyChanged(nameof(LpnRows));
         UpdateRecovery();
     }
@@ -142,9 +140,9 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         await Navigation.PushAsync(page);
     }
 
-    private async void OnLpnClicked(object? sender, EventArgs e)
+    private async void OnLpnTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Button { CommandParameter: Guid id }) await OpenLpnPageAsync(id);
+        if (e.Parameter is Guid id) await OpenLpnPageAsync(id);
     }
 
     private async Task OpenLpnPageAsync(Guid id)
@@ -152,17 +150,6 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         if (_order is null || _busy || _process.HasPendingCommand) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
         page.Show(_order.Id, id, _process);
-        await Navigation.PushAsync(page);
-    }
-
-    private async void OnPutawayClicked(object? sender, EventArgs e)
-    {
-        if (_order is null || _busy || _process.HasPendingCommand
-            || sender is not Button { CommandParameter: Guid id }) return;
-        var lpn = _order.Lpns.SingleOrDefault(x => x.Id == id);
-        if (lpn is null) return;
-        var page = _services.GetRequiredService<LicensePlateNumberPutawayDetailsPage>();
-        page.Show(lpn);
         await Navigation.PushAsync(page);
     }
 
@@ -250,5 +237,5 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     }
 }
 
-public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
-    string Description, bool CanPutaway);
+public sealed record ReceivingWorkLpnRow(Guid Id, string Code, string Description,
+    string StatusGlyph, string StatusDescription);

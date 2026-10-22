@@ -48,7 +48,9 @@ public partial class ReceivingOrderLicensePlateNumberQuantityPage : ContentPage
             SkuNameLabel.Text = sku.SkuName ?? sku.SkuId.ToString();
             SkuCodeLabel.Text = sku.SkuCode;
             PlanLabel.Text = Format(sku.PlanQuantity);
-            FactLabel.Text = Format(sku.FactQuantity);
+            FactLabel.Text = ReceivingStatusSymbols.FactText(sku.PlanQuantity, sku.FactQuantity);
+            SemanticProperties.SetDescription(FactLabel,
+                ReceivingStatusSymbols.FactDescription(sku.PlanQuantity, sku.FactQuantity));
             CurrentLabel.Text = item is null ? "нет" : Format(item.Quantity);
             UnitLabel.Text = sku.UnitOfMeasure ?? "—";
             QuantityEntry.Text = item?.Quantity.ToString("0.###", CultureInfo.InvariantCulture);

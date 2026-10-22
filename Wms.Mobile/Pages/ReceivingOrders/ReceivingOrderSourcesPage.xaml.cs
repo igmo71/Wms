@@ -135,12 +135,15 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         _sources = await _orders.GetLinkedSourcesAsync(_order.Id);
         var canDetach = CanAttach && _order.Lpns.All(x => x.Status is not
             (MobileLicensePlateNumberStatus.Closed or MobileLicensePlateNumberStatus.Deleted));
-        SourceRows = _sources.Select(source => new ReceivingSourceCompactRow(
-            source.RefKey,
-            $"{(source.LastAttemptError is null ? "" : "⚠ ")}{source.Number ?? source.RefKey.ToString()} · {SourceDate(source.Date)}",
-            $"{source.SenderName ?? source.Sender ?? "—"} · {source.WarehouseOperation ?? "—"}",
-            canDetach,
-            source.RefKey == _newSourceRefKey ? Colors.LightGray : Colors.White)).ToArray();
+        SourceRows = _sources.Select(source =>
+        {
+            var check = ReceivingStatusSymbols.ForDocumentCheck(source.LastAttemptError is not null);
+            return new ReceivingSourceCompactRow(source.RefKey,
+                $"{source.Number ?? source.RefKey.ToString()} · {SourceDate(source.Date)}",
+                $"{source.SenderName ?? source.Sender ?? "—"} · {source.WarehouseOperation ?? "—"}",
+                check.Glyph, check.Description, canDetach,
+                source.RefKey == _newSourceRefKey ? Colors.LightGray : Colors.White);
+        }).ToArray();
         OnPropertyChanged(nameof(SourceRows));
         EmptyLabel.IsVisible = SourceRows.Count == 0;
         EmptyLabel.Text = "В ордере нет документов 1С.";
@@ -364,6 +367,13 @@ public partial class ReceivingOrderSourcesPage : ContentPage
     private void UpdateRecovery()
     {
         NumberLabel.Text = _order is null ? "Новый ордер" : $"Ордер {_order.Number}";
+        OrderStatusIcon.IsVisible = _order is not null;
+        if (_order is not null)
+        {
+            var status = ReceivingStatusSymbols.ForOrder(_order.Status);
+            OrderStatusIcon.Text = status.Glyph;
+            SemanticProperties.SetDescription(OrderStatusIcon, $"Статус ордера: {status.Description}");
+        }
         JoinButton.Text = _order?.Status == MobileReceivingOrderStatus.ReadyForReceiving
             ? "Начать" : "Присоединиться";
         RetryButton.IsVisible = HasPendingCommand;
@@ -411,4 +421,8 @@ public partial class ReceivingOrderSourcesPage : ContentPage
 }
 
 public sealed record ReceivingSourceCompactRow(Guid RefKey, string FirstLine,
-    string SecondLine, bool CanDetach, Color BackgroundColor);
+    string SecondLine, string WarningGlyph, string WarningDescription,
+    bool CanDetach, Color BackgroundColor)
+{
+    public bool HasWarning => !string.IsNullOrEmpty(WarningGlyph);
+}

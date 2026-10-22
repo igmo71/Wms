@@ -76,16 +76,12 @@ public partial class ReceivingOrderSkuPage : ContentPage
     {
         _order = order;
         NumberLabel.Text = order.Number;
-        var status = order.Status switch
-        {
-            MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
-            MobileReceivingOrderStatus.InReceiving => "В работе",
-            MobileReceivingOrderStatus.Received => "Принят",
-            _ => order.Status.ToString()
-        };
-        StatusLabel.Text = order.ReceivingLocationId is Guid id
-            ? $"{status} · Место: {order.ReceivingLocationAddress ?? id.ToString()}"
-            : $"{status} · Место не выбрано";
+        var status = ReceivingStatusSymbols.ForOrder(order.Status);
+        StatusIcon.Text = status.Glyph;
+        SemanticProperties.SetDescription(StatusIcon, $"Статус ордера: {status.Description}");
+        LocationLabel.Text = order.ReceivingLocationId is Guid id
+            ? $"Место: {order.ReceivingLocationAddress ?? id.ToString()}"
+            : "Место не выбрано";
         JoinButton.Text = order.Status == MobileReceivingOrderStatus.ReadyForReceiving
             ? "Начать" : "Присоединиться";
         JoinButton.IsVisible = !order.IsParticipant
@@ -110,8 +106,9 @@ public partial class ReceivingOrderSkuPage : ContentPage
                     && x.Items.Any(y => y.SkuId == item.SkuId));
                 var unit = string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "—" : item.UnitOfMeasure;
                 return new ReceivingWorkItemRow(item.SkuId, DisplayName(item),
-                    $"План: {Format(item.PlanQuantity)} {unit}",
-                    $"Факт: {Format(item.FactQuantity)}",
+                    $"{Format(item.PlanQuantity)} {unit}",
+                    ReceivingStatusSymbols.FactText(item.PlanQuantity, item.FactQuantity),
+                    ReceivingStatusSymbols.FactDescription(item.PlanQuantity, item.FactQuantity),
                     order.IsParticipant && !activeLpn && item.FactQuantity is null,
                     item.FactQuantity is null, matched, different);
             }).ToArray();
@@ -271,5 +268,5 @@ public partial class ReceivingOrderSkuPage : ContentPage
 }
 
 public sealed record ReceivingWorkItemRow(Guid SkuId, string Name,
-    string PlanText, string FactText, bool CanConfirmZero,
+    string PlanText, string FactText, string FactDescription, bool CanConfirmZero,
     bool IsUnchecked, bool IsMatched, bool IsDifferent);

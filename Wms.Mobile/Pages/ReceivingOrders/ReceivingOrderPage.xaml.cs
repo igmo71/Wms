@@ -88,10 +88,13 @@ public partial class ReceivingOrderPage : ContentPage
         try
         {
             var orders = await _orders.GetOrdersAsync(warehouse.Id);
-            OrderRows = orders.Select(x => new ReceivingWorkOrderRow(
-                x.Id, x.Number,
-                $"Создан: {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}",
-                StatusText(x.Status))).ToArray();
+            OrderRows = orders.Select(x =>
+            {
+                var status = ReceivingStatusSymbols.ForOrder(x.Status);
+                return new ReceivingWorkOrderRow(x.Id, x.Number,
+                    $"Создан: {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}",
+                    status.Glyph, $"Статус ордера: {status.Description}");
+            }).ToArray();
             OnPropertyChanged(nameof(OrderRows));
             ErrorLabel.Text = string.Empty;
         }
@@ -199,15 +202,8 @@ public partial class ReceivingOrderPage : ContentPage
         WarehousePicker.IsEnabled = !busy;
         if (busy) CameraScannerView.Stop();
     }
-
-    private static string StatusText(MobileReceivingOrderStatus status) => status switch
-    {
-        MobileReceivingOrderStatus.ReadyForReceiving => "К приёмке",
-        MobileReceivingOrderStatus.InReceiving => "В работе",
-        MobileReceivingOrderStatus.Received => "Принят",
-        _ => status.ToString()
-    };
 }
 
 public sealed record ReceivingWorkOrderRow(
-    Guid Id, string Number, string CreatedAtText, string StatusText);
+    Guid Id, string Number, string CreatedAtText,
+    string StatusGlyph, string StatusDescription);

@@ -24,9 +24,13 @@
                                         <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnOrderTapped" />
                                     </Border.GestureRecognizers>
                                     <VerticalStackLayout>
-                                        <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                        <HorizontalStackLayout Spacing="7">
+                                            <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                            <Label Text="{Binding StatusGlyph}" FontSize="17"
+                                                   VerticalTextAlignment="Center"
+                                                   SemanticProperties.Description="{Binding StatusDescription}" />
+                                        </HorizontalStackLayout>
                                         <Label Text="{Binding CreatedAtText}" FontSize="12" />
-                                        <Label Text="{Binding StatusText}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>

@@ -8,21 +8,53 @@
         <RefreshView x:Name="LpnRefreshView" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="8">
-                    <Label x:Name="CodeLabel" FontSize="21" FontAttributes="Bold" />
-                    <Label x:Name="StatusLabel" FontSize="12" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Label x:Name="CodeLabel" FontSize="21" FontAttributes="Bold" />
+                        <Label x:Name="StatusIcon" FontSize="21" VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Label Text="Сканируйте SKU или найдите его вручную." FontSize="12" />
+                    <Label x:Name="ScanHintLabel" Text="Сканируйте SKU или найдите его вручную." FontSize="12" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingLpnItemRow">
-                                <Border Padding="8" Stroke="#D4D4D4">
+                                <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource ReceivingNeutralBackgroundLight}, Dark={StaticResource ReceivingNeutralBackgroundDark}}">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnItemTapped" />
                                     </Border.GestureRecognizers>
-                                    <VerticalStackLayout>
-                                        <Label Text="{Binding Name}" FontAttributes="Bold" />
-                                        <Label Text="{Binding Details}" FontSize="12" />
-                                    </VerticalStackLayout>
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchBackgroundLight}, Dark={StaticResource ReceivingMatchBackgroundDark}}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsDifferent}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentBackgroundLight}, Dark={StaticResource ReceivingDifferentBackgroundDark}}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                            <Label Text="{Binding ExpirationText}" FontSize="12" IsVisible="{Binding ShowsExpiration}" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="End" VerticalOptions="Start">
+                                            <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End"
+                                                   SemanticProperties.Description="{Binding FactDescription}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Text="{Binding LpnQuantityText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="13" HorizontalTextAlignment="End" />
+                                        </VerticalStackLayout>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
@@ -34,14 +66,41 @@
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding CandidateRows, Source={x:Reference Page}}" Spacing="4">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="local:ReceivingSkuChoiceRow">
-                                    <Border Padding="8" Stroke="#D4D4D4">
+                                    <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}" StrokeThickness="2">
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnCandidateTapped" />
                                         </Border.GestureRecognizers>
-                                        <VerticalStackLayout>
-                                            <Label Text="{Binding Name}" FontAttributes="Bold" />
-                                            <Label Text="{Binding Plan}" FontSize="12" />
-                                        </VerticalStackLayout>
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
+                                                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsDifferent}" Value="True">
+                                                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                                <Label Text="{Binding Details}" FontSize="12" IsVisible="{Binding HasDetails}" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="2" HorizontalOptions="End" VerticalOptions="Start">
+                                                <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End" />
+                                                <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End"
+                                                       SemanticProperties.Description="{Binding FactDescription}">
+                                                    <Label.Triggers>
+                                                        <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
+                                                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
+                                                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
+                                                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                                        </DataTrigger>
+                                                    </Label.Triggers>
+                                                </Label>
+                                            </VerticalStackLayout>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
@@ -54,10 +113,14 @@
             <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" Clicked="OnRetryClicked" IsVisible="False" />
-            <Button x:Name="SearchButton" Text="Выбрать SKU вручную" Clicked="OnManualSearchClicked" />
-            <Button x:Name="CloseButton" Text="Закрыть LPN и провести приход" Clicked="OnCloseClicked" />
-            <Button x:Name="CancelButton" Text="Отменить открытый LPN" Clicked="OnCancelClicked" />
-            <Button x:Name="PutawayButton" Text="Разместить LPN" Clicked="OnPutawayClicked" />
+            <Grid x:Name="ActionsGrid" ColumnDefinitions="*,*,*" ColumnSpacing="4">
+                <Button x:Name="SearchButton" Text="🔍 SKU" FontSize="12" Padding="2,8"
+                        SemanticProperties.Description="Выбрать SKU вручную" Clicked="OnManualSearchClicked" />
+                <Button x:Name="CancelButton" Grid.Column="1" Text="Отменить" FontSize="12"
+                        Padding="2,8" Clicked="OnCancelClicked" />
+                <Button x:Name="CloseButton" Grid.Column="2" Text="Закрыть" FontSize="12"
+                        Padding="2,8" Clicked="OnCloseClicked" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

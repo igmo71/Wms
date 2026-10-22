@@ -33,7 +33,8 @@
                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
                                     <HorizontalStackLayout Spacing="7">
                                         <Label FontAttributes="Bold" FontSize="15" Text="{Binding Code}" />
-                                        <Label FontSize="12" Text="{Binding StatusName}" VerticalTextAlignment="Center" />
+                                        <Label FontSize="16" Text="{Binding StatusGlyph}" VerticalTextAlignment="Center"
+                                               SemanticProperties.Description="{Binding StatusDescription}" />
                                     </HorizontalStackLayout>
                                     <Label Grid.Column="1" Grid.RowSpan="2" FontAttributes="Bold" FontSize="14" Text="{Binding QuantityText}" VerticalTextAlignment="Center" />
                                     <Label Grid.Row="1" FontSize="11" Text="{Binding ResponsibleUserName}" />

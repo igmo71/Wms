@@ -41,8 +41,9 @@ section navigation as an existing order. A participant scans an issued LPN, sele
 globally scans its SKU, enters a positive quantity and may close it. WMS orders
 carry their own number and factual creation time in Mobile V1 responses, while
 their IDs remain the keys for commands; 1C numbers belong to individual sources. The
-queue shows the number and separate local creation time. The SKU and LPN screens use the order
-number as their heading and place status and receiving location on one line;
+queue shows the number with a status symbol and separate local creation time.
+The SKU, LPN and document screens show the order number with the same status
+symbol; the SKU and LPN screens put the receiving location on the next line;
 they omit creation time and warehouse from the compact heading. The existing
 order has separate SKU, LPN, and document screens headed «Приёмка › SKU»,
 «Приёмка › LPN», and «Приёмка › Документы 1С». A selected section is visibly
@@ -56,14 +57,40 @@ commands prevent navigation until explicit retry. LPN scans work on both SKU and
 LPN list screens, through either device scanner or camera. SKU scans remain
 inside an opened LPN. The SKU list sorts by displayed name without row numbers,
 using code and ID when a name is unavailable. Each SKU card keeps its name left
-and semibold plan and fact on two right-aligned lines, with the unit shown once.
+and semibold plan and fact on two right-aligned lines without labels (plan above
+fact), with the unit shown once. The compact zero-confirmation button sits below
+the fact in the quantity block.
 An unchecked fact is a red question mark on a neutral card. Equal known plan
-and fact use green text and a soft green background; a checked difference uses
-yellow text and background. An unknown plan leaves the card neutral. Each SKU
-card opens its details on tap and keeps a compact zero-confirmation action
-when eligible. Zero checking and direct putaway of
-closed LPNs remain available before order completion. Closing and putaway use
-separate retry-safe commands. The document screen shows «Новый ордер» before creation and the WMS order
+and fact show a green «✓» beside the fact and a soft green background; a checked
+difference shows a yellow «≠» beside the fact and a soft yellow background.
+An unknown plan leaves the card neutral and its known fact has no comparison
+symbol. Each SKU card opens its details on tap and keeps a compact zero-confirmation action
+when eligible.
+SKU cards within an LPN show the order plan and fact with the same background
+and fact colors, then the quantity in that LPN as a third right-aligned line;
+the unit appears only on the plan line. They omit putaway quantities
+and show an expiration line only when the SKU requires a date, with the saved
+date or «не указан». Manual SKU search sorts by displayed name and uses the
+same right-aligned plan and fact, with a colored border for a known match or
+difference; unverified or unknown-plan candidates keep a neutral border.
+The receiving status vocabulary is shared across lists and details: «◇» means
+ready order or available LPN; «○» means order in progress or open LPN; «✓»
+means received order, closed LPN, or matched SKU; «≠» means a checked SKU
+difference; «?» means unchecked fact; «⚠» means a failed 1C document check;
+«⊘» means cancelled LPN and «×» deleted LPN. Each status symbol has its full
+meaning in an accessible description. Order and LPN symbols sit beside their
+numbers; SKU comparison symbols sit beside fact quantities; the document
+warning sits beside its number. The SKU scanning hint is hidden
+when the LPN is not editable.
+In the LPN list, tapping a card opens its detail. An editable LPN shows manual
+SKU search, cancel and eligible close actions in one row as «🔍 SKU»,
+«Отменить» and «Закрыть». Opening search changes the first action to «✕ SKU»;
+the full action descriptions remain available to a screen reader. Closing
+still asks for explicit confirmation that receipt will be posted. The receiving
+screens have no putaway actions; the independent putaway screen starts that
+workflow by scanning a closed LPN. Zero checking remains available before
+order completion. Closing and the separate putaway flow use retry-safe
+commands. The document screen shows «Новый ордер» before creation and the WMS order
 number once the first document creates it. Each document row
 shows number and date, then sender name and warehouse operation, with no field
 labels; a tap reveals other source details and any latest check error. A failed

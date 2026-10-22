@@ -6,8 +6,11 @@
              Title="Приёмка › SKU">
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
         <VerticalStackLayout Spacing="3">
-            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
-            <Label x:Name="StatusLabel" FontSize="13" />
+            <HorizontalStackLayout Spacing="8">
+                <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+                <Label x:Name="StatusIcon" FontSize="21" VerticalTextAlignment="Center" />
+            </HorizontalStackLayout>
+            <Label x:Name="LocationLabel" FontSize="13" />
         </VerticalStackLayout>
         <RefreshView x:Name="OrderRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
@@ -30,7 +33,7 @@
                                         </DataTrigger>
                                     </Border.Triggers>
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Padding="8,6">
-                                        <VerticalStackLayout Spacing="6" VerticalOptions="Start">
+                                        <VerticalStackLayout VerticalOptions="Start">
                                             <Label Text="{Binding Name}" FontAttributes="Bold"
                                                    LineBreakMode="WordWrap">
                                                 <Label.GestureRecognizers>
@@ -38,18 +41,14 @@
                                                                           Tapped="OnSkuTapped" />
                                                 </Label.GestureRecognizers>
                                             </Label>
-                                            <Button Text="0" FontSize="14" WidthRequest="44" HeightRequest="40"
-                                                    Padding="0" HorizontalOptions="Start"
-                                                    SemanticProperties.Description="Подтвердить отсутствие SKU"
-                                                    IsVisible="{Binding CanConfirmZero}"
-                                                    CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="1" Spacing="2"
                                                              HorizontalOptions="End" VerticalOptions="Start">
                                             <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold"
                                                    FontSize="13" HorizontalTextAlignment="End" />
                                             <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
-                                                   FontSize="13" HorizontalTextAlignment="End">
+                                                   FontSize="13" HorizontalTextAlignment="End"
+                                                   SemanticProperties.Description="{Binding FactDescription}">
                                                 <Label.Triggers>
                                                     <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
                                                         <Setter Property="TextColor"
@@ -65,6 +64,12 @@
                                                     </DataTrigger>
                                                 </Label.Triggers>
                                             </Label>
+                                            <Button Text="0" FontSize="12" WidthRequest="32" HeightRequest="30"
+                                                    MinimumWidthRequest="0" MinimumHeightRequest="0"
+                                                    Padding="0" HorizontalOptions="End"
+                                                    SemanticProperties.Description="Подтвердить отсутствие SKU"
+                                                    IsVisible="{Binding CanConfirmZero}"
+                                                    CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
                                         </VerticalStackLayout>
                                     </Grid>
                                 </Border>
