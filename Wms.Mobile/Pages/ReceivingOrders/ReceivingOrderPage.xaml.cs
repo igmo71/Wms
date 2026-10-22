@@ -184,7 +184,7 @@ public partial class ReceivingOrderPage : ContentPage
 
     private async Task OpenOrderAsync(MobileReceivingWorkOrderResponse order)
     {
-        var page = _services.GetRequiredService<ReceivingOrderReceivingPage>();
+        var page = _services.GetRequiredService<ReceivingOrderSkuPage>();
         page.Show(order);
         await Navigation.PushAsync(page);
     }

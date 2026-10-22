@@ -36,18 +36,35 @@ button starts the camera fallback when no embedded scanner is available.
 The server rejects a document with a different sender ID. On the empty creation
 screen, a scan of an already linked document offers to open its order. Returning
 before the first scan creates nothing; returning after creation leaves the order in the
-queue. «Готово» opens its SKU view. A participant scans an issued LPN, selects or
+queue. After creation, the document screen shows the same SKU, LPN and 1C
+section navigation as an existing order. A participant scans an issued LPN, selects or
 globally scans its SKU, enters a positive quantity and may close it. WMS orders
 carry their own number and factual creation time in Mobile V1 responses, while
 their IDs remain the keys for commands; 1C numbers belong to individual sources. The
-queue shows the number and separate local creation time. The order page uses the
-number as its heading and places status and receiving location on one line; it
-omits creation time and warehouse from the compact heading. Each SKU card opens
-its details on tap and keeps a compact zero-confirmation action when eligible.
-The order page offers zero checking and direct putaway of closed LPNs before order
-completion. Closing and putaway use separate retry-safe commands.
-The active Mobile order has a bottom «📄 1С» button opening a separate document
-screen. The order screen itself stays focused on SKU and LPN. Each document row
+queue shows the number and separate local creation time. The SKU and LPN screens use the order
+number as their heading and place status and receiving location on one line;
+they omit creation time and warehouse from the compact heading. The existing
+order has separate SKU, LPN, and document screens headed «Приёмка › SKU»,
+«Приёмка › LPN», and «Приёмка › Документы 1С». A selected section is visibly
+marked and does not respond to taps. Sections use the same default page transition. Switching replaces the current section in
+the navigation stack, so Back returns to the order queue; a detail page returns
+to the section that opened it. A shared join screen is reachable from all three
+sections and returns to the originating section. Its entry button reads «Начать» for a ready order and «Присоединиться»
+for an order in progress. A new cycle selects a receiving
+location there; an ongoing cycle joins without selecting it again. Pending
+commands prevent navigation until explicit retry. LPN scans work on both SKU and
+LPN list screens, through either device scanner or camera. SKU scans remain
+inside an opened LPN. The SKU list sorts by displayed name without row numbers,
+using code and ID when a name is unavailable. Each SKU card keeps its name left
+and semibold plan and fact on two right-aligned lines, with the unit shown once.
+An unchecked fact is a red question mark on a neutral card. Equal known plan
+and fact use green text and a soft green background; a checked difference uses
+yellow text and background. An unknown plan leaves the card neutral. Each SKU
+card opens its details on tap and keeps a compact zero-confirmation action
+when eligible. Zero checking and direct putaway of
+closed LPNs remain available before order completion. Closing and putaway use
+separate retry-safe commands. The document screen shows «Новый ордер» before creation and the WMS order
+number once the first document creates it. Each document row
 shows number and date, then sender name and warehouse operation, with no field
 labels; a tap reveals other source details and any latest check error. A failed
 check marks its row with a warning symbol. Scanning immediately attaches one
@@ -55,8 +72,11 @@ document and recalculates the order plan. Consecutive scans attach consecutive
 documents, and the newest row is highlighted gray. A sender mismatch stays on
 the document screen with a clear error. A cross on the document row detaches it
 before the first posted LPN; detaching the last document keeps the empty order.
-«Готово» and Back return to the SKU view; neither
-performs an additional save. An uncertain response retains the original barcode
+Before the first document scan, Back leaves without creating an order and
+section navigation is hidden. Once the order is created, the document screen
+offers the shared section navigation and no «Готово» action. On the document
+screen of an existing order, Back returns to the order queue. An uncertain
+response retains the original barcode
 or source ID and command ID for explicit retry, including the first create scan.
 The Mobile quantity page shows the date field when the current SKU flag is on
 or a date was already saved on the open LPN. It retains and displays that saved

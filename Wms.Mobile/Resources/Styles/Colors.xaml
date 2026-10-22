@@ -27,6 +27,19 @@
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
 
+    <Color x:Key="ReceivingNeutralBackgroundLight">#FFFFFF</Color>
+    <Color x:Key="ReceivingNeutralBackgroundDark">#1F1F1F</Color>
+    <Color x:Key="ReceivingMatchBackgroundLight">#E6F4EA</Color>
+    <Color x:Key="ReceivingMatchBackgroundDark">#173A26</Color>
+    <Color x:Key="ReceivingDifferentBackgroundLight">#FFF4D6</Color>
+    <Color x:Key="ReceivingDifferentBackgroundDark">#493A16</Color>
+    <Color x:Key="ReceivingUncheckedFactLight">#B3261E</Color>
+    <Color x:Key="ReceivingUncheckedFactDark">#FF8A80</Color>
+    <Color x:Key="ReceivingMatchFactLight">#176B34</Color>
+    <Color x:Key="ReceivingMatchFactDark">#87DFA2</Color>
+    <Color x:Key="ReceivingDifferentFactLight">#8A5900</Color>
+    <Color x:Key="ReceivingDifferentFactDark">#FFD54F</Color>
+
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
     <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>

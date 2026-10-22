@@ -216,8 +216,11 @@ Feature clients and Mobile V1 contract source files are grouped by business
 feature over one authenticated transport.
 
 A page retains controls, modes, scanner lifecycle, navigation, dialogs, and
-rendering. A concrete feature process may own retry-aware API sequences and
-stable request ids when that materially clarifies the page.
+rendering. Distinct operator tasks use separate mobile screens with explicit
+navigation; sibling screens replace each other in the navigation stack when
+Back should return to their common parent. A concrete feature process may own
+retry-aware API sequences and stable request ids when that materially clarifies
+the page.
 
 Web and Mobile retain the original command inputs, request id and user for
 explicit retry after transport failure, `408`, `5xx` or an unreadable successful

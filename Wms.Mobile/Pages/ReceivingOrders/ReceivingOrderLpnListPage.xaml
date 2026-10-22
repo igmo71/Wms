@@ -1,0 +1,57 @@
+<ContentPage x:Class="Wms.Mobile.ReceivingOrderLpnListPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Приёмка › LPN">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="StatusLabel" FontSize="13" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="OrderRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label x:Name="ScanHintLabel" FontSize="12" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding LpnRows, Source={x:Reference Page}}" Spacing="4">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingWorkLpnRow">
+                                <Border Padding="8" Stroke="#D4D4D4">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                        <VerticalStackLayout>
+                                            <Label Text="{Binding Code}" FontAttributes="Bold" />
+                                            <Label Text="{Binding Description}" FontSize="12" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Button Text="Открыть" FontSize="11" CommandParameter="{Binding Id}" Clicked="OnLpnClicked" />
+                                            <Button Text="Разместить" FontSize="11" IsVisible="{Binding CanPutaway}"
+                                                    CommandParameter="{Binding Id}" Clicked="OnPutawayClicked" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="JoinButton" Text="Начать" Clicked="OnJoinClicked" />
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="5">
+                <Button x:Name="SkuButton" Text="SKU" Clicked="OnSkuClicked" />
+                <Border Grid.Column="1" BackgroundColor="{StaticResource Primary}"
+                        Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" HeightRequest="44">
+                    <Label Text="LPN" TextColor="White" FontSize="14"
+                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
+                           SemanticProperties.Description="Текущий раздел LPN" />
+                </Border>
+                <Button x:Name="SourcesButton" Grid.Column="2" Text="📄 1С"
+                        SemanticProperties.Description="Документы 1С" Clicked="OnSourcesClicked" />
+            </Grid>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

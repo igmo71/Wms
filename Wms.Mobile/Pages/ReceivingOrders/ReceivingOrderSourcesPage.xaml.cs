@@ -43,6 +43,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
     {
         _creating = false;
         _order = order;
+        NumberLabel.Text = $"Ордер {order.Number}";
         _process = process;
         _newSourceRefKey = null;
     }
@@ -143,6 +144,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         OnPropertyChanged(nameof(SourceRows));
         EmptyLabel.IsVisible = SourceRows.Count == 0;
         EmptyLabel.Text = "В ордере нет документов 1С.";
+        UpdateRecovery();
         ScanHintLabel.Text = CanAttach
             ? "Сканируйте документ 1С. Он сразу прикрепится к ордеру."
             : "Прикрепление документов в текущем статусе недоступно.";
@@ -243,10 +245,10 @@ public partial class ReceivingOrderSourcesPage : ContentPage
 
     private async Task OpenOrderAsync(MobileReceivingWorkOrderResponse order)
     {
-        var page = _services.GetRequiredService<ReceivingOrderReceivingPage>();
-        page.Show(order);
-        Navigation.InsertPageBefore(page, this);
-        await Navigation.PopAsync();
+        var page = _services.GetRequiredService<ReceivingOrderSkuPage>();
+        page.Show(order, _process);
+        await Navigation.PushAsync(page);
+        Navigation.RemovePage(this);
     }
 
     private void MarkNewSource()
@@ -316,12 +318,30 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         }, retry: true);
     }
 
-    private async void OnDoneClicked(object? sender, EventArgs e)
+    private async void OnJoinClicked(object? sender, EventArgs e)
     {
-        if (_busy || HasPendingCommand) return;
-        if (_creating && _order is { } order)
-            await OpenOrderAsync(order);
-        else await Navigation.PopAsync();
+        if (_order is null || _busy || HasPendingCommand) return;
+        var page = _services.GetRequiredService<ReceivingOrderJoinPage>();
+        page.Show(_order, _process);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnSkuClicked(object? sender, EventArgs e)
+    {
+        if (_order is null || _busy || HasPendingCommand) return;
+        var page = _services.GetRequiredService<ReceivingOrderSkuPage>();
+        page.Show(_order, _process);
+        await Navigation.PushAsync(page);
+        Navigation.RemovePage(this);
+    }
+
+    private async void OnLpnsClicked(object? sender, EventArgs e)
+    {
+        if (_order is null || _busy || HasPendingCommand) return;
+        var page = _services.GetRequiredService<ReceivingOrderLpnListPage>();
+        page.Show(_order, _process);
+        await Navigation.PushAsync(page);
+        Navigation.RemovePage(this);
     }
 
     private async Task ExecuteAsync(Func<Task> action, bool retry = false)
@@ -343,12 +363,19 @@ public partial class ReceivingOrderSourcesPage : ContentPage
 
     private void UpdateRecovery()
     {
+        NumberLabel.Text = _order is null ? "Новый ордер" : $"Ордер {_order.Number}";
+        JoinButton.Text = _order?.Status == MobileReceivingOrderStatus.ReadyForReceiving
+            ? "Начать" : "Присоединиться";
         RetryButton.IsVisible = HasPendingCommand;
         if (RetryButton.IsVisible) RetryButton.Text = _pendingCreate is not null
             ? "Повторить создание ордера"
             : $"Повторить: {_process.PendingLabel}";
-        DoneButton.IsVisible = !_creating || _order is not null;
-        DoneButton.IsEnabled = !_busy && !HasPendingCommand;
+        SectionsGrid.IsVisible = _order is not null;
+        SkuButton.IsEnabled = !_busy && !HasPendingCommand;
+        LpnsButton.IsEnabled = !_busy && !HasPendingCommand;
+        JoinButton.IsVisible = _order is { IsParticipant: false,
+            Status: MobileReceivingOrderStatus.ReadyForReceiving or MobileReceivingOrderStatus.InReceiving };
+        JoinButton.IsEnabled = !_busy && !HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !_busy && !HasPendingCommand);
     }
 

@@ -1,0 +1,95 @@
+<ContentPage x:Class="Wms.Mobile.ReceivingOrderSkuPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Приёмка › SKU">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="7">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="StatusLabel" FontSize="13" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="OrderRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label x:Name="ScanHintLabel" FontSize="12" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReceivingWorkItemRow">
+                                <Border Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource ReceivingNeutralBackgroundLight}, Dark={StaticResource ReceivingNeutralBackgroundDark}}">
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
+                                            <Setter Property="BackgroundColor"
+                                                    Value="{AppThemeBinding Light={StaticResource ReceivingMatchBackgroundLight}, Dark={StaticResource ReceivingMatchBackgroundDark}}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsDifferent}" Value="True">
+                                            <Setter Property="BackgroundColor"
+                                                    Value="{AppThemeBinding Light={StaticResource ReceivingDifferentBackgroundLight}, Dark={StaticResource ReceivingDifferentBackgroundDark}}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Padding="8,6">
+                                        <VerticalStackLayout Spacing="6" VerticalOptions="Start">
+                                            <Label Text="{Binding Name}" FontAttributes="Bold"
+                                                   LineBreakMode="WordWrap">
+                                                <Label.GestureRecognizers>
+                                                    <TapGestureRecognizer CommandParameter="{Binding SkuId}"
+                                                                          Tapped="OnSkuTapped" />
+                                                </Label.GestureRecognizers>
+                                            </Label>
+                                            <Button Text="0" FontSize="14" WidthRequest="44" HeightRequest="40"
+                                                    Padding="0" HorizontalOptions="Start"
+                                                    SemanticProperties.Description="Подтвердить отсутствие SKU"
+                                                    IsVisible="{Binding CanConfirmZero}"
+                                                    CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2"
+                                                             HorizontalOptions="End" VerticalOptions="Start">
+                                            <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="13" HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="13" HorizontalTextAlignment="End">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
+                                                        <Setter Property="TextColor"
+                                                                Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
+                                                        <Setter Property="TextColor"
+                                                                Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
+                                                        <Setter Property="TextColor"
+                                                                Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="JoinButton" Text="Начать" Clicked="OnJoinClicked" />
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="5">
+                <Border BackgroundColor="{StaticResource Primary}" Stroke="{StaticResource Primary}"
+                        StrokeShape="RoundRectangle 8" HeightRequest="44">
+                    <Label Text="SKU" TextColor="White" FontSize="14"
+                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
+                           SemanticProperties.Description="Текущий раздел SKU" />
+                </Border>
+                <Button x:Name="LpnsButton" Grid.Column="1" Text="LPN" Clicked="OnLpnsClicked" />
+                <Button x:Name="SourcesButton" Grid.Column="2" Text="📄 1С"
+                        SemanticProperties.Description="Документы 1С" Clicked="OnSourcesClicked" />
+            </Grid>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
