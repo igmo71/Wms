@@ -67,6 +67,7 @@ public sealed record MobileReceivingWorkOrderResponse(
 {
     public string? WarehouseName { get; init; }
     public string? ReceivingLocationAddress { get; init; }
+    public bool MayCompleteOrder { get; init; }
 }
 
 public sealed record MobileReceivingSkuCandidateResponse(
@@ -96,6 +97,7 @@ public sealed record MobileReceivingOpenLpnRequest(
     Guid ClientRequestId, string LpnCode);
 public sealed record MobileReceivingEditLpnRequest(
     Guid ClientRequestId, Guid SkuId, decimal Quantity, DateOnly? ExpirationDate);
+public sealed record MobileReceivingClearLpnItemRequest(Guid ClientRequestId, long ExpectedRevision);
 public sealed record MobileReceivingCloseLpnRequest(
     Guid ClientRequestId, bool ConfirmExpiredDate, string? ManagerReason);
 public sealed record MobileReceivingPutawayRequest(

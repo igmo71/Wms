@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
@@ -15,9 +16,12 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private Guid _orderId;
     private Guid _lpnId;
     private Guid? _pendingSkuId;
+    private Guid? _selectedSkuId;
     private bool _catalogSearch;
     private bool _visible;
     private bool _busy;
+    private bool _closeAfterSave;
+    private bool _confirmedExpiredDate;
     private long _scanGeneration;
 
     public ReceivingOrderLicensePlateNumberPage(MobileReceivingOrderClient orders,
@@ -31,16 +35,23 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<ReceivingLpnItemRow> ItemRows { get; private set; } = [];
     public IReadOnlyList<ReceivingSkuChoiceRow> CandidateRows { get; private set; } = [];
     private MobileReceivingWorkLpnResponse? Lpn =>
         _order?.Lpns.SingleOrDefault(x => x.Id == _lpnId);
 
-    public void Show(Guid orderId, Guid lpnId, ReceivingOrderReceivingProcess process)
+    public void Show(Guid orderId, Guid lpnId, ReceivingOrderReceivingProcess process,
+        Guid? selectedSkuId = null)
     {
         _orderId = orderId;
         _lpnId = lpnId;
         _process = process;
+        _selectedSkuId = selectedSkuId;
+        _catalogSearch = false;
+        ScopeButton.Text = "Поиск: состав ордера";
+        SkuSearch.Text = string.Empty;
+        _closeAfterSave = false;
+        _confirmedExpiredDate = false;
+        SearchPanel.IsVisible = false;
     }
 
     protected override async void OnAppearing()
@@ -91,37 +102,51 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         var status = ReceivingStatusSymbols.ForLpn(lpn.Status);
         StatusIcon.Text = status.Glyph;
         SemanticProperties.SetDescription(StatusIcon, $"Статус LPN: {status.Description}");
-        ItemRows = lpn.Items.Select(x =>
-        {
-            var orderItem = order.Items.FirstOrDefault(item => item.SkuId == x.SkuId);
-            var plan = orderItem?.PlanQuantity;
-            var fact = orderItem?.FactQuantity;
-            var unit = string.IsNullOrWhiteSpace(x.UnitOfMeasure) ? "—" : x.UnitOfMeasure;
-            return new ReceivingLpnItemRow(x.SkuId,
-                !string.IsNullOrWhiteSpace(x.SkuName) ? x.SkuName
-                    : !string.IsNullOrWhiteSpace(x.SkuCode) ? x.SkuCode : x.SkuId.ToString(),
-                $"LPN: {x.Quantity:0.###}",
-                $"Срок: {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}",
-                orderItem?.TracksExpirationDate == true,
-                $"{Format(plan)} {unit}", ReceivingStatusSymbols.FactText(plan, fact),
-                ReceivingStatusSymbols.FactDescription(plan, fact),
-                fact is null, plan is decimal expected && fact == expected,
-                plan is decimal planned && fact is decimal actual && planned != actual);
-        }).ToArray();
-        OnPropertyChanged(nameof(ItemRows));
+        if (lpn.Items.SingleOrDefault() is { } item)
+            _selectedSkuId = item.SkuId;
+        else if (_selectedSkuId is Guid selected && order.Items.All(x => x.SkuId != selected))
+            _selectedSkuId = null;
         var editable = lpn.Status == MobileLicensePlateNumberStatus.Open
             && order.IsParticipant;
-        ScanHintLabel.IsVisible = editable;
+        ScanHintLabel.IsVisible = editable && _selectedSkuId is null;
         ActionsGrid.IsVisible = editable;
-        CloseButton.IsVisible = editable && lpn.Items.Any(x => x.Quantity > 0);
-        Grid.SetColumnSpan(SearchButton, CloseButton.IsVisible ? 1 : 2);
-        Grid.SetColumn(CancelButton, CloseButton.IsVisible ? 1 : 2);
-        if (!editable)
-        {
-            SearchPanel.IsVisible = false;
-            UpdateSearchButton();
-        }
+        SearchPanel.IsVisible = editable && _selectedSkuId is null;
+        ShowSelectedSku();
         UpdateRecovery();
+    }
+
+    private void ShowSelectedSku()
+    {
+        var sku = _order?.Items.FirstOrDefault(x => x.SkuId == _selectedSkuId);
+        EditorPanel.IsVisible = sku is not null;
+        ClearSkuButton.IsVisible = sku is not null
+            && Lpn?.Status == MobileLicensePlateNumberStatus.Open
+            && _order?.IsParticipant == true;
+        ApplyButton.IsVisible = sku is not null && Lpn?.Status == MobileLicensePlateNumberStatus.Open
+            && _order?.IsParticipant == true;
+        CloseButton.IsVisible = ApplyButton.IsVisible;
+        Grid.SetColumn(CancelButton, ApplyButton.IsVisible ? 2 : 0);
+        Grid.SetColumnSpan(CancelButton, ApplyButton.IsVisible ? 1 : 3);
+        if (sku is null) return;
+
+        var item = Lpn?.Items.SingleOrDefault(x => x.SkuId == sku.SkuId);
+        SkuNameLabel.Text = sku.SkuName ?? sku.SkuCode ?? sku.SkuId.ToString();
+        SkuCodeLabel.Text = sku.SkuCode;
+        PlanLabel.Text = Format(sku.PlanQuantity);
+        FactLabel.Text = ReceivingStatusSymbols.FactText(sku.PlanQuantity, sku.FactQuantity);
+        SemanticProperties.SetDescription(FactLabel,
+            ReceivingStatusSymbols.FactDescription(sku.PlanQuantity, sku.FactQuantity));
+        CurrentLabel.Text = item is null ? "нет" : Format(item.Quantity);
+        UnitLabel.Text = sku.UnitOfMeasure ?? "—";
+        QuantityEntry.Text = item?.Quantity.ToString("0.###", CultureInfo.InvariantCulture);
+        ExpirationPanel.IsVisible = sku.TracksExpirationDate || item?.ExpirationDate is not null;
+        ExpirationHintLabel.Text = sku.TracksExpirationDate
+            ? "Для закрытия LPN с положительным количеством укажите срок годности."
+            : "Сохранённый срок годности не удаляется при выключении его учёта.";
+        ExpirationSwitch.IsToggled = item?.ExpirationDate is not null;
+        ExpirationPicker.Date = item?.ExpirationDate is DateOnly date
+            ? date.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
+        ExpirationPicker.IsVisible = ExpirationSwitch.IsToggled;
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
@@ -144,17 +169,17 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         if (barcode.Trim().StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
         {
-            await ExecuteAsync(async () =>
-            {
-                Apply(await _process.OpenLpnAsync(_orderId, barcode.Trim()));
-                if (_process.LastResourceId is Guid id) _lpnId = id;
-            });
-            await RefreshAsync();
+            ErrorLabel.Text = "LPN сканируется в списке LPN ордера.";
             return;
         }
         if (Lpn.Status != MobileLicensePlateNumberStatus.Open)
         {
             ErrorLabel.Text = "Закрытый LPN нельзя изменить.";
+            return;
+        }
+        if (_selectedSkuId is not null)
+        {
+            ErrorLabel.Text = "Сначала уберите выбранный SKU.";
             return;
         }
         SetBusy(true);
@@ -169,26 +194,48 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private async void OnItemTapped(object? sender, TappedEventArgs e)
+    private async void OnClearSkuClicked(object? sender, EventArgs e)
     {
-        if (e.Parameter is Guid skuId && _order?.IsParticipant == true
-            && Lpn?.Status == MobileLicensePlateNumberStatus.Open)
-            await SelectSkuAsync(skuId, true);
+        if (_busy || _process.HasPendingCommand || _selectedSkuId is null
+            || Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn
+            || _order?.IsParticipant != true) return;
+
+        if (lpn.Items.SingleOrDefault() is null)
+        {
+            if (HasUnsavedChanges(lpn) && !await DisplayAlertAsync("Убрать SKU",
+                    "Несохранённое количество и срок будут сброшены. Продолжить?",
+                    "Убрать", "Назад")) return;
+            ResetSkuSelection();
+            ShowSelectedSku();
+            UpdateRecovery();
+            await SearchAsync();
+            return;
+        }
+
+        var confirmation = $"Убрать SKU и сохранённое количество из {lpn.Code}?";
+        if (HasUnsavedChanges(lpn))
+            confirmation += " Несохранённые изменения тоже будут сброшены.";
+        if (!await DisplayAlertAsync("Убрать SKU", confirmation,
+                "Убрать", "Назад")) return;
+        if (await ExecuteAsync(async () => ApplyClearedSku(
+                await _process.ClearLpnItemAsync(_orderId, _lpnId, lpn.Revision))))
+            await SearchAsync();
     }
 
-    private async void OnManualSearchClicked(object? sender, EventArgs e)
+    private void ResetSkuSelection()
     {
-        if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true) return;
-        SearchPanel.IsVisible = !SearchPanel.IsVisible;
-        UpdateSearchButton();
-        if (SearchPanel.IsVisible) await SearchAsync();
+        _selectedSkuId = null;
+        _catalogSearch = false;
+        ScopeButton.Text = "Поиск: состав ордера";
+        SkuSearch.Text = string.Empty;
+        SearchPanel.IsVisible = true;
+        ScanHintLabel.IsVisible = true;
     }
 
-    private void UpdateSearchButton()
+    private void ApplyClearedSku(MobileReceivingWorkOrderResponse order)
     {
-        SearchButton.Text = SearchPanel.IsVisible ? "✕ SKU" : "🔍 SKU";
-        SemanticProperties.SetDescription(SearchButton,
-            SearchPanel.IsVisible ? "Скрыть подбор SKU" : "Выбрать SKU вручную");
+        ResetSkuSelection();
+        Apply(order);
     }
 
     private async void OnScopeClicked(object? sender, EventArgs e)
@@ -238,7 +285,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось найти SKU."; }
-        finally { SetBusy(false); }
+        finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
     private async void OnCandidateTapped(object? sender, TappedEventArgs e)
@@ -252,6 +299,11 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     {
         if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true
             || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
+        if (_selectedSkuId is Guid currentSku && currentSku != skuId
+            && Lpn is { } currentLpn && HasUnsavedChanges(currentLpn)
+            && !await DisplayAlertAsync("Несохранённое количество",
+                "Выбор другого SKU сбросит несохранённое количество и срок. Продолжить?",
+                "Продолжить", "Назад")) return;
         if (!inOrder)
         {
             if (!await DisplayAlertAsync("SKU вне плана", "Добавить SKU в ордер с планом 0?", "Добавить", "Назад")) return;
@@ -260,23 +312,86 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             if (_process.HasPendingCommand || _pendingSkuId is null) return;
             _pendingSkuId = null;
         }
-        var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberQuantityPage>();
-        page.Show(_orderId, _lpnId, skuId, _process);
-        await Navigation.PushAsync(page);
+        _selectedSkuId = skuId;
+        SearchPanel.IsVisible = false;
+        ScanHintLabel.IsVisible = false;
+        ShowSelectedSku();
+        UpdateRecovery();
+        await UpdateCameraAsync();
+    }
+
+    private void OnExpirationToggled(object? sender, ToggledEventArgs e) =>
+        ExpirationPicker.IsVisible = e.Value;
+
+    private async void OnQuantityCompleted(object? sender, EventArgs e)
+    {
+        QuantityEntry.Unfocus();
+        await QuantityEntry.HideSoftInputAsync(CancellationToken.None);
+    }
+
+    private async void OnApplyClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand
+            || Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn
+            || _order?.IsParticipant != true) return;
+        if (!TryReadEditedValues(out var skuId, out var quantity, out var expiration)) return;
+        if (!HasUnsavedChanges(lpn))
+        {
+            await ReturnToLpnListAsync();
+            return;
+        }
+        if (await ExecuteAsync(async () => Apply(await _process.EditLpnAsync(
+            _orderId, _lpnId, skuId, quantity, expiration))))
+            await ReturnToLpnListAsync();
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
-        if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn || _busy) return;
-        if (lpn.Items.Count == 0 || lpn.Items.All(x => x.Quantity <= 0)) return;
-        var expired = lpn.Items.Any(x => x.ExpirationDate is DateOnly date
-            && date < DateOnly.FromDateTime(DateTime.UtcNow));
+        if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn
+            || _busy || _process.HasPendingCommand || _order?.IsParticipant != true) return;
+        if (!TryReadEditedValues(out var skuId, out var quantity, out var expiration)) return;
+        if (_order.Items.FirstOrDefault(x => x.SkuId == skuId)?.TracksExpirationDate == true
+            && expiration is null)
+        {
+            ErrorLabel.Text = "Укажите срок годности перед закрытием LPN.";
+            return;
+        }
+        var expired = expiration is DateOnly date
+            && date < DateOnly.FromDateTime(DateTime.UtcNow);
         if (expired && !await DisplayAlertAsync("Прошедший срок",
                 "Срок годности прошёл. Подтвердить закрытие LPN?", "Подтвердить", "Назад")) return;
-        if (!await DisplayAlertAsync("Провести приход", $"Закрыть {lpn.Code} и провести количество?", "Да", "Нет")) return;
-        await ExecuteAsync(async () => Apply(await _process.CloseLpnAsync(_orderId, _lpnId, expired, null)),
-            refreshOnConflict: true);
-        if (_process.HasPendingCommand || _process.LastCloseResult is null) return;
+        if (!await DisplayAlertAsync("Провести приход",
+                $"Закрыть {lpn.Code} и провести {quantity:0.###}?", "Да", "Нет")) return;
+        if (_busy || _process.HasPendingCommand || Lpn?.Status != MobileLicensePlateNumberStatus.Open)
+            return;
+
+        _confirmedExpiredDate = expired;
+        if (HasUnsavedChanges(lpn))
+        {
+            _closeAfterSave = true;
+            var saved = await ExecuteAsync(async () => Apply(await _process.EditLpnAsync(
+                _orderId, _lpnId, skuId, quantity, expiration)));
+            if (!saved)
+            {
+                if (!_process.HasPendingCommand) _closeAfterSave = false;
+                return;
+            }
+            _closeAfterSave = false;
+        }
+        await CloseSavedLpnAsync();
+    }
+
+    private async Task CloseSavedLpnAsync()
+    {
+        if (!await ExecuteAsync(async () => Apply(await _process.CloseLpnAsync(
+                _orderId, _lpnId, _confirmedExpiredDate, null)), refreshOnConflict: true))
+            return;
+        await FinishCloseAsync();
+    }
+
+    private async Task FinishCloseAsync()
+    {
+        if (_process.LastCloseResult is null) return;
         var result = _process.LastCloseResult;
         if (!result.SourceCheckSucceeded)
             await DisplayAlertAsync("Сверка 1С", result.SourceCheckError ?? "План не подтверждён.", "Понятно");
@@ -285,19 +400,20 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 
     private async void OnCancelClicked(object? sender, EventArgs e)
     {
-        if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn || _busy) return;
+        if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn
+            || _busy || _process.HasPendingCommand) return;
         if (!await DisplayAlertAsync("Отменить LPN", $"Отменить {lpn.Code} без прихода?", "Отменить", "Назад")) return;
-        await ExecuteAsync(async () => Apply(await _process.CancelLpnAsync(_orderId, _lpnId)));
-        if (!_process.HasPendingCommand && Lpn?.Status == MobileLicensePlateNumberStatus.Cancelled)
+        if (await ExecuteAsync(async () => Apply(await _process.CancelLpnAsync(_orderId, _lpnId)))
+            && Lpn?.Status == MobileLicensePlateNumberStatus.Cancelled)
             await Navigation.PopAsync();
     }
 
-    private async Task ExecuteAsync(Func<Task> action, bool refreshOnConflict = false)
+    private async Task<bool> ExecuteAsync(Func<Task> action, bool refreshOnConflict = false)
     {
-        if (_busy || _process.HasPendingCommand) return;
+        if (_busy || _process.HasPendingCommand) return false;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
-        try { await action(); }
+        try { await action(); return true; }
         catch (MobileApiException ex)
         {
             _pendingSkuId = null;
@@ -313,6 +429,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         catch (InvalidOperationException ex) { ErrorLabel.Text = ex.Message; }
         finally { SetBusy(false); UpdateRecovery(); await UpdateCameraAsync(); }
+        return false;
     }
 
     private async void OnRetryClicked(object? sender, EventArgs e)
@@ -323,11 +440,18 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         SetBusy(true);
         try
         {
-            Apply(await _process.RetryAsync());
+            var order = await _process.RetryAsync();
+            if (action == "Убрать SKU") ApplyClearedSku(order);
+            else Apply(order);
             ErrorLabel.Text = string.Empty;
             succeeded = true;
         }
-        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; _pendingSkuId = null; }
+        catch (MobileApiException ex)
+        {
+            ErrorLabel.Text = ex.Message;
+            _pendingSkuId = null;
+            _closeAfterSave = false;
+        }
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         finally { SetBusy(false); UpdateRecovery(); await UpdateCameraAsync(); }
         if (!succeeded) return;
@@ -336,24 +460,59 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             _pendingSkuId = null;
             await SelectSkuAsync(skuId, true);
         }
-        else if (action is "Закрыть LPN" or "Отменить LPN")
-            await Navigation.PopAsync();
-        else if (action == "Открыть LPN" && _process.LastResourceId is Guid lpnId)
+        else if (action == "Сохранить LPN")
         {
-            _lpnId = lpnId;
-            await RefreshAsync();
+            if (_closeAfterSave)
+            {
+                _closeAfterSave = false;
+                await CloseSavedLpnAsync();
+            }
+            else await ReturnToLpnListAsync();
         }
+        else if (action == "Закрыть LPN")
+            await FinishCloseAsync();
+        else if (action == "Убрать SKU")
+            await SearchAsync();
+        else if (action == "Отменить LPN")
+            await Navigation.PopAsync();
+    }
+
+    private async Task ReturnToLpnListAsync()
+    {
+        var stack = Navigation.NavigationStack.ToArray();
+        if (stack.Length > 1 && stack[^2] is ReceivingOrderLpnListPage)
+        {
+            await Navigation.PopAsync();
+            return;
+        }
+
+        if (_order is null) return;
+        var skuSection = Array.FindLastIndex(stack, page => page is ReceivingOrderSkuPage);
+        if (skuSection < 0) return;
+
+        var list = _services.GetRequiredService<ReceivingOrderLpnListPage>();
+        list.Show(_order, _process);
+        await Navigation.PushAsync(list);
+        foreach (var page in stack.Skip(skuSection))
+            Navigation.RemovePage(page);
     }
 
     private void UpdateRecovery()
     {
         RetryButton.IsVisible = _process.HasPendingCommand;
         RetryButton.Text = $"Повторить: {_process.PendingLabel}";
-        SearchButton.IsEnabled = !_busy && !_process.HasPendingCommand;
-        CloseButton.IsEnabled = SearchButton.IsEnabled;
-        CancelButton.IsEnabled = SearchButton.IsEnabled;
-        ScopeButton.IsEnabled = SearchButton.IsEnabled;
-        SkuSearch.IsEnabled = SearchButton.IsEnabled;
+        var canEdit = !_busy && !_process.HasPendingCommand
+            && Lpn?.Status == MobileLicensePlateNumberStatus.Open
+            && _order?.IsParticipant == true;
+        ClearSkuButton.IsEnabled = canEdit;
+        CloseButton.IsEnabled = canEdit;
+        CancelButton.IsEnabled = canEdit;
+        ScopeButton.IsEnabled = canEdit;
+        SkuSearch.IsEnabled = canEdit;
+        QuantityEntry.IsEnabled = canEdit;
+        ExpirationSwitch.IsEnabled = canEdit;
+        ExpirationPicker.IsEnabled = canEdit;
+        ApplyButton.IsEnabled = canEdit && _selectedSkuId is not null;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
     }
 
@@ -375,18 +534,68 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async Task UpdateCameraAsync()
     {
         if (_visible && !_busy && !_process.HasPendingCommand
+            && Lpn?.Status == MobileLicensePlateNumberStatus.Open
+            && _order?.IsParticipant == true
+            && _selectedSkuId is null
             && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
     }
 
     private static string Format(decimal? value) => value?.ToString("0.###") ?? "?";
+
+    private bool TryReadEditedValues(out Guid skuId, out decimal quantity,
+        out DateOnly? expiration)
+    {
+        skuId = _selectedSkuId ?? Guid.Empty;
+        expiration = SelectedExpiration();
+        if (skuId == Guid.Empty)
+        {
+            quantity = default;
+            ErrorLabel.Text = "Выберите SKU.";
+            return false;
+        }
+        if (!TryReadQuantity(out quantity))
+        {
+            ErrorLabel.Text = "Введите положительное количество с точностью до трёх знаков.";
+            return false;
+        }
+        if (ExpirationPanel.IsVisible && ExpirationSwitch.IsToggled && expiration is null)
+        {
+            ErrorLabel.Text = "Выберите дату срока годности.";
+            return false;
+        }
+        return true;
+    }
+
+    private bool TryReadQuantity(out decimal quantity) =>
+        decimal.TryParse((QuantityEntry.Text ?? string.Empty).Trim().Replace(',', '.'),
+            NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out quantity)
+        && WarehouseQuantityInput.IsSupported(quantity) && quantity > 0;
+
+    private DateOnly? SelectedExpiration() =>
+        ExpirationPanel.IsVisible && ExpirationSwitch.IsToggled
+            && ExpirationPicker.Date is DateTime date
+            ? DateOnly.FromDateTime(date) : null;
+
+    private bool HasUnsavedChanges(MobileReceivingWorkLpnResponse lpn)
+    {
+        var item = lpn.Items.SingleOrDefault();
+        if (item is null)
+            return _selectedSkuId is not null
+                && (!string.IsNullOrWhiteSpace(QuantityEntry.Text)
+                    || SelectedExpiration() is not null);
+        return _selectedSkuId != item.SkuId
+            || !TryReadQuantity(out var quantity) || quantity != item.Quantity
+            || SelectedExpiration() != item.ExpirationDate;
+    }
+
+    private void OnNonScanControlLoaded(object? sender, EventArgs e)
+    {
+        if (sender is VisualElement element) AndroidFocus.Suppress(element);
+    }
 }
 
-public sealed record ReceivingLpnItemRow(Guid SkuId, string Name, string LpnQuantityText,
-    string ExpirationText, bool ShowsExpiration, string PlanText, string FactText,
-    string FactDescription,
-    bool IsUnchecked, bool IsMatched, bool IsDifferent);
 public sealed record ReceivingSkuChoiceRow(Guid SkuId, string Name, string Details,
     string PlanText, string FactText, string FactDescription, bool IsInOrder,
     bool IsUnchecked, bool IsMatched, bool IsDifferent)

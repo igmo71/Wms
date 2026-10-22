@@ -16,6 +16,10 @@ public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient cl
         StartAsync("Присоединиться к приёмке", orderId, async id =>
             (await client.JoinAsync(orderId, locationId, id)).ResourceId);
 
+    public Task<MobileReceivingWorkOrderResponse> CompleteOrderAsync(Guid orderId) =>
+        StartAsync("Завершить ордер", orderId, async id =>
+            (await client.CompleteOrderAsync(orderId, id)).ResourceId);
+
     public Task<MobileReceivingWorkOrderResponse> OpenLpnAsync(Guid orderId, string code) =>
         StartAsync("Открыть LPN", orderId, async id =>
             (await client.OpenLpnAsync(orderId, code, id)).ResourceId);
@@ -46,6 +50,11 @@ public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient cl
     public Task<MobileReceivingWorkOrderResponse> CancelLpnAsync(Guid orderId, Guid lpnId) =>
         StartAsync("Отменить LPN", orderId, async id =>
             (await client.CancelLpnAsync(orderId, lpnId, id)).ResourceId);
+
+    public Task<MobileReceivingWorkOrderResponse> ClearLpnItemAsync(
+        Guid orderId, Guid lpnId, long expectedRevision) =>
+        StartAsync("Убрать SKU", orderId, async id =>
+            (await client.ClearLpnItemAsync(orderId, lpnId, expectedRevision, id)).ResourceId);
 
     public Task<MobileReceivingWorkOrderResponse> CloseLpnAsync(
         Guid orderId, Guid lpnId, bool confirmExpiredDate, string? managerReason) =>

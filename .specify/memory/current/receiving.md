@@ -99,6 +99,12 @@ edit or cancel another user's open LPN. Drafts and cancellation do not post
 stock. A current-cycle participant may explicitly confirm a SKU as checked
 zero when no active LPN contains it. An absent fact remains unchecked.
 
+The responsible user or a Manager may clear the current SKU, quantity and
+expiration date from an open LPN. Clearing requires the LPN revision shown to
+the user; a stale revision is rejected. The former item remains marked deleted
+for audit, while the LPN stays open and can receive another SKU. Clearing does
+not post stock or change the order's received fact.
+
 Closing requires one SKU and a positive quantity. It checks every linked 1C
 source first and uses the current plan when that succeeds. On a failed check it
 uses the last numeric plan, marked unconfirmed. Plan excess or an unknown plan

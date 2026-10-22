@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<JoinReceivingCycle>();
         services.AddScoped<OpenReceivingLpn>();
         services.AddScoped<EditReceivingLpn>();
+        services.AddScoped<ClearReceivingLpnItem>();
         services.AddScoped<CancelReceivingLpn>();
         services.AddScoped<ConfirmZeroReceived>();
         services.AddScoped<CloseReceivingLpn>();

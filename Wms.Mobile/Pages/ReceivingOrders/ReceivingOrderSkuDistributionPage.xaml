@@ -17,6 +17,9 @@
                 <Label x:Name="UnitLabel" Grid.Column="4" FontSize="12" />
             </Grid>
             <Label FontAttributes="Bold" FontSize="13" Text="По LPN" />
+            <local:OperationalCameraScannerView x:Name="CameraScannerView" IsVisible="False" />
+            <Label x:Name="ScanHintLabel" Text="Сканируйте LPN для этого SKU."
+                   FontSize="12" IsVisible="False" />
         </VerticalStackLayout>
         <RefreshView x:Name="SkuRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
@@ -26,7 +29,8 @@
                     </BindableLayout.EmptyView>
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="local:ReceivingOrderSkuLpnRow">
-                            <Border Padding="8,6" Stroke="#D4D4D4" StrokeThickness="1">
+                            <Border Padding="8,6" Stroke="#D4D4D4" StrokeThickness="1"
+                                    InputTransparent="{Binding IsReadOnly}">
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer CommandParameter="{Binding LicensePlateNumberId}" Tapped="OnLpnTapped" />
                                 </Border.GestureRecognizers>
@@ -45,6 +49,10 @@
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
-        <Label x:Name="ErrorLabel" Grid.Row="2" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}" HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" FontSize="12" HorizontalTextAlignment="Center" TextColor="Red" />
+            <Button x:Name="RetryButton" Text="Повторить команду" Clicked="OnRetryClicked" IsVisible="False" />
+        </VerticalStackLayout>
     </Grid>
 </ContentPage>

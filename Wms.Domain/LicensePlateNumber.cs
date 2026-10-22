@@ -110,6 +110,23 @@ public sealed class LicensePlateNumber
         return OperationResult.Success();
     }
 
+    public OperationResult ClearReceivingItem(
+        long expectedRevision, string userId, DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateEditing(userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("LPN изменился. Обновите его перед удалением SKU.");
+        var activeItems = _items.Where(x => !x.IsDeleted).Take(2).ToArray();
+        if (activeItems.Length != 1)
+            return OperationError.Conflict("В LPN должен быть один выбранный SKU.");
+        var deleted = activeItems[0].Delete(occurredAtUtc, userId);
+        if (deleted.IsSuccess)
+            OperationalRevision++;
+        return deleted;
+    }
+
     public OperationResult CloseReceiving(string userId, DateTimeOffset closedAtUtc, bool canManage)
     {
         if (ReceivingCycleId is null || OriginalReceivingLocationId is null)

@@ -87,6 +87,8 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         JoinButton.IsVisible = !order.IsParticipant
             && order.Status is (MobileReceivingOrderStatus.ReadyForReceiving
                 or MobileReceivingOrderStatus.InReceiving);
+        CompleteButton.IsVisible = order.MayCompleteOrder;
+        CompleteHintLabel.IsVisible = order.MayCompleteOrder && HasOpenLpn(order);
         ScanHintLabel.Text = order.IsParticipant
             ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
             : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
@@ -95,10 +97,31 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             .Select(x =>
             {
                 var lpnStatus = ReceivingStatusSymbols.ForLpn(x.Status);
+                var item = x.Items.SingleOrDefault();
+                var orderItem = item is null ? null
+                    : order.Items.FirstOrDefault(y => y.SkuId == item.SkuId);
+                var plan = orderItem?.PlanQuantity;
+                var fact = orderItem?.FactQuantity;
+                var unit = item?.UnitOfMeasure ?? "—";
                 return new ReceivingWorkLpnRow(x.Id, x.Code,
-                    string.Join("; ", x.Items.Select(y =>
-                        $"{y.SkuName ?? y.SkuId.ToString()}: {y.Quantity:0.###} {y.UnitOfMeasure ?? "—"}")),
-                    lpnStatus.Glyph, $"Статус LPN: {lpnStatus.Description}");
+                    lpnStatus.Glyph, $"Статус LPN: {lpnStatus.Description}",
+                    item is null ? "SKU не выбран"
+                        : item.SkuName ?? item.SkuCode ?? item.SkuId.ToString(),
+                    item is null ? string.Empty : $"План: {Format(plan)} {unit}",
+                    item is null ? string.Empty
+                        : $"Факт: {ReceivingStatusSymbols.FactText(plan, fact)}",
+                    item is null ? string.Empty : $"В LPN: {item.Quantity:0.###}",
+                    item is null ? string.Empty
+                        : $"Срок: {item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}",
+                    item is not null && (orderItem?.TracksExpirationDate == true
+                        || item.ExpirationDate is not null),
+                    item is not null,
+                    x.Status == MobileLicensePlateNumberStatus.Open && order.IsParticipant,
+                    item is not null && fact is null,
+                    plan is decimal expected && fact == expected,
+                    plan is decimal planned && fact is decimal actual && planned != actual,
+                    item is null ? string.Empty
+                        : ReceivingStatusSymbols.FactDescription(plan, fact));
             }).ToArray();
         OnPropertyChanged(nameof(LpnRows));
         UpdateRecovery();
@@ -140,14 +163,28 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         await Navigation.PushAsync(page);
     }
 
+    private async void OnCompleteClicked(object? sender, EventArgs e)
+    {
+        if (_order is not { MayCompleteOrder: true } order || HasOpenLpn(order)
+            || _busy || _process.HasPendingCommand) return;
+        if (!await DisplayAlertAsync("Завершить ордер",
+            $"Завершить приёмку ордера {order.Number}? Текущий план и факт будут сохранены.",
+            "Завершить", "Отмена")) return;
+        if (_busy || _process.HasPendingCommand
+            || _order is not { MayCompleteOrder: true } current || HasOpenLpn(current)) return;
+        await ExecuteAsync(async () => Apply(await _process.CompleteOrderAsync(current.Id)));
+    }
+
     private async void OnLpnTapped(object? sender, TappedEventArgs e)
     {
-        if (e.Parameter is Guid id) await OpenLpnPageAsync(id);
+        if (e.Parameter is Guid id && LpnRows.Any(x => x.Id == id && x.IsEditable))
+            await OpenLpnPageAsync(id);
     }
 
     private async Task OpenLpnPageAsync(Guid id)
     {
-        if (_order is null || _busy || _process.HasPendingCommand) return;
+        if (_order is null || _busy || _process.HasPendingCommand
+            || !LpnRows.Any(x => x.Id == id && x.IsEditable)) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
         page.Show(_order.Id, id, _process);
         await Navigation.PushAsync(page);
@@ -208,6 +245,8 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         RetryButton.IsVisible = _process.HasPendingCommand;
         RetryButton.Text = $"Повторить: {_process.PendingLabel}";
         JoinButton.IsEnabled = !_busy && !_process.HasPendingCommand;
+        CompleteButton.IsEnabled = !_busy && !_process.HasPendingCommand
+            && _order is { MayCompleteOrder: true } order && !HasOpenLpn(order);
         SkuButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         SourcesButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
@@ -235,7 +274,19 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
     }
+
+    private static bool HasOpenLpn(MobileReceivingWorkOrderResponse order) =>
+        order.Lpns.Any(x => x.Status == MobileLicensePlateNumberStatus.Open);
+
+    private static string Format(decimal? quantity) => quantity?.ToString("0.###") ?? "?";
 }
 
-public sealed record ReceivingWorkLpnRow(Guid Id, string Code, string Description,
-    string StatusGlyph, string StatusDescription);
+public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
+    string StatusGlyph, string StatusDescription, string SkuName,
+    string PlanText, string FactText, string QuantityText,
+    string ExpirationText, bool ShowsExpiration, bool ShowsQuantities,
+    bool IsEditable, bool IsUnchecked, bool IsMatched, bool IsDifferent,
+    string FactDescription)
+{
+    public bool IsReadOnly => !IsEditable;
+}

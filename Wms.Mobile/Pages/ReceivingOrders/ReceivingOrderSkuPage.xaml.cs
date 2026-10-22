@@ -87,6 +87,8 @@ public partial class ReceivingOrderSkuPage : ContentPage
         JoinButton.IsVisible = !order.IsParticipant
             && order.Status is (MobileReceivingOrderStatus.ReadyForReceiving
                 or MobileReceivingOrderStatus.InReceiving);
+        CompleteButton.IsVisible = order.MayCompleteOrder;
+        CompleteHintLabel.IsVisible = order.MayCompleteOrder && HasOpenLpn(order);
         ScanHintLabel.Text = order.IsParticipant
             ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
             : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
@@ -150,6 +152,18 @@ public partial class ReceivingOrderSkuPage : ContentPage
         var page = _services.GetRequiredService<ReceivingOrderJoinPage>();
         page.Show(_order, _process);
         await Navigation.PushAsync(page);
+    }
+
+    private async void OnCompleteClicked(object? sender, EventArgs e)
+    {
+        if (_order is not { MayCompleteOrder: true } order || HasOpenLpn(order)
+            || _busy || _process.HasPendingCommand) return;
+        if (!await DisplayAlertAsync("Завершить ордер",
+            $"Завершить приёмку ордера {order.Number}? Текущий план и факт будут сохранены.",
+            "Завершить", "Отмена")) return;
+        if (_busy || _process.HasPendingCommand
+            || _order is not { MayCompleteOrder: true } current || HasOpenLpn(current)) return;
+        await ExecuteAsync(async () => Apply(await _process.CompleteOrderAsync(current.Id)));
     }
 
     private async void OnZeroClicked(object? sender, EventArgs e)
@@ -231,6 +245,8 @@ public partial class ReceivingOrderSkuPage : ContentPage
         RetryButton.IsVisible = _process.HasPendingCommand;
         RetryButton.Text = $"Повторить: {_process.PendingLabel}";
         JoinButton.IsEnabled = !_busy && !_process.HasPendingCommand;
+        CompleteButton.IsEnabled = !_busy && !_process.HasPendingCommand
+            && _order is { MayCompleteOrder: true } order && !HasOpenLpn(order);
         LpnsButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         SourcesButton.IsEnabled = !_busy && !_process.HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
@@ -265,6 +281,9 @@ public partial class ReceivingOrderSkuPage : ContentPage
         : item.SkuId.ToString();
 
     private static string Format(decimal? value) => value?.ToString("0.###") ?? "?";
+
+    private static bool HasOpenLpn(MobileReceivingWorkOrderResponse order) =>
+        order.Lpns.Any(x => x.Status == MobileLicensePlateNumberStatus.Open);
 }
 
 public sealed record ReceivingWorkItemRow(Guid SkuId, string Name,

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Wms.Application.Receiving;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
+using Wms.Data;
 using Wms.Domain.Enums;
 using Wms.Integration.OneS;
 
@@ -40,9 +41,13 @@ internal static class MobileReceivingOrderEndpoints
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapPost("/{orderId:guid}/join", JoinAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
+        group.MapPost("/{orderId:guid}/complete", CompleteOrderAsync)
+            .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapPost("/{orderId:guid}/lpns", OpenLpnAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapPut("/{orderId:guid}/lpns/{lpnId:guid}", EditLpnAsync)
+            .WithMobileResponses<MobileReceivingCommandIdResponse>();
+        group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/clear", ClearLpnItemAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapPost("/{orderId:guid}/lpns/{lpnId:guid}/cancel", CancelLpnAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
@@ -71,7 +76,7 @@ internal static class MobileReceivingOrderEndpoints
         var linked = await orders.GetOrderBySourceAsync(decoded.Value, userId, ct);
         if (linked is not null)
             return linked.WarehouseId == warehouseId
-                ? TypedResults.Ok(new MobileReceivingDocumentResolutionResponse(null, MapOrder(linked)))
+                ? TypedResults.Ok(new MobileReceivingDocumentResolutionResponse(null, MapOrder(linked, principal)))
                 : MobileEndpointResults.CommandProblem(
                     OperationError.Conflict("Документ относится к другому складу."));
         var source = (await sources.GetByRefKeysAsync([decoded.Value], ct))
@@ -107,7 +112,7 @@ internal static class MobileReceivingOrderEndpoints
             return MobileEndpointResults.CommandProblem(OperationError.Invalid("Выберите склад."));
         var results = await orders.ListOrdersAsync(warehouseId, userId, ct);
         return TypedResults.Ok<IReadOnlyList<MobileReceivingWorkOrderResponse>>(
-            results.Select(MapOrder).ToArray());
+            results.Select(x => MapOrder(x, principal)).ToArray());
     }
 
     private static async Task<IResult> GetOrderAsync(
@@ -120,7 +125,7 @@ internal static class MobileReceivingOrderEndpoints
         var order = await orders.GetOrderAsync(orderId, userId, ct);
         return order is null
             ? MobileEndpointResults.CommandProblem(OperationError.NotFound("Приходный ордер не найден."))
-            : TypedResults.Ok(MapOrder(order));
+            : TypedResults.Ok(MapOrder(order, principal));
     }
 
     private static async Task<IResult> GetLinkedSourcesAsync(
@@ -206,6 +211,12 @@ internal static class MobileReceivingOrderEndpoints
             new JoinReceivingCycleRequest(request.ClientRequestId, orderId,
                 request.ReceivingLocationId, userId), ct));
 
+    private static async Task<IResult> CompleteOrderAsync(
+        Guid orderId, MobileReceivingCommandRequest request,
+        ClaimsPrincipal principal, CompleteReceivingOrder complete, CancellationToken ct) =>
+        await ExecuteForUserAsync(principal, userId => complete.ExecuteAsync(
+            new CompleteReceivingOrderRequest(request.ClientRequestId, orderId, userId), ct));
+
     private static async Task<IResult> OpenLpnAsync(
         Guid orderId, MobileReceivingOpenLpnRequest request,
         ClaimsPrincipal principal, OpenReceivingLpn open, CancellationToken ct) =>
@@ -219,6 +230,13 @@ internal static class MobileReceivingOrderEndpoints
         await ExecuteForUserAsync(principal, userId => edit.ExecuteAsync(
             new EditReceivingLpnRequest(request.ClientRequestId, orderId,
                 lpnId, request.SkuId, request.Quantity, request.ExpirationDate, userId), ct));
+
+    private static async Task<IResult> ClearLpnItemAsync(
+        Guid orderId, Guid lpnId, MobileReceivingClearLpnItemRequest request,
+        ClaimsPrincipal principal, ClearReceivingLpnItem clear, CancellationToken ct) =>
+        await ExecuteForUserAsync(principal, userId => clear.ExecuteAsync(
+            new ClearReceivingLpnItemRequest(request.ClientRequestId, orderId,
+                lpnId, request.ExpectedRevision, userId), ct));
 
     private static async Task<IResult> CancelLpnAsync(
         Guid orderId, Guid lpnId, MobileReceivingCommandRequest request,
@@ -276,7 +294,8 @@ internal static class MobileReceivingOrderEndpoints
         sku.SkuId, sku.Name, sku.Code, sku.TracksExpirationDate,
         sku.IsInOrder, sku.CurrentPlanQuantity, sku.FactQuantity);
 
-    private static MobileReceivingWorkOrderResponse MapOrder(ReceivingWorkOrderView order) => new(
+    private static MobileReceivingWorkOrderResponse MapOrder(
+        ReceivingWorkOrderView order, ClaimsPrincipal principal) => new(
         order.Id, order.Number, order.CreatedAtUtc,
         order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
         order.ActiveCycleNumber, order.ReceivingLocationId,
@@ -288,7 +307,9 @@ internal static class MobileReceivingOrderEndpoints
         order.Lpns.Select(MapLpn).ToArray())
     {
         WarehouseName = order.WarehouseName,
-        ReceivingLocationAddress = order.ReceivingLocationAddress
+        ReceivingLocationAddress = order.ReceivingLocationAddress,
+        MayCompleteOrder = order.Status == ReceivingOrderStatus.InReceiving
+            && (order.IsParticipant || principal.IsInRole(ApplicationRoles.Manager))
     };
 
     internal static MobileReceivingWorkLpnResponse MapLpn(ReceivingWorkLpnView lpn) => new(

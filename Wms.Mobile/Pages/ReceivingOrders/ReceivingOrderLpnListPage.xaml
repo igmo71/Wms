@@ -20,19 +20,57 @@
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding LpnRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingWorkLpnRow">
-                                <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}">
+                                <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
+                                        InputTransparent="{Binding IsReadOnly}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource ReceivingNeutralBackgroundLight}, Dark={StaticResource ReceivingNeutralBackgroundDark}}">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnLpnTapped" />
                                     </Border.GestureRecognizers>
-                                    <VerticalStackLayout>
-                                        <HorizontalStackLayout Spacing="7">
-                                            <Label Text="{Binding Code}" FontAttributes="Bold" />
-                                            <Label Text="{Binding StatusGlyph}" FontSize="17"
-                                                   VerticalTextAlignment="Center"
-                                                   SemanticProperties.Description="{Binding StatusDescription}" />
-                                        </HorizontalStackLayout>
-                                        <Label Text="{Binding Description}" FontSize="12" />
-                                    </VerticalStackLayout>
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchBackgroundLight}, Dark={StaticResource ReceivingMatchBackgroundDark}}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsDifferent}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentBackgroundLight}, Dark={StaticResource ReceivingDifferentBackgroundDark}}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <VerticalStackLayout Spacing="2">
+                                            <HorizontalStackLayout Spacing="7">
+                                                <Label Text="{Binding Code}" FontAttributes="Bold" />
+                                                <Label Text="{Binding StatusGlyph}" FontSize="17"
+                                                       VerticalTextAlignment="Center"
+                                                       SemanticProperties.Description="{Binding StatusDescription}" />
+                                            </HorizontalStackLayout>
+                                            <Label Text="{Binding SkuName}" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                            <Label Text="{Binding ExpirationText}" FontSize="12"
+                                                   IsVisible="{Binding ShowsExpiration}" />
+                                            <Label Text="Нажмите, чтобы изменить LPN" FontSize="11"
+                                                   IsVisible="{Binding IsEditable}" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2"
+                                                             HorizontalOptions="End" IsVisible="{Binding ShowsQuantities}">
+                                            <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="12" HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="12" HorizontalTextAlignment="End"
+                                                   SemanticProperties.Description="{Binding FactDescription}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                            <Label Text="{Binding QuantityText}" FontFamily="OpenSansSemibold"
+                                                   FontSize="12" HorizontalTextAlignment="End" />
+                                        </VerticalStackLayout>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
@@ -45,15 +83,13 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
             <Button x:Name="JoinButton" Text="Начать" Clicked="OnJoinClicked" />
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="5">
+            <Label x:Name="CompleteHintLabel" Text="Перед завершением закройте или отмените открытые LPN."
+                   FontSize="12" IsVisible="False" />
+            <Button x:Name="CompleteButton" Text="Завершить ордер" IsVisible="False"
+                    Clicked="OnCompleteClicked" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="5">
                 <Button x:Name="SkuButton" Text="SKU" Clicked="OnSkuClicked" />
-                <Border Grid.Column="1" BackgroundColor="{StaticResource Primary}"
-                        Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" HeightRequest="44">
-                    <Label Text="LPN" TextColor="White" FontSize="14"
-                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-                           SemanticProperties.Description="Текущий раздел LPN" />
-                </Border>
-                <Button x:Name="SourcesButton" Grid.Column="2" Text="📄 1С"
+                <Button x:Name="SourcesButton" Grid.Column="1" Text="📄 1С"
                         SemanticProperties.Description="Документы 1С" Clicked="OnSourcesClicked" />
             </Grid>
         </VerticalStackLayout>

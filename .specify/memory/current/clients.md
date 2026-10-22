@@ -46,8 +46,9 @@ The SKU, LPN and document screens show the order number with the same status
 symbol; the SKU and LPN screens put the receiving location on the next line;
 they omit creation time and warehouse from the compact heading. The existing
 order has separate SKU, LPN, and document screens headed «Приёмка › SKU»,
-«Приёмка › LPN», and «Приёмка › Документы 1С». A selected section is visibly
-marked and does not respond to taps. Sections use the same default page transition. Switching replaces the current section in
+«Приёмка › LPN», and «Приёмка › Документы 1С». Each screen offers only the two
+other sections as buttons, in SKU, LPN, 1C order. Sections use the same default
+page transition. Switching replaces the current section in
 the navigation stack, so Back returns to the order queue; a detail page returns
 to the section that opened it. A shared join screen is reachable from all three
 sections and returns to the originating section. Its entry button reads «Начать» for a ready order and «Присоединиться»
@@ -66,11 +67,16 @@ difference shows a yellow «≠» beside the fact and a soft yellow background.
 An unknown plan leaves the card neutral and its known fact has no comparison
 symbol. Each SKU card opens its details on tap and keeps a compact zero-confirmation action
 when eligible.
-SKU cards within an LPN show the order plan and fact with the same background
-and fact colors, then the quantity in that LPN as a third right-aligned line;
-the unit appears only on the plan line. They omit putaway quantities
-and show an expiration line only when the SKU requires a date, with the saved
-date or «не указан». Manual SKU search sorts by displayed name and uses the
+When the SKU detail has no active LPN rows, a current-cycle participant can scan
+an issued available or empty open LPN there. The resulting LPN editor has that SKU selected
+for quantity entry; an LPN already containing another SKU or in a final status
+does not open for editing. A delayed response uses the same explicit retry flow.
+Each receiving LPN card shows its number and status, its one SKU or «SKU не выбран»,
+and the order plan, fact, and LPN quantity in a right-aligned block. The unit
+appears only with the plan. A saved expiration date remains visible even if
+the SKU no longer requires one; otherwise the expiration line appears only
+when the SKU requires a date. The card omits putaway quantities. Manual SKU
+search sorts by displayed name and uses the
 same right-aligned plan and fact, with a colored border for a known match or
 difference; unverified or unknown-plan candidates keep a neutral border.
 The receiving status vocabulary is shared across lists and details: «◇» means
@@ -82,11 +88,19 @@ meaning in an accessible description. Order and LPN symbols sit beside their
 numbers; SKU comparison symbols sit beside fact quantities; the document
 warning sits beside its number. The SKU scanning hint is hidden
 when the LPN is not editable.
-In the LPN list, tapping a card opens its detail. An editable LPN shows manual
-SKU search, cancel and eligible close actions in one row as «🔍 SKU»,
-«Отменить» and «Закрыть». Opening search changes the first action to «✕ SKU»;
-the full action descriptions remain available to a screen reader. Closing
-still asks for explicit confirmation that receipt will be posted. The receiving
+Tapping an editable open LPN from its list or a SKU distribution opens one
+editor with SKU selection, quantity, optional expiration date, saving, cancellation,
+and eligible closing. An empty LPN opens with SKU search; an LPN with a SKU opens
+with its saved quantity. Closed LPN cards are read-only and have no tap action.
+The editor has separate «Сохранить», «Закрыть» and «Отменить» actions in its
+bottom row; the «🔍 SKU» search action sits above the SKU content and becomes
+«✕ SKU» while search is open. «Сохранить» keeps the LPN open and returns to the
+LPN list, including after a confirmed retry and when opened from a SKU screen.
+«Закрыть» confirms receipt posting, saves changed quantity, SKU, and date first,
+then closes the LPN. A failed close leaves the saved LPN open on the editor for
+review; uncertain save and close responses retain their respective command IDs
+for explicit retry. «Отменить» cancels the open LPN after confirmation. The
+full action descriptions remain available to a screen reader. The receiving
 screens have no putaway actions; the independent putaway screen starts that
 workflow by scanning a closed LPN. Zero checking remains available before
 order completion. Closing and the separate putaway flow use retry-safe
@@ -105,11 +119,18 @@ offers the shared section navigation and no «Готово» action. On the docu
 screen of an existing order, Back returns to the order queue. An uncertain
 response retains the original barcode
 or source ID and command ID for explicit retry, including the first create scan.
-The Mobile quantity page shows the date field when the current SKU flag is on
+The Mobile LPN editor shows the date field when the current SKU flag is on
 or a date was already saved on the open LPN. It retains and displays that saved
 date after the flag is turned off. If closing is rejected after the flag or
 another closing input changes, the LPN page refreshes its server view and
 prompts the user to check the date before retrying.
+When an open LPN has no selected SKU, the editor immediately shows search in
+the order composition, with a switch to the whole catalog, and accepts SKU
+scans. A selected SKU replaces the search panel and has a cross beside its name.
+The cross discards an unsaved selection locally or, after confirmation, clears
+the saved SKU, quantity and expiration date on the server. The LPN remains open
+and the order-scoped search appears again. A closed LPN has no cross. The bottom
+actions remain «Сохранить», «Закрыть» and «Отменить».
 
 The Web menu group «Приёмка» opens separate 1C documents and WMS orders pages.
 `/receiving-orders` lists only WMS orders by their own numbers and actual
@@ -142,7 +163,10 @@ A Web order card shows open LPNs without controls for SKU selection, quantity
 entry or closing; physical receiving remains in Mobile. Web no longer calls
 the old order-completion command. Manager LPN quantity correction and deletion
 are exposed. Only a Manager can complete an order in Web or reopen a completed
-order into a new cycle. A participant can still complete it in Mobile. The page retains
+order into a new cycle. In Mobile, a current-cycle participant or Manager can
+complete the order from its SKU or LPN list once every open LPN is closed or cancelled.
+The mobile action confirms the decision and retains its command ID for retry
+after an uncertain response. The Web page retains
 the command ID for a retry after an uncertain response and reloads the saved
 status and cycle snapshots after success.
 The order card separates current plan/fact discrepancies from immutable cycle

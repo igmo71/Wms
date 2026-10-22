@@ -84,15 +84,13 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
             <Button x:Name="JoinButton" Text="Начать" Clicked="OnJoinClicked" />
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="5">
-                <Border BackgroundColor="{StaticResource Primary}" Stroke="{StaticResource Primary}"
-                        StrokeShape="RoundRectangle 8" HeightRequest="44">
-                    <Label Text="SKU" TextColor="White" FontSize="14"
-                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-                           SemanticProperties.Description="Текущий раздел SKU" />
-                </Border>
-                <Button x:Name="LpnsButton" Grid.Column="1" Text="LPN" Clicked="OnLpnsClicked" />
-                <Button x:Name="SourcesButton" Grid.Column="2" Text="📄 1С"
+            <Label x:Name="CompleteHintLabel" Text="Перед завершением закройте или отмените открытые LPN."
+                   FontSize="12" IsVisible="False" />
+            <Button x:Name="CompleteButton" Text="Завершить ордер" IsVisible="False"
+                    Clicked="OnCompleteClicked" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="5">
+                <Button x:Name="LpnsButton" Text="LPN" Clicked="OnLpnsClicked" />
+                <Button x:Name="SourcesButton" Grid.Column="1" Text="📄 1С"
                         SemanticProperties.Description="Документы 1С" Clicked="OnSourcesClicked" />
             </Grid>
         </VerticalStackLayout>

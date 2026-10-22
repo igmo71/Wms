@@ -60,17 +60,10 @@
                     IsVisible="False" Clicked="OnRetryClicked" />
             <Button x:Name="JoinButton" Text="Начать"
                     IsVisible="False" Clicked="OnJoinClicked" />
-            <Grid x:Name="SectionsGrid" ColumnDefinitions="*,*,*" ColumnSpacing="5"
+            <Grid x:Name="SectionsGrid" ColumnDefinitions="*,*" ColumnSpacing="5"
                   IsVisible="False">
                 <Button x:Name="SkuButton" Text="SKU" Clicked="OnSkuClicked" />
                 <Button x:Name="LpnsButton" Grid.Column="1" Text="LPN" Clicked="OnLpnsClicked" />
-                <Border Grid.Column="2" BackgroundColor="{StaticResource Primary}"
-                        Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8"
-                        HeightRequest="44">
-                    <Label Text="📄 1С" TextColor="White" FontSize="14"
-                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-                           SemanticProperties.Description="Текущий раздел Документы 1С" />
-                </Border>
             </Grid>
         </VerticalStackLayout>
     </Grid>

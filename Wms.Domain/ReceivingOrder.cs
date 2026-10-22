@@ -257,6 +257,19 @@ public class ReceivingOrder
         return changed;
     }
 
+    public OperationResult ClearReceivingLpnItem(
+        LicensePlateNumber lpn, long expectedRevision, string userId,
+        DateTimeOffset occurredAtUtc, bool canManage)
+    {
+        var access = ValidateCurrentLpn(lpn, userId, canManage);
+        if (!access.IsSuccess)
+            return access;
+        var changed = lpn.ClearReceivingItem(expectedRevision, userId, occurredAtUtc, canManage);
+        if (changed.IsSuccess)
+            AdvanceOperationalRevision();
+        return changed;
+    }
+
     public OperationResult CancelReceivingLpn(
         LicensePlateNumber lpn, string userId, DateTimeOffset occurredAtUtc, bool canManage)
     {

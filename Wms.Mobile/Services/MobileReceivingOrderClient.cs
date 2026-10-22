@@ -67,6 +67,10 @@ public sealed class MobileReceivingOrderClient
             $"{Route}/{orderId:D}/join",
             new MobileReceivingJoinCycleRequest(requestId, locationId), ct);
 
+    public Task<MobileReceivingCommandIdResponse> CompleteOrderAsync(
+        Guid orderId, Guid requestId, CancellationToken ct = default) =>
+        PostIdAsync($"{Route}/{orderId:D}/complete", requestId, ct);
+
     public Task<MobileReceivingCommandIdResponse> OpenLpnAsync(
         Guid orderId, string code, Guid requestId, CancellationToken ct = default) =>
         PostAsync<MobileReceivingOpenLpnRequest, MobileReceivingCommandIdResponse>(
@@ -79,6 +83,13 @@ public sealed class MobileReceivingOrderClient
         PutAsync<MobileReceivingEditLpnRequest, MobileReceivingCommandIdResponse>(
             $"{Route}/{orderId:D}/lpns/{lpnId:D}",
             new MobileReceivingEditLpnRequest(requestId, skuId, quantity, expirationDate), ct);
+
+    public Task<MobileReceivingCommandIdResponse> ClearLpnItemAsync(
+        Guid orderId, Guid lpnId, long expectedRevision,
+        Guid requestId, CancellationToken ct = default) =>
+        PostAsync<MobileReceivingClearLpnItemRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/lpns/{lpnId:D}/clear",
+            new MobileReceivingClearLpnItemRequest(requestId, expectedRevision), ct);
 
     public Task<MobileReceivingCommandIdResponse> CancelLpnAsync(
         Guid orderId, Guid lpnId, Guid requestId, CancellationToken ct = default) =>
