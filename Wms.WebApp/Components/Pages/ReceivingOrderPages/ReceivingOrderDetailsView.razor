@@ -79,10 +79,7 @@
     </MudExpansionPanels>
 }
 
-<ReceivingOrderDiscrepancies Order="Order" Sources="Sources" />
-
 @code {
-    [Parameter, EditorRequired] public ReceivingWorkOrderView Order { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<ReceivingSourceView> Sources { get; set; } = [];
     [Parameter] public IReadOnlyList<ReceivingSourceChangeHistoryView> SourceHistory { get; set; } = [];
     [Parameter] public IReadOnlyDictionary<Guid, string> SourceNames { get; set; } = new Dictionary<Guid, string>();

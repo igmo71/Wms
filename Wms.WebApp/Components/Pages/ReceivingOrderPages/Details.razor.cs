@@ -29,7 +29,7 @@ public partial class Details
     private IReadOnlyList<ReceivingSourceChangeHistoryView> _sourceHistory = [];
     private IReadOnlyDictionary<Guid, string> _sourceNames = new Dictionary<Guid, string>();
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
-    private bool _showLpns = true;
+    private bool _showLpns;
     private bool _showStages;
     private IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>
         _deletionHistory = new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
@@ -48,6 +48,8 @@ public partial class Details
 
     protected override async Task OnParametersSetAsync()
     {
+        _showLpns = false;
+        _showStages = false;
         _sourceChangeMessage = null;
         _pendingCompleteRequestId = null;
         _pendingReopenRequestId = null;

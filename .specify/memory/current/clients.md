@@ -199,16 +199,16 @@ The Web plan/fact table also shows an SKU that currently has an open LPN, with
 its stored plan and fact state, even before it enters the posted composition.
 The order heading shows the number and creation time on the first row. A bordered,
 evenly spaced second row shows the warehouse name, status, receiving location,
-and receiving number. Documents, link history, plan/fact, receiving LPNs, and
+and receiving number. Plan/fact, receiving LPNs, documents, link history, and
 receivings use the same expandable panel style with raised headers. Document,
-LPN, and receiving counts appear in muted badges. The LPN panel starts open; the other sections start
+LPN, and receiving counts appear in muted badges. The plan/fact panel starts open; the other sections start
 closed. Each receiving card shows its location and completing user in the header,
 with space above the first card. Expanding it immediately shows its SKU plan/fact
 table without a separate label. The plan/fact table sorts
 SKU by displayed name. Rows with known, equal plan/fact use the theme's subtle success
 hover color; rows with known, differing plan/fact use the warning hover color;
 rows without a checked fact or known plan remain unshaded. Receivings and their
-SKU lists follow the LPN panel.
+SKU lists follow the document and link-history panels.
 The Web receiving LPN panel uses a table sorted by displayed SKU name, with
 LPNs without a selected SKU last and the LPN code breaking ties. Its columns show LPN,
 status, SKU, expiration date, the current order plan and fact for that SKU, and

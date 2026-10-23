@@ -61,11 +61,7 @@ else
             <MudAlert Severity="Severity.Success">@_sourceChangeMessage</MudAlert>
         }
 
-        <ReceivingOrderDetailsView Order="_order" Sources="_sources"
-                                   SourceHistory="_sourceHistory" SourceNames="_sourceNames"
-                                   CanManage="_canManage" Busy="_busy"
-                                   RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
-                                   OnChangeComposition="OpenSourceCompositionAsync" />
+        <ReceivingOrderDiscrepancies Order="_order" Sources="_sources" />
 
         <MudExpansionPanels Outlined="true" Elevation="0">
         <MudExpansionPanel HeaderClass="mud-elevation-1" @bind-Expanded="_showLpns">
@@ -178,6 +174,12 @@ else
             </ChildContent>
         </MudExpansionPanel>
         </MudExpansionPanels>
+
+        <ReceivingOrderDetailsView Sources="_sources"
+                                   SourceHistory="_sourceHistory" SourceNames="_sourceNames"
+                                   CanManage="_canManage" Busy="_busy"
+                                   RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
+                                   OnChangeComposition="OpenSourceCompositionAsync" />
 
         <MudExpansionPanels Outlined="true" Elevation="0">
         <MudExpansionPanel HeaderClass="mud-elevation-1" @bind-Expanded="_showStages">
