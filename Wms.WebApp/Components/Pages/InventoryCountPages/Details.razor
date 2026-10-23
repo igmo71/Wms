@@ -113,7 +113,7 @@ else
             </MudPaper>
         }
 
-        <MudTable Items="_inventoryCount.Items.OrderBy(x => x.LineNumber)" Hover="true" Striped="true" Dense="true">
+        <MudTable Items="SortedItems" Hover="true" Striped="true" Dense="true">
             <HeaderContent>
                 <MudTh>Товар</MudTh>
                 <MudTh>Ожидается</MudTh>

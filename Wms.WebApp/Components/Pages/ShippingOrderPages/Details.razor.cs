@@ -36,6 +36,10 @@ public partial class Details
     private bool RollbackPending => _isRollingBack || _isChoosingRollback || _pendingRollback is not null;
     private bool InputsLocked => HasPendingTransition || RollbackPending || _isAcknowledgingSynchronization;
     private ShippingOrder? _order;
+    private IReadOnlyList<ShippingOrderItem> SortedItems => _order?.Items
+        .OrderBy(x => x.StockKeepingUnit?.Name ?? x.StockKeepingUnitId.ToString(),
+            StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(x => x.LineNumber).ToArray() ?? [];
     private Zone? _shippingZone;
     private StorageLocation? _shippingLocation;
     private bool _isLoading = true;

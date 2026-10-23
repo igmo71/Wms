@@ -114,9 +114,9 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
                     || dbContext.SkuBarcodes.Any(barcode =>
                         barcode.SkuId == x.Id && barcode.Value == term)
             })
-            .OrderByDescending(x => x.IsExactMatch)
-            .ThenBy(x => x.Name)
+            .OrderBy(x => x.Name)
             .ThenBy(x => x.Code)
+            .ThenBy(x => x.Id)
             .Take(Math.Clamp(take, 1, 100))
             .ToListAsync(ct);
 

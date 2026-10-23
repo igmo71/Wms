@@ -121,7 +121,9 @@ public sealed class MobileShippingOrderQueryService(
                 && x.StockKeepingUnit.Barcodes.Any(itemBarcode =>
                     itemBarcode.Value == barcode))
             .Select(x => MapCandidate(x, true))
-            .OrderBy(x => x.LineNumber)
+            .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SkuCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.LineNumber)
             .ToList();
 
         return matches.Count > 0
@@ -165,9 +167,8 @@ public sealed class MobileShippingOrderQueryService(
             .Select(x => MapCandidate(
                 x,
                 IsExactMatch(x.StockKeepingUnit!, term)))
-            .OrderByDescending(x => x.IsExactMatch)
-            .ThenBy(x => x.SkuName)
-            .ThenBy(x => x.SkuCode)
+            .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SkuCode, StringComparer.OrdinalIgnoreCase)
             .ThenBy(x => x.LineNumber)
             .Take(maximumItems + 1)
             .ToList();

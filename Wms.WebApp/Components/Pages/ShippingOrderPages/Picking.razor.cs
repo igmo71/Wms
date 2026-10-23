@@ -33,6 +33,10 @@ public partial class Picking
     private bool InputsLocked => _pendingRollback is not null || _isSavingMovement || _pendingMovement is not null || _isCompleting
         || _pendingCompletion is not null || _isRollingBack || _isChoosingRollback || _isAcknowledgingSynchronization;
     private ShippingOrder? _order;
+    private IReadOnlyList<ShippingOrderItem> SortedItems => _order?.Items
+        .OrderBy(x => x.StockKeepingUnit?.Name ?? x.StockKeepingUnitId.ToString(),
+            StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(x => x.LineNumber).ToArray() ?? [];
     private MudDataGrid<ShippingOrderItem> _orderItemsGrid = null!;
     private ShippingOrderItem? _selectedLine;
     private int? _expandedLineNumber;

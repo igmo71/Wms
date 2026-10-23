@@ -18,9 +18,9 @@ public sealed class UndatedExpirationStockStore(
 
         var totalCount = await balances.CountAsync(ct);
         var rows = await balances
-            .OrderBy(x => x.Warehouse!.Name).ThenBy(x => x.WarehouseId)
+            .OrderBy(x => x.StockKeepingUnit!.Name).ThenBy(x => x.StockKeepingUnitId)
+            .ThenBy(x => x.Warehouse!.Name).ThenBy(x => x.WarehouseId)
             .ThenBy(x => x.StorageLocation!.Code).ThenBy(x => x.StorageLocationId)
-            .ThenBy(x => x.StockKeepingUnit!.Name).ThenBy(x => x.StockKeepingUnitId)
             .Select(x => new UndatedExpirationStockRow(
                 x.WarehouseId, x.Warehouse!.Name,
                 x.StorageLocationId, x.StorageLocation!.Code,

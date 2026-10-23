@@ -681,7 +681,7 @@ public partial class ShippingOrderPickingPage : ContentPage
             }
         }
 
-        foreach (var line in details.Lines.OrderBy(x => x.LineNumber))
+        foreach (var line in details.Lines)
         {
             var movements = details.Movements.Where(x => x.LineNumber == line.LineNumber);
             var state = LineStates.SingleOrDefault(x => x.LineNumber == line.LineNumber);
@@ -703,6 +703,17 @@ public partial class ShippingOrderPickingPage : ContentPage
                     _accentedLineNumber,
                     _accentedMovementId);
             }
+        }
+
+        var sorted = LineStates
+            .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SkuCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.LineNumber).ToArray();
+        for (var index = 0; index < sorted.Length; index++)
+        {
+            var currentIndex = LineStates.IndexOf(sorted[index]);
+            if (currentIndex != index)
+                LineStates.Move(currentIndex, index);
         }
     }
 

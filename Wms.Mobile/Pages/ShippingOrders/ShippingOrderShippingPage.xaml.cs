@@ -146,7 +146,10 @@ public partial class ShippingOrderShippingPage : ContentPage
         _synchronization = OrderSynchronizationPresentation.MergeOpeningAssessment(
             _synchronization,
             details.Order.Synchronization);
-        Lines = details.Lines;
+        Lines = details.Lines
+            .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SkuCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.LineNumber).ToArray();
         OnPropertyChanged(nameof(Lines));
         NumberLabel.Text = $"Ордер {details.Order.Number}";
         WarehouseLabel.Text = $"Склад: {details.Order.WarehouseName}";

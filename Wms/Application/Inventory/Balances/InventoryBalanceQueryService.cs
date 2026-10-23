@@ -94,12 +94,12 @@ public class InventoryBalanceQueryService(IDbContextFactory<ApplicationDbContext
             "UpdatedAtUtc" => sortDescending
                 ? query.OrderByDescending(x => x.UpdatedAtUtc)
                 : query.OrderBy(x => x.UpdatedAtUtc),
-            _ => query.OrderBy(x => x.Warehouse!.Name)
+            _ => query.OrderBy(x => x.StockKeepingUnit!.Name)
+                .ThenBy(x => x.StockKeepingUnitId)
+                .ThenBy(x => x.Warehouse!.Name)
                 .ThenBy(x => x.WarehouseId)
                 .ThenBy(x => x.StorageLocation!.Name)
                 .ThenBy(x => x.StorageLocationId)
-                .ThenBy(x => x.StockKeepingUnit!.Name)
-                .ThenBy(x => x.StockKeepingUnitId)
                 .ThenBy(x => x.ExpirationDate)
                 .ThenBy(x => x.Id)
         };

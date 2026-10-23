@@ -22,6 +22,10 @@ public partial class Details
     [Inject] private ILogger<Details> Logger { get; set; } = null!;
 
     private InventoryCount? _inventoryCount;
+    private IReadOnlyList<InventoryCountItem> SortedItems => _inventoryCount?.Items
+        .OrderBy(x => x.StockKeepingUnit?.Name ?? x.StockKeepingUnitId.ToString(),
+            StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(x => x.LineNumber).ToArray() ?? [];
     private InventoryCountSkuSearchResult? _selectedSku;
     private decimal? _manualQuantity;
     private bool _isLoading = true;

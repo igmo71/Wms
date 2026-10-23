@@ -168,7 +168,7 @@ else
             </MudGrid>
         </MudPaper>
 
-        <MudDataGrid T="ShippingOrderItem" Items="_order.Items" Hover="true" Striped="true" Dense="true">
+        <MudDataGrid T="ShippingOrderItem" Items="SortedItems" Hover="true" Striped="true" Dense="true">
             <Columns>
                 <PropertyColumn Property="x => x.LineNumber" Title="Строка" />
                 <PropertyColumn Property="x => x.StockKeepingUnit == null ? string.Empty : x.StockKeepingUnit.Name" Title="SKU" />

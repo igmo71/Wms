@@ -233,6 +233,7 @@ public partial class InventoryCountDetailsPage : ContentPage
         {
             item = InventoryCountItemViewState.FromPendingSku(sku);
             ItemStates.Add(item);
+            SortItemStates();
         }
         BeginQuantityEdit(item);
     }
@@ -381,6 +382,20 @@ public partial class InventoryCountDetailsPage : ContentPage
                 ItemStates.Add(InventoryCountItemViewState.FromItem(item, IsDraft));
             else
                 state.Update(item, IsDraft);
+        }
+        SortItemStates();
+    }
+
+    private void SortItemStates()
+    {
+        var sorted = ItemStates
+            .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.StockKeepingUnitId).ToArray();
+        for (var index = 0; index < sorted.Length; index++)
+        {
+            var currentIndex = ItemStates.IndexOf(sorted[index]);
+            if (currentIndex != index)
+                ItemStates.Move(currentIndex, index);
         }
     }
 

@@ -154,8 +154,10 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
                 : query.OrderBy(x => x.BaseUnitOfMeasure!.Name),
             "WeightKg" => sortDescending ? query.OrderByDescending(x => x.WeightKg) : query.OrderBy(x => x.WeightKg),
             "VolumeM3" => sortDescending ? query.OrderByDescending(x => x.VolumeM3) : query.OrderBy(x => x.VolumeM3),
-            "Name" => sortDescending ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
-            _ => query.OrderBy(x => x.Name),
+            "Name" => sortDescending
+                ? query.OrderByDescending(x => x.Name).ThenBy(x => x.Code).ThenBy(x => x.Id)
+                : query.OrderBy(x => x.Name).ThenBy(x => x.Code).ThenBy(x => x.Id),
+            _ => query.OrderBy(x => x.Name).ThenBy(x => x.Code).ThenBy(x => x.Id),
         };
     }
 }

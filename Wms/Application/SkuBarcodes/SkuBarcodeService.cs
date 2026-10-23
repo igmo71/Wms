@@ -31,9 +31,11 @@ public class SkuBarcodeService(
 
         query = listQuery.SortBy switch
         {
-            "Sku.Name" => listQuery.SortDescending ? query.OrderByDescending(x => x.Sku!.Name) : query.OrderBy(x => x.Sku!.Name),
+            "Sku.Name" => listQuery.SortDescending
+                ? query.OrderByDescending(x => x.Sku!.Name).ThenBy(x => x.SkuId).ThenBy(x => x.Value)
+                : query.OrderBy(x => x.Sku!.Name).ThenBy(x => x.SkuId).ThenBy(x => x.Value),
             "Value" => listQuery.SortDescending ? query.OrderByDescending(x => x.Value) : query.OrderBy(x => x.Value),
-            _ => query.OrderBy(x => x.Value)
+            _ => query.OrderBy(x => x.Sku!.Name).ThenBy(x => x.SkuId).ThenBy(x => x.Value)
         };
 
         var items = await query.Skip(listQuery.Skip).Take(listQuery.Take).ToListAsync(ct);

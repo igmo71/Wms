@@ -192,9 +192,9 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
                         barcode.SkuId == x.StockKeepingUnitId
                         && barcode.Value == term)
             })
-            .OrderByDescending(x => x.IsExactMatch)
-            .ThenBy(x => x.Name)
+            .OrderBy(x => x.Name)
             .ThenBy(x => x.Code)
+            .ThenBy(x => x.Id)
             .Take(Math.Clamp(take, 1, 10))
             .ToListAsync(ct);
 
@@ -307,9 +307,9 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
                         barcode.SkuId == x.StockKeepingUnitId
                         && barcode.Value == term)
             })
-            .OrderByDescending(x => x.IsExactMatch)
-            .ThenBy(x => x.Name)
+            .OrderBy(x => x.Name)
             .ThenBy(x => x.Code)
+            .ThenBy(x => x.Id)
             .Take(Math.Clamp(take, 1, 10))
             .ToListAsync(ct);
 
