@@ -1,41 +1,71 @@
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Graphics;
 using Wms.Contracts.Mobile.V1;
 
 namespace Wms.Mobile;
 
-internal readonly record struct ReceivingStatusSymbol(string Glyph, string Description);
+internal enum ReceivingStatusTone { Neutral, Waiting, InProgress, Success, Failure }
+
+internal readonly record struct ReceivingStatusSymbol(
+    string Glyph, string Description, ReceivingStatusTone Tone)
+{
+    public Color TextColor => ReceivingStatusSymbols.ColorFor(Tone);
+    public FontAttributes GlyphFontAttributes => ReceivingStatusSymbols.FontForGlyph(Glyph);
+}
 
 internal static class ReceivingStatusSymbols
 {
     public static ReceivingStatusSymbol ForOrder(MobileReceivingOrderStatus status) => status switch
     {
-        MobileReceivingOrderStatus.ReadyForReceiving => new("◇", "К приёмке"),
-        MobileReceivingOrderStatus.InReceiving => new("○", "В работе"),
-        MobileReceivingOrderStatus.Received => new("✓", "Принят"),
-        _ => new("?", status.ToString())
+        MobileReceivingOrderStatus.ReadyForReceiving => new("◇", "К приёмке", ReceivingStatusTone.Waiting),
+        MobileReceivingOrderStatus.InReceiving => new("○", "В работе", ReceivingStatusTone.InProgress),
+        MobileReceivingOrderStatus.Received => new("✓", "Принят", ReceivingStatusTone.Success),
+        _ => new("?", status.ToString(), ReceivingStatusTone.Neutral)
     };
 
     public static ReceivingStatusSymbol ForLpn(MobileLicensePlateNumberStatus status) => status switch
     {
-        MobileLicensePlateNumberStatus.Available => new("◇", "Доступен"),
-        MobileLicensePlateNumberStatus.Open => new("○", "Открыт"),
-        MobileLicensePlateNumberStatus.Closed => new("✓", "Закрыт: приход проведён"),
-        MobileLicensePlateNumberStatus.Cancelled => new("⊘", "Отменён"),
-        MobileLicensePlateNumberStatus.Deleted => new("×", "Удалён"),
-        _ => new("?", status.ToString())
+        MobileLicensePlateNumberStatus.Available => new("◇", "Доступен", ReceivingStatusTone.Waiting),
+        MobileLicensePlateNumberStatus.Open => new("○", "Открыт", ReceivingStatusTone.InProgress),
+        MobileLicensePlateNumberStatus.Closed => new("✓", "Закрыт: приход проведён", ReceivingStatusTone.Success),
+        MobileLicensePlateNumberStatus.Cancelled => new("⊘", "Отменён", ReceivingStatusTone.Failure),
+        MobileLicensePlateNumberStatus.Deleted => new("×", "Удалён", ReceivingStatusTone.Failure),
+        _ => new("?", status.ToString(), ReceivingStatusTone.Neutral)
     };
 
     public static ReceivingStatusSymbol ForSku(decimal? plan, decimal? fact)
     {
-        if (fact is null) return new("?", "не проверен");
-        if (plan is null) return new(string.Empty, "план неизвестен");
+        if (fact is null) return new("?", "не проверен", ReceivingStatusTone.Waiting);
+        if (plan is null) return new(string.Empty, "план неизвестен", ReceivingStatusTone.Neutral);
         return plan == fact
-            ? new("✓", "совпадает с планом")
-            : new("≠", "расходится с планом");
+            ? new("✓", "совпадает с планом", ReceivingStatusTone.Success)
+            : new("≠", "расходится с планом", ReceivingStatusTone.Failure);
     }
 
     public static ReceivingStatusSymbol ForDocumentCheck(bool hasError) => hasError
-        ? new("⚠", "Ошибка последней сверки документа 1С")
-        : new(string.Empty, string.Empty);
+        ? new("⚠", "Ошибка последней сверки документа 1С", ReceivingStatusTone.Failure)
+        : new(string.Empty, string.Empty, ReceivingStatusTone.Neutral);
+
+    public static Color FactColor(decimal? plan, decimal? fact) =>
+        ForSku(plan, fact).TextColor;
+
+    internal static Color ColorFor(ReceivingStatusTone tone)
+    {
+        var dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        return tone switch
+        {
+            ReceivingStatusTone.Waiting => Color.FromArgb(dark ? "#93C5FD" : "#1D4ED8"),
+            ReceivingStatusTone.InProgress => Color.FromArgb(dark ? "#FFD54F" : "#8A5900"),
+            ReceivingStatusTone.Success => Color.FromArgb(dark ? "#87DFA2" : "#176B34"),
+            ReceivingStatusTone.Failure => Color.FromArgb(dark ? "#FF8A80" : "#B3261E"),
+            _ => dark ? Colors.White : Colors.Black
+        };
+    }
+
+    internal static FontAttributes FontForGlyph(string glyph) =>
+        glyph is "\u25c7" or "\u25cb" or "\u2298"
+            ? FontAttributes.Bold : FontAttributes.None;
 
     public static string FactText(decimal? plan, decimal? fact)
     {

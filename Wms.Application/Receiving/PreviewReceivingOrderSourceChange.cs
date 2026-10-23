@@ -149,6 +149,9 @@ public sealed class PreviewReceivingOrderSourceChange(
             change.SkuId, referenceNames.Skus.GetValueOrDefault(change.SkuId),
             change.BeforePresent, change.BeforePlan, change.AfterPresent, change.AfterPlan,
             change.Fact, change.ProjectedExcess))
+            .OrderBy(change => change.SkuName ?? change.SkuId.ToString(),
+                StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(change => change.SkuId)
             .ToArray();
 
         return new ReceivingSourceCompositionPreview(order.Id, order.Number, request.Kind,

@@ -101,6 +101,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         CodeLabel.Text = lpn.Code;
         var status = ReceivingStatusSymbols.ForLpn(lpn.Status);
         StatusIcon.Text = status.Glyph;
+        StatusIcon.TextColor = status.TextColor;
+        StatusIcon.FontAttributes = status.GlyphFontAttributes;
         SemanticProperties.SetDescription(StatusIcon, $"Статус LPN: {status.Description}");
         if (lpn.Items.SingleOrDefault() is { } item)
             _selectedSkuId = item.SkuId;
@@ -134,6 +136,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         SkuCodeLabel.Text = sku.SkuCode;
         PlanLabel.Text = Format(sku.PlanQuantity);
         FactLabel.Text = ReceivingStatusSymbols.FactText(sku.PlanQuantity, sku.FactQuantity);
+        FactLabel.TextColor = ReceivingStatusSymbols.FactColor(sku.PlanQuantity, sku.FactQuantity);
         SemanticProperties.SetDescription(FactLabel,
             ReceivingStatusSymbols.FactDescription(sku.PlanQuantity, sku.FactQuantity));
         CurrentLabel.Text = item is null ? "нет" : Format(item.Quantity);
@@ -141,7 +144,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         QuantityEntry.Text = item?.Quantity.ToString("0.###", CultureInfo.InvariantCulture);
         ExpirationPanel.IsVisible = sku.TracksExpirationDate || item?.ExpirationDate is not null;
         ExpirationHintLabel.Text = sku.TracksExpirationDate
-            ? "Для закрытия LPN с положительным количеством укажите срок годности."
+            ? "Для закрытия LPN укажите срок годности."
             : "Сохранённый срок годности не удаляется при выключении его учёта.";
         ExpirationSwitch.IsToggled = item?.ExpirationDate is not null;
         ExpirationPicker.Date = item?.ExpirationDate is DateOnly date
@@ -187,7 +190,9 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         {
             var sku = await _orders.ResolveSkuAsync(_orderId, barcode);
             SetBusy(false);
-            await SelectSkuAsync(sku.SkuId, sku.IsInOrder);
+            await SelectSkuAsync(sku.SkuId, sku.IsInOrder,
+                !string.IsNullOrWhiteSpace(sku.Name) ? sku.Name
+                : !string.IsNullOrWhiteSpace(sku.Code) ? sku.Code : sku.SkuId.ToString());
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось определить SKU. Повторите сканирование."; }
@@ -271,7 +276,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
                 var fact = x.FactQuantity;
                 return new ReceivingSkuChoiceRow(x.SkuId, name, details,
                     $"{Format(plan)}{unit}", ReceivingStatusSymbols.FactText(plan, fact),
-                    ReceivingStatusSymbols.FactDescription(plan, fact), x.IsInOrder,
+                    ReceivingStatusSymbols.FactDescription(plan, fact),
+                    ReceivingStatusSymbols.FactColor(plan, fact), x.IsInOrder,
                     fact is null,
                     x.IsInOrder && plan is decimal expected && fact == expected,
                     x.IsInOrder && plan is decimal planned && fact is decimal actual && planned != actual);
@@ -292,10 +298,10 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     {
         if (e.Parameter is not Guid id || _busy || _process.HasPendingCommand) return;
         var candidate = CandidateRows.SingleOrDefault(x => x.SkuId == id);
-        if (candidate is not null) await SelectSkuAsync(id, candidate.IsInOrder);
+        if (candidate is not null) await SelectSkuAsync(id, candidate.IsInOrder, candidate.Name);
     }
 
-    private async Task SelectSkuAsync(Guid skuId, bool inOrder)
+    private async Task SelectSkuAsync(Guid skuId, bool inOrder, string? skuName = null)
     {
         if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true
             || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
@@ -306,7 +312,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
                 "Продолжить", "Назад")) return;
         if (!inOrder)
         {
-            if (!await DisplayAlertAsync("SKU вне плана", "Добавить SKU в ордер с планом 0?", "Добавить", "Назад")) return;
+            if (!await DisplayAlertAsync("Нет в ордере", skuName ?? skuId.ToString(),
+                    "Добавить с планом 0", "Назад")) return;
             _pendingSkuId = skuId;
             await ExecuteAsync(async () => Apply(await _process.AddSkuAsync(_orderId, skuId)));
             if (_process.HasPendingCommand || _pendingSkuId is null) return;
@@ -422,7 +429,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
                 try { Apply(await _orders.GetAsync(_orderId)); }
                 catch (MobileApiException) { }
                 catch (HttpRequestException) { }
-                ErrorLabel.Text = $"{ex.Message} Проверьте актуальные данные SKU и дату срока перед повтором.";
+                ErrorLabel.Text = ex.Message;
             }
             else ErrorLabel.Text = ex.Message;
         }
@@ -487,13 +494,14 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
 
         if (_order is null) return;
-        var skuSection = Array.FindLastIndex(stack, page => page is ReceivingOrderSkuPage);
-        if (skuSection < 0) return;
+        var section = Array.FindLastIndex(stack, page =>
+            page is ReceivingOrderSkuPage or ReceivingOrderLpnListPage);
+        if (section < 0) return;
 
         var list = _services.GetRequiredService<ReceivingOrderLpnListPage>();
         list.Show(_order, _process);
         await Navigation.PushAsync(list);
-        foreach (var page in stack.Skip(skuSection))
+        foreach (var page in stack.Skip(section))
             Navigation.RemovePage(page);
     }
 
@@ -597,7 +605,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
 }
 
 public sealed record ReceivingSkuChoiceRow(Guid SkuId, string Name, string Details,
-    string PlanText, string FactText, string FactDescription, bool IsInOrder,
+    string PlanText, string FactText, string FactDescription, Color FactColor, bool IsInOrder,
     bool IsUnchecked, bool IsMatched, bool IsDifferent)
 {
     public bool HasDetails => !string.IsNullOrEmpty(Details);

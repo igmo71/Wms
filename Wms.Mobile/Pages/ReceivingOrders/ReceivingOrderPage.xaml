@@ -26,7 +26,7 @@
                                     <VerticalStackLayout>
                                         <HorizontalStackLayout Spacing="7">
                                             <Label Text="{Binding Number}" FontAttributes="Bold" />
-                                            <Label Text="{Binding StatusGlyph}" FontSize="17"
+                                            <Label Text="{Binding StatusGlyph}" TextColor="{Binding StatusColor}" FontAttributes="{Binding StatusFontAttributes}" FontSize="17"
                                                    VerticalTextAlignment="Center"
                                                    SemanticProperties.Description="{Binding StatusDescription}" />
                                         </HorizontalStackLayout>

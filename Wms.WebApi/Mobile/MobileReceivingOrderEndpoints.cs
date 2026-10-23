@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Wms.Application.Receiving;
+using Wms.Application.Users;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
 using Wms.Data;
@@ -60,6 +61,7 @@ internal static class MobileReceivingOrderEndpoints
         MobileReceivingResolveDocumentRequest request, Guid warehouseId,
         ClaimsPrincipal principal, SynchronizeReceivingSource synchronize,
         GetReceivingSources sources, IReceivingWorkQueryStore orders,
+        ApplicationUserQueryService userNames,
         CancellationToken ct)
     {
         if (warehouseId == Guid.Empty)
@@ -75,10 +77,15 @@ internal static class MobileReceivingOrderEndpoints
         await synchronize.ExecuteAsync(decoded.Value, ct);
         var linked = await orders.GetOrderBySourceAsync(decoded.Value, userId, ct);
         if (linked is not null)
-            return linked.WarehouseId == warehouseId
-                ? TypedResults.Ok(new MobileReceivingDocumentResolutionResponse(null, MapOrder(linked, principal)))
-                : MobileEndpointResults.CommandProblem(
+        {
+            if (linked.WarehouseId != warehouseId)
+                return MobileEndpointResults.CommandProblem(
                     OperationError.Conflict("Документ относится к другому складу."));
+            var names = await userNames.GetDisplayNamesAsync(
+                linked.Lpns.Select(x => x.ResponsibleUserId), ct);
+            return TypedResults.Ok(new MobileReceivingDocumentResolutionResponse(
+                null, MapOrder(linked, principal, names)));
+        }
         var source = (await sources.GetByRefKeysAsync([decoded.Value], ct))
             .SingleOrDefault(x => x.RefKey == decoded.Value);
         if (source is null)
@@ -103,7 +110,8 @@ internal static class MobileReceivingOrderEndpoints
 
     private static async Task<IResult> GetOrdersAsync(
         Guid warehouseId, ClaimsPrincipal principal,
-        IReceivingWorkQueryStore orders, CancellationToken ct)
+        IReceivingWorkQueryStore orders, ApplicationUserQueryService userNames,
+        CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
@@ -111,21 +119,26 @@ internal static class MobileReceivingOrderEndpoints
         if (warehouseId == Guid.Empty)
             return MobileEndpointResults.CommandProblem(OperationError.Invalid("Выберите склад."));
         var results = await orders.ListOrdersAsync(warehouseId, userId, ct);
+        var names = await userNames.GetDisplayNamesAsync(
+            results.SelectMany(x => x.Lpns.Select(lpn => lpn.ResponsibleUserId)), ct);
         return TypedResults.Ok<IReadOnlyList<MobileReceivingWorkOrderResponse>>(
-            results.Select(x => MapOrder(x, principal)).ToArray());
+            results.Select(x => MapOrder(x, principal, names)).ToArray());
     }
 
     private static async Task<IResult> GetOrderAsync(
         Guid orderId, ClaimsPrincipal principal,
-        IReceivingWorkQueryStore orders, CancellationToken ct)
+        IReceivingWorkQueryStore orders, ApplicationUserQueryService userNames,
+        CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
             return TypedResults.Unauthorized();
         var order = await orders.GetOrderAsync(orderId, userId, ct);
-        return order is null
-            ? MobileEndpointResults.CommandProblem(OperationError.NotFound("Приходный ордер не найден."))
-            : TypedResults.Ok(MapOrder(order, principal));
+        if (order is null)
+            return MobileEndpointResults.CommandProblem(OperationError.NotFound("Приходный ордер не найден."));
+        var names = await userNames.GetDisplayNamesAsync(
+            order.Lpns.Select(x => x.ResponsibleUserId), ct);
+        return TypedResults.Ok(MapOrder(order, principal, names));
     }
 
     private static async Task<IResult> GetLinkedSourcesAsync(
@@ -295,7 +308,8 @@ internal static class MobileReceivingOrderEndpoints
         sku.IsInOrder, sku.CurrentPlanQuantity, sku.FactQuantity);
 
     private static MobileReceivingWorkOrderResponse MapOrder(
-        ReceivingWorkOrderView order, ClaimsPrincipal principal) => new(
+        ReceivingWorkOrderView order, ClaimsPrincipal principal,
+        IReadOnlyDictionary<string, string> responsibleUserNames) => new(
         order.Id, order.Number, order.CreatedAtUtc,
         order.WarehouseId, (MobileReceivingOrderStatus)order.Status,
         order.ActiveCycleNumber, order.ReceivingLocationId,
@@ -304,7 +318,13 @@ internal static class MobileReceivingOrderEndpoints
             x.SkuId, x.SkuCode, x.SkuName, x.TracksExpirationDate,
             x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)
         { IsCurrent = x.IsCurrent }).ToArray(),
-        order.Lpns.Select(MapLpn).ToArray())
+        order.Lpns.Select(lpn => MapLpn(lpn) with
+        {
+            ResponsibleUserName = lpn.ResponsibleUserId is { } id
+                && responsibleUserNames.TryGetValue(id, out var name)
+                ? name : lpn.ResponsibleUserId is null
+                    ? "Ответственный не указан" : "Имя не указано"
+        }).ToArray())
     {
         WarehouseName = order.WarehouseName,
         ReceivingLocationAddress = order.ReceivingLocationAddress,

@@ -12,6 +12,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly IServiceProvider _services;
     private MobileReceivingWorkOrderResponse? _order;
+    private Guid? _pendingSkuId;
     private bool _visible;
     private bool _busy;
     private long _scanGeneration;
@@ -78,6 +79,8 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         NumberLabel.Text = order.Number;
         var status = ReceivingStatusSymbols.ForOrder(order.Status);
         StatusIcon.Text = status.Glyph;
+        StatusIcon.TextColor = status.TextColor;
+        StatusIcon.FontAttributes = status.GlyphFontAttributes;
         SemanticProperties.SetDescription(StatusIcon, $"Статус ордера: {status.Description}");
         LocationLabel.Text = order.ReceivingLocationId is Guid id
             ? $"Место: {order.ReceivingLocationAddress ?? id.ToString()}"
@@ -90,10 +93,15 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         CompleteButton.IsVisible = order.MayCompleteOrder;
         CompleteHintLabel.IsVisible = order.MayCompleteOrder && HasOpenLpn(order);
         ScanHintLabel.Text = order.IsParticipant
-            ? "Сканируйте выданную этикетку LPN. SKU сканируется внутри LPN."
-            : "Присоединитесь к циклу приёмки, чтобы открыть LPN.";
+            ? "Сканируйте SKU для просмотра его LPN или выданный LPN для работы."
+            : "Сканируйте SKU или закрытый LPN для просмотра. Для приёмки присоединитесь к ордеру.";
         LpnRows = order.Lpns.Where(x => x.Status is not
             (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
+            .OrderBy(x => x.Items.Count == 0)
+            .ThenBy(x => x.Items.SingleOrDefault() is { } item
+                ? item.SkuName ?? item.SkuCode ?? item.SkuId.ToString() : string.Empty,
+                StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
             .Select(x =>
             {
                 var lpnStatus = ReceivingStatusSymbols.ForLpn(x.Status);
@@ -104,12 +112,13 @@ public partial class ReceivingOrderLpnListPage : ContentPage
                 var fact = orderItem?.FactQuantity;
                 var unit = item?.UnitOfMeasure ?? "—";
                 return new ReceivingWorkLpnRow(x.Id, x.Code,
-                    lpnStatus.Glyph, $"Статус LPN: {lpnStatus.Description}",
+                    lpnStatus.Glyph, $"Статус LPN: {lpnStatus.Description}", lpnStatus.TextColor,
                     item is null ? "SKU не выбран"
                         : item.SkuName ?? item.SkuCode ?? item.SkuId.ToString(),
                     item is null ? string.Empty : $"План: {Format(plan)} {unit}",
                     item is null ? string.Empty
                         : $"Факт: {ReceivingStatusSymbols.FactText(plan, fact)}",
+                    ReceivingStatusSymbols.FactColor(plan, fact),
                     item is null ? string.Empty : $"В LPN: {item.Quantity:0.###}",
                     item is null ? string.Empty
                         : $"Срок: {item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}",
@@ -117,6 +126,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
                         || item.ExpirationDate is not null),
                     item is not null,
                     x.Status == MobileLicensePlateNumberStatus.Open && order.IsParticipant,
+                    x.Status == MobileLicensePlateNumberStatus.Closed,
                     item is not null && fact is null,
                     plan is decimal expected && fact == expected,
                     plan is decimal planned && fact is decimal actual && planned != actual,
@@ -140,19 +150,78 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     private async Task HandleScanAsync(string code)
     {
         if (!_visible || _busy || _process.HasPendingCommand || _order is null) return;
+        var scannedCode = code.Trim();
+        if (!scannedCode.StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
+        {
+            await OpenScannedSkuAsync(scannedCode);
+            return;
+        }
+        var closedLpn = _order.Lpns.FirstOrDefault(x =>
+            x.Status == MobileLicensePlateNumberStatus.Closed
+            && string.Equals(x.Code, scannedCode, StringComparison.OrdinalIgnoreCase));
+        if (closedLpn is not null)
+        {
+            await OpenLpnPageAsync(closedLpn.Id);
+            return;
+        }
         if (!_order.IsParticipant)
         {
             ErrorLabel.Text = "Сначала присоединитесь к приёмке.";
             return;
         }
-        if (!code.Trim().StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
-        {
-            ErrorLabel.Text = "SKU сканируется на экране LPN.";
-            return;
-        }
-        await ExecuteAsync(async () => Apply(await _process.OpenLpnAsync(_order.Id, code.Trim())));
+        await ExecuteAsync(async () => Apply(await _process.OpenLpnAsync(_order.Id, scannedCode)));
         if (!_process.HasPendingCommand && _process.LastResourceId is Guid id)
             await OpenLpnPageAsync(id);
+    }
+
+    private async Task OpenScannedSkuAsync(string barcode)
+    {
+        if (_order is null) return;
+        SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        Guid? skuToOpen = null;
+        try
+        {
+            var sku = await _orders.ResolveSkuAsync(_order.Id, barcode);
+            if (!_visible) return;
+            if (!sku.IsInOrder)
+            {
+                if (_order is not { IsParticipant: true,
+                        Status: MobileReceivingOrderStatus.InReceiving })
+                {
+                    ErrorLabel.Text = "Чтобы добавить SKU, присоединитесь к действующей приёмке.";
+                    return;
+                }
+                var skuName = !string.IsNullOrWhiteSpace(sku.Name) ? sku.Name
+                    : !string.IsNullOrWhiteSpace(sku.Code) ? sku.Code : sku.SkuId.ToString();
+                if (!await DisplayAlertAsync("Нет в ордере", skuName,
+                        "Добавить с планом 0", "Назад")) return;
+                if (!_visible || _process.HasPendingCommand) return;
+                _pendingSkuId = sku.SkuId;
+                Apply(await _process.AddSkuAsync(_order.Id, sku.SkuId));
+                _pendingSkuId = null;
+            }
+            skuToOpen = sku.SkuId;
+        }
+        catch (MobileApiException ex)
+        {
+            _pendingSkuId = null;
+            ErrorLabel.Text = ex.Message;
+        }
+        catch (HttpRequestException)
+        {
+            if (!_process.HasPendingCommand) _pendingSkuId = null;
+            ErrorLabel.Text = _process.HasPendingCommand
+                ? "Ответ не подтверждён. Повторите ту же команду."
+                : "Не удалось определить SKU. Повторите сканирование.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            _pendingSkuId = null;
+            ErrorLabel.Text = ex.Message;
+        }
+        finally { SetBusy(false); await UpdateCameraAsync(); }
+        if (skuToOpen is Guid skuId && _visible) await OpenSkuDetailsAsync(skuId);
     }
 
     private async void OnJoinClicked(object? sender, EventArgs e)
@@ -172,21 +241,35 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             "Завершить", "Отмена")) return;
         if (_busy || _process.HasPendingCommand
             || _order is not { MayCompleteOrder: true } current || HasOpenLpn(current)) return;
-        await ExecuteAsync(async () => Apply(await _process.CompleteOrderAsync(current.Id)));
+        var completed = false;
+        await ExecuteAsync(async () =>
+        {
+            Apply(await _process.CompleteOrderAsync(current.Id));
+            completed = true;
+        });
+        if (completed) await Navigation.PopAsync();
     }
 
     private async void OnLpnTapped(object? sender, TappedEventArgs e)
     {
-        if (e.Parameter is Guid id && LpnRows.Any(x => x.Id == id && x.IsEditable))
+        if (e.Parameter is Guid id && LpnRows.Any(x => x.Id == id && x.CanOpen))
             await OpenLpnPageAsync(id);
     }
 
     private async Task OpenLpnPageAsync(Guid id)
     {
         if (_order is null || _busy || _process.HasPendingCommand
-            || !LpnRows.Any(x => x.Id == id && x.IsEditable)) return;
+            || !LpnRows.Any(x => x.Id == id && x.CanOpen)) return;
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
         page.Show(_order.Id, id, _process);
+        await Navigation.PushAsync(page);
+    }
+
+    private async Task OpenSkuDetailsAsync(Guid skuId)
+    {
+        if (_order is null || _busy || _process.HasPendingCommand) return;
+        var page = _services.GetRequiredService<ReceivingOrderSkuDistributionPage>();
+        page.Show(_order.Id, skuId, _process);
         await Navigation.PushAsync(page);
     }
 
@@ -225,6 +308,8 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         if (_busy || !_process.HasPendingCommand) return;
         SetBusy(true);
         Guid? openedId = null;
+        var completing = _process.PendingLabel == "Завершить ордер";
+        var addingSku = _process.PendingLabel == "Добавить SKU";
         var succeeded = false;
         try
         {
@@ -234,10 +319,20 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             ErrorLabel.Text = string.Empty;
             succeeded = true;
         }
-        catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
+        catch (MobileApiException ex)
+        {
+            _pendingSkuId = null;
+            ErrorLabel.Text = ex.Message;
+        }
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
-        if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
+        if (succeeded && completing) await Navigation.PopAsync();
+        else if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
+        else if (succeeded && addingSku && _pendingSkuId is Guid skuId)
+        {
+            _pendingSkuId = null;
+            await OpenSkuDetailsAsync(skuId);
+        }
     }
 
     private void UpdateRecovery()
@@ -282,11 +377,16 @@ public partial class ReceivingOrderLpnListPage : ContentPage
 }
 
 public sealed record ReceivingWorkLpnRow(Guid Id, string Code,
-    string StatusGlyph, string StatusDescription, string SkuName,
-    string PlanText, string FactText, string QuantityText,
+    string StatusGlyph, string StatusDescription, Color StatusColor, string SkuName,
+    string PlanText, string FactText, Color FactColor, string QuantityText,
     string ExpirationText, bool ShowsExpiration, bool ShowsQuantities,
-    bool IsEditable, bool IsUnchecked, bool IsMatched, bool IsDifferent,
+    bool IsEditable, bool IsClosed, bool IsUnchecked, bool IsMatched, bool IsDifferent,
     string FactDescription)
 {
-    public bool IsReadOnly => !IsEditable;
+    public FontAttributes StatusFontAttributes =>
+        ReceivingStatusSymbols.FontForGlyph(StatusGlyph);
+    public bool CanOpen => IsEditable || IsClosed;
+    public bool IsReadOnly => !CanOpen;
+    public string OpenHint => IsClosed ? "Нажмите, чтобы посмотреть LPN"
+        : "Нажмите, чтобы изменить LPN";
 }

@@ -8,6 +8,10 @@ The receiving workspace and numbering decisions are in
 Web and Mobile use `SKU` and `LPN` in user-facing labels and messages. LPN
 status wording treats the number as masculine (for example, «Открыт» and
 «Закрыт»). Integration identifiers and 1C field names retain their source names.
+SKU lists and SKU search results in Web and Mobile default to ascending displayed
+SKU name. Server-paged views apply that order before paging. Web grids honor an
+explicit sort chosen by the user. Lists of inventory movements and other event
+history retain their event order.
 
 Mobile is online-only. Urovo ScanWedge intent input and the ML Kit camera
 fallback implement one scanner boundary; operational screens prefer the
@@ -55,8 +59,12 @@ sections and returns to the originating section. Its entry button reads «Нач
 for an order in progress. A new cycle selects a receiving
 location there; an ongoing cycle joins without selecting it again. Pending
 commands prevent navigation until explicit retry. LPN scans work on both SKU and
-LPN list screens, through either device scanner or camera. SKU scans remain
-inside an opened LPN. The SKU list sorts by displayed name without row numbers,
+LPN list screens, through either device scanner or camera. Scanning a closed LPN
+already in the displayed order opens its details for reading without joining a
+current cycle or sending an LPN open command. Scanning a SKU on either list
+opens its distribution card; an SKU outside the order first uses the existing
+confirmation to add an order row with plan zero. Quantity entry still happens
+inside an open LPN. The SKU list sorts by displayed name without row numbers,
 using code and ID when a name is unavailable. Each SKU card keeps its name left
 and semibold plan and fact on two right-aligned lines without labels (plan above
 fact), with the unit shown once. The compact zero-confirmation button sits below
@@ -67,31 +75,43 @@ difference shows a yellow «≠» beside the fact and a soft yellow background.
 An unknown plan leaves the card neutral and its known fact has no comparison
 symbol. Each SKU card opens its details on tap and keeps a compact zero-confirmation action
 when eligible.
-When the SKU detail has no active LPN rows, a current-cycle participant can scan
-an issued available or empty open LPN there. The resulting LPN editor has that SKU selected
+In the SKU detail, a current-cycle participant can scan an issued available or
+empty open LPN even when the SKU already has other LPN rows. The resulting LPN editor has that SKU selected
 for quantity entry; an LPN already containing another SKU or in a final status
-does not open for editing. A delayed response uses the same explicit retry flow.
+does not open for editing. Existing open and closed LPNs shown for that SKU open
+from the detail list by tap or scan; a closed LPN opens for reading even outside
+an active receiving cycle. Each LPN row shows the responsible employee's display
+name instead of an internal user ID. A delayed response uses the same explicit
+retry flow.
 Each receiving LPN card shows its number and status, its one SKU or «SKU не выбран»,
 and the order plan, fact, and LPN quantity in a right-aligned block. The unit
 appears only with the plan. A saved expiration date remains visible even if
 the SKU no longer requires one; otherwise the expiration line appears only
-when the SKU requires a date. The card omits putaway quantities. Manual SKU
-search sorts by displayed name and uses the
+when the SKU requires a date. The Mobile LPN list follows SKU name order, with
+empty LPNs last and code breaking ties. The card omits putaway quantities.
+Manual SKU search sorts by displayed name and uses the
 same right-aligned plan and fact, with a colored border for a known match or
 difference; unverified or unknown-plan candidates keep a neutral border.
 The receiving status vocabulary is shared across lists and details: «◇» means
 ready order or available LPN; «○» means order in progress or open LPN; «✓»
 means received order, closed LPN, or matched SKU; «≠» means a checked SKU
 difference; «?» means unchecked fact; «⚠» means a failed 1C document check;
-«⊘» means cancelled LPN and «×» deleted LPN. Each status symbol has its full
-meaning in an accessible description. Order and LPN symbols sit beside their
+«⊘» means cancelled LPN and «×» deleted LPN. Waiting and unchecked states
+use blue, active states amber, completed and matched states green, and
+cancelled, deleted, failed checks and SKU differences red in both themes.
+The outlined «◇», «○» and «⊘» use bold font weight for legibility.
+Web receiving order and LPN statuses show the same colored symbols before their text.
+Each status symbol has its full meaning in an accessible description. Order and LPN symbols sit beside their
 numbers; SKU comparison symbols sit beside fact quantities; the document
 warning sits beside its number. The SKU scanning hint is hidden
 when the LPN is not editable.
 Tapping an editable open LPN from its list or a SKU distribution opens one
 editor with SKU selection, quantity, optional expiration date, saving, cancellation,
 and eligible closing. An empty LPN opens with SKU search; an LPN with a SKU opens
-with its saved quantity. Closed LPN cards are read-only and have no tap action.
+with its saved quantity. Tapping a closed LPN in the list opens the same details
+for reading, with quantity and expiration inputs disabled and no edit actions.
+The expiration date picker appears beside its switch so that it stays visible
+above the fixed action row on compact mobile screens.
 The editor has separate «Сохранить», «Закрыть» and «Отменить» actions in its
 bottom row; the «🔍 SKU» search action sits above the SKU content and becomes
 «✕ SKU» while search is open. «Сохранить» keeps the LPN open and returns to the
@@ -123,7 +143,7 @@ The Mobile LPN editor shows the date field when the current SKU flag is on
 or a date was already saved on the open LPN. It retains and displays that saved
 date after the flag is turned off. If closing is rejected after the flag or
 another closing input changes, the LPN page refreshes its server view and
-prompts the user to check the date before retrying.
+shows the specific server error without appending a generic retry message.
 When an open LPN has no selected SKU, the editor immediately shows search in
 the order composition, with a switch to the whole catalog, and accepts SKU
 scans. A selected SKU replaces the search panel and has a cross beside its name.
@@ -160,17 +180,23 @@ Each receiving LPN shows its own status; its active SKU row shows the expiration
 date or "Не указан" without a separate item-state label.
 Unchecked fact is textual; different SKU quantities are not totaled together.
 A Web order card shows open LPNs without controls for SKU selection, quantity
-entry or closing; physical receiving remains in Mobile. Web no longer calls
+entry; physical counting remains in Mobile. A Web Manager can close an open LPN
+with a saved positive quantity using the receiving close command after reviewing
+its SKU, quantity, plan, and expiration date. The confirmation rejects a changed
+LPN revision; expired dates require explicit confirmation. Web no longer calls
 the old order-completion command. Manager LPN quantity correction and deletion
 are exposed. Only a Manager can complete an order in Web or reopen a completed
 order into a new cycle. In Mobile, a current-cycle participant or Manager can
 complete the order from its SKU or LPN list once every open LPN is closed or cancelled.
 The mobile action confirms the decision and retains its command ID for retry
-after an uncertain response. The Web page retains
+after an uncertain response. On successful completion or retry, Mobile returns
+to the receiving order list, which refreshes on appearing. The Web page retains
 the command ID for a retry after an uncertain response and reloads the saved
 status and cycle snapshots after success.
 The order card separates current plan/fact discrepancies from immutable cycle
 completion snapshots and shows source check failures and unknown-plan reasons.
+The Web plan/fact table also shows an SKU that currently has an open LPN, with
+its stored plan and fact state, even before it enters the posted composition.
 The order heading shows the number and creation time on the first row. A bordered,
 evenly spaced second row shows the warehouse name, status, receiving location,
 and receiving number. Documents, link history, plan/fact, receiving LPNs, and
@@ -183,13 +209,16 @@ SKU by displayed name. Rows with known, equal plan/fact use the theme's subtle s
 hover color; rows with known, differing plan/fact use the warning hover color;
 rows without a checked fact or known plan remain unshaded. Receivings and their
 SKU lists follow the LPN panel.
-LPN cards sort by code. Each SKU line includes placed and remaining quantity;
-putaways appear below in a compact table with quantity, cell, date, and the
-user's display name. A deleted LPN has no separate pre-deletion composition
-label. The LPN delete button opens the existing preview and confirmation flow.
-Deletion history starts collapsed, shows the confirming user's
-name, and uses a dash for missing addresses; the original inventory movement
-ID remains internal.
+The Web receiving LPN panel uses a table sorted by displayed SKU name, with
+LPNs without a selected SKU last and the LPN code breaking ties. Its columns show LPN,
+status, SKU, expiration date, the current order plan and fact for that SKU, and
+the LPN quantity. Managers can correct eligible closed LPNs and delete closed
+LPNs through dialogs; deletion shows reverse movements and forecast balances
+before confirmation. Clicking an LPN number with putaways or deletion history
+expands its details. These show placed and remaining quantity, putaways with
+quantity, cell, date and user, and deletion history with the confirming user's
+name. Missing addresses use a dash; the original inventory movement ID remains
+internal.
 User-facing order screens call linked sources "Документы 1С" and receiving
 cycles "Приёмки". Receiving history shows the completing user's display
 name and a snapshot table with short plan and fact headers, without a version

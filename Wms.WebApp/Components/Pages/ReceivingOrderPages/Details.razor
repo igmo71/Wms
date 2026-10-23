@@ -25,7 +25,7 @@ else
             <MudPaper Outlined="true" Class="pa-2 my-2">
                 <MudGrid Spacing="2">
                     <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">@(_order.WarehouseName ?? _order.WarehouseId.ToString())</MudText></MudItem>
-                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">@_order.Status.GetDisplayName()</MudText></MudItem>
+                    <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2"><ReceivingStatusText Status="@_order.Status" /></MudText></MudItem>
                     <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">Место приёмки: @(_order.ReceivingLocationAddress ?? _order.ReceivingLocationId?.ToString() ?? "не выбрано")</MudText></MudItem>
                     <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">Приёмка: @_order.ActiveCycleNumber</MudText></MudItem>
                 </MudGrid>
@@ -34,7 +34,7 @@ else
             {
                 @if (_order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
                 {
-                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN в мобильном приложении.</MudText>
+                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN.</MudText>
                 }
                 <MudButton Class="mt-2" Color="Color.Primary" Variant="Variant.Filled"
                            Disabled="@(_busy || _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))"
@@ -77,102 +77,85 @@ else
             {
                 <MudText>LPN пока нет.</MudText>
             }
-            @foreach (var lpn in _order.Lpns)
+            @if (_order.Lpns.Count > 0)
             {
-                <MudPaper Class="pa-3 mb-2" Outlined="true">
-                    <MudStack Row="true" AlignItems="AlignItems.Center">
-                        <MudText Typo="Typo.subtitle1">@lpn.Code · @lpn.Status.GetDisplayName()</MudText>
-                        <MudSpacer />
-                        @if (_canManage && lpn.Status == LicensePlateNumberStatus.Closed)
-                        {
-                            @if (lpn.Putaways.Count == 0 && lpn.Items.Count == 1)
+                <MudTable T="ReceivingWorkLpnView" Items="SortedLpns" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>LPN</MudTh><MudTh>Статус</MudTh><MudTh>SKU</MudTh>
+                        <MudTh>Срок годности</MudTh><MudTh>План</MudTh>
+                        <MudTh>Факт по ордеру</MudTh><MudTh>Факт по LPN</MudTh><MudTh>Действия</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        @{ var item = context.Items.SingleOrDefault(); var orderItem = item is null ? null : _order.Items.FirstOrDefault(x => x.SkuId == item.SkuId); }
+                        <MudTd DataLabel="LPN">
+                            @if (context.Putaways.Count > 0 || _canManage && _deletionHistory.ContainsKey(context.Id))
                             {
-                                <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="() => PrepareCorrection(lpn)">Исправить количество</MudButton>
+                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => ToggleLpnDetails(context.Id)">@context.Code</MudButton>
                             }
-                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Close"
-                                       Disabled="_busy" OnClick="() => PreviewDeletionAsync(lpn.Id)">Удалить</MudButton>
-                        }
-                    </MudStack>
-                    @foreach (var item in lpn.Items)
-                    {
-                        <MudText>
-                            @(item.SkuName ?? item.SkuId.ToString()) · @Format(item.Quantity) @item.UnitOfMeasure · Срок годности: @(item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")
-                            @if (lpn.Status != LicensePlateNumberStatus.Deleted)
+                            else
                             {
-                                <span> · Размещено: @Format(item.PlacedQuantity) @item.UnitOfMeasure · Осталось: @Format(item.Quantity - item.PlacedQuantity) @item.UnitOfMeasure</span>
+                                @context.Code
                             }
-                        </MudText>
-                    }
-                    @if (lpn.Putaways.Count > 0)
-                    {
-                        <MudTable T="ReceivingWorkPutawayView" Items="lpn.Putaways" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent><MudTh>Количество</MudTh><MudTh>Ячейка</MudTh><MudTh>Дата</MudTh><MudTh>Пользователь</MudTh></HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
-                                <MudTd DataLabel="Ячейка">@(context.DestinationAddress ?? context.DestinationStorageLocationId.ToString())</MudTd>
-                                <MudTd DataLabel="Дата">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
-                                <MudTd DataLabel="Пользователь">@UserName(context.CreatedBy)</MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                    }
-                    @if (_canManage && _correctionLpnId == lpn.Id)
-                    {
-                        <MudDivider Class="my-2" />
-                        <MudText>Поправка количества проводится в исходном месте приёмки. SKU и срок годности сохраняются.</MudText>
-                        <MudNumericField T="decimal?" @bind-Value="_correctionQuantity" Label="Новое количество" Min="0" HideSpinButtons="true" />
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                                   Disabled="@(_busy || _correctionQuantity is null || _correctionQuantity < 0)"
-                                   OnClick="CorrectLpnAsync">Провести поправку</MudButton>
-                    }
-                    @if (_canManage && _deletionLpnId == lpn.Id && _deletionPreview is { } preview)
-                    {
-                        <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle2">Обратные движения по исходным адресам</MudText>
-                        <MudTable Items="preview.Reversals" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "—")</MudTd>
-                                <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "—")</MudTd>
-                                <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
-                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
-                                <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                        <MudText Typo="Typo.subtitle2" Class="mt-2">Прогноз остатков после удаления</MudText>
-                        <MudTable Items="preview.Balances" Dense="true" Hover="true" Elevation="0">
-                            <HeaderContent><MudTh>Ячейка</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Сейчас</MudTh><MudTh>После</MudTh></HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Ячейка">@context.Address</MudTd>
-                                <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
-                                <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
-                                <MudTd DataLabel="Сейчас">@Format(context.Before)</MudTd>
-                                <MudTd DataLabel="После">
-                                    @if (context.After < 0)
-                                    {
-                                        <MudText Color="Color.Error">@Format(context.After)</MudText>
-                                    }
-                                    else
-                                    {
-                                        @Format(context.After)
-                                    }
-                                </MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                        @if (preview.RequiresNegativeConfirmation)
+                        </MudTd>
+                        <MudTd DataLabel="Статус"><ReceivingStatusText Status="@context.Status" /></MudTd>
+                        <MudTd DataLabel="SKU">
+                            @(item is null ? "—" : item.SkuName ?? item.SkuId.ToString())
+                            @if (item is not null)
+                            {
+                                <MudText Typo="Typo.caption">@(item.UnitOfMeasure ?? "Ед. изм. неизвестна")</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Срок годности">@(item?.ExpirationDate?.ToString("dd.MM.yyyy") ?? (item is null ? "—" : "Не указан"))</MudTd>
+                        <MudTd DataLabel="План">@(orderItem is null ? "—" : Format(orderItem.PlanQuantity))</MudTd>
+                        <MudTd DataLabel="Факт по ордеру">@(orderItem is null ? "—" : orderItem.FactQuantity is null ? "Не проверено" : Format(orderItem.FactQuantity))</MudTd>
+                        <MudTd DataLabel="Факт по LPN">@(item is null ? "—" : Format(item.Quantity))</MudTd>
+                        <MudTd DataLabel="Действия">
+                            @if (_canManage && _order.Status == ReceivingOrderStatus.InReceiving
+                                && context.Status == LicensePlateNumberStatus.Open
+                                && context.Items.Count == 1 && context.Items[0].Quantity > 0)
+                            {
+                                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.CheckCircle"
+                                           Disabled="_busy" OnClick="() => CloseLpnAsync(context)">Закрыть</MudButton>
+                            }
+                            @if (_canManage && context.Status == LicensePlateNumberStatus.Closed)
+                            {
+                                @if (context.Putaways.Count == 0 && context.Items.Count == 1)
+                                {
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy"
+                                               OnClick="() => OpenCorrectionAsync(context)">Исправить</MudButton>
+                                }
+                                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteOutline"
+                                           Disabled="_busy" OnClick="() => OpenDeletionAsync(context)">Удалить</MudButton>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <ChildRowContent Context="lpn">
+                        @if (_expandedLpnId == lpn.Id)
                         {
-                            <MudAlert Severity="Severity.Warning" Class="mt-2">После удаления появятся отрицательные остатки.</MudAlert>
-                            <MudCheckBox T="bool" @bind-Value="_confirmNegative" Label="Подтверждаю отрицательные остатки по указанным ячейкам" />
-                        }
-                        <MudButton Class="mt-2" Color="Color.Error" Variant="Variant.Filled"
-                                   Disabled="@(_busy || preview.RequiresNegativeConfirmation && !_confirmNegative)"
-                                   OnClick="DeleteLpnAsync">Подтвердить удаление LPN</MudButton>
-                    }
-                    @if (_canManage && lpn.Status == LicensePlateNumberStatus.Deleted
-                        && _deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
-                    {
-                        <MudExpansionPanels Outlined="true" Elevation="0" Class="mt-2">
-                            <MudExpansionPanel Text="История" HeaderClass="mud-elevation-1">
-                                <ChildContent>
+                            <MudTr>
+                            <MudTd colspan="8">
+                                @foreach (var item in lpn.Items)
+                                {
+                                    @if (lpn.Status != LicensePlateNumberStatus.Deleted)
+                                    {
+                                        <MudText>Размещено: @Format(item.PlacedQuantity) · Осталось: @Format(item.Quantity - item.PlacedQuantity) @(item.UnitOfMeasure ?? "ед. изм. неизвестна")</MudText>
+                                    }
+                                }
+                                @if (lpn.Putaways.Count > 0)
+                                {
+                                    <MudTable T="ReceivingWorkPutawayView" Items="lpn.Putaways" Dense="true" Hover="true" Elevation="0">
+                                        <HeaderContent><MudTh>Количество</MudTh><MudTh>Ячейка</MudTh><MudTh>Дата</MudTh><MudTh>Пользователь</MudTh></HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                                            <MudTd DataLabel="Ячейка">@(context.DestinationAddress ?? context.DestinationStorageLocationId.ToString())</MudTd>
+                                            <MudTd DataLabel="Дата">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                                            <MudTd DataLabel="Пользователь">@UserName(context.CreatedBy)</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                }
+                                @if (_canManage && _deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
+                                {
+                                    <MudText Typo="Typo.subtitle2">История удаления</MudText>
                                     <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
                                         <HeaderContent><MudTh>Время</MudTh><MudTh>Пользователь</MudTh><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
                                         <RowTemplate>
@@ -185,11 +168,12 @@ else
                                             <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
                                         </RowTemplate>
                                     </MudTable>
-                                </ChildContent>
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-                </MudPaper>
+                                }
+                            </MudTd>
+                            </MudTr>
+                        }
+                    </ChildRowContent>
+                </MudTable>
             }
             </ChildContent>
         </MudExpansionPanel>

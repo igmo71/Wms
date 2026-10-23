@@ -30,7 +30,7 @@
                                                                       Tapped="OnSourceTapped" />
                                             </VerticalStackLayout.GestureRecognizers>
                                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
-                                                <Label Text="{Binding WarningGlyph}" FontAttributes="Bold"
+                                                <Label Text="{Binding WarningGlyph}" TextColor="{Binding WarningColor}" FontAttributes="Bold"
                                                        IsVisible="{Binding HasWarning}"
                                                        SemanticProperties.Description="{Binding WarningDescription}" />
                                                 <Label Grid.Column="1" Text="{Binding FirstLine}"

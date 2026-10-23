@@ -57,6 +57,28 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Stale_web_lpn_revision_rejects_close_without_posting()
+    {
+        var state = await SeedAsync(5m, 3m);
+        long revision;
+        await using (var read = database.CreateDbContext())
+            revision = (await read.LicensePlateNumbers.SingleAsync(x => x.Id == state.LpnId))
+                .OperationalRevision;
+        var command = new CloseReceivingLpnCommand(Guid.NewGuid(), state.OrderId,
+            state.LpnId, "manager-test", ExpectedLpnRevision: revision + 1);
+
+        Error(await Handler(state.Reader).ExecuteAsync(command), OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(LicensePlateNumberStatus.Open,
+            (await verify.LicensePlateNumbers.SingleAsync(x => x.Id == state.LpnId)).Status);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x =>
+            x.LicensePlateNumberId == state.LpnId));
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.CommandType == "receiving.lpn.close" && x.RequestId == command.RequestId));
+    }
+
+    [Fact]
     public async Task Failed_refresh_uses_last_plan_and_requires_manager_for_excess()
     {
         var state = await SeedAsync(2m, 3m);

@@ -1,0 +1,66 @@
+@using Wms.Application.Receiving
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+            <MudText>Поправка количества проводится в исходном месте приёмки. SKU и срок годности сохраняются.</MudText>
+            <MudNumericField T="decimal?" @bind-Value="_quantity" Label="Новое количество" Min="0" HideSpinButtons="true" Disabled="_busy" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="_busy" OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@(_busy || _quantity is null || _quantity < 0)"
+                   OnClick="SaveAsync">Провести поправку</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+    [Parameter, EditorRequired] public Guid LpnId { get; set; }
+    [Parameter, EditorRequired] public decimal CurrentQuantity { get; set; }
+    [Parameter, EditorRequired] public string UserId { get; set; } = null!;
+
+    [Inject] private CorrectReceivingLpnQuantity CorrectLpn { get; set; } = null!;
+
+    private decimal? _quantity;
+    private (decimal Quantity, Guid RequestId)? _pending;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized() => _quantity = CurrentQuantity;
+
+    private async Task SaveAsync()
+    {
+        if (_busy || _quantity is not decimal quantity || quantity < 0)
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            if (_pending is not { } pending || pending.Quantity != quantity)
+                _pending = (quantity, Guid.NewGuid());
+            var result = await CorrectLpn.ExecuteAsync(new CorrectReceivingLpnQuantityCommand(
+                _pending.Value.RequestId, OrderId, LpnId, quantity, UserId));
+            if (result.IsSuccess)
+            {
+                _pending = null;
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                _pending = null;
+                _error = result.Error!.Message;
+            }
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

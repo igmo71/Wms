@@ -40,8 +40,10 @@ different-warehouse source contributes zero. An unresolved quantity or metadata
 makes only the affected known SKU plan unknown; valid plans for other SKUs
 remain visible. Former SKU rows remain stored with zero when their contribution
 disappears, preserving fact, zero confirmations, and open LPN work. The current
-Web and Mobile plan/fact list shows only SKU from the latest versions of linked
-sources or active closed LPNs; former SKU without either is hidden. A posted
+Mobile plan/fact list shows only SKU from the latest versions of linked
+sources or active closed LPNs; former SKU without either is hidden. The Web
+plan/fact table also shows a stored SKU while it has an open LPN, with its
+current plan and stored fact state. A posted
 SKU without a current source line remains visible with known plan zero and its
 fact. Newly known rows are added. An identical check does not advance
 the order revision. A failed check records the error and retains the last
@@ -114,6 +116,9 @@ movement, audit, and command receipt together. Concurrent changes to its
 decision inputs reject all staged effects. A closed LPN cannot reopen.
 When every source has been detached during an active cycle, the known plan is
 zero; closing a positive LPN then requires a Manager.
+A Web Manager may close an open LPN through the same posting command after
+confirming the saved SKU, quantity, and date. If the LPN changed since it was
+displayed for confirmation, Web closing is rejected and requires a refresh.
 
 The local SKU expiration-tracking flag belongs to WMS. A Web Manager can switch
 it with an audit event; catalog imports preserve it. An open LPN may keep a

@@ -25,7 +25,13 @@
               RowStyleFunc="PlanRowStyle">
         <HeaderContent><MudTh>SKU</MudTh><MudTh>Код</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Расхождение</MudTh></HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="SKU">@(context.SkuName ?? context.SkuId.ToString())</MudTd>
+            <MudTd DataLabel="SKU">
+                @(context.SkuName ?? context.SkuId.ToString())
+                @if (!context.IsCurrent)
+                {
+                    <MudText Typo="Typo.caption">Есть открытый LPN</MudText>
+                }
+            </MudTd>
             <MudTd DataLabel="Код">@context.SkuCode</MudTd>
             <MudTd DataLabel="План">@Format(context.PlanQuantity) @context.UnitOfMeasure</MudTd>
             <MudTd DataLabel="Факт">@(context.FactQuantity is null ? "Не проверено" : Format(context.FactQuantity) + " " + context.UnitOfMeasure)</MudTd>
@@ -47,7 +53,10 @@
 
     private bool _expanded;
 
-    private IReadOnlyList<ReceivingWorkItemView> SortedItems => Order.CurrentItems
+    private IReadOnlyList<ReceivingWorkItemView> SortedItems => Order.Items
+        .Where(item => item.IsCurrent || Order.Lpns.Any(lpn =>
+            lpn.Status == Wms.Domain.Enums.LicensePlateNumberStatus.Open
+            && lpn.Items.Any(lpnItem => lpnItem.SkuId == item.SkuId)))
         .OrderBy(item => item.SkuName ?? item.SkuId.ToString(), StringComparer.CurrentCultureIgnoreCase)
         .ThenBy(item => item.SkuId).ToArray();
 

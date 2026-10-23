@@ -33,8 +33,6 @@
     <Color x:Key="ReceivingMatchBackgroundDark">#173A26</Color>
     <Color x:Key="ReceivingDifferentBackgroundLight">#FFF4D6</Color>
     <Color x:Key="ReceivingDifferentBackgroundDark">#493A16</Color>
-    <Color x:Key="ReceivingUncheckedFactLight">#B3261E</Color>
-    <Color x:Key="ReceivingUncheckedFactDark">#FF8A80</Color>
     <Color x:Key="ReceivingMatchFactLight">#176B34</Color>
     <Color x:Key="ReceivingMatchFactDark">#87DFA2</Color>
     <Color x:Key="ReceivingDifferentFactLight">#8A5900</Color>

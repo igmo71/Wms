@@ -141,7 +141,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
             return new ReceivingSourceCompactRow(source.RefKey,
                 $"{source.Number ?? source.RefKey.ToString()} · {SourceDate(source.Date)}",
                 $"{source.SenderName ?? source.Sender ?? "—"} · {source.WarehouseOperation ?? "—"}",
-                check.Glyph, check.Description, canDetach,
+                check.Glyph, check.Description, check.TextColor, canDetach,
                 source.RefKey == _newSourceRefKey ? Colors.LightGray : Colors.White);
         }).ToArray();
         OnPropertyChanged(nameof(SourceRows));
@@ -372,6 +372,8 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         {
             var status = ReceivingStatusSymbols.ForOrder(_order.Status);
             OrderStatusIcon.Text = status.Glyph;
+            OrderStatusIcon.TextColor = status.TextColor;
+            OrderStatusIcon.FontAttributes = status.GlyphFontAttributes;
             SemanticProperties.SetDescription(OrderStatusIcon, $"Статус ордера: {status.Description}");
         }
         JoinButton.Text = _order?.Status == MobileReceivingOrderStatus.ReadyForReceiving
@@ -421,7 +423,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
 }
 
 public sealed record ReceivingSourceCompactRow(Guid RefKey, string FirstLine,
-    string SecondLine, string WarningGlyph, string WarningDescription,
+    string SecondLine, string WarningGlyph, string WarningDescription, Color WarningColor,
     bool CanDetach, Color BackgroundColor)
 {
     public bool HasWarning => !string.IsNullOrEmpty(WarningGlyph);

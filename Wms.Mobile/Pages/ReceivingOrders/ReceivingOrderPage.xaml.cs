@@ -93,7 +93,7 @@ public partial class ReceivingOrderPage : ContentPage
                 var status = ReceivingStatusSymbols.ForOrder(x.Status);
                 return new ReceivingWorkOrderRow(x.Id, x.Number,
                     $"Создан: {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}",
-                    status.Glyph, $"Статус ордера: {status.Description}");
+                    status.Glyph, $"Статус ордера: {status.Description}", status.TextColor);
             }).ToArray();
             OnPropertyChanged(nameof(OrderRows));
             ErrorLabel.Text = string.Empty;
@@ -206,4 +206,8 @@ public partial class ReceivingOrderPage : ContentPage
 
 public sealed record ReceivingWorkOrderRow(
     Guid Id, string Number, string CreatedAtText,
-    string StatusGlyph, string StatusDescription);
+    string StatusGlyph, string StatusDescription, Color StatusColor)
+{
+    public FontAttributes StatusFontAttributes =>
+        ReceivingStatusSymbols.FontForGlyph(StatusGlyph);
+}

@@ -38,7 +38,7 @@
                     <MudTd DataLabel="Номер WMS"><MudLink Href="@($"receiving-orders/{context.Id}")">@context.Number</MudLink></MudTd>
                     <MudTd DataLabel="Создан">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudTd>
                     <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudTd>
-                    <MudTd DataLabel="Статус">@context.Status.GetDisplayName()</MudTd>
+                    <MudTd DataLabel="Статус"><ReceivingStatusText Status="@context.Status" /></MudTd>
                     <MudTd DataLabel="Документов 1С">@context.SourceRefKeys.Count</MudTd>
                     <MudTd DataLabel="Строк">@context.CurrentItems.Count</MudTd>
                     <MudTd DataLabel="Расхождения и непроверенные SKU">@context.CurrentDiscrepancyCount

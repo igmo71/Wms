@@ -38,34 +38,23 @@
                                         <VerticalStackLayout Spacing="2">
                                             <HorizontalStackLayout Spacing="7">
                                                 <Label Text="{Binding Code}" FontAttributes="Bold" />
-                                                <Label Text="{Binding StatusGlyph}" FontSize="17"
+                                                <Label Text="{Binding StatusGlyph}" TextColor="{Binding StatusColor}" FontAttributes="{Binding StatusFontAttributes}" FontSize="17"
                                                        VerticalTextAlignment="Center"
                                                        SemanticProperties.Description="{Binding StatusDescription}" />
                                             </HorizontalStackLayout>
                                             <Label Text="{Binding SkuName}" FontAttributes="Bold" LineBreakMode="WordWrap" />
                                             <Label Text="{Binding ExpirationText}" FontSize="12"
                                                    IsVisible="{Binding ShowsExpiration}" />
-                                            <Label Text="Нажмите, чтобы изменить LPN" FontSize="11"
-                                                   IsVisible="{Binding IsEditable}" />
+                                            <Label Text="{Binding OpenHint}" FontSize="11"
+                                                   IsVisible="{Binding CanOpen}" />
                                         </VerticalStackLayout>
                                         <VerticalStackLayout Grid.Column="1" Spacing="2"
                                                              HorizontalOptions="End" IsVisible="{Binding ShowsQuantities}">
                                             <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold"
                                                    FontSize="12" HorizontalTextAlignment="End" />
-                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
+                                            <Label Text="{Binding FactText}" TextColor="{Binding FactColor}" FontFamily="OpenSansSemibold"
                                                    FontSize="12" HorizontalTextAlignment="End"
                                                    SemanticProperties.Description="{Binding FactDescription}">
-                                                <Label.Triggers>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
-                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
-                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
-                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
-                                                    </DataTrigger>
-                                                </Label.Triggers>
                                             </Label>
                                             <Label Text="{Binding QuantityText}" FontFamily="OpenSansSemibold"
                                                    FontSize="12" HorizontalTextAlignment="End" />

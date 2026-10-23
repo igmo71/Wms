@@ -54,7 +54,10 @@ public sealed record MobileReceivingWorkLpnResponse(
     MobileLicensePlateNumberStatus Status, string? ResponsibleUserId,
     Guid? OriginalReceivingLocationId, long Revision,
     IReadOnlyList<MobileReceivingWorkLpnItemResponse> Items,
-    IReadOnlyList<MobileReceivingWorkPutawayResponse> Putaways);
+    IReadOnlyList<MobileReceivingWorkPutawayResponse> Putaways)
+{
+    public string? ResponsibleUserName { get; init; }
+}
 
 public sealed record MobileReceivingWorkOrderResponse(
     Guid Id, string Number, DateTimeOffset CreatedAtUtc,

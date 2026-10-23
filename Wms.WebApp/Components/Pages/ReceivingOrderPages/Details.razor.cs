@@ -19,10 +19,8 @@ public partial class Details
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private ResynchronizeReceivingOrder RefreshSources { get; set; } = null!;
     [Inject] private CompleteReceivingOrder CompleteOrder { get; set; } = null!;
+    [Inject] private CloseReceivingLpn CloseLpn { get; set; } = null!;
     [Inject] private ReopenReceivingOrder ReopenOrder { get; set; } = null!;
-    [Inject] private CorrectReceivingLpnQuantity CorrectLpn { get; set; } = null!;
-    [Inject] private PreviewReceivingLpnDeletion PreviewDeletion { get; set; } = null!;
-    [Inject] private DeleteReceivingLpn DeleteLpn { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
     [Inject] private ApplicationUserQueryService UserNames { get; set; } = null!;
 
@@ -42,13 +40,8 @@ public partial class Details
     private ReceivingOrderRefreshResult? _refreshResult;
     private Guid? _pendingCompleteRequestId;
     private Guid? _pendingReopenRequestId;
-    private (Guid LpnId, decimal Quantity, Guid RequestId)? _pendingCorrection;
-    private (Guid LpnId, string Token, bool ConfirmNegative, Guid RequestId)? _pendingDelete;
-    private Guid? _correctionLpnId;
-    private decimal? _correctionQuantity;
-    private Guid? _deletionLpnId;
-    private ReceivingLpnDeletionPreview? _deletionPreview;
-    private bool _confirmNegative;
+    private (Guid LpnId, long Revision, bool ConfirmExpiredDate, Guid RequestId)? _pendingClose;
+    private Guid? _expandedLpnId;
     private bool _canManage;
     private bool _loading = true;
     private bool _busy;
@@ -60,11 +53,7 @@ public partial class Details
         _pendingReopenRequestId = null;
         _lifecycleMessage = null;
         _refreshResult = null;
-        _correctionLpnId = null;
-        _pendingCorrection = null;
-        _deletionLpnId = null;
-        _deletionPreview = null;
-        _pendingDelete = null;
+        _expandedLpnId = null;
         await ReloadAsync();
     }
 
@@ -230,110 +219,130 @@ public partial class Details
         finally { _loading = false; }
     }
 
-    private void PrepareCorrection(ReceivingWorkLpnView lpn)
+    private void ToggleLpnDetails(Guid lpnId) =>
+        _expandedLpnId = _expandedLpnId == lpnId ? null : lpnId;
+
+    private IReadOnlyList<ReceivingWorkLpnView> SortedLpns =>
+        _order?.Lpns.OrderBy(lpn => lpn.Items.Count == 0)
+            .ThenBy(lpn => lpn.Items.FirstOrDefault() is { } item
+                ? item.SkuName ?? item.SkuId.ToString() : string.Empty,
+                StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(lpn => lpn.Code, StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+
+    private async Task OpenCorrectionAsync(ReceivingWorkLpnView lpn)
     {
-        if (!_canManage || _busy || lpn.Status != LicensePlateNumberStatus.Closed
+        if (!_canManage || _busy || _userId is null || lpn.Status != LicensePlateNumberStatus.Closed
             || lpn.Putaways.Count != 0 || lpn.Items.Count != 1)
             return;
-
-        _correctionLpnId = lpn.Id;
-        _correctionQuantity = lpn.Items.Single().Quantity;
-        _pendingCorrection = null;
-        _deletionLpnId = null;
-        _deletionPreview = null;
-        _pendingDelete = null;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var parameters = new DialogParameters<ReceivingLpnCorrectionDialog>
+            {
+                { x => x.OrderId, Id },
+                { x => x.LpnId, lpn.Id },
+                { x => x.CurrentQuantity, lpn.Items.Single().Quantity },
+                { x => x.UserId, _userId }
+            };
+            var dialog = await DialogService.ShowAsync<ReceivingLpnCorrectionDialog>(
+                $"Исправить LPN {lpn.Code}", parameters,
+                new DialogOptions { BackdropClick = false, CloseOnEscapeKey = false });
+            var result = await dialog.Result;
+            if (result is { Canceled: false })
+                await ReloadAsync();
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
     }
 
-    private async Task CorrectLpnAsync()
+    private async Task CloseLpnAsync(ReceivingWorkLpnView lpn)
     {
         if (!_canManage || _busy || _userId is null
-            || _correctionLpnId is not Guid lpnId || _correctionQuantity is not decimal quantity)
+            || _order is not { Status: ReceivingOrderStatus.InReceiving } order
+            || lpn.Status != LicensePlateNumberStatus.Open || lpn.Items.Count != 1
+            || lpn.Items[0].Quantity <= 0) return;
+
+        var item = lpn.Items[0];
+        var orderItem = order.Items.FirstOrDefault(x => x.SkuId == item.SkuId);
+        if (orderItem?.TracksExpirationDate == true && item.ExpirationDate is null)
+        {
+            _error = $"Для закрытия {lpn.Code} укажите срок годности в мобильном приложении.";
             return;
+        }
+
+        var expired = item.ExpirationDate is DateOnly date
+            && date < DateOnly.FromDateTime(DateTime.UtcNow);
+        var name = item.SkuName ?? item.SkuCode ?? item.SkuId.ToString();
+        var message = $"LPN {lpn.Code}. SKU: {name}. Количество: {Format(item.Quantity)} {item.UnitOfMeasure ?? "ед."}. "
+            + $"План по ордеру: {Format(orderItem?.PlanQuantity)}. "
+            + $"Срок годности: {item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}. "
+            + "Закрытие проведёт приход. Менеджер подтверждает приёмку сверх плана или без известного плана."
+            + (expired ? " Срок годности прошёл; подтвердите закрытие с просроченным товаром." : string.Empty);
+
         _busy = true;
         _error = null;
         try
         {
-            if (_pendingCorrection is not { } pending || pending.LpnId != lpnId
-                || pending.Quantity != quantity)
-                _pendingCorrection = (lpnId, quantity, Guid.NewGuid());
-            var result = await CorrectLpn.ExecuteAsync(new CorrectReceivingLpnQuantityCommand(
-                _pendingCorrection.Value.RequestId, Id, lpnId, quantity, _userId));
-            if (result.IsSuccess)
+            var confirmed = await DialogService.ShowMessageBoxAsync("Закрыть LPN", message,
+                yesText: "Закрыть и провести", cancelText: "Назад");
+            if (confirmed != true) return;
+
+            if (_pendingClose is null || _pendingClose.Value.LpnId != lpn.Id
+                || _pendingClose.Value.Revision != lpn.Revision
+                || _pendingClose.Value.ConfirmExpiredDate != expired)
+                _pendingClose = (lpn.Id, lpn.Revision, expired, Guid.NewGuid());
+            var result = await CloseLpn.ExecuteAsync(new CloseReceivingLpnCommand(
+                _pendingClose.Value.RequestId, Id, lpn.Id, _userId,
+                ConfirmExpiredDate: expired, ExpectedLpnRevision: lpn.Revision));
+            if (!result.IsSuccess)
             {
-                _pendingCorrection = null;
-                _correctionLpnId = null;
-                await ReloadAsync();
-            }
-            else
-            {
-                _pendingCorrection = null;
+                _pendingClose = null;
+                if (result.Error!.Type == OperationErrorType.Conflict)
+                    await ReloadAsync();
                 _error = result.Error!.Message;
+                return;
             }
+
+            _pendingClose = null;
+            await ReloadAsync();
+            if (_error is null)
+                _lifecycleMessage = result.Value!.SourceCheckSucceeded
+                    ? $"LPN {lpn.Code} закрыт, приход проведён."
+                    : $"LPN {lpn.Code} закрыт по последнему плану; свежая сверка 1С не удалась.";
         }
-        catch (Exception exception) { _error = exception.Message; }
+        catch (Exception exception)
+        {
+            _error = $"Ответ не подтверждён. Повторите закрытие с тем же LPN. {exception.Message}";
+        }
         finally { _busy = false; }
     }
 
-    private async Task PreviewDeletionAsync(Guid lpnId)
+    private async Task OpenDeletionAsync(ReceivingWorkLpnView lpn)
     {
-        if (!_canManage || _busy || _userId is null)
-            return;
-        _busy = true;
-        _error = null;
-        _deletionLpnId = lpnId;
-        _deletionPreview = null;
-        _confirmNegative = false;
-        _pendingDelete = null;
-        _correctionLpnId = null;
-        _pendingCorrection = null;
-        try
-        {
-            var result = await PreviewDeletion.ExecuteAsync(Id, lpnId, _userId);
-            if (result.IsSuccess)
-                _deletionPreview = result.Value;
-            else
-                _error = result.Error!.Message;
-        }
-        catch (Exception exception) { _error = exception.Message; }
-        finally { _busy = false; }
-    }
-
-    private async Task DeleteLpnAsync()
-    {
-        if (!_canManage || _busy || _userId is null || _deletionPreview is not { } preview
-            || _deletionLpnId != preview.LpnId
-            || preview.RequiresNegativeConfirmation && !_confirmNegative)
+        if (!_canManage || _busy || _userId is null || _order is null
+            || lpn.Status != LicensePlateNumberStatus.Closed)
             return;
         _busy = true;
         _error = null;
         try
         {
-            if (_pendingDelete is not { } pending || pending.LpnId != preview.LpnId
-                || pending.Token != preview.SnapshotToken
-                || pending.ConfirmNegative != _confirmNegative)
-                _pendingDelete = (preview.LpnId, preview.SnapshotToken,
-                    _confirmNegative, Guid.NewGuid());
-            var result = await DeleteLpn.ExecuteAsync(new DeleteReceivingLpnCommand(
-                _pendingDelete.Value.RequestId, Id, preview.LpnId,
-                preview.SnapshotToken, _confirmNegative, _userId));
-            if (result.IsSuccess)
+            var parameters = new DialogParameters<ReceivingLpnDeletionDialog>
             {
-                _pendingDelete = null;
-                _deletionLpnId = null;
-                _deletionPreview = null;
+                { x => x.OrderId, Id },
+                { x => x.LpnId, lpn.Id },
+                { x => x.LpnCode, lpn.Code },
+                { x => x.UserId, _userId },
+                { x => x.OrderItems, _order.Items }
+            };
+            var dialog = await DialogService.ShowAsync<ReceivingLpnDeletionDialog>(
+                $"Удалить LPN {lpn.Code}", parameters,
+                new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true,
+                    BackdropClick = false, CloseOnEscapeKey = false });
+            var result = await dialog.Result;
+            if (result is { Canceled: false })
                 await ReloadAsync();
-            }
-            else
-            {
-                _pendingDelete = null;
-                _error = result.Error!.Message;
-                if (result.Error.Type == OperationErrorType.Conflict)
-                {
-                    var refreshed = await PreviewDeletion.ExecuteAsync(Id, preview.LpnId, _userId);
-                    _deletionPreview = refreshed.IsSuccess ? refreshed.Value : null;
-                    _confirmNegative = false;
-                }
-            }
         }
         catch (Exception exception) { _error = exception.Message; }
         finally { _busy = false; }

@@ -1,0 +1,35 @@
+@using Wms.Common
+@using Wms.Domain.Enums
+
+@if (Presentation.Glyph.Length > 0)
+{
+    <span aria-hidden="true" style="@GlyphStyle">@Presentation.Glyph</span>
+}
+<span>@DisplayName</span>
+
+@code {
+    [Parameter, EditorRequired] public Enum Status { get; set; } = null!;
+
+    private (string Glyph, string Color, bool Bold) Presentation => Status switch
+    {
+        ReceivingOrderStatus.ReadyForReceiving => ("◇", "var(--mud-palette-info)", true),
+        ReceivingOrderStatus.InReceiving => ("○", "var(--mud-palette-warning)", true),
+        ReceivingOrderStatus.Received => ("✓", "var(--mud-palette-success)", false),
+        LicensePlateNumberStatus.Available => ("◇", "var(--mud-palette-info)", true),
+        LicensePlateNumberStatus.Open => ("○", "var(--mud-palette-warning)", true),
+        LicensePlateNumberStatus.Closed => ("✓", "var(--mud-palette-success)", false),
+        LicensePlateNumberStatus.Cancelled => ("⊘", "var(--mud-palette-error)", true),
+        LicensePlateNumberStatus.Deleted => ("×", "var(--mud-palette-error)", false),
+        _ => (string.Empty, string.Empty, false)
+    };
+
+    private string DisplayName => Status switch
+    {
+        ReceivingOrderStatus order => order.GetDisplayName(),
+        LicensePlateNumberStatus lpn => lpn.GetDisplayName(),
+        _ => Status?.ToString() ?? string.Empty
+    };
+
+    private string GlyphStyle =>
+        $"color: {Presentation.Color}; font-weight: {(Presentation.Bold ? 700 : 400)}; margin-right: .35em;";
+}

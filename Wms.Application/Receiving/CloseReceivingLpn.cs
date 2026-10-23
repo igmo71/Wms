@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
@@ -10,7 +11,8 @@ namespace Wms.Application.Receiving;
 
 public sealed record CloseReceivingLpnCommand(
     Guid RequestId, Guid OrderId, Guid LpnId, string UserId,
-    bool ConfirmExpiredDate = false, string? ManagerReason = null);
+    bool ConfirmExpiredDate = false, string? ManagerReason = null,
+    long? ExpectedLpnRevision = null);
 
 public sealed record CloseReceivingLpnResult(
     Guid LpnId, decimal? UsedPlan, decimal TotalFact, bool SourceCheckSucceeded,
@@ -33,10 +35,18 @@ public sealed class CloseReceivingLpn(
         if (command.ManagerReason is { Length: > 500 })
             return OperationError.Invalid("Причина менеджера слишком длинная.");
 
-        var hash = CommandExecutor.ComputeHash(JsonSerializer.Serialize(new
-        {
-            command.OrderId, command.LpnId, command.ConfirmExpiredDate, command.ManagerReason
-        }));
+        // Keep the hash of existing Mobile requests unchanged for pending retries.
+        var hash = CommandExecutor.ComputeHash(command.ExpectedLpnRevision is long revision
+            ? JsonSerializer.Serialize(new
+            {
+                command.OrderId, command.LpnId, command.ConfirmExpiredDate,
+                command.ManagerReason, ExpectedLpnRevision = revision
+            })
+            : JsonSerializer.Serialize(new
+            {
+                command.OrderId, command.LpnId, command.ConfirmExpiredDate,
+                command.ManagerReason
+            }));
         var executed = await executor.ExecuteAsync(CommandType, command.RequestId, hash, command.UserId,
             async (session, operationCt) =>
             {
@@ -62,6 +72,9 @@ public sealed class CloseReceivingLpn(
                 var lpn = await store.LoadLpnAsync(session, command.LpnId, operationCt);
                 if (lpn is null || lpn.ReceivingOrderId != order.Id)
                     return OperationError.NotFound("LPN не найден в ордере.");
+                if (command.ExpectedLpnRevision is long expectedRevision
+                    && lpn.OperationalRevision != expectedRevision)
+                    return OperationError.Conflict("LPN изменился. Обновите его перед закрытием.");
                 var item = lpn.Items.SingleOrDefault(x => !x.IsDeleted);
                 if (item is null)
                     return OperationError.Invalid("Закрыть можно только LPN с положительным количеством одного SKU.");
@@ -108,10 +121,10 @@ public sealed class CloseReceivingLpn(
                 var managerException = usedPlan is not decimal plan || totalFact > plan;
                 if (managerException && !canManage)
                 {
-                    var planText = usedPlan?.ToString() ?? "неизвестен";
-                    var freshness = sourceCheckSucceeded ? "подтверждён" : "не подтверждён свежей сверкой";
-                    return OperationError.Conflict(
-                        $"Суммарный факт {totalFact} превышает план {planText} или план неизвестен; план {freshness}. Требуется Manager.");
+                    var factText = totalFact.ToString("0.000", CultureInfo.GetCultureInfo("ru-RU"));
+                    return OperationError.Conflict(usedPlan is null
+                        ? $"Суммарный факт {factText}, план неизвестен. Требуется решение Менеджера."
+                        : $"Суммарный факт {factText} превышает план. Требуется решение Менеджера.");
                 }
 
                 store.GuardClosingInputs(session, orderItem, sku);

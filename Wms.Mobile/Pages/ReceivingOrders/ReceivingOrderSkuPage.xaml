@@ -46,23 +46,10 @@
                                                              HorizontalOptions="End" VerticalOptions="Start">
                                             <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold"
                                                    FontSize="13" HorizontalTextAlignment="End" />
-                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
-                                                   FontSize="13" HorizontalTextAlignment="End"
+                                            <Label Text="{Binding FactText}" TextColor="{Binding FactColor}"
+                                                   FontFamily="OpenSansSemibold" FontSize="13"
+                                                   HorizontalTextAlignment="End"
                                                    SemanticProperties.Description="{Binding FactDescription}">
-                                                <Label.Triggers>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsUnchecked}" Value="True">
-                                                        <Setter Property="TextColor"
-                                                                Value="{AppThemeBinding Light={StaticResource ReceivingUncheckedFactLight}, Dark={StaticResource ReceivingUncheckedFactDark}}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsMatched}" Value="True">
-                                                        <Setter Property="TextColor"
-                                                                Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger TargetType="Label" Binding="{Binding IsDifferent}" Value="True">
-                                                        <Setter Property="TextColor"
-                                                                Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
-                                                    </DataTrigger>
-                                                </Label.Triggers>
                                             </Label>
                                             <Button Text="0" FontSize="12" WidthRequest="32" HeightRequest="30"
                                                     MinimumWidthRequest="0" MinimumHeightRequest="0"

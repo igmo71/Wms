@@ -85,6 +85,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
         SkuCodeLabel.Text = item.SkuCode;
         PlanLabel.Text = item.PlanQuantity?.ToString("0.###") ?? "?";
         FactLabel.Text = ReceivingStatusSymbols.FactText(item.PlanQuantity, item.FactQuantity);
+        FactLabel.TextColor = ReceivingStatusSymbols.FactColor(item.PlanQuantity, item.FactQuantity);
         SemanticProperties.SetDescription(FactLabel,
             ReceivingStatusSymbols.FactDescription(item.PlanQuantity, item.FactQuantity));
         UnitLabel.Text = item.UnitOfMeasure ?? "—";
@@ -96,16 +97,21 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
                 {
                     var status = ReceivingStatusSymbols.ForLpn(x.Lpn.Status);
                     return new ReceivingOrderSkuLpnRow(x.Lpn.Id, x.Lpn.Code,
-                        status.Glyph, $"Статус LPN: {status.Description}",
-                        x.Lpn.ResponsibleUserId ?? "—",
+                        status.Glyph, $"Статус LPN: {status.Description}", status.TextColor,
+                        $"Ответственный: {x.Lpn.ResponsibleUserName ?? "Имя не указано"}",
                         $"{x.Item!.Quantity:0.###} {item.UnitOfMeasure ?? "—"}",
                         x.Lpn.Status == MobileLicensePlateNumberStatus.Open
-                            && order.IsParticipant);
+                            && order.IsParticipant,
+                        x.Lpn.Status == MobileLicensePlateNumberStatus.Closed);
                 })
                 .ToArray();
         OnPropertyChanged(nameof(LpnRows));
-        ScanHintLabel.IsVisible = LpnRows.Count == 0 && order.IsParticipant
+        var canStartLpn = order.IsParticipant
             && order.Status == MobileReceivingOrderStatus.InReceiving;
+        ScanHintLabel.IsVisible = canStartLpn || LpnRows.Any(x => x.CanOpen);
+        ScanHintLabel.Text = canStartLpn
+            ? "Сканируйте выданный LPN для этого SKU или LPN из списка для просмотра."
+            : "Сканируйте LPN из списка, чтобы открыть его.";
         UpdateRecovery();
     }
 
@@ -121,22 +127,31 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 
     private async Task HandleScanAsync(string code)
     {
-        if (!_visible || _busy || _process.HasPendingCommand || _order is null
-            || LpnRows.Count != 0) return;
+        if (!_visible || _busy || _process.HasPendingCommand || _order is null) return;
+        code = code.Trim();
+        if (!code.StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
+        {
+            ErrorLabel.Text = "Сканируйте этикетку LPN.";
+            await UpdateCameraAsync();
+            return;
+        }
+        var listedLpn = LpnRows.FirstOrDefault(x => x.CanOpen
+            && string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (listedLpn is not null)
+        {
+            await OpenLpnDetailsAsync(listedLpn.LicensePlateNumberId);
+            return;
+        }
         if (_order.Status != MobileReceivingOrderStatus.InReceiving)
         {
             ErrorLabel.Text = "Ордер сейчас не находится в приёмке.";
+            await UpdateCameraAsync();
             return;
         }
         if (!_order.IsParticipant)
         {
             ErrorLabel.Text = "Сначала присоединитесь к приёмке.";
-            return;
-        }
-        code = code.Trim();
-        if (!code.StartsWith("LPN", StringComparison.OrdinalIgnoreCase))
-        {
-            ErrorLabel.Text = "Сканируйте этикетку LPN.";
+            await UpdateCameraAsync();
             return;
         }
         var existing = _order.Lpns.FirstOrDefault(x =>
@@ -144,6 +159,7 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
         if (existing is not null && !CanPlaceSku(existing))
         {
             ErrorLabel.Text = "Этот LPN недоступен для выбранного SKU.";
+            await UpdateCameraAsync();
             return;
         }
 
@@ -220,8 +236,9 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
     private async Task UpdateCameraAsync()
     {
         if (_visible && !_busy && !_process.HasPendingCommand
-            && _order is { IsParticipant: true, Status: MobileReceivingOrderStatus.InReceiving }
-            && LpnRows.Count == 0 && _scanner.ActiveSource == BarcodeScanSource.Camera)
+            && ((_order is { IsParticipant: true, Status: MobileReceivingOrderStatus.InReceiving })
+                || LpnRows.Any(x => x.CanOpen))
+            && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
     }
@@ -229,7 +246,12 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
     private async void OnLpnTapped(object? sender, TappedEventArgs e)
     {
         if (_busy || _process.HasPendingCommand || e.Parameter is not Guid id
-            || !LpnRows.Any(x => x.LicensePlateNumberId == id && x.IsEditable)) return;
+            || !LpnRows.Any(x => x.LicensePlateNumberId == id && x.CanOpen)) return;
+        await OpenLpnDetailsAsync(id);
+    }
+
+    private async Task OpenLpnDetailsAsync(Guid id)
+    {
         var page = _services.GetRequiredService<ReceivingOrderLicensePlateNumberPage>();
         page.Show(_orderId, id, _process);
         await Navigation.PushAsync(page);
@@ -237,8 +259,11 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
 }
 
 public sealed record ReceivingOrderSkuLpnRow(Guid LicensePlateNumberId,
-    string Code, string StatusGlyph, string StatusDescription,
-    string ResponsibleUserName, string QuantityText, bool IsEditable)
+    string Code, string StatusGlyph, string StatusDescription, Color StatusColor,
+    string ResponsibleUserName, string QuantityText, bool IsEditable, bool IsClosed)
 {
-    public bool IsReadOnly => !IsEditable;
+    public FontAttributes StatusFontAttributes =>
+        ReceivingStatusSymbols.FontForGlyph(StatusGlyph);
+    public bool CanOpen => IsEditable || IsClosed;
+    public bool IsReadOnly => !CanOpen;
 }
