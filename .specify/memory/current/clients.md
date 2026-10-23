@@ -1,7 +1,9 @@
 # Current client behavior
 
 The receiving workspace and numbering decisions are in
-[feature 002](../../../specs/002-receiving-workspaces/spec.md).
+[feature 002](../../../specs/002-receiving-workspaces/spec.md). The accepted
+Mobile receiving screen decisions are in
+[feature 005](../../../specs/005-mobile-receiving-ui/spec.md).
 
 ## Client behavior
 
@@ -47,8 +49,9 @@ carry their own number and factual creation time in Mobile V1 responses, while
 their IDs remain the keys for commands; 1C numbers belong to individual sources. The
 queue shows the number with a status symbol and separate local creation time.
 The SKU, LPN and document screens show the order number with the same status
-symbol; the SKU and LPN screens put the receiving location on the next line;
-they omit creation time and warehouse from the compact heading. The existing
+symbol; the SKU and LPN screens show «Место приёмки:» and its address on the
+next line, or «Место не выбрано» until a location is selected. They omit
+creation time and warehouse from the compact heading. The existing
 order has separate SKU, LPN, and document screens headed «Приёмка › SKU»,
 «Приёмка › LPN», and «Приёмка › Документы 1С». Each screen offers only the two
 other sections as buttons, in SKU, LPN, 1C order. Sections use the same default
@@ -58,8 +61,9 @@ to the section that opened it. A shared join screen is reachable from all three
 sections and returns to the originating section. Its entry button reads «Начать» for a ready order and «Присоединиться»
 for an order in progress. A new cycle selects a receiving
 location there; an ongoing cycle joins without selecting it again. Pending
-commands prevent navigation until explicit retry. LPN scans work on both SKU and
-LPN list screens, through either device scanner or camera. Scanning a closed LPN
+commands prevent navigation until explicit retry. The SKU and LPN lists omit
+general scanning instructions. LPN scans work on both screens, through either
+device scanner or camera. Scanning a closed LPN
 already in the displayed order opens its details for reading without joining a
 current cycle or sending an LPN open command. Scanning a SKU on either list
 opens its distribution card; an SKU outside the order first uses the existing
