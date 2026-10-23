@@ -83,7 +83,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         StatusIcon.FontAttributes = status.GlyphFontAttributes;
         SemanticProperties.SetDescription(StatusIcon, $"Статус ордера: {status.Description}");
         LocationLabel.Text = order.ReceivingLocationId is Guid id
-            ? $"Место: {order.ReceivingLocationAddress ?? id.ToString()}"
+            ? $"Место приёмки: {order.ReceivingLocationAddress ?? id.ToString()}"
             : "Место не выбрано";
         JoinButton.Text = order.Status == MobileReceivingOrderStatus.ReadyForReceiving
             ? "Начать" : "Присоединиться";
@@ -92,9 +92,6 @@ public partial class ReceivingOrderLpnListPage : ContentPage
                 or MobileReceivingOrderStatus.InReceiving);
         CompleteButton.IsVisible = order.MayCompleteOrder;
         CompleteHintLabel.IsVisible = order.MayCompleteOrder && HasOpenLpn(order);
-        ScanHintLabel.Text = order.IsParticipant
-            ? "Сканируйте SKU для просмотра его LPN или выданный LPN для работы."
-            : "Сканируйте SKU или закрытый LPN для просмотра. Для приёмки присоединитесь к ордеру.";
         LpnRows = order.Lpns.Where(x => x.Status is not
             (MobileLicensePlateNumberStatus.Cancelled or MobileLicensePlateNumberStatus.Deleted))
             .OrderBy(x => x.Items.Count == 0)

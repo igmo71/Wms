@@ -16,7 +16,6 @@
             <ScrollView>
                 <VerticalStackLayout Spacing="8">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Label x:Name="ScanHintLabel" FontSize="12" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingWorkItemRow">
