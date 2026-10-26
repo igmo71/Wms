@@ -214,6 +214,9 @@ MAUI pages are grouped by operator workflow. Scanner adapters, feature HTTP
 clients, session handling, and platform helpers remain technical components.
 Feature clients and Mobile V1 contract source files are grouped by business
 feature over one authenticated transport.
+Receiving reads use separate Mobile queue, Web list, Mobile detail, and full
+order queries. Mobile detail omits cycle history and destination-address data
+used only by Web while preserving the Mobile V1 response.
 
 A page retains controls, modes, scanner lifecycle, navigation, dialogs, and
 rendering. Distinct operator tasks use separate mobile screens with explicit

@@ -37,6 +37,8 @@ empty document screen. The first successful scan creates an order with that
 document; each later scan immediately attaches another document and recalculates
 its plan. Scanning on the queue opens the linked order directly or creates an
 order from a free document and opens the document screen with that first row.
+The Mobile V1 queue response contains only the order ID, number, creation time,
+warehouse ID, and status. Opening an order reads its full detail separately.
 The queue accepts the device scanner without opening a document list; a compact
 button starts the camera fallback when no embedded scanner is available.
 The server rejects a document with a different sender ID. On the empty creation
@@ -232,6 +234,9 @@ order list, ready orders have no color; active and completed orders use a subtle
 warning row color when current SKU plan or fact is unknown or differs, and a
 subtle success color otherwise. The list also marks completed orders whose
 current discrepancy differs from their latest completion snapshot.
+The Web order list reads a compact order summary with document and current SKU
+counts, discrepancy count, and the post-completion discrepancy marker; the order
+card reads full detail when opened.
 The Web order card shows linked documents in columns for number, date, sender,
 warehouse, warehouse operation, and business operation, without a duplicate
 summary above it. The recheck button shows the latest

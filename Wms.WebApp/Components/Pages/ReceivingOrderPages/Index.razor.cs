@@ -1,6 +1,4 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 using Wms.Application.Receiving;
 using Wms.Domain.Enums;
 
@@ -9,18 +7,17 @@ namespace Wms.WebApp.Components.Pages.ReceivingOrderPages;
 public partial class Index
 {
     [Inject] private IReceivingWorkQueryStore Orders { get; set; } = null!;
-    [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
 
-    private IReadOnlyList<ReceivingWorkOrderView> _orders = [];
+    private IReadOnlyList<ReceivingWorkOrderListView> _orders = [];
     private string? _orderFilter;
     private string? _error;
     private bool _busy;
 
-    private IEnumerable<ReceivingWorkOrderView> FilteredOrders =>
+    private IEnumerable<ReceivingWorkOrderListView> FilteredOrders =>
         string.IsNullOrWhiteSpace(_orderFilter) ? _orders
             : _orders.Where(x => x.Number.Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    private static string OrderRowStyle(ReceivingWorkOrderView order, int _) =>
+    private static string OrderRowStyle(ReceivingWorkOrderListView order, int _) =>
         order.Status == ReceivingOrderStatus.ReadyForReceiving ? ""
             : order.CurrentDiscrepancyCount > 0
                 ? "background-color: var(--mud-palette-warning-hover);"
@@ -34,14 +31,7 @@ public partial class Index
         _error = null;
         try
         {
-            var userId = (await Authentication.GetAuthenticationStateAsync()).User
-                .FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userId is null)
-            {
-                _error = "Не удалось определить пользователя.";
-                return;
-            }
-            _orders = await Orders.ListOrdersAsync(null, userId, CancellationToken.None);
+            _orders = await Orders.ListOrdersAsync(null, CancellationToken.None);
         }
         catch (Exception exception)
         {

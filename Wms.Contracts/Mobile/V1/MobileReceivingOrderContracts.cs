@@ -59,6 +59,10 @@ public sealed record MobileReceivingWorkLpnResponse(
     public string? ResponsibleUserName { get; init; }
 }
 
+public sealed record MobileReceivingOrderQueueResponse(
+    Guid Id, string Number, DateTimeOffset CreatedAtUtc,
+    Guid WarehouseId, MobileReceivingOrderStatus Status);
+
 public sealed record MobileReceivingWorkOrderResponse(
     Guid Id, string Number, DateTimeOffset CreatedAtUtc,
     Guid WarehouseId, MobileReceivingOrderStatus Status,

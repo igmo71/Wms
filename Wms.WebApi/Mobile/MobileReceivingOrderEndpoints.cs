@@ -23,7 +23,7 @@ internal static class MobileReceivingOrderEndpoints
         group.MapPost("", CreateOrderAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapGet("", GetOrdersAsync)
-            .WithMobileResponses<IReadOnlyList<MobileReceivingWorkOrderResponse>>();
+            .WithMobileResponses<IReadOnlyList<MobileReceivingOrderQueueResponse>>();
         group.MapGet("/{orderId:guid}", GetOrderAsync)
             .WithMobileResponses<MobileReceivingWorkOrderResponse>();
         group.MapGet("/{orderId:guid}/sources", GetLinkedSourcesAsync)
@@ -75,7 +75,9 @@ internal static class MobileReceivingOrderEndpoints
 
         // A failed refresh leaves the last successful source version available.
         await synchronize.ExecuteAsync(decoded.Value, ct);
-        var linked = await orders.GetOrderBySourceAsync(decoded.Value, userId, ct);
+        var linkedOrderId = await orders.FindLinkedOrderIdBySourceAsync(decoded.Value, ct);
+        var linked = linkedOrderId is Guid id
+            ? await orders.GetMobileOrderAsync(id, userId, ct) : null;
         if (linked is not null)
         {
             if (linked.WarehouseId != warehouseId)
@@ -110,7 +112,7 @@ internal static class MobileReceivingOrderEndpoints
 
     private static async Task<IResult> GetOrdersAsync(
         Guid warehouseId, ClaimsPrincipal principal,
-        IReceivingWorkQueryStore orders, ApplicationUserQueryService userNames,
+        IReceivingWorkQueryStore orders,
         CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -118,11 +120,11 @@ internal static class MobileReceivingOrderEndpoints
             return TypedResults.Unauthorized();
         if (warehouseId == Guid.Empty)
             return MobileEndpointResults.CommandProblem(OperationError.Invalid("Выберите склад."));
-        var results = await orders.ListOrdersAsync(warehouseId, userId, ct);
-        var names = await userNames.GetDisplayNamesAsync(
-            results.SelectMany(x => x.Lpns.Select(lpn => lpn.ResponsibleUserId)), ct);
-        return TypedResults.Ok<IReadOnlyList<MobileReceivingWorkOrderResponse>>(
-            results.Select(x => MapOrder(x, principal, names)).ToArray());
+        var results = await orders.ListQueueAsync(warehouseId, ct);
+        return TypedResults.Ok<IReadOnlyList<MobileReceivingOrderQueueResponse>>(
+            results.Select(x => new MobileReceivingOrderQueueResponse(
+                x.Id, x.Number, x.CreatedAtUtc, x.WarehouseId,
+                (MobileReceivingOrderStatus)x.Status)).ToArray());
     }
 
     private static async Task<IResult> GetOrderAsync(
@@ -133,7 +135,7 @@ internal static class MobileReceivingOrderEndpoints
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
             return TypedResults.Unauthorized();
-        var order = await orders.GetOrderAsync(orderId, userId, ct);
+        var order = await orders.GetMobileOrderAsync(orderId, userId, ct);
         if (order is null)
             return MobileEndpointResults.CommandProblem(OperationError.NotFound("Приходный ордер не найден."));
         var names = await userNames.GetDisplayNamesAsync(
@@ -148,11 +150,11 @@ internal static class MobileReceivingOrderEndpoints
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
             return TypedResults.Unauthorized();
-        var order = await orders.GetOrderAsync(orderId, userId, ct);
-        if (order is null)
+        var sourceRefKeys = await orders.GetOrderSourceRefKeysAsync(orderId, ct);
+        if (sourceRefKeys is null)
             return MobileEndpointResults.CommandProblem(
                 OperationError.NotFound("Приходный ордер не найден."));
-        var linked = await sources.GetByRefKeysAsync(order.SourceRefKeys, ct);
+        var linked = await sources.GetLinkedSummariesAsync(sourceRefKeys, ct);
         return TypedResults.Ok<IReadOnlyList<MobileReceivingLinkedSourceResponse>>(
             linked.Select(x => new MobileReceivingLinkedSourceResponse(
                 x.RefKey, x.Number, x.Date, x.Sender, x.SenderType,

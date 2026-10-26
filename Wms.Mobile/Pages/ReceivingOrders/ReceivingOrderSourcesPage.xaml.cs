@@ -21,6 +21,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
     private Guid? _newSourceRefKey;
     private bool _visible;
     private bool _busy;
+    private bool _useSuppliedOrderOnNextAppearance;
     private long _scanGeneration;
 
     public ReceivingOrderSourcesPage(MobileReceivingOrderClient orders,
@@ -46,6 +47,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         NumberLabel.Text = $"Ордер {order.Number}";
         _process = process;
         _newSourceRefKey = null;
+        _useSuppliedOrderOnNextAppearance = true;
     }
 
     public void ShowForCreation(Guid warehouseId, Guid? initialSourceRefKey = null)
@@ -55,6 +57,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         _initialSourceRefKey = initialSourceRefKey;
         _order = null;
         _newSourceRefKey = null;
+        _useSuppliedOrderOnNextAppearance = false;
         ShowEmptyState();
     }
 
@@ -68,7 +71,12 @@ public partial class ReceivingOrderSourcesPage : ContentPage
             _initialSourceRefKey = null;
             await CreateInitialSourceAsync(sourceRefKey);
         }
-        else await RefreshAsync();
+        else
+        {
+            var useSuppliedOrder = _useSuppliedOrderOnNextAppearance;
+            _useSuppliedOrderOnNextAppearance = false;
+            await RefreshAsync(useSuppliedOrder);
+        }
         await UpdateCameraAsync();
     }
 
@@ -108,7 +116,7 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         SourcesRefreshView.IsRefreshing = false;
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(bool useSuppliedOrder = false)
     {
         if (_busy) return;
         if (_order is null)
@@ -120,7 +128,8 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         SetBusy(true);
         try
         {
-            _order = await _orders.GetAsync(_order.Id);
+            if (!useSuppliedOrder)
+                _order = await _orders.GetAsync(_order.Id);
             await RefreshSourcesAsync();
             ErrorLabel.Text = string.Empty;
         }

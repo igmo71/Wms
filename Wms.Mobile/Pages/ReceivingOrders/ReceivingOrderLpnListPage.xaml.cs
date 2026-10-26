@@ -15,6 +15,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     private Guid? _pendingSkuId;
     private bool _visible;
     private bool _busy;
+    private bool _useSuppliedOrderOnNextAppearance;
     private long _scanGeneration;
 
     public ReceivingOrderLpnListPage(ReceivingOrderReceivingProcess process,
@@ -37,6 +38,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     {
         _process = process;
         Apply(order);
+        _useSuppliedOrderOnNextAppearance = true;
     }
 
     protected override async void OnAppearing()
@@ -44,7 +46,10 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         base.OnAppearing();
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
-        await RefreshAsync();
+        if (_useSuppliedOrderOnNextAppearance)
+            _useSuppliedOrderOnNextAppearance = false;
+        else
+            await RefreshAsync();
         await UpdateCameraAsync();
     }
 

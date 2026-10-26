@@ -68,20 +68,20 @@ public sealed class ChangeReceivingOrderSources(
                 if (request.Kind == ReceivingSourceChangeKind.Attach
                     && request.Channel == ReceivingSourceChangeChannel.Mobile)
                 {
-                    var preview = await orders.GetOrderAsync(
-                        request.OrderId, request.UserId, operationCt);
-                    if (preview is null)
+                    var status = await orders.GetOrderStatusAsync(
+                        request.OrderId, operationCt);
+                    if (status is null)
                         return OperationError.NotFound("Приходный ордер не найден.");
-                    if (preview.Status is not (ReceivingOrderStatus.ReadyForReceiving
+                    if (status is not (ReceivingOrderStatus.ReadyForReceiving
                         or ReceivingOrderStatus.InReceiving or ReceivingOrderStatus.Received))
                         return OperationError.Conflict("Состав источников нельзя изменить в текущем статусе ордера.");
-                    if (preview.Status == ReceivingOrderStatus.Received
+                    if (status == ReceivingOrderStatus.Received
                         && (!canManage || request.Channel != ReceivingSourceChangeChannel.Web))
                         return OperationError.Conflict("Для изменения источников нужен Manager в Web.");
-                    var linked = await orders.GetOrderBySourceAsync(
-                        request.SourceRefKey, request.UserId, operationCt);
-                    if (linked is not null)
-                        return OperationError.Conflict(linked.Id == request.OrderId
+                    var linkedOrderId = await orders.FindLinkedOrderIdBySourceAsync(
+                        request.SourceRefKey, operationCt);
+                    if (linkedOrderId is Guid id)
+                        return OperationError.Conflict(id == request.OrderId
                             ? "Источник уже привязан к этому ордеру."
                             : "Источник уже привязан к другому ордеру.");
                     var refreshed = await synchronize.ExecuteAsync(request.SourceRefKey, operationCt);

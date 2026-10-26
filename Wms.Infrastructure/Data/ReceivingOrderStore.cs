@@ -34,6 +34,20 @@ public sealed class ReceivingOrderStore(IDbContextFactory<ApplicationDbContext> 
         return await WithVersionsAsync(context, sources, ct);
     }
 
+    public async Task<IReadOnlyList<ReceivingSourceHeader>> LoadSourceHeadersAsync(
+        IReadOnlyCollection<Guid> refKeys, CancellationToken ct)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(ct);
+        return await (from source in context.ReceivingSourceDocuments.AsNoTracking()
+            join version in context.ReceivingSourceVersions.AsNoTracking()
+                on source.LastSuccessfulVersionId equals (Guid?)version.Id into versions
+            from version in versions.DefaultIfEmpty()
+            where refKeys.Contains(source.RefKey)
+            select new ReceivingSourceHeader(source.RefKey,
+                version == null ? null : version.SnapshotJson,
+                source.LastAttemptError)).ToArrayAsync(ct);
+    }
+
     public async Task<IReadOnlyList<ReceivingSourceState>> ListUnlinkedSourcesAsync(
         CancellationToken ct)
     {

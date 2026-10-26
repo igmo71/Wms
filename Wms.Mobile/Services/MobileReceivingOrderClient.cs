@@ -9,9 +9,9 @@ public sealed class MobileReceivingOrderClient
     internal MobileReceivingOrderClient(MobileApiTransport transport) => this.transport = transport;
     private static string Route => MobileApiRoutes.ReceivingOrders;
 
-    public Task<IReadOnlyList<MobileReceivingWorkOrderResponse>> GetOrdersAsync(
+    public Task<IReadOnlyList<MobileReceivingOrderQueueResponse>> GetOrdersAsync(
         Guid warehouseId, CancellationToken ct = default) =>
-        GetListAsync<MobileReceivingWorkOrderResponse>($"{Route}?warehouseId={warehouseId:D}", ct);
+        GetListAsync<MobileReceivingOrderQueueResponse>($"{Route}?warehouseId={warehouseId:D}", ct);
 
     public Task<MobileReceivingWorkOrderResponse> GetAsync(
         Guid orderId, CancellationToken ct = default) =>

@@ -724,6 +724,10 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
             IReadOnlyCollection<Guid> refKeys, CancellationToken ct) =>
             inner.LoadSourcesAsync(refKeys, ct);
 
+        public Task<IReadOnlyList<ReceivingSourceHeader>> LoadSourceHeadersAsync(
+            IReadOnlyCollection<Guid> refKeys, CancellationToken ct) =>
+            inner.LoadSourceHeadersAsync(refKeys, ct);
+
         public Task<IReadOnlyList<ReceivingSourceState>> ListUnlinkedSourcesAsync(
             CancellationToken ct) => inner.ListUnlinkedSourcesAsync(ct);
 

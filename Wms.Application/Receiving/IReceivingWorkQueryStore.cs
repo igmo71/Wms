@@ -92,18 +92,36 @@ public sealed record ReceivingWorkOrderView(
     }
 }
 
+public sealed record ReceivingWorkOrderQueueView(
+    Guid Id, string Number, DateTimeOffset CreatedAtUtc,
+    Guid WarehouseId, ReceivingOrderStatus Status);
+
+public sealed record ReceivingWorkOrderListView(
+    Guid Id, string Number, DateTimeOffset CreatedAtUtc,
+    Guid WarehouseId, string? WarehouseName, ReceivingOrderStatus Status,
+    int SourceCount, int CurrentItemCount, int CurrentDiscrepancyCount,
+    bool HasNewDiscrepancyAfterCompletion);
+
 public sealed record ReceivingPutawayRecommendationView(
     Guid StorageLocationId, string Address, string Name,
     decimal? CurrentSkuQuantity);
 
 public interface IReceivingWorkQueryStore
 {
-    Task<IReadOnlyList<ReceivingWorkOrderView>> ListOrdersAsync(
-        Guid? warehouseId, string userId, CancellationToken ct);
+    Task<IReadOnlyList<ReceivingWorkOrderQueueView>> ListQueueAsync(
+        Guid warehouseId, CancellationToken ct);
+    Task<IReadOnlyList<ReceivingWorkOrderListView>> ListOrdersAsync(
+        Guid? warehouseId, CancellationToken ct);
     Task<ReceivingWorkOrderView?> GetOrderAsync(
         Guid orderId, string userId, CancellationToken ct);
-    Task<ReceivingWorkOrderView?> GetOrderBySourceAsync(
-        Guid refKey, string userId, CancellationToken ct);
+    Task<ReceivingWorkOrderView?> GetMobileOrderAsync(
+        Guid orderId, string userId, CancellationToken ct);
+    Task<ReceivingOrderStatus?> GetOrderStatusAsync(
+        Guid orderId, CancellationToken ct);
+    Task<IReadOnlyList<Guid>?> GetOrderSourceRefKeysAsync(
+        Guid orderId, CancellationToken ct);
+    Task<Guid?> FindLinkedOrderIdBySourceAsync(
+        Guid refKey, CancellationToken ct);
     Task<ReceivingWorkLpnView?> GetLpnAsync(
         Guid? lpnId, string? code, CancellationToken ct);
     Task<IReadOnlyDictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>>

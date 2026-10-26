@@ -32,9 +32,20 @@ public sealed record ReceivingSourceLineView(
     int LineNumber, Guid? SourceSkuRefKey, Guid? StockKeepingUnitId,
     string? RawQuantity, decimal? Quantity, string? Error);
 
+public sealed record ReceivingLinkedSourceSummary(
+    Guid RefKey, string? Number, string? Date, string? Sender,
+    string? SenderType, string? WarehouseOperation, string? BusinessOperation,
+    string? BasisDocument, string? BasisDocumentType,
+    string? SenderName, string? LastAttemptError);
+
+public sealed record ReceivingSourceHeader(
+    Guid RefKey, string? SnapshotJson, string? LastAttemptError);
+
 public interface IReceivingOrderStore
 {
     Task<IReadOnlyList<ReceivingSourceState>> LoadSourcesAsync(
+        IReadOnlyCollection<Guid> refKeys, CancellationToken ct);
+    Task<IReadOnlyList<ReceivingSourceHeader>> LoadSourceHeadersAsync(
         IReadOnlyCollection<Guid> refKeys, CancellationToken ct);
 
     Task<IReadOnlyList<ReceivingSourceState>> ListUnlinkedSourcesAsync(CancellationToken ct);
@@ -71,6 +82,9 @@ public sealed class GetReceivingSources(
     IReceivingOrderStore store, IReceivingSourceParser parser,
     IReceivingReferenceNames names)
 {
+    private const string PartnerSenderType = "StandardODATA.Catalog_Партнеры";
+    private const string WarehouseSenderType = "StandardODATA.Catalog_Склады";
+
     public async Task<IReadOnlyList<ReceivingSourceView>> ListAllAsync(
         CancellationToken ct = default)
     {
@@ -91,6 +105,50 @@ public sealed class GetReceivingSources(
         if (refKeys is null || refKeys.Count == 0)
             return [];
         return await MapAsync(await store.LoadSourcesAsync(refKeys.Distinct().ToArray(), ct), ct);
+    }
+
+    public async Task<IReadOnlyList<ReceivingLinkedSourceSummary>> GetLinkedSummariesAsync(
+        IReadOnlyCollection<Guid> refKeys, CancellationToken ct = default)
+    {
+        if (refKeys is null || refKeys.Count == 0)
+            return [];
+        var headers = await store.LoadSourceHeadersAsync(refKeys.Distinct().ToArray(), ct);
+        if (headers.Count == 0)
+            return [];
+        var summaries = headers.Select(header =>
+        {
+            var parsed = header.SnapshotJson is { } json
+                ? parser.Parse(header.RefKey, json).Value : null;
+            return new ReceivingLinkedSourceSummary(header.RefKey,
+                parsed?.Number, parsed?.Date, parsed?.Sender, parsed?.SenderType,
+                parsed?.WarehouseOperation, parsed?.BusinessOperation,
+                parsed?.BasisDocument, parsed?.BasisDocumentType,
+                null, header.LastAttemptError);
+        }).ToArray();
+        var warehouseIds = summaries.Where(x => x.SenderType == WarehouseSenderType
+                && Guid.TryParse(x.Sender, out _))
+            .Select(x => Guid.Parse(x.Sender!)).Distinct().ToArray();
+        var partnerIds = summaries.Where(x => x.SenderType == PartnerSenderType
+                && Guid.TryParse(x.Sender, out _))
+            .Select(x => Guid.Parse(x.Sender!)).Distinct().ToArray();
+        if (warehouseIds.Length == 0 && partnerIds.Length == 0)
+            return summaries;
+        var references = await names.GetAsync(warehouseIds, [], partnerIds, ct);
+        return summaries.Select(x => x with
+        {
+            SenderName = ResolveSenderName(x.SenderType, x.Sender, references)
+        }).ToArray();
+    }
+
+    private static string? ResolveSenderName(
+        string? senderType, string? sender, ReceivingReferenceNames references)
+    {
+        if (!Guid.TryParse(sender, out var senderId))
+            return null;
+        if (senderType == PartnerSenderType)
+            return references.Partners.GetValueOrDefault(senderId);
+        return senderType == WarehouseSenderType
+            ? references.Warehouses.GetValueOrDefault(senderId) : null;
     }
 
     private async Task<IReadOnlyList<ReceivingSourceView>> MapAsync(
@@ -140,13 +198,13 @@ public sealed class GetReceivingSources(
         }
         var warehouseIds = results.Where(x => x.WarehouseId.HasValue)
             .Select(x => x.WarehouseId!.Value)
-            .Concat(results.Where(x => x.SenderType == "StandardODATA.Catalog_Склады"
+            .Concat(results.Where(x => x.SenderType == WarehouseSenderType
                     && Guid.TryParse(x.Sender, out _))
                 .Select(x => Guid.Parse(x.Sender!))).Distinct().ToArray();
         var skuIds = results.SelectMany(x => x.PlanBySku.Keys
             .Concat(x.Lines.Where(line => line.StockKeepingUnitId.HasValue)
                 .Select(line => line.StockKeepingUnitId!.Value))).Distinct().ToArray();
-        var partnerIds = results.Where(x => x.SenderType == "StandardODATA.Catalog_Партнеры"
+        var partnerIds = results.Where(x => x.SenderType == PartnerSenderType
                 && Guid.TryParse(x.Sender, out _))
             .Select(x => Guid.Parse(x.Sender!)).Distinct().ToArray();
         var references = await names.GetAsync(warehouseIds, skuIds, partnerIds, ct);
@@ -155,14 +213,7 @@ public sealed class GetReceivingSources(
             WarehouseName = source.WarehouseId is Guid warehouseId
                 && references.Warehouses.TryGetValue(warehouseId, out var warehouseName)
                     ? warehouseName : null,
-            SenderName = source.SenderType == "StandardODATA.Catalog_Партнеры"
-                && Guid.TryParse(source.Sender, out var partnerId)
-                && references.Partners.TryGetValue(partnerId, out var partnerName)
-                    ? partnerName : source.SenderType == "StandardODATA.Catalog_Склады"
-                        && Guid.TryParse(source.Sender, out var senderWarehouseId)
-                        && references.Warehouses.TryGetValue(senderWarehouseId,
-                            out var senderWarehouseName)
-                            ? senderWarehouseName : null,
+            SenderName = ResolveSenderName(source.SenderType, source.Sender, references),
             SkuNames = references.Skus
         }).ToArray();
     }

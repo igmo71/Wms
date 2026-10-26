@@ -31,7 +31,7 @@
         }
         else
         {
-            <MudTable T="ReceivingWorkOrderView" Items="FilteredOrders" Dense="true" Hover="true"
+            <MudTable T="ReceivingWorkOrderListView" Items="FilteredOrders" Dense="true" Hover="true"
                       Elevation="0" RowsPerPage="15" RowStyleFunc="OrderRowStyle">
                 <HeaderContent><MudTh>Номер WMS</MudTh><MudTh>Создан</MudTh><MudTh>Склад</MudTh><MudTh>Статус</MudTh><MudTh>Документов 1С</MudTh><MudTh>Строк</MudTh><MudTh>Расхождения и непроверенные SKU</MudTh></HeaderContent>
                 <RowTemplate>
@@ -39,8 +39,8 @@
                     <MudTd DataLabel="Создан">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</MudTd>
                     <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudTd>
                     <MudTd DataLabel="Статус"><ReceivingStatusText Status="@context.Status" /></MudTd>
-                    <MudTd DataLabel="Документов 1С">@context.SourceRefKeys.Count</MudTd>
-                    <MudTd DataLabel="Строк">@context.CurrentItems.Count</MudTd>
+                    <MudTd DataLabel="Документов 1С">@context.SourceCount</MudTd>
+                    <MudTd DataLabel="Строк">@context.CurrentItemCount</MudTd>
                     <MudTd DataLabel="Расхождения и непроверенные SKU">@context.CurrentDiscrepancyCount
                         @if (context.HasNewDiscrepancyAfterCompletion)
                         {
