@@ -34,6 +34,12 @@ page activity, including after leaving and returning to the same live page.
 Independent putaway starts from its own LPN screen. Its placement history shows
 the destination cell address.
 
+Web has a read-only placement history page under «Размещение» for Operator and
+Manager. It lists the actor, LPN, SKU, quantity, destination address,
+warehouse and local time, newest first, with server paging. The page filters
+by inclusive local date range, LPN number, SKU name substring, user name or
+login, and destination cell address; filters can be combined.
+
 The Mobile receiving queue lists WMS orders for the selected warehouse.
 «Создать ордер» opens an initially
 empty document screen. The first successful scan creates an order with that

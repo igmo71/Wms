@@ -106,6 +106,21 @@ public sealed record ReceivingPutawayRecommendationView(
     Guid StorageLocationId, string Address, string Name,
     decimal? CurrentSkuQuantity);
 
+public sealed record ReceivingPutawayHistoryRow(
+    Guid SkuId, DateTimeOffset CreatedAtUtc, string CreatedBy,
+    string LpnCode, string? SkuName, string? SkuCode,
+    decimal Quantity, string? UnitOfMeasure,
+    string DestinationAddress, string? WarehouseName);
+
+public sealed record ReceivingPutawayHistoryPage(
+    IReadOnlyList<ReceivingPutawayHistoryRow> Items, int TotalItems);
+
+public sealed record ReceivingPutawayHistoryQuery(
+    DateTime? DateFrom, DateTime? DateTo,
+    string? LpnCode, string? SkuName,
+    string? UserName, string? DestinationAddress,
+    int Skip, int Take);
+
 public interface IReceivingWorkQueryStore
 {
     Task<IReadOnlyList<ReceivingWorkOrderQueueView>> ListQueueAsync(
@@ -131,4 +146,6 @@ public interface IReceivingWorkQueryStore
     Task<IReadOnlyList<ReceivingPutawayRecommendationView>>
         GetPutawayRecommendationsAsync(
             Guid warehouseId, Guid skuId, CancellationToken ct);
+    Task<ReceivingPutawayHistoryPage> ListPutawayHistoryAsync(
+        ReceivingPutawayHistoryQuery filter, CancellationToken ct);
 }

@@ -9,6 +9,79 @@ namespace Wms.Data;
 public sealed class ReceivingWorkQueryStore(
     IDbContextFactory<ApplicationDbContext> contextFactory) : IReceivingWorkQueryStore
 {
+    public async Task<ReceivingPutawayHistoryPage> ListPutawayHistoryAsync(
+        ReceivingPutawayHistoryQuery filter, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        if (filter.DateFrom is DateTime start && filter.DateTo is DateTime end
+            && start.Date > end.Date)
+            return new ReceivingPutawayHistoryPage([], 0);
+
+        var query = db.LicensePlateNumberPutaways.AsNoTracking();
+        if (filter.DateFrom is DateTime dateFrom)
+        {
+            var fromUtc = StartOfLocalDayUtc(dateFrom);
+            query = query.Where(x => x.CreatedAtUtc >= fromUtc);
+        }
+        if (filter.DateTo is DateTime dateTo && dateTo.Date < DateTime.MaxValue.Date)
+        {
+            var throughUtc = StartOfLocalDayUtc(dateTo.Date.AddDays(1));
+            query = query.Where(x => x.CreatedAtUtc < throughUtc);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.LpnCode))
+        {
+            var search = filter.LpnCode.Trim();
+            query = query.Where(x => x.LicensePlateNumber.Code.Contains(search));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.SkuName))
+        {
+            var search = filter.SkuName.Trim();
+            query = query.Where(x => x.StockKeepingUnit.Name != null
+                && x.StockKeepingUnit.Name.Contains(search));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.UserName))
+        {
+            var search = filter.UserName.Trim();
+            query = query.Where(x => x.CreatedBy.Contains(search)
+                || db.Users.Any(user => user.Id == x.CreatedBy
+                    && (user.DisplayName.Contains(search)
+                        || user.UserName != null && user.UserName.Contains(search))));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.DestinationAddress))
+        {
+            var address = StorageLocationAddress.Normalize(filter.DestinationAddress);
+            if (!address.IsSuccess)
+                return new ReceivingPutawayHistoryPage([], 0);
+            var search = address.Value!;
+            query = query.Where(x => x.DestinationStorageLocation.Code.Contains(search));
+        }
+
+        var totalItems = await query.CountAsync(ct);
+        var putaways = await query
+            .Include(x => x.LicensePlateNumber)
+            .Include(x => x.StockKeepingUnit).ThenInclude(x => x.BaseUnitOfMeasure)
+            .Include(x => x.DestinationStorageLocation).ThenInclude(x => x.Warehouse)
+            .OrderByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id)
+            .Skip(Math.Max(0, filter.Skip)).Take(Math.Clamp(filter.Take, 1, 100))
+            .ToArrayAsync(ct);
+
+        return new ReceivingPutawayHistoryPage(putaways.Select(x =>
+            new ReceivingPutawayHistoryRow(
+                x.StockKeepingUnitId, x.CreatedAtUtc, x.CreatedBy,
+                x.LicensePlateNumber.Code,
+                x.StockKeepingUnit.Name, x.StockKeepingUnit.Code,
+                x.Quantity,
+                x.StockKeepingUnit.BaseUnitOfMeasure?.Description
+                    ?? x.StockKeepingUnit.BaseUnitOfMeasure?.Abbreviation,
+                x.DestinationStorageLocation.DisplayAddress,
+                x.DestinationStorageLocation.Warehouse?.Name)).ToArray(), totalItems);
+    }
+
+    private static DateTimeOffset StartOfLocalDayUtc(DateTime date) =>
+        new(TimeZoneInfo.ConvertTimeToUtc(
+            DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified),
+            TimeZoneInfo.Local), TimeSpan.Zero);
+
     public async Task<IReadOnlyList<ReceivingWorkOrderQueueView>> ListQueueAsync(
         Guid warehouseId, CancellationToken ct)
     {

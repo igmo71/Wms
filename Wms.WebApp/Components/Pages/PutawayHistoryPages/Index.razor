@@ -1,0 +1,79 @@
+@page "/putaway-history"
+@attribute [Authorize(Roles = "Operator,Manager")]
+@using Wms.Application.Receiving
+
+<PageTitle>История размещения</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h5">История размещения</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync">Обновить</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-3 mb-4" Elevation="1">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6" md="4">
+            <MudDatePicker Label="Дата с" Date="_dateFrom" DateChanged="OnDateFromChangedAsync" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudDatePicker Label="Дата по" Date="_dateTo" DateChanged="OnDateToChangedAsync" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField T="string" Value="_lpnCode" ValueChanged="OnLpnCodeChangedAsync"
+                          Label="LPN" Immediate="true" DebounceInterval="300" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField T="string" Value="_skuName" ValueChanged="OnSkuNameChangedAsync"
+                          Label="Наименование SKU" Immediate="true" DebounceInterval="300" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField T="string" Value="_userName" ValueChanged="OnUserNameChangedAsync"
+                          Label="Пользователь" Immediate="true" DebounceInterval="300" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField T="string" Value="_destinationAddress" ValueChanged="OnDestinationAddressChangedAsync"
+                          Label="Ячейка" Immediate="true" DebounceInterval="300" Clearable="true" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_dateFrom is DateTime dateFrom && _dateTo is DateTime dateTo && dateFrom.Date > dateTo.Date)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">Дата «с» позже даты «по».</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+<MudDataGrid T="ReceivingPutawayHistoryRow" @ref="_grid" ServerData="LoadAsync"
+             SortMode="SortMode.None" Filterable="false" Hover="true" Dense="true" RowsPerPage="25">
+    <Columns>
+        <TemplateColumn Title="Дата" Sortable="false">
+            <CellTemplate>@context.Item.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Пользователь" Sortable="false">
+            <CellTemplate>@UserName(context.Item.CreatedBy)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="LPN" Sortable="false">
+            <CellTemplate>@context.Item.LpnCode</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="SKU" Sortable="false">
+            <CellTemplate>@SkuText(context.Item)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Количество" Sortable="false">
+            <CellTemplate>@context.Item.Quantity.ToString("N3") @(context.Item.UnitOfMeasure ?? "ед. изм. неизвестна")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Ячейка" Sortable="false">
+            <CellTemplate>@context.Item.DestinationAddress</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Склад" Sortable="false">
+            <CellTemplate>@(context.Item.WarehouseName ?? "—")</CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>Размещений нет.</MudText></NoRecordsContent>
+    <PagerContent>
+        <MudDataGridPager T="ReceivingPutawayHistoryRow" PageSizeOptions="new[] { 10, 25, 50 }" />
+    </PagerContent>
+</MudDataGrid>
