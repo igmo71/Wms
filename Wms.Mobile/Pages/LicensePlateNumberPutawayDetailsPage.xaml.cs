@@ -39,7 +39,7 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
             x.SkuName ?? x.SkuId.ToString(),
             $"Принято {x.Quantity:0.###} · размещено {x.PlacedQuantity:0.###} · осталось {x.RemainingQuantity:0.###} {x.UnitOfMeasure ?? "—"} · срок {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}")).ToArray();
         History = lpn.Putaways.Select(x => new ReceivingPutawayHistoryRow(
-            $"{x.Quantity:0.###} → {x.DestinationStorageLocationId} · {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}")).ToArray();
+            $"{x.Quantity:0.###} → {x.DestinationAddress ?? "Адрес не указан"} · {x.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm}")).ToArray();
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(History));
         NextLpnButton.IsVisible = !lpn.Items.Any(x => x.RemainingQuantity > 0);

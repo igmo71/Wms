@@ -344,5 +344,8 @@ internal static class MobileReceivingOrderEndpoints
             x.Quantity - x.PlacedQuantity)).ToArray(),
         lpn.Putaways.Select(x => new MobileReceivingWorkPutawayResponse(
             x.Id, x.ItemId, x.DestinationStorageLocationId,
-            x.Quantity, x.CreatedAtUtc, x.MovementId)).ToArray());
+            x.Quantity, x.CreatedAtUtc, x.MovementId)
+        {
+            DestinationAddress = x.DestinationAddress
+        }).ToArray());
 }

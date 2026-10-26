@@ -47,7 +47,10 @@ public sealed record MobileReceivingWorkLpnItemResponse(
 
 public sealed record MobileReceivingWorkPutawayResponse(
     Guid Id, Guid ItemId, Guid DestinationStorageLocationId,
-    decimal Quantity, DateTimeOffset CreatedAtUtc, Guid MovementId);
+    decimal Quantity, DateTimeOffset CreatedAtUtc, Guid MovementId)
+{
+    public string? DestinationAddress { get; init; }
+}
 
 public sealed record MobileReceivingWorkLpnResponse(
     Guid Id, string Code, Guid OrderId, Guid WarehouseId,

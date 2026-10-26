@@ -31,8 +31,11 @@ only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
 can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
-Independent putaway starts from its own LPN screen. The Mobile receiving queue
-lists WMS orders for the selected warehouse. «Создать ордер» opens an initially
+Independent putaway starts from its own LPN screen. Its placement history shows
+the destination cell address.
+
+The Mobile receiving queue lists WMS orders for the selected warehouse.
+«Создать ордер» opens an initially
 empty document screen. The first successful scan creates an order with that
 document; each later scan immediately attaches another document and recalculates
 its plan. Scanning on the queue opens the linked order directly or creates an
