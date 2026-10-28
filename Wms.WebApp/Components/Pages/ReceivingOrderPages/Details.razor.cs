@@ -108,7 +108,7 @@ public partial class Details
         {
             _pendingCompleteRequestId ??= Guid.NewGuid();
             var result = await CompleteOrder.ExecuteAsync(new CompleteReceivingOrderRequest(
-                _pendingCompleteRequestId.Value, Id, _userId));
+                _pendingCompleteRequestId.Value, Id, _userId, FromWeb: true));
             if (!result.IsSuccess)
             {
                 _pendingCompleteRequestId = null;
@@ -297,7 +297,8 @@ public partial class Details
                 _pendingClose = (lpn.Id, lpn.Revision, expired, Guid.NewGuid());
             var result = await CloseLpn.ExecuteAsync(new CloseReceivingLpnCommand(
                 _pendingClose.Value.RequestId, Id, lpn.Id, _userId,
-                ConfirmExpiredDate: expired, ExpectedLpnRevision: lpn.Revision));
+                ConfirmExpiredDate: expired, ExpectedLpnRevision: lpn.Revision,
+                FromWeb: true));
             if (!result.IsSuccess)
             {
                 _pendingClose = null;

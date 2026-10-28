@@ -35,7 +35,7 @@ public sealed class PutAwayReceivingLpn(
         return executor.ExecuteAsync(CommandType, command.RequestId, hash, command.UserId,
             async (session, operationCt) =>
             {
-                var access = await permission.RequireReceivingWorkerAsync(
+                var access = await permission.RequireOperatorAsync(
                     command.UserId, operationCt);
                 if (!access.IsSuccess)
                     return access.Error!;

@@ -65,7 +65,8 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
             revision = (await read.LicensePlateNumbers.SingleAsync(x => x.Id == state.LpnId))
                 .OperationalRevision;
         var command = new CloseReceivingLpnCommand(Guid.NewGuid(), state.OrderId,
-            state.LpnId, "manager-test", ExpectedLpnRevision: revision + 1);
+            state.LpnId, "manager-test", ExpectedLpnRevision: revision + 1,
+            FromWeb: true);
 
         Error(await Handler(state.Reader).ExecuteAsync(command), OperationErrorType.Conflict);
 
@@ -76,6 +77,40 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
             x.LicensePlateNumberId == state.LpnId));
         Assert.False(await verify.CommandReceipts.AnyAsync(x =>
             x.CommandType == "receiving.lpn.close" && x.RequestId == command.RequestId));
+    }
+
+    [Fact]
+    public async Task Manager_only_cannot_post_mobile_close_but_can_close_prepared_lpn_in_web()
+    {
+        var state = await SeedAsync(5m, 3m);
+        var close = Handler(state.Reader);
+        var mobileRequestId = Guid.NewGuid();
+        Error(await close.ExecuteAsync(new CloseReceivingLpnCommand(
+            mobileRequestId, state.OrderId, state.LpnId, "manager-only-test")),
+            OperationErrorType.Conflict);
+
+        long revision;
+        await using (var read = database.CreateDbContext())
+        {
+            Assert.False(await read.InventoryMovements.AnyAsync(x =>
+                x.LicensePlateNumberId == state.LpnId));
+            Assert.False(await read.CommandReceipts.AnyAsync(x =>
+                x.RequestId == mobileRequestId));
+            revision = (await read.LicensePlateNumbers.SingleAsync(x =>
+                x.Id == state.LpnId)).OperationalRevision;
+        }
+
+        Error(await close.ExecuteAsync(new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test",
+            ExpectedLpnRevision: revision, FromWeb: true)),
+            OperationErrorType.Conflict);
+        var webResult = Value(await close.ExecuteAsync(new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "manager-only-test",
+            ExpectedLpnRevision: revision, FromWeb: true)));
+        Assert.Equal(state.LpnId, webResult.LpnId);
+        await using var verify = database.CreateDbContext();
+        Assert.Single(await verify.InventoryMovements.Where(x =>
+            x.LicensePlateNumberId == state.LpnId).ToListAsync());
     }
 
     [Fact]
@@ -338,9 +373,9 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     private sealed class ReceivingPermission : IWarehousePermissionStore
     {
         public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
-            Task.FromResult(userId == "manager-test");
+            Task.FromResult(userId is "manager-test" or "manager-only-test");
 
-        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(userId is "operator-test" or "manager-test");
     }
 

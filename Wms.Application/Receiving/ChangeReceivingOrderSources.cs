@@ -54,13 +54,13 @@ public sealed class ChangeReceivingOrderSources(
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
             async (session, operationCt) =>
             {
-                var access = await permission.RequireReceivingWorkerAsync(request.UserId, operationCt);
+                var access = request.Channel == ReceivingSourceChangeChannel.Web
+                    ? await permission.RequireManagerAsync(request.UserId, operationCt)
+                    : await permission.RequireOperatorAsync(request.UserId, operationCt);
                 if (!access.IsSuccess)
                     return access.Error!;
                 var canManage = (await permission.RequireManagerAsync(
                     request.UserId, operationCt)).IsSuccess;
-                if (request.Channel == ReceivingSourceChangeChannel.Web && !canManage)
-                    return OperationError.Conflict("Для изменения источников в Web нужна роль Manager.");
                 if (request.Channel == ReceivingSourceChangeChannel.Web
                     && string.IsNullOrWhiteSpace(request.StateToken))
                     return OperationError.Invalid("Перед изменением состава обновите предпросмотр.");

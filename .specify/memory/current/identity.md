@@ -2,19 +2,21 @@
 
 ## Identity and access
 
-WebApp uses ASP.NET Core Identity with three roles. `Operator` runs warehouse
-operations and reports; `Manager` can also correct eligible closed receiving
-LPNs, reopen completed receiving orders for a new cycle, and close open LPNs
-for another user or when the resulting fact would exceed the plan or the plan
-is unknown; `Administrator` manages configuration and users.
+WebApp uses ASP.NET Core Identity with three independent roles. `Operator`
+performs ordinary warehouse operations; `Manager` makes receiving control
+decisions and handles exceptions; `Administrator` manages configuration and
+users. Combined duties require explicit membership in each relevant role.
 Legacy warehouse workflows still allow some operations with `Administrator`,
 pending their replacement. New receiving manager actions require
-explicit `Manager` membership, including for an administrator. SKU selection
-and cycle/LPN work in the new receiving use cases accept `Operator` or
-`Manager`; `Administrator` alone grants none of those commands. A `Manager`
-may edit or cancel another user's open receiving LPN. Imported catalog
-lists are visible to `Manager` and `Administrator`; manual synchronization from
-WebApp or the catalog import API requires `Manager` at execution. Changing the
+explicit `Manager` membership, including for an administrator. Mobile
+receiving and putaway require `Operator`; approving a Mobile manager exception
+also requires `Manager`. Web receiving is readable to either role. A Web
+`Manager` can change order sources, complete a cycle, close an already filled
+LPN, correct or delete a closed LPN, and reopen an order without `Operator`.
+An `Operator` with `Manager` may edit, clear, or cancel another user's open LPN
+in Mobile. `Administrator` alone grants none of the new receiving commands.
+Imported catalog lists are visible to `Manager` and `Administrator`; manual
+synchronization from WebApp or the catalog import API requires `Manager` at execution. Changing the
 SKU expiration-tracking flag also requires `Manager` at execution. Zones and
 storage locations remain administrator-only configuration. Public
 self-registration is not offered; administrator-created accounts are confirmed

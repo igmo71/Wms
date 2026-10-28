@@ -7,7 +7,7 @@ using Wms.Domain;
 namespace Wms.Application.Receiving;
 
 public sealed record CompleteReceivingOrderRequest(
-    Guid RequestId, Guid OrderId, string UserId);
+    Guid RequestId, Guid OrderId, string UserId, bool FromWeb = false);
 
 public sealed class CompleteReceivingOrder(
     CommandExecutor executor, IReceivingWorkStore store,
@@ -27,8 +27,9 @@ public sealed class CompleteReceivingOrder(
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
             async (session, operationCt) =>
             {
-                var access = await permission.RequireReceivingWorkerAsync(
-                    request.UserId, operationCt);
+                var access = request.FromWeb
+                    ? await permission.RequireManagerAsync(request.UserId, operationCt)
+                    : await permission.RequireOperatorAsync(request.UserId, operationCt);
                 if (!access.IsSuccess)
                     return access.Error!;
                 var canManage = (await permission.RequireManagerAsync(

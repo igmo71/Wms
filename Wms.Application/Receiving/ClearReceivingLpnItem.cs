@@ -26,7 +26,7 @@ public sealed class ClearReceivingLpnItem(
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
             async (session, operationCt) =>
             {
-                var access = await permission.RequireReceivingWorkerAsync(
+                var access = await permission.RequireOperatorAsync(
                     request.UserId, operationCt);
                 if (!access.IsSuccess)
                     return access.Error!;

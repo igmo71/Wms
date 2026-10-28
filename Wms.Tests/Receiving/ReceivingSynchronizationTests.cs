@@ -226,7 +226,7 @@ public sealed class ReceivingSynchronizationTests(SqlDatabase database)
         public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(true);
 
-        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(true);
     }
 }

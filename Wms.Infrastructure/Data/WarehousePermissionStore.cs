@@ -17,15 +17,14 @@ internal sealed class WarehousePermissionStore(IDbContextFactory<ApplicationDbCo
             select membership).AnyAsync(ct);
     }
 
-    public async Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct)
+    public async Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);
         return await (
             from membership in context.UserRoles
             join role in context.Roles on membership.RoleId equals role.Id
             where membership.UserId == userId
-                && (role.Name == WarehousePermission.OperatorRole
-                    || role.Name == WarehousePermission.ManagerRole)
+                && role.Name == WarehousePermission.OperatorRole
             select membership).AnyAsync(ct);
     }
 }

@@ -136,7 +136,7 @@ The cross discards an unsaved selection locally or, after confirmation, clears
 the saved SKU, quantity and expiration date on the server. The LPN remains open
 and the order-scoped search appears again. A closed LPN has no cross.
 
-A current-cycle participant or Manager can complete an order from the SKU or
+A current-cycle Operator can complete an order from the SKU or
 LPN list when no LPN remains open. Mobile confirms the decision, retains the
 command ID for uncertain retry and returns to the refreshed queue on success.
 

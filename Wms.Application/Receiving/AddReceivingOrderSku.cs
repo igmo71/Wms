@@ -27,7 +27,7 @@ public sealed class AddReceivingOrderSku(
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
             async (session, operationCt) =>
             {
-                var allowed = await permission.RequireReceivingWorkerAsync(
+                var allowed = await permission.RequireOperatorAsync(
                     request.UserId, operationCt);
                 if (!allowed.IsSuccess)
                     return allowed.Error!;

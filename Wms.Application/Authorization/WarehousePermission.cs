@@ -5,7 +5,7 @@ namespace Wms.Application.Authorization;
 public interface IWarehousePermissionStore
 {
     Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct);
-    Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct);
+    Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct);
 }
 
 public sealed class WarehousePermission(IWarehousePermissionStore store)
@@ -21,12 +21,12 @@ public sealed class WarehousePermission(IWarehousePermissionStore store)
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> RequireReceivingWorkerAsync(
+    public async Task<OperationResult> RequireOperatorAsync(
         string? userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userId)
-            || !await store.HasReceivingRoleAsync(userId, ct))
-            return OperationError.Conflict("Для этого действия требуется роль Operator или Manager.");
+            || !await store.HasOperatorRoleAsync(userId, ct))
+            return OperationError.Conflict("Для этого действия требуется роль Operator.");
 
         return OperationResult.Success();
     }

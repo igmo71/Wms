@@ -422,12 +422,17 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
 
         var executor = new CommandExecutor(new CommandExecutionStore(database));
         var workStore = new ReceivingWorkStore(database);
-        var permission = new WarehousePermission(new ManagerPermission());
+        var permission = new WarehousePermission(new ManagerPermission(operatorRole: false));
         var close = new CloseReceivingLpn(executor, workStore, synchronize, parser,
             new Wms.Application.Inventory.PostInventoryMovement.Handler(new InventoryPostingStore()),
             permission, TimeProvider.System);
+        long lpnRevision;
+        await using (var read = database.CreateDbContext())
+            lpnRevision = (await read.LicensePlateNumbers.SingleAsync(x => x.Id == lpnId))
+                .OperationalRevision;
         Assert.Equal(2m, Value(await close.ExecuteAsync(new CloseReceivingLpnCommand(
-            Guid.NewGuid(), orderId, lpnId, "manager"))).UsedPlan);
+            Guid.NewGuid(), orderId, lpnId, "manager",
+            ExpectedLpnRevision: lpnRevision, FromWeb: true))).UsedPlan);
 
         var store = new ReceivingOrderSourceChangeStore(database);
         var preview = new PreviewReceivingOrderSourceChange(store, parser, synchronize,
@@ -447,7 +452,8 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         var complete = new CompleteReceivingOrder(executor, workStore, synchronize,
             permission, TimeProvider.System);
         Assert.Equal(orderId, Value(await complete.ExecuteAsync(
-            new CompleteReceivingOrderRequest(Guid.NewGuid(), orderId, "manager"))));
+            new CompleteReceivingOrderRequest(Guid.NewGuid(), orderId, "manager",
+                FromWeb: true))));
         var detachToken = Value(await preview.ExecuteAsync(
             new PreviewReceivingOrderSourceChangeRequest(orderId, firstKey,
                 ReceivingSourceChangeKind.Detach, "manager"))).StateToken;
@@ -756,13 +762,13 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
                 new ReceivingSourceRead(refKey, responses[refKey]));
     }
 
-    private sealed class ManagerPermission : IWarehousePermissionStore
+    private sealed class ManagerPermission(bool operatorRole = true) : IWarehousePermissionStore
     {
         public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(true);
 
-        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
-            Task.FromResult(true);
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(operatorRole);
     }
 
     private sealed class ManagerAndOperatorPermission : IWarehousePermissionStore
@@ -770,7 +776,7 @@ public sealed class ReceivingOrderCreationTests(SqlDatabase database)
         public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(userId == "manager");
 
-        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(userId is "manager" or "operator");
     }
 }

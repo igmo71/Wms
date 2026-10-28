@@ -62,7 +62,7 @@ public sealed class ExpirationTrackingTests(SqlDatabase database)
         public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(userId == "manager-test");
 
-        public Task<bool> HasReceivingRoleAsync(string userId, CancellationToken ct) =>
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
             Task.FromResult(false);
     }
 }

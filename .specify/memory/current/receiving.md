@@ -50,7 +50,7 @@ If a linked 1C document changes its sender or loses a valid sender GUID,
 its new version is rejected as a failed check; the previously accepted version
 and plan remain in force.
 
-An Operator or Manager may attach a freshly checked source through Mobile to an
+An Operator may attach a freshly checked source through Mobile to an
 unfinished order when its warehouse matches. An Operator may detach one through
 Mobile before the first posted receiving LPN. Web source changes require Manager
 and a matching preview token, including before the first posted LPN. After
@@ -88,33 +88,35 @@ location in the fixed warehouse. Later participants use that same location.
 Joining does not write to 1C. Mobile lists WMS orders for the selected warehouse;
 the order screen shows plan and fact separately.
 
-A participant binds an issued label to an open receiving LPN. Its order,
+An Operator participating in the current cycle binds an issued label to an open
+receiving LPN. Its order,
 creator, responsible user, creation time, and original receiving location are
 retained. The code cannot be reused for another order, and one employee may
 hold several open LPNs. An open receiving LPN has at most one current SKU row
 with an absolute nonnegative quantity and optional expiration date. The
-responsible user may edit or cancel it, including after editing; a Manager may
-edit or cancel another user's open LPN. Drafts and cancellation do not post
-stock. A current-cycle participant may explicitly confirm a SKU as checked
-zero when no active LPN contains it. An absent fact remains unchecked.
+responsible Operator may edit or cancel it, including after editing; an Operator
+with Manager may edit or cancel another user's open LPN in Mobile. Drafts and
+cancellation do not post stock. An Operator in the current cycle may explicitly
+confirm a SKU as checked zero when no active LPN contains it. An absent fact
+remains unchecked.
 
-The responsible user or a Manager may clear the current SKU, quantity and
-expiration date from an open LPN. Clearing requires the LPN revision shown to
-the user; a stale revision is rejected. The former item remains marked deleted
+The responsible Operator or an Operator with Manager may clear the current SKU,
+quantity and expiration date from an open LPN. Clearing requires the LPN revision
+shown to the user; a stale revision is rejected. The former item remains marked deleted
 for audit, while the LPN stays open and can receive another SKU. Clearing does
 not post stock or change the order's received fact.
 
 Closing requires one SKU and a positive quantity. It checks every linked 1C
 source first and uses the current plan when that succeeds. On a failed check it
 uses the last numeric plan, marked unconfirmed. Plan excess or an unknown plan
-requires a Manager. The close posts one receipt at the LPN's original Receiving
-location, updates the order's checked fact from closed LPNs, and commits
-movement, audit, and command receipt together. Concurrent changes to its
+requires Manager in addition to Operator in Mobile. The close posts one receipt
+at the LPN's original Receiving location, updates the order's checked fact from
+closed LPNs, and commits movement, audit, and command receipt together. Concurrent changes to its
 decision inputs reject all staged effects. A closed LPN cannot reopen.
 When every source has been detached during an active cycle, the known plan is
-zero; closing a positive LPN then requires a Manager.
-A Web Manager may close an open LPN through the same posting command after
-confirming the saved SKU, quantity, and date. If the LPN changed since it was
+zero; closing a positive LPN then requires Manager in addition to Operator in
+Mobile. A Web Manager may close an open LPN through the same posting command
+after confirming the saved SKU, quantity, and date. If the LPN changed since it was
 displayed for confirmation, Web closing is rejected and requires a refresh.
 
 The local SKU expiration-tracking flag belongs to WMS. A Web Manager can switch
@@ -124,9 +126,9 @@ is enabled requires a date. A date before the UTC closing day requires explicit
 confirmation by the closer, with no higher role; today's date does not. Saved
 dates survive a later flag change and do not merge stock groups.
 
-A current-cycle participant or Manager can complete an order when no receiving
-LPN is open. Completion tries to check every linked source, then stores an
-immutable snapshot of that cycle's stored plan/fact rows, source versions, and check
+A current-cycle Operator in Mobile or Manager in Web can complete an order when
+no receiving LPN is open. Completion tries to check every linked source, then
+stores an immutable snapshot of that cycle's stored plan/fact rows, source versions, and check
 failure. Discrepancy or unchecked fact does not require Manager approval.
 Completion posts no stock and does not write to 1C. A Web Manager may reopen a
 completed order as a new cycle with a new location and participant set. Earlier

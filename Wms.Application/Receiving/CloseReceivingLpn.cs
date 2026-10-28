@@ -12,7 +12,7 @@ namespace Wms.Application.Receiving;
 public sealed record CloseReceivingLpnCommand(
     Guid RequestId, Guid OrderId, Guid LpnId, string UserId,
     bool ConfirmExpiredDate = false, string? ManagerReason = null,
-    long? ExpectedLpnRevision = null);
+    long? ExpectedLpnRevision = null, bool FromWeb = false);
 
 public sealed record CloseReceivingLpnResult(
     Guid LpnId, decimal? UsedPlan, decimal TotalFact, bool SourceCheckSucceeded,
@@ -32,6 +32,8 @@ public sealed class CloseReceivingLpn(
     {
         if (command is null || command.OrderId == Guid.Empty || command.LpnId == Guid.Empty)
             return OperationError.Invalid("Ордер и LPN обязательны.");
+        if (command.FromWeb && command.ExpectedLpnRevision is null)
+            return OperationError.Invalid("Для закрытия в Web нужна текущая версия LPN.");
         if (command.ManagerReason is { Length: > 500 })
             return OperationError.Invalid("Причина менеджера слишком длинная.");
 
@@ -50,8 +52,9 @@ public sealed class CloseReceivingLpn(
         var executed = await executor.ExecuteAsync(CommandType, command.RequestId, hash, command.UserId,
             async (session, operationCt) =>
             {
-                var access = await permission.RequireReceivingWorkerAsync(
-                    command.UserId, operationCt);
+                var access = command.FromWeb
+                    ? await permission.RequireManagerAsync(command.UserId, operationCt)
+                    : await permission.RequireOperatorAsync(command.UserId, operationCt);
                 if (!access.IsSuccess)
                     return access.Error!;
                 var canManage = (await permission.RequireManagerAsync(
