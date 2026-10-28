@@ -1,9 +1,8 @@
 # WMS architecture
 
 This document describes the implemented code and its detailed engineering
-conventions. The receiving implementation follows the
-[feature plan](../../specs/001-receiving-stock-lifecycle/plan.md).
-Project-wide principles live in the [WMS Constitution](constitution.md).
+conventions. Project-wide principles live in the
+[WMS Constitution](constitution.md).
 
 ## Current project map
 
@@ -30,10 +29,9 @@ as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
 Integration registers the receiving source HTTP reader and parser in both hosts;
 Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
-`Wms.Contracts`. Closing a receiving LPN posts its receipt movement; the new
-putaway command posts its placement movement. Former receiving command,
-source-order synchronization, and putaway services have been removed. The
-remaining label service issues and reads labels for listing and printing.
+`Wms.Contracts`. Closing a receiving LPN posts its receipt movement; putaway
+posts its placement movement. The label service issues and reads labels for
+listing and printing.
 
 ## Direction
 

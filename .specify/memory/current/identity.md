@@ -3,10 +3,12 @@
 ## Identity and access
 
 WebApp uses ASP.NET Core Identity with three roles. `Operator` runs warehouse
-operations and reports; `Manager` can also correct and reopen receiving LPNs and
-approve quantity differences; `Administrator` manages configuration and users.
-Legacy warehouse workflows still allow some operations and LPN corrections with
-`Administrator`, pending their replacement. New receiving manager actions require
+operations and reports; `Manager` can also correct eligible closed receiving
+LPNs, reopen completed receiving orders for a new cycle, and close open LPNs
+for another user or when the resulting fact would exceed the plan or the plan
+is unknown; `Administrator` manages configuration and users.
+Legacy warehouse workflows still allow some operations with `Administrator`,
+pending their replacement. New receiving manager actions require
 explicit `Manager` membership, including for an administrator. SKU selection
 and cycle/LPN work in the new receiving use cases accept `Operator` or
 `Manager`; `Administrator` alone grants none of those commands. A `Manager`

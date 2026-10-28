@@ -23,7 +23,9 @@ requires their decision history. The top-level
 - Keep each detailed rule in one owning document and link to it elsewhere.
   Current-state files describe implemented rules; the backlog describes remaining
   work. Neither contains implementation logs, test inventories, or repeated
-  handoffs; preserve decision history in frozen specs.
+  handoffs; preserve decision history in frozen specs. Keep current-state and
+  architecture documents self-contained instead of relying on links to completed
+  feature artifacts or one-time migration steps.
 - Scale documentation to the task. A small, bounded issue may proceed from
   discussion and resolved assumptions to implementation without a formal
   `plan.md` or `tasks.md`. Use the Spec Kit `specs/NNN-feature-slug/` structure
@@ -32,8 +34,8 @@ requires their decision history. The top-level
   increments need tracking. Clarify material questions before implementation.
 - When a specified feature is complete, distill lasting rules into
   `.specify/memory/current/` and retain its feature directory as decision
-  history. Give a later substantial change its own issue, specification and
-  branch instead of rewriting completed history. Small follow-ups may be
+  history without editing it. Give a later substantial change its own issue,
+  specification and branch instead of rewriting completed history. Small follow-ups may be
   resolved in their issue and reflected in current documentation when built.
 - Treat one implementation increment as one task and leave a concise handoff.
 - Minimize tool calls. Read only required file sections, batch independent reads,

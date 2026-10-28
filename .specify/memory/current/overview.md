@@ -1,16 +1,19 @@
 # Current WMS state
 
-This directory describes implemented behavior. The code and migrations remain the source of truth for implementation details. The receiving lifecycle decisions are in [epic 001](../../../specs/001-receiving-stock-lifecycle/spec.md); workspace and numbering decisions are in [feature 002](../../../specs/002-receiving-workspaces/spec.md).
+This directory describes implemented behavior. The code and database schema
+remain the source of truth for implementation details. Completed feature
+specifications preserve decisions made during delivery, not the current rules.
 
 Read only the relevant area: [identity](identity.md), [inventory](inventory.md), [receiving](receiving.md), [other warehouse workflows](other-workflows.md), [1C integration](integration.md), and [clients](clients.md). Current technical structure and conventions are in [architecture](../architecture.md); deferred work is in [backlog](../backlog.md).
 
 ## Product boundary
 
 WMS is a warehouse-management MVP. 1C owns catalogs and source receiving and
-shipping documents. WMS imports them, executes warehouse work, returns results
-to 1C, and owns operational inventory by storage location.
+shipping documents. WMS imports them, executes warehouse work, and owns
+operational inventory by storage location. Outbound exchange with 1C depends on
+the workflow, as described in [integration](integration.md).
 
-Active replacement workflows are receiving and putaway. Older picking and
+Receiving and putaway use replacement workflows. Older picking and
 shipping, direct and transit intra-warehouse transfers, and location inventory
 counts still exist but await replacement for dated and signed stock; they are
 not established as production-ready with the new receiving inventory. Inventory
@@ -21,16 +24,9 @@ The supported interactive clients are `Wms.WebApp` and Android `Wms.Mobile`.
 `Wms.WebApi` exposes authenticated Mobile V1 plus separate 1C integration
 endpoints.
 
-Domain types are extracted into `Wms.Domain`. The existing EF context,
-configurations, Identity data types and migration history reside in
-`Wms.Infrastructure`; existing application services and 1C integration still
-run in the legacy `Wms` project. `Wms.Application` contains the new command
-execution, inventory posting, and receiving use cases;
-`Wms.Integration` contains the 1C receiving reader and parser. The active
-[receiving rules](receiving.md) post stock on LPN close and partial putaway.
-Completing an order only records the cycle decision. Web and Mobile receiving
-and putaway routes call the new Application handlers; the former Mobile
-endpoint groups are not mapped.
+The [receiving rules](receiving.md) post stock on LPN close and partial
+putaway. Completing an order only records the cycle decision. The project map
+and implementation boundaries are in [architecture](../architecture.md).
 
 Warehouse quantities retain at most three decimal places. Read-only Web
 quantity tables show three places; compact TSD displays show up to three.

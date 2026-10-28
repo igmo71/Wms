@@ -98,6 +98,6 @@ Posting and eligibility-changing topology or lock updates advance
 balance concurrency tokens plus named database constraints. Only recognized
 inventory concurrency failures become business conflicts.
 
-Old picking, shipping, transfers, and inventory counts have not been adapted
-to every dated or negative group. Their replacement and count expansion are
-tracked in [the backlog](../backlog.md).
+The current boundaries of picking, shipping, transfers, and inventory counts
+are in [other warehouse workflows](other-workflows.md); their replacement and
+count expansion are tracked in [the backlog](../backlog.md).

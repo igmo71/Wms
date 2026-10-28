@@ -1,5 +1,14 @@
 # Current other warehouse workflows
 
+These workflows remain available, but their behavior with dated or negative
+stock from receiving is not established as production-ready:
+
+| Workflow | Current boundary |
+|---|---|
+| Picking and shipping | Movement commands do not carry an expiration date; the workflow cannot identify the dated balance group to move or issue. |
+| Intra-warehouse transfers | Movements are created without an expiration date, so a dated group cannot be preserved. |
+| Inventory count | A draft covers one ordinary Storage location and snapshots only positive balances by SKU. It cannot represent several date groups of one SKU; negative balances are excluded. |
+
 ## Picking and shipping
 
 Picking starts against a scanned shipping location and creates split draft

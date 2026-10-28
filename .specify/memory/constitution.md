@@ -24,8 +24,8 @@ requires removing its former posting path before the replacement is usable.
 1C transport and document formats belong in the integration adapter. WMS
 application use cases decide how source state affects WMS plans and operations.
 An unreadable or unsupported source value MUST remain distinguishable from a
-known zero. Receiving currently has no outbound write to 1C; any future write
-requires a separately specified business decision.
+known zero. An outbound write from receiving to 1C requires a separately
+specified business decision.
 
 ### IV. Direct feature-oriented implementation
 
@@ -90,4 +90,4 @@ change. Increment MAJOR for incompatible governance changes, MINOR for new or
 materially expanded rules, and PATCH for clarification. User instructions take
 precedence over this document.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-20
+**Version**: 1.2.1 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-28

@@ -1,26 +1,23 @@
 # Current receiving and LPN
 
-This page records active receiving and putaway behavior. The base lifecycle
-decisions are in [epic 001](../../../specs/001-receiving-stock-lifecycle/spec.md);
-WMS numbering and source-composition decisions are in
-[feature 002](../../../specs/002-receiving-workspaces/spec.md).
+This page records implemented receiving and putaway behavior.
 
 ## Sources and WMS orders
 
 One WMS receiving order has its own ID, immutable human-readable `yyMMdd-HHmmss`
-number, and fixed warehouse. The number starts from the local second of creation;
-if occupied, creation takes the next free second under a transaction lock. The
-actual `CreatedAtUtc` remains unchanged by a number collision. It may combine
+number, and fixed warehouse. The number starts from the creation second in the
+WMS server's local time zone; if occupied, creation takes the next free second
+under a transaction lock. The actual `CreatedAtUtc` remains unchanged by a
+number collision. It may combine
 several distinct 1C documents identified by `Ref_Key`. Web can create the order
 from free sources; Mobile creates it from the first scanned document and attaches
 subsequent scans to the unfinished order. A linked document can open its WMS order.
 The mobile queue does not load a list of free 1C documents. Active source links
-retain history. Repeating the same complete selection returns the existing
-order. Creation records the acting user, source versions, and command receipt
-with an audit event in the same transaction. Repeating the same request ID
-returns its original order without another creation event.
-The number migration assumes an empty `ReceivingOrders` table. It adds a
-required number column and unique index without historical backfill.
+retain history. If the selected sources exactly match all active links of one
+existing order, creation returns that order. Creation records the acting user,
+source versions, command receipt, and audit event in the same transaction.
+Repeating the same request ID returns its original order without another
+creation event.
 Receiving notifications update only the 1C source mirror and the current plan
 of an already linked WMS order; they never create a WMS order.
 The latest successful version supplies each source's own number, date, sender,
@@ -147,11 +144,6 @@ checks both the unplaced quantity of that LPN and physical source balance,
 retains its SKU and expiration date, and commits the linked movement, history,
 audit, and command receipt together. Receiving orders have no placement status
 or order-level putaway command.
-Putaway recommendations prioritize locations with a positive current quantity
-of the selected SKU. A historical location is suggested only when it has a
-saved zero balance row for that SKU and no nonzero balances; negative balances
-are not presented as empty locations.
-
 On the Mobile quantity screen, editing or focusing an amount revokes its
 confirmation. Finishing input or choosing the entire remainder confirms a
 valid positive amount. Scans queued before confirmation cannot post. After a
@@ -160,8 +152,9 @@ commands use the shared explicit retry flow. A rejected destination leaves the
 confirmed quantity available for another scan.
 
 The destination suggestions show active unlocked Storage locations with
-positive stock of the chosen SKU first, then empty locations with a retained
-zero balance row for that SKU. Other empty locations are omitted. A location
+positive stock of the chosen SKU first, then locations with a retained zero
+balance row for that SKU and no nonzero balances. Locations with negative
+balances are not presented as empty; other empty locations are omitted. A location
 with no `PickSequence` follows locations with a sequence; ties use address and
 location ID. Suggestions are snapshots: any valid Storage destination may be
 scanned, and posting rechecks its topology and lock. Capacity and storage

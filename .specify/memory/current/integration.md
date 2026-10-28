@@ -31,7 +31,7 @@ creates that order explicitly from selected sources. Web Managers may check all
 sources of one WMS order manually.
 Manual checks record their outcome in audit.
 
-New receiving and putaway do not write status, item tables, or comments to 1C.
+Receiving and putaway do not write status, item tables, or comments to 1C.
 WMS owns its receiving location, facts, cycles, LPNs, movements, users, and
 timestamps. Current receiving has no direct line-comment command. Historical
 receiving comments remain WMS-owned annotations, not warehouse facts.
