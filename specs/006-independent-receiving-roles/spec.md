@@ -3,7 +3,7 @@
 **Feature Branch**: `codex/006-independent-roles`
 **Issue**: [#24](https://github.com/igmo71/Wms/issues/24)
 **Created**: 2026-10-28
-**Status**: In progress
+**Status**: Completed
 **Input**: Separate Operator and Manager permissions in receiving and putaway while retaining Manager-only Web control actions.
 
 ## User Scenarios & Testing
