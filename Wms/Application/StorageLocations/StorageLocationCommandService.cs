@@ -84,6 +84,15 @@ public class StorageLocationCommandService(IDbContextFactory<ApplicationDbContex
             return OperationError.Invalid("Группу с дочерними позициями нельзя преобразовать в место хранения.");
         }
 
+        if (location.AllowsMultipleSkus && !details.AllowsMultipleSkus
+            && await dbContext.InventoryBalances
+                .Where(x => x.StorageLocationId == id && x.Quantity != 0)
+                .Select(x => x.StockKeepingUnitId).Distinct().Take(2).CountAsync(ct) > 1)
+        {
+            return OperationError.Conflict(
+                "Нельзя запретить смешение SKU, пока в ячейке есть ненулевые остатки разных SKU.");
+        }
+
         OperationResult updateResult = location.UpdateDetails(details);
         if (!updateResult.IsSuccess)
         {

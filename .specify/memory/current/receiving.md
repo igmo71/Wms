@@ -154,7 +154,8 @@ location to an active unlocked Storage location in the same warehouse. It
 checks both the unplaced quantity of that LPN and physical source balance,
 retains its SKU and expiration date, and commits the linked movement, history,
 audit, and command receipt together. Receiving orders have no placement status
-or order-level putaway command.
+or order-level putaway command. The destination also follows the
+[Storage location SKU-mixing rule](inventory.md).
 On the Mobile quantity screen, editing or focusing an amount revokes its
 confirmation. Finishing input or choosing the entire remainder confirms a
 valid positive amount. Scans queued before confirmation cannot post. After a

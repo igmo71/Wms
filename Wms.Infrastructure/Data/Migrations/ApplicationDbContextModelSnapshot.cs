@@ -1517,6 +1517,11 @@ namespace Wms.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AllowsMultipleSkus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(32)

@@ -23,6 +23,10 @@ public interface IInventoryPostingStore
         ICommandExecutionContext context,
         InventoryMovement movement,
         CancellationToken ct);
+
+    Task<bool> HasMultipleNonzeroSkusAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        Guid storageLocationId, CancellationToken ct);
 }
 
 public static class PostInventoryMovement
@@ -108,6 +112,14 @@ public static class PostInventoryMovement
                     command.Kind, command.PostedAtUtc, state, context);
                 if (!destinationResult.IsSuccess)
                     return destinationResult.Error!;
+
+                var location = state.Locations[destination];
+                if (location.Zone?.Type == ZoneType.Storage
+                    && !location.AllowsMultipleSkus
+                    && await store.HasMultipleNonzeroSkusAsync(
+                        context, movement.WarehouseId, destination, ct))
+                    return OperationError.Conflict(
+                        $"В ячейке {location.DisplayAddress} запрещено хранить несколько SKU.");
             }
 
             context.Stage(movement);

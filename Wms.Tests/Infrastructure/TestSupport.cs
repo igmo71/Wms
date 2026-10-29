@@ -33,10 +33,12 @@ internal static class TestSupport
     public static Zone Zone(Guid warehouseId, string code, ZoneType type) =>
         Value(Wms.Domain.Zone.Create(Guid.NewGuid(), warehouseId, code, code, type));
 
-    public static StorageLocation Location(Guid warehouseId, Zone zone, int number) =>
+    public static StorageLocation Location(Guid warehouseId, Zone zone, int number,
+        bool allowsMultipleSkus = false) =>
         Value(StorageLocation.Create(
             Guid.NewGuid(), warehouseId, zone.Id, null, $"{zone.Code}{number}",
-            Value(StorageLocationDetails.Create("Test location", false, LocationDimensions.Empty, LocationCoordinates.Empty, null))));
+            Value(StorageLocationDetails.Create("Test location", false,
+                LocationDimensions.Empty, LocationCoordinates.Empty, null, allowsMultipleSkus))));
 
     public static InventoryBalance Balance(Guid warehouseId, Guid locationId, Guid skuId, decimal quantity) =>
         Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId, skuId, quantity, DateTimeOffset.UtcNow));

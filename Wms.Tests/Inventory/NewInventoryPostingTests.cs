@@ -14,6 +14,57 @@ namespace Wms.Tests.Inventory;
 public sealed class NewInventoryPostingTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Putaway_cannot_add_second_sku_to_restricted_storage_location()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Restricted putaway" };
+        var firstSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "First SKU" };
+        var secondSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Second SKU" };
+        var receivingZone = Zone(warehouse.Id, "MR", ZoneType.Receiving);
+        var storageZone = Zone(warehouse.Id, "MS", ZoneType.Storage);
+        var receiving = Location(warehouse.Id, receivingZone, 1);
+        var storage = Location(warehouse.Id, storageZone, 1);
+        var batch = Value(LicensePlateNumberBatch.Issue(1, "test-user", now));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, firstSku, secondSku, receivingZone, storageZone,
+                receiving, storage, batch,
+                Balance(warehouse.Id, receiving.Id, secondSku.Id, 5m),
+                Balance(warehouse.Id, storage.Id, firstSku.Id, 7m));
+            await seed.SaveChangesAsync();
+        }
+
+        var movement = Value(InventoryMovement.Create(Guid.NewGuid(), warehouse.Id,
+            receiving.Id, storage.Id, secondSku.Id, 2m, now,
+            RecorderType.ReceivingOrder, Guid.NewGuid(), 1, "test-user",
+            licensePlateNumberId: batch.Labels.Single().Id));
+        var requestId = Guid.NewGuid();
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
+        var posting = new PostInventoryMovement.Handler(new InventoryPostingStore());
+        var result = await executor.ExecuteAsync("test.restricted-putaway", requestId,
+            CommandExecutor.ComputeHash(movement.Id.ToString()), "test-user",
+            async (context, ct) =>
+            {
+                var posted = await posting.HandleAsync(
+                    new(movement, InventoryPostingKind.Putaway, now.AddSeconds(1)),
+                    context, ct);
+                if (!posted.IsSuccess)
+                    return OperationResult<CommandExecutionResult>.Failure(posted.Error!);
+                return new CommandExecutionResult(movement.Id, []);
+            }, default);
+        Error(result, OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(5m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == receiving.Id)).Quantity);
+        Assert.Equal(7m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == storage.Id)).Quantity);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.Id == movement.Id));
+        Assert.False(await verify.InventoryTurnovers.AnyAsync(x => x.InventoryMovementId == movement.Id));
+        Assert.False(await verify.CommandReceipts.AnyAsync(x => x.RequestId == requestId));
+    }
+
+    [Fact]
     public async Task Two_movements_in_one_command_share_the_staged_balance()
     {
         var now = DateTimeOffset.UtcNow;

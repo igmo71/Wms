@@ -53,9 +53,53 @@ public sealed class InventorySafetyTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Concurrent_transfers_cannot_mix_distinct_skus_in_restricted_location()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Destination race" };
+        var firstSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "First SKU" };
+        var secondSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Second SKU" };
+        var zone = Zone(warehouse.Id, "RM", ZoneType.Storage);
+        var firstSource = Location(warehouse.Id, zone, 1);
+        var secondSource = Location(warehouse.Id, zone, 2);
+        var destination = Location(warehouse.Id, zone, 3);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, firstSku, secondSku, zone,
+                firstSource, secondSource, destination,
+                Balance(warehouse.Id, firstSource.Id, firstSku.Id, 1m),
+                Balance(warehouse.Id, secondSource.Id, secondSku.Id, 1m));
+            await seed.SaveChangesAsync();
+        }
+
+        var service = TransferService(database);
+        var firstTransfer = Value(await service.CreateAsync(
+            new(warehouse.Id, null), Command("mix-a")));
+        var secondTransfer = Value(await service.CreateAsync(
+            new(warehouse.Id, null), Command("mix-b")));
+        var racingService = TransferService(database.WithInterceptor(new ReceiptSaveBarrier()));
+        var results = await Task.WhenAll(
+            racingService.MoveDirectAsync(new(firstTransfer, firstSource.Id,
+                destination.Id, firstSku.Id, 1m), Command("mix-a")),
+            racingService.MoveDirectAsync(new(secondTransfer, secondSource.Id,
+                destination.Id, secondSku.Id, 1m), Command("mix-b")));
+
+        Assert.Single(results, result => result.IsSuccess);
+        Error(results.Single(result => !result.IsSuccess), OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        var destinationBalances = await verify.InventoryBalances
+            .Where(x => x.StorageLocationId == destination.Id && x.Quantity != 0)
+            .ToListAsync();
+        Assert.Single(destinationBalances);
+        Assert.Equal(1m, destinationBalances[0].Quantity);
+        Assert.Equal(2m, await verify.InventoryBalances
+            .Where(x => x.WarehouseId == warehouse.Id)
+            .SumAsync(x => x.Quantity));
+    }
+
+    [Fact]
     public async Task Inventory_count_posts_positive_and_negative_corrections_once_and_releases_lock()
     {
-        var setup = await CreateCountSetup(10m);
+        var setup = await CreateCountSetup(10m, allowsMultipleSkus: true);
         var service = CountService(database);
         var countId = Value(await service.StartAsync(new(setup.WarehouseId, setup.LocationId), Command("count-correction")));
         var count = await LoadCount(countId);
@@ -72,6 +116,41 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         Assert.Equal(2, await verify.InventoryMovements.CountAsync(x => x.RecorderId == countId && x.PostedAtUtc != null));
         Assert.Equal(2, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == countId));
         Assert.False(await verify.StorageLocationLocks.AnyAsync(x => x.StorageLocationId == setup.LocationId));
+    }
+
+    [Fact]
+    public async Task Restricted_count_accepts_sku_replacement_but_rejects_mixed_final_stock()
+    {
+        var setup = await CreateCountSetup(10m, allowsMultipleSkus: false);
+        var service = CountService(database);
+        var countId = Value(await service.StartAsync(
+            new(setup.WarehouseId, setup.LocationId), Command("count-replace")));
+        var count = await LoadCount(countId);
+        Value(await service.SetCountedQuantityAsync(
+            new(countId, count.Items.Single().Id, 0m), Command("count-replace")));
+        Value(await service.SetSkuCountedQuantityAsync(
+            new(countId, setup.UnexpectedSkuId, 10m), Command("count-replace")));
+        Value(await service.PostAsync(countId, Command("count-replace")));
+
+        var secondId = Value(await service.StartAsync(
+            new(setup.WarehouseId, setup.LocationId), Command("count-mixed")));
+        var second = await LoadCount(secondId);
+        Value(await service.SetCountedQuantityAsync(
+            new(secondId, second.Items.Single().Id, 10m), Command("count-mixed")));
+        Value(await service.SetSkuCountedQuantityAsync(
+            new(secondId, setup.ExpectedSkuId, 1m), Command("count-mixed")));
+        Error(await service.PostAsync(secondId, Command("count-mixed")),
+            OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        var balances = await verify.InventoryBalances
+            .Where(x => x.StorageLocationId == setup.LocationId)
+            .ToDictionaryAsync(x => x.StockKeepingUnitId);
+        Assert.Equal(0m, balances[setup.ExpectedSkuId].Quantity);
+        Assert.Equal(10m, balances[setup.UnexpectedSkuId].Quantity);
+        Assert.Equal(InventoryCountStatus.Draft,
+            (await verify.InventoryCounts.SingleAsync(x => x.Id == secondId)).Status);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.RecorderId == secondId));
     }
 
     [Fact]
@@ -104,13 +183,14 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         Assert.Equal(1, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == countId));
     }
 
-    private async Task<CountSetup> CreateCountSetup(decimal quantity)
+    private async Task<CountSetup> CreateCountSetup(
+        decimal quantity, bool allowsMultipleSkus = false)
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Count safety" };
         var expectedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Expected SKU" };
         var unexpectedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Unexpected SKU" };
         var zone = Zone(warehouse.Id, "CS", ZoneType.Storage);
-        var location = Location(warehouse.Id, zone, 1);
+        var location = Location(warehouse.Id, zone, 1, allowsMultipleSkus);
         var balance = Balance(warehouse.Id, location.Id, expectedSku.Id, quantity);
         await using var seed = database.CreateDbContext();
         seed.AddRange(warehouse, expectedSku, unexpectedSku, zone, location, balance);
