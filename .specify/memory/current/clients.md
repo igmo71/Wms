@@ -131,7 +131,8 @@ requires confirmation. Action descriptions remain available to a screen reader.
 Receiving screens have no putaway actions; putaway starts from its own LPN screen.
 
 The document screen shows «Новый ордер» before creation and the WMS number
-after the first scan. Each document row
+after the first scan. Documents within an order sort by 1C number ascending,
+with missing numbers last. Each document row
 shows number and date, then sender name and warehouse operation, with no field
 labels; a tap reveals other source details and any latest check error. A failed
 check marks its row with a warning symbol. The newest attached document is
@@ -163,7 +164,9 @@ success, including after a confirmed retry.
 The Web menu group «Приёмка» opens separate 1C documents and WMS orders pages.
 `/receiving-orders` lists only WMS orders by their own numbers and actual
 creation times. `/receiving-sources` lists both free and linked 1C documents
-with their WMS order link. Managers may select free documents of one warehouse,
+by 1C number ascending, with missing numbers last, and shows their WMS order
+link. A direct link to a document brings it to the top of the filtered list.
+Managers may select free documents of one warehouse,
 inspect their summed plan and create an order. Clicking a source shows its last
 saved 1C lines, including when linked; selecting free sources shows their
 combined plan. The source and SKU tables sit side by side on wide screens and
@@ -205,8 +208,9 @@ snapshot; link history shows the actor's name. In the order list, ready orders
 are uncolored; active and completed orders show subtle warning or success color
 for current discrepancies. Completed orders also mark a change since their
 latest cycle snapshot.
-The order card lists linked documents with number, date, sender, warehouse and
-operations. Its recheck button shows the latest attempt time and checks all
+The order card lists linked documents by 1C number ascending, with missing
+numbers last, and shows number, date, sender, warehouse and operations. Its
+recheck button shows the latest attempt time and checks all
 linked sources. A Manager changes composition in a separate dialog with live
 number filters. Before confirmation it shows the document, warehouse, changed
 SKU plans and fact-preservation warning; a stale preview needs a new selection.

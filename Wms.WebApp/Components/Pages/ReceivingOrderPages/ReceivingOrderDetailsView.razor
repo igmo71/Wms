@@ -46,7 +46,7 @@
     }
     @if (Sources.Count > 0)
     {
-        <MudTable T="ReceivingSourceView" Items="Sources" Dense="true" Hover="true" Striped="true" Elevation="0">
+        <MudTable T="ReceivingSourceView" Items="SortedSources" Dense="true" Hover="true" Striped="true" Elevation="0">
             <HeaderContent><MudTh>Номер</MudTh><MudTh>Дата</MudTh><MudTh>Отправитель</MudTh><MudTh>Склад</MudTh><MudTh>Складская операция</MudTh><MudTh>Хозяйственная операция</MudTh></HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Номер"><MudLink Href="@($"receiving-sources?document={context.RefKey}")">@(context.Number ?? context.RefKey.ToString())</MudLink></MudTd>
@@ -91,6 +91,11 @@
 
     private string LastAttemptText => Sources.Count == 0 ? "нет"
         : Sources.Max(source => source.LastAttemptAtUtc)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "нет";
+
+    private IEnumerable<ReceivingSourceView> SortedSources => Sources
+        .OrderBy(source => string.IsNullOrWhiteSpace(source.Number))
+        .ThenBy(source => source.Number, StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(source => source.RefKey);
 
     private bool _showDocuments;
     private bool _showSourceHistory;

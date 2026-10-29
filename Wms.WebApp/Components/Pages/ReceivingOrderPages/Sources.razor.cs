@@ -36,8 +36,13 @@ public partial class Sources
                 : _sources.Where(x =>
                     x.Number?.Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase) == true
                     || x.RefKey.ToString().Contains(_sourceFilter.Trim(), StringComparison.OrdinalIgnoreCase));
-            return DocumentRefKey is Guid requestedRefKey && _activeSourceRefKey == requestedRefKey
-                ? matches.OrderByDescending(x => x.RefKey == requestedRefKey) : matches;
+            var requestedRefKey = DocumentRefKey;
+            var prioritizeRequested = requestedRefKey is Guid
+                && _activeSourceRefKey == requestedRefKey;
+            return matches.OrderByDescending(x => prioritizeRequested && x.RefKey == requestedRefKey)
+                .ThenBy(x => string.IsNullOrWhiteSpace(x.Number))
+                .ThenBy(x => x.Number, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.RefKey);
         }
     }
 

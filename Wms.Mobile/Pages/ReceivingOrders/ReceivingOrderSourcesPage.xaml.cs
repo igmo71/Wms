@@ -144,15 +144,19 @@ public partial class ReceivingOrderSourcesPage : ContentPage
         _sources = await _orders.GetLinkedSourcesAsync(_order.Id);
         var canDetach = CanAttach && _order.Lpns.All(x => x.Status is not
             (MobileLicensePlateNumberStatus.Closed or MobileLicensePlateNumberStatus.Deleted));
-        SourceRows = _sources.Select(source =>
-        {
-            var check = ReceivingStatusSymbols.ForDocumentCheck(source.LastAttemptError is not null);
-            return new ReceivingSourceCompactRow(source.RefKey,
-                $"{source.Number ?? source.RefKey.ToString()} · {SourceDate(source.Date)}",
-                $"{source.SenderName ?? source.Sender ?? "—"} · {source.WarehouseOperation ?? "—"}",
-                check.Glyph, check.Description, check.TextColor, canDetach,
-                source.RefKey == _newSourceRefKey ? Colors.LightGray : Colors.White);
-        }).ToArray();
+        SourceRows = _sources
+            .OrderBy(source => string.IsNullOrWhiteSpace(source.Number))
+            .ThenBy(source => source.Number, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(source => source.RefKey)
+            .Select(source =>
+            {
+                var check = ReceivingStatusSymbols.ForDocumentCheck(source.LastAttemptError is not null);
+                return new ReceivingSourceCompactRow(source.RefKey,
+                    $"{source.Number ?? source.RefKey.ToString()} · {SourceDate(source.Date)}",
+                    $"{source.SenderName ?? source.Sender ?? "—"} · {source.WarehouseOperation ?? "—"}",
+                    check.Glyph, check.Description, check.TextColor, canDetach,
+                    source.RefKey == _newSourceRefKey ? Colors.LightGray : Colors.White);
+            }).ToArray();
         OnPropertyChanged(nameof(SourceRows));
         EmptyLabel.IsVisible = SourceRows.Count == 0;
         EmptyLabel.Text = "В ордере нет документов 1С.";
