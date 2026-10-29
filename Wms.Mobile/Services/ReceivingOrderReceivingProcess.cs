@@ -28,6 +28,11 @@ public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient cl
         StartAsync("Добавить SKU", orderId, async id =>
             (await client.AddSkuAsync(orderId, skuId, id)).ResourceId);
 
+    public Task<MobileReceivingWorkOrderResponse> AddSkuBarcodeAsync(
+        Guid orderId, Guid skuId, string barcode) =>
+        StartAsync("Добавить штрихкод", orderId, async id =>
+            (await client.AddSkuBarcodeAsync(orderId, skuId, barcode, id)).ResourceId);
+
     public Task<MobileReceivingWorkOrderResponse> ConfirmZeroAsync(Guid orderId, Guid skuId) =>
         StartAsync("Проверено: 0", orderId, async id =>
             (await client.ConfirmZeroAsync(orderId, skuId, id)).ResourceId);

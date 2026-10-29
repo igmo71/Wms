@@ -6,4 +6,5 @@ public class SkuBarcode
     public StockKeepingUnit? Sku { get; set; }
 
     public string? Value { get; set; }
+    public Enums.SkuBarcodeSource Source { get; set; } = Enums.SkuBarcodeSource.OneC;
 }

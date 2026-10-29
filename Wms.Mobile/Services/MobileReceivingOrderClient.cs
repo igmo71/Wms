@@ -57,6 +57,13 @@ public sealed class MobileReceivingOrderClient
         Guid orderId, Guid skuId, Guid requestId, CancellationToken ct = default) =>
         PostIdAsync($"{Route}/{orderId:D}/skus/{skuId:D}", requestId, ct);
 
+    public Task<MobileReceivingCommandIdResponse> AddSkuBarcodeAsync(
+        Guid orderId, Guid skuId, string barcode, Guid requestId,
+        CancellationToken ct = default) =>
+        PostAsync<MobileReceivingAddBarcodeRequest, MobileReceivingCommandIdResponse>(
+            $"{Route}/{orderId:D}/skus/{skuId:D}/barcodes",
+            new MobileReceivingAddBarcodeRequest(requestId, barcode), ct);
+
     public Task<MobileReceivingCommandIdResponse> ConfirmZeroAsync(
         Guid orderId, Guid skuId, Guid requestId, CancellationToken ct = default) =>
         PostIdAsync($"{Route}/{orderId:D}/skus/{skuId:D}/confirm-zero", requestId, ct);

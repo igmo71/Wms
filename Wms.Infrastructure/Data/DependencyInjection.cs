@@ -6,6 +6,7 @@ using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
 using Wms.Application.Receiving;
 using Wms.Application.Reports;
+using Wms.Application.SkuBarcodes;
 using Wms.Application.StockKeepingUnits;
 
 namespace Wms.Data;
@@ -30,6 +31,16 @@ public static class DependencyInjection
         services.AddScoped<WarehousePermission>();
         services.AddScoped<ICommandExecutionStore, CommandExecutionStore>();
         services.AddScoped<CommandExecutor>();
+        services.AddScoped<SkuBarcodeStore>();
+        services.AddScoped<ISkuBarcodeMutationLock>(sp => sp.GetRequiredService<SkuBarcodeStore>());
+        services.AddScoped<ISkuBarcodeSynchronizationStore>(sp => sp.GetRequiredService<SkuBarcodeStore>());
+        services.AddScoped<IReceivingSkuBarcodeStore>(sp => sp.GetRequiredService<SkuBarcodeStore>());
+        services.AddScoped<ISkuBarcodeListStore>(sp => sp.GetRequiredService<SkuBarcodeStore>());
+        services.AddScoped<ISkuBarcodeRemovalStore>(sp => sp.GetRequiredService<SkuBarcodeStore>());
+        services.AddScoped<SynchronizeSkuBarcodes>();
+        services.AddScoped<AddReceivingSkuBarcode>();
+        services.AddScoped<ListSkuBarcodes>();
+        services.AddScoped<RemoveLocalSkuBarcode>();
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<PostInventoryMovement.Handler>();
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();

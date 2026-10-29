@@ -49,7 +49,6 @@ public static class DependencyInjection
         services.AddScoped<ShippingOrderSynchronizationService>();
         services.AddScoped<MobileShippingOrderQueryService>();
         services.AddScoped<ShippingOrderQueryService>();
-        services.AddScoped<SkuBarcodeService>();
         services.AddScoped<StockKeepingUnitService>();
         services.AddScoped<InventoryTransferCommandService>();
         services.AddScoped<InventoryTransferQueryService>();

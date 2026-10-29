@@ -11,6 +11,10 @@ internal class SkuBarcodeConfiguration : IEntityTypeConfiguration<SkuBarcode>
         builder.HasKey(x => new { x.SkuId, x.Value });
 
         builder.Property(x => x.Value).HasMaxLength(DefaultConfiguration.Code);
+        builder.Property(x => x.Source)
+            .HasDefaultValue(Wms.Domain.Enums.SkuBarcodeSource.OneC)
+            .IsRequired();
+        builder.HasIndex(x => x.Value);
 
         builder.HasOne(x => x.Sku).WithMany(x => x.Barcodes)
             .HasForeignKey(x => x.SkuId).HasPrincipalKey(x => x.Id)
