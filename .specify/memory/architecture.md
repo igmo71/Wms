@@ -28,7 +28,8 @@ WebApi and WebApp directly reference Application, Infrastructure, and Integratio
 as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
 Integration registers the receiving source HTTP reader and parser in both hosts;
-Infrastructure registers the source and order stores and their use cases. `Wms.Mobile` uses
+Infrastructure registers the source, order, and barcode stores and their use
+cases. `Wms.Mobile` uses
 `Wms.Contracts`. Closing a receiving LPN posts its receipt movement; putaway
 posts its placement movement. The label service issues and reads labels for
 listing and printing.
@@ -105,6 +106,13 @@ project move. Legacy application services still use that context directly.
 `Integration.OneS` owns OData DTOs, metadata names, protocol statuses,
 notification parsing, and HTTP mechanics. Its implementations use 1C names;
 application ports use WMS terminology.
+The legacy 1C SKU barcode adapter passes a complete source read to the
+Application barcode synchronization use case. Infrastructure coordinates
+barcode mutations across hosts with a database session lock and reconciles one
+source scope atomically. This also prevents an older overlapping import read
+from committing after a newer one.
+Mobile barcode additions and Web local removals use the same lock through
+their command receipt and audit save.
 
 One legacy operation normally has one explicit save boundary. New commands use
 the Application command executor and its Infrastructure store: receipt lookup

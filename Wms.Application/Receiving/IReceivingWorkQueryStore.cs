@@ -7,6 +7,7 @@ public sealed record ReceivingWorkItemView(
     string? UnitOfMeasure, decimal? PlanQuantity, decimal? FactQuantity)
 {
     public bool IsCurrent { get; init; }
+    public bool HasBarcode { get; init; }
 }
 
 public sealed record ReceivingWorkLpnItemView(

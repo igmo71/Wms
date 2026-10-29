@@ -78,6 +78,15 @@ barcode resolves against the entire catalog. Adding a catalog SKU creates one
 stored order row with known plan zero and unchecked fact; it enters the current
 plan/fact list when it appears in a linked source or a receiving LPN is posted.
 Repetition does not duplicate it. Later source checks can update that row's plan.
+The Mobile order response also reports whether each current SKU has a barcode.
+An Operator participating in the active cycle can add a scanned barcode for a
+current order SKU through the Mobile API. The command trims and validates the
+value, rejects a value assigned to another SKU with that SKU identified, and
+records a local association, audit event, and replay receipt together. An
+existing pair is left unchanged. The new pair is immediately available to SKU
+lookup and does not change stock facts or write to 1C. A concurrent order-state
+change rejects the save; barcode imports and manual writes share a database
+lock.
 
 ## Cycle and receiving work
 

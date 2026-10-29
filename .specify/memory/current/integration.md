@@ -8,6 +8,24 @@ Manual catalog imports are available from the WebApp catalog lists and the
 remain the automatic integration path. SKU imports preserve the WMS-owned
 expiration-tracking flag described in [receiving.md](receiving.md).
 
+The SKU barcode register has a separate import rule. Both single-SKU
+notifications and full imports read the complete requested 1C set before
+changing stored barcodes, then reconcile that set in one database transaction.
+Existing barcode rows are treated as 1C-owned. A 1C-owned pair absent from a
+successful source response is removed; a WMS-owned pair absent from 1C remains.
+When 1C supplies the same SKU and barcode as a WMS-owned pair, that pair becomes
+1C-owned without a second row. The original manual-addition audit remains
+after promotion or later source removal. The same barcode value may be
+imported for different SKUs; barcode
+lookup must not silently choose between them. A failed source read or save
+retains the previously stored set. Barcode imports do not write to 1C.
+The barcode catalog list can identify values linked to more than one distinct
+visible SKU. A Manager may remove a current WMS-owned pair with an audit event;
+the command rechecks ownership and rejects a pair already promoted to 1C.
+Imported pairs remain under 1C control and cannot be removed locally.
+Removing a local pair changes future barcode lookup only; receiving and
+inventory history remain unchanged.
+
 The receiving reader fetches the current 1C document by `Ref_Key` and returns
 its JSON response. A successful check stores a new immutable source version
 only when content changes. An unchanged response updates the last successful

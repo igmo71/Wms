@@ -38,6 +38,7 @@ public sealed record MobileReceivingWorkItemResponse(
     decimal? PlanQuantity, decimal? FactQuantity)
 {
     public bool IsCurrent { get; init; } = true;
+    public bool HasBarcode { get; init; }
 }
 
 public sealed record MobileReceivingWorkLpnItemResponse(
@@ -100,6 +101,7 @@ public sealed record MobileReceivingLinkedSourceResponse(
 public sealed record MobileReceivingDocumentResolutionResponse(
     MobileReceivingSourceResponse? Source, MobileReceivingWorkOrderResponse? Order);
 public sealed record MobileReceivingBarcodeRequest(string Barcode);
+public sealed record MobileReceivingAddBarcodeRequest(Guid ClientRequestId, string Barcode);
 public sealed record MobileReceivingCommandRequest(Guid ClientRequestId);
 public sealed record MobileReceivingJoinCycleRequest(
     Guid ClientRequestId, Guid? ReceivingLocationId);

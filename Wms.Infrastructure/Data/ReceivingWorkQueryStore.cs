@@ -216,7 +216,20 @@ public sealed class ReceivingWorkQueryStore(
             .AnyAsync(x => x.ReceivingOrderId == orderId && x.UserId == userId
                 && x.ReceivingCycle!.Number == order.ActiveCycleNumber, ct);
         var sourceSkus = await LoadCurrentSourceSkusAsync(db, orderId, null, ct);
-        return MapOrder(order, userId, sourceSkus, isParticipant, includeCycles: false);
+        var view = MapOrder(order, userId, sourceSkus, isParticipant, includeCycles: false);
+        var currentSkuIds = view.Items.Where(x => x.IsCurrent)
+            .Select(x => x.SkuId).ToArray();
+        var barcodeSkuIds = await db.SkuBarcodes.AsNoTracking()
+            .Where(x => currentSkuIds.Contains(x.SkuId))
+            .Select(x => x.SkuId).Distinct().ToArrayAsync(ct);
+        var withBarcodes = barcodeSkuIds.ToHashSet();
+        return view with
+        {
+            Items = view.Items.Select(x => x with
+            {
+                HasBarcode = withBarcodes.Contains(x.SkuId)
+            }).ToArray()
+        };
     }
 
     public async Task<ReceivingOrderStatus?> GetOrderStatusAsync(

@@ -72,6 +72,17 @@ using code and ID when a name is unavailable. Each SKU card keeps its name left
 and semibold plan and fact on two right-aligned lines without labels (plan above
 fact), with the unit shown once. The compact zero-confirmation button sits below
 the fact in the quantity block.
+A barcode action follows the zero-confirmation button when it is present and
+occupies the same action area otherwise. Its icon is prominent when the SKU has
+at least one barcode and pale when it has none; either state opens the add panel
+for a current-cycle participant. The panel captures device or camera scans
+without triggering the SKU list's usual scan action, shows the selected SKU and
+captured value, and requires an explicit save. A confirmed save closes the panel
+and refreshes the order; an uncertain response keeps the same request for an
+explicit retry.
+If a scanned value belongs to another SKU, the conflict shows its name, or its
+code when the name is missing, without a technical identifier.
+Closing the add panel or starting a new scan clears its previous error.
 An unchecked fact is a blue question mark on a neutral card. Equal known plan
 and fact show a green «✓» beside the fact and a soft green background; a checked
 difference shows a red «≠» beside the fact and a soft yellow background.
@@ -231,6 +242,17 @@ number filters. Before confirmation it shows the document, warehouse, changed
 SKU plans and fact-preservation warning; a stale preview needs a new selection.
 An uncertain response retains its request ID for retry; success reloads plan,
 fact and links. Operators view composition without change controls.
+
+## Web barcode catalog
+
+The barcode list searches values and SKU names or codes, sorts and pages on the
+server, and can include inactive SKUs. A «Только дубли» switch shows values
+linked to more than one distinct SKU among the visible catalog rows. Each row
+shows its source and duplicate status. A Manager can confirm removal of a
+WMS-owned association; 1C-owned rows have no removal control. A stale
+confirmation for a removed or promoted row produces a refreshed list and an
+error message. An uncertain
+removal retains its request ID for explicit retry.
 
 ## Mobile input
 

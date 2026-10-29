@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Wms.Application.Receiving;
+using Wms.Application.SkuBarcodes;
 using Wms.Application.Users;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
@@ -37,6 +38,8 @@ internal static class MobileReceivingOrderEndpoints
         group.MapPost("/{orderId:guid}/skus/resolve-barcode", ResolveSkuAsync)
             .WithMobileResponses<MobileReceivingSkuCandidateResponse>();
         group.MapPost("/{orderId:guid}/skus/{skuId:guid}", AddSkuAsync)
+            .WithMobileResponses<MobileReceivingCommandIdResponse>();
+        group.MapPost("/{orderId:guid}/skus/{skuId:guid}/barcodes", AddBarcodeAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
         group.MapPost("/{orderId:guid}/skus/{skuId:guid}/confirm-zero", ConfirmZeroAsync)
             .WithMobileResponses<MobileReceivingCommandIdResponse>();
@@ -213,6 +216,13 @@ internal static class MobileReceivingOrderEndpoints
         await ExecuteForUserAsync(principal, userId => add.ExecuteAsync(
             new AddReceivingOrderSkuRequest(request.ClientRequestId, orderId, skuId, userId), ct));
 
+    private static async Task<IResult> AddBarcodeAsync(
+        Guid orderId, Guid skuId, MobileReceivingAddBarcodeRequest request,
+        ClaimsPrincipal principal, AddReceivingSkuBarcode add, CancellationToken ct) =>
+        await ExecuteForUserAsync(principal, userId => add.ExecuteAsync(
+            new AddReceivingSkuBarcodeRequest(request.ClientRequestId,
+                orderId, skuId, request.Barcode, userId), ct));
+
     private static async Task<IResult> ConfirmZeroAsync(
         Guid orderId, Guid skuId, MobileReceivingCommandRequest request,
         ClaimsPrincipal principal, ConfirmZeroReceived confirm, CancellationToken ct) =>
@@ -318,7 +328,7 @@ internal static class MobileReceivingOrderEndpoints
         order.Items.Select(x => new MobileReceivingWorkItemResponse(
             x.SkuId, x.SkuCode, x.SkuName, x.TracksExpirationDate,
             x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity)
-        { IsCurrent = x.IsCurrent }).ToArray(),
+        { IsCurrent = x.IsCurrent, HasBarcode = x.HasBarcode }).ToArray(),
         order.Lpns.Select(lpn => MapLpn(lpn) with
         {
             ResponsibleUserName = lpn.ResponsibleUserId is { } id

@@ -16,7 +16,28 @@
             <ScrollView>
                 <VerticalStackLayout Spacing="8">
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
+                    <VerticalStackLayout x:Name="BarcodePanel" IsVisible="False" Spacing="8">
+                        <local:OperationalCameraScannerView x:Name="BarcodeCameraScannerView" />
+                        <Border Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}" Padding="10">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Добавить штрихкод SKU" FontAttributes="Bold" FontSize="18" />
+                                <Label x:Name="BarcodeSkuLabel" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                <Label Text="Отсканируйте штрихкод товара. Проверьте SKU и код перед сохранением."
+                                       FontSize="13" LineBreakMode="WordWrap" />
+                                <Label x:Name="BarcodeValueLabel" Text="Штрихкод ещё не считан"
+                                       FontSize="17" LineBreakMode="CharacterWrap" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="5">
+                                    <Button x:Name="BarcodeCancelButton" Text="Отмена"
+                                            Clicked="OnBarcodeCancelClicked" />
+                                    <Button x:Name="BarcodeSaveButton" Grid.Column="1" Text="Сохранить"
+                                            IsEnabled="False" Clicked="OnBarcodeSaveClicked" />
+                                </Grid>
+                                <Button x:Name="BarcodeRescanButton" Text="Сканировать снова"
+                                        IsVisible="False" Clicked="OnBarcodeRescanClicked" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout x:Name="ItemList" BindableLayout.ItemsSource="{Binding ItemRows, Source={x:Reference Page}}" Spacing="4">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:ReceivingWorkItemRow">
                                 <Border Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
@@ -50,12 +71,21 @@
                                                    HorizontalTextAlignment="End"
                                                    SemanticProperties.Description="{Binding FactDescription}">
                                             </Label>
-                                            <Button Text="0" FontSize="12" WidthRequest="32" HeightRequest="30"
-                                                    MinimumWidthRequest="0" MinimumHeightRequest="0"
-                                                    Padding="0" HorizontalOptions="End"
-                                                    SemanticProperties.Description="Подтвердить отсутствие SKU"
-                                                    IsVisible="{Binding CanConfirmZero}"
-                                                    CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
+                                            <HorizontalStackLayout Spacing="4" HorizontalOptions="End">
+                                                <Button Text="0" FontSize="12" WidthRequest="32" HeightRequest="30"
+                                                        MinimumWidthRequest="0" MinimumHeightRequest="0"
+                                                        Padding="0" HorizontalOptions="End"
+                                                        SemanticProperties.Description="Подтвердить отсутствие SKU"
+                                                        IsVisible="{Binding CanConfirmZero}"
+                                                        CommandParameter="{Binding SkuId}" Clicked="OnZeroClicked" />
+                                                <Button ImageSource="barcode_action.svg" WidthRequest="34" HeightRequest="30"
+                                                        MinimumWidthRequest="0" MinimumHeightRequest="0"
+                                                        Padding="2" BackgroundColor="Transparent"
+                                                        Opacity="{Binding BarcodeOpacity}"
+                                                        IsEnabled="{Binding CanAddBarcode}"
+                                                        SemanticProperties.Description="{Binding BarcodeDescription}"
+                                                        CommandParameter="{Binding SkuId}" Clicked="OnBarcodeClicked" />
+                                            </HorizontalStackLayout>
                                         </VerticalStackLayout>
                                     </Grid>
                                 </Border>
@@ -70,11 +100,9 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" IsVisible="False" Clicked="OnRetryClicked" />
             <Button x:Name="JoinButton" Text="Начать" Clicked="OnJoinClicked" />
-            <Label x:Name="CompleteHintLabel" Text="Перед завершением закройте или отмените открытые LPN."
-                   FontSize="12" IsVisible="False" />
             <Button x:Name="CompleteButton" Text="Завершить ордер" IsVisible="False"
                     Clicked="OnCompleteClicked" />
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="5">
+            <Grid x:Name="SectionButtons" ColumnDefinitions="*,*" ColumnSpacing="5">
                 <Button x:Name="LpnsButton" Text="LPN" Clicked="OnLpnsClicked" />
                 <Button x:Name="SourcesButton" Grid.Column="1" Text="📄 1С"
                         SemanticProperties.Description="Документы 1С" Clicked="OnSourcesClicked" />

@@ -1462,7 +1462,14 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<int>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.HasKey("SkuId", "Value");
+
+                    b.HasIndex("Value");
 
                     b.ToTable("SkuBarcodes");
                 });
