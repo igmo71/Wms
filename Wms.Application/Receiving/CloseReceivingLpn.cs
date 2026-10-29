@@ -11,13 +11,13 @@ namespace Wms.Application.Receiving;
 
 public sealed record CloseReceivingLpnCommand(
     Guid RequestId, Guid OrderId, Guid LpnId, string UserId,
-    bool ConfirmExpiredDate = false, string? ManagerReason = null,
+    string? ManagerReason = null,
     long? ExpectedLpnRevision = null, bool FromWeb = false);
 
 public sealed record CloseReceivingLpnResult(
     Guid LpnId, decimal? UsedPlan, decimal TotalFact, bool SourceCheckSucceeded,
     string? SourceCheckError, DateTimeOffset? LastSuccessfulCheckAtUtc,
-    bool ManagerException, bool ExpiredDateConfirmed);
+    bool ManagerException);
 
 public sealed class CloseReceivingLpn(
     CommandExecutor executor, IReceivingWorkStore store,
@@ -41,12 +41,12 @@ public sealed class CloseReceivingLpn(
         var hash = CommandExecutor.ComputeHash(command.ExpectedLpnRevision is long revision
             ? JsonSerializer.Serialize(new
             {
-                command.OrderId, command.LpnId, command.ConfirmExpiredDate,
+                command.OrderId, command.LpnId, ConfirmExpiredDate = false,
                 command.ManagerReason, ExpectedLpnRevision = revision
             })
             : JsonSerializer.Serialize(new
             {
-                command.OrderId, command.LpnId, command.ConfirmExpiredDate,
+                command.OrderId, command.LpnId, ConfirmExpiredDate = false,
                 command.ManagerReason
             }));
         var executed = await executor.ExecuteAsync(CommandType, command.RequestId, hash, command.UserId,
@@ -110,11 +110,9 @@ public sealed class CloseReceivingLpn(
                 if (sku.TracksExpirationDate && item.ExpirationDate is null)
                     return OperationError.Conflict(
                         "Учёт срока годности SKU включён. Обновите LPN и укажите дату перед закрытием.");
-                var expired = item.ExpirationDate is DateOnly date
-                    && date < DateOnly.FromDateTime(now.UtcDateTime);
-                if (expired && !command.ConfirmExpiredDate)
-                    return OperationError.Conflict(
-                        "У LPN прошла дата срока годности. Подтвердите закрытие явно.");
+                if (item.ExpirationDate is DateOnly date
+                    && date < DateOnly.FromDateTime(now.UtcDateTime))
+                    return OperationError.Conflict("Срок годности LPN истёк. Приёмка запрещена.");
 
                 var closed = order.CloseReceivingLpn(
                     lpn, command.UserId, now, canManage);
@@ -160,7 +158,7 @@ public sealed class CloseReceivingLpn(
                         LastSuccessfulCheckAtUtc = sources.Select(x =>
                             x.Source.LastSuccessfulCheckAtUtc).Min(),
                         ManagerException = managerException,
-                        command.ManagerReason, ExpiredDateConfirmed = expired,
+                        command.ManagerReason,
                         ClosedBy = command.UserId
                     }),
                     [movement.Value!.Id], versionIds, command.UserId,

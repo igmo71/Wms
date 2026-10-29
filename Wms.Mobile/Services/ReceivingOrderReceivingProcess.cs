@@ -57,11 +57,11 @@ public sealed class ReceivingOrderReceivingProcess(MobileReceivingOrderClient cl
             (await client.ClearLpnItemAsync(orderId, lpnId, expectedRevision, id)).ResourceId);
 
     public Task<MobileReceivingWorkOrderResponse> CloseLpnAsync(
-        Guid orderId, Guid lpnId, bool confirmExpiredDate, string? managerReason) =>
+        Guid orderId, Guid lpnId, string? managerReason) =>
         StartAsync("Закрыть LPN", orderId, async id =>
         {
             LastCloseResult = await client.CloseLpnAsync(
-                orderId, lpnId, confirmExpiredDate, managerReason, id);
+                orderId, lpnId, managerReason, id);
             return LastCloseResult.LpnId;
         });
 

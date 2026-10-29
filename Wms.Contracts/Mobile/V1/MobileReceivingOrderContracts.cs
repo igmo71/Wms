@@ -109,7 +109,7 @@ public sealed record MobileReceivingEditLpnRequest(
     Guid ClientRequestId, Guid SkuId, decimal Quantity, DateOnly? ExpirationDate);
 public sealed record MobileReceivingClearLpnItemRequest(Guid ClientRequestId, long ExpectedRevision);
 public sealed record MobileReceivingCloseLpnRequest(
-    Guid ClientRequestId, bool ConfirmExpiredDate, string? ManagerReason);
+    Guid ClientRequestId, string? ManagerReason);
 public sealed record MobileReceivingPutawayRequest(
     Guid ClientRequestId, Guid LpnItemId,
     Guid DestinationStorageLocationId, decimal Quantity);
@@ -132,4 +132,4 @@ public sealed record MobileReceivingCloseResultResponse(
     Guid LpnId, decimal? UsedPlan, decimal TotalFact,
     bool SourceCheckSucceeded, string? SourceCheckError,
     DateTimeOffset? LastSuccessfulCheckAtUtc,
-    bool ManagerException, bool ExpiredDateConfirmed);
+    bool ManagerException);

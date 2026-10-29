@@ -111,8 +111,9 @@ bottom row; the «🔍 SKU» search action sits above the SKU content and become
 «✕ SKU» while search is open. «Сохранить» keeps the LPN open and returns to the
 LPN list, including after a confirmed retry and when opened from a SKU screen.
 «Закрыть» confirms receipt posting, saves changed SKU, quantity and date, then
-closes the LPN. A failed close leaves the saved LPN open; uncertain save and
-close responses retain separate command IDs for explicit retry. «Отменить»
+closes the LPN and opens the order SKU list, whether the LPN was entered from
+the SKU detail or LPN list. A failed close leaves the saved LPN open. Uncertain
+save and close responses retain separate command IDs for explicit retry. «Отменить»
 requires confirmation. Action descriptions remain available to a screen reader.
 Receiving screens have no putaway actions; putaway starts from its own LPN screen.
 
@@ -126,9 +127,12 @@ A cross detaches a document before the first posted LPN. Before the first scan,
 section navigation is hidden; afterward it appears without a «Готово» action.
 Back from an existing order returns to the queue. An uncertain response retains
 the barcode or source ID and command ID for explicit retry, including creation.
-The LPN editor shows the date field while expiration tracking is on or a date
-is saved, retaining that date after the flag turns off. A rejected close after
-a changed input refreshes the LPN and shows the specific server error.
+The LPN editor shows the date field immediately when a selected SKU tracks
+expiration, with no preselected date or enable switch. Saving or closing the
+LPN requires an explicit date no earlier than the current UTC day. A saved date
+remains visible after the flag turns off; closing rejects it if it has expired.
+A rejected close after a changed input refreshes the LPN and shows the specific
+server error.
 When an open LPN has no selected SKU, the editor immediately shows search in
 the order composition, with a switch to the whole catalog, and accepts SKU
 scans. A selected SKU replaces the search panel and has a cross beside its name.
@@ -138,7 +142,8 @@ and the order-scoped search appears again. A closed LPN has no cross.
 
 A current-cycle Operator can complete an order from the SKU or
 LPN list when no LPN remains open. Mobile confirms the decision, retains the
-command ID for uncertain retry and returns to the refreshed queue on success.
+command ID for uncertain retry and shows the completed order's SKU list on
+success, including after a confirmed retry.
 
 ## Web receiving
 
@@ -163,7 +168,7 @@ Unchecked fact is textual; different SKU quantities are not totaled together.
 A Web order card has no controls to select an SKU or enter a quantity into an
 open LPN; physical counting stays in Mobile. A Manager may close a saved,
 positive LPN after reviewing its SKU, quantity, plan and date. Closing rejects
-a changed LPN revision and asks for explicit confirmation of an expired date.
+a changed LPN revision or an expired date; expired stock cannot be confirmed.
 Only a Manager may complete or reopen an order in Web. An uncertain completion
 retains its command ID for explicit retry; success reloads status and cycle
 snapshots.

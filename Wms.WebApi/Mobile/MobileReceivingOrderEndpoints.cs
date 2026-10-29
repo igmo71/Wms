@@ -268,15 +268,14 @@ internal static class MobileReceivingOrderEndpoints
             return TypedResults.Unauthorized();
         var result = await close.ExecuteAsync(new CloseReceivingLpnCommand(
             request.ClientRequestId, orderId, lpnId, userId,
-            request.ConfirmExpiredDate, request.ManagerReason), ct);
+            request.ManagerReason), ct);
         if (!result.IsSuccess)
             return MobileEndpointResults.CommandProblem(result.Error!);
         var value = result.Value!;
         return TypedResults.Ok(new MobileReceivingCloseResultResponse(
             value.LpnId, value.UsedPlan, value.TotalFact,
             value.SourceCheckSucceeded, value.SourceCheckError,
-            value.LastSuccessfulCheckAtUtc, value.ManagerException,
-            value.ExpiredDateConfirmed));
+            value.LastSuccessfulCheckAtUtc, value.ManagerException));
     }
 
     private static async Task<IResult> ExecuteForUserAsync(

@@ -21,7 +21,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private bool _visible;
     private bool _busy;
     private bool _closeAfterSave;
-    private bool _confirmedExpiredDate;
     private long _scanGeneration;
 
     public ReceivingOrderLicensePlateNumberPage(MobileReceivingOrderClient orders,
@@ -50,7 +49,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         ScopeButton.Text = "Поиск: состав ордера";
         SkuSearch.Text = string.Empty;
         _closeAfterSave = false;
-        _confirmedExpiredDate = false;
         SearchPanel.IsVisible = false;
     }
 
@@ -144,12 +142,10 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         QuantityEntry.Text = item?.Quantity.ToString("0.###", CultureInfo.InvariantCulture);
         ExpirationPanel.IsVisible = sku.TracksExpirationDate || item?.ExpirationDate is not null;
         ExpirationHintLabel.Text = sku.TracksExpirationDate
-            ? "Для закрытия LPN укажите срок годности."
+            ? "Укажите срок годности перед сохранением LPN."
             : "Сохранённый срок годности не удаляется при выключении его учёта.";
-        ExpirationSwitch.IsToggled = item?.ExpirationDate is not null;
         ExpirationPicker.Date = item?.ExpirationDate is DateOnly date
-            ? date.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
-        ExpirationPicker.IsVisible = ExpirationSwitch.IsToggled;
+            ? date.ToDateTime(TimeOnly.MinValue) : null;
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
@@ -327,9 +323,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         await UpdateCameraAsync();
     }
 
-    private void OnExpirationToggled(object? sender, ToggledEventArgs e) =>
-        ExpirationPicker.IsVisible = e.Value;
-
     private async void OnQuantityCompleted(object? sender, EventArgs e)
     {
         QuantityEntry.Unfocus();
@@ -357,22 +350,11 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         if (Lpn is not { Status: MobileLicensePlateNumberStatus.Open } lpn
             || _busy || _process.HasPendingCommand || _order?.IsParticipant != true) return;
         if (!TryReadEditedValues(out var skuId, out var quantity, out var expiration)) return;
-        if (_order.Items.FirstOrDefault(x => x.SkuId == skuId)?.TracksExpirationDate == true
-            && expiration is null)
-        {
-            ErrorLabel.Text = "Укажите срок годности перед закрытием LPN.";
-            return;
-        }
-        var expired = expiration is DateOnly date
-            && date < DateOnly.FromDateTime(DateTime.UtcNow);
-        if (expired && !await DisplayAlertAsync("Прошедший срок",
-                "Срок годности прошёл. Подтвердить закрытие LPN?", "Подтвердить", "Назад")) return;
         if (!await DisplayAlertAsync("Провести приход",
                 $"Закрыть {lpn.Code} и провести {quantity:0.###}?", "Да", "Нет")) return;
         if (_busy || _process.HasPendingCommand || Lpn?.Status != MobileLicensePlateNumberStatus.Open)
             return;
 
-        _confirmedExpiredDate = expired;
         if (HasUnsavedChanges(lpn))
         {
             _closeAfterSave = true;
@@ -391,7 +373,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async Task CloseSavedLpnAsync()
     {
         if (!await ExecuteAsync(async () => Apply(await _process.CloseLpnAsync(
-                _orderId, _lpnId, _confirmedExpiredDate, null)), refreshOnConflict: true))
+                _orderId, _lpnId, null)), refreshOnConflict: true))
             return;
         await FinishCloseAsync();
     }
@@ -402,7 +384,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         var result = _process.LastCloseResult;
         if (!result.SourceCheckSucceeded)
             await DisplayAlertAsync("Сверка 1С", result.SourceCheckError ?? "План не подтверждён.", "Понятно");
-        await Navigation.PopAsync();
+        await ReturnToSkuListAsync();
     }
 
     private async void OnCancelClicked(object? sender, EventArgs e)
@@ -505,6 +487,27 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             Navigation.RemovePage(page);
     }
 
+    private async Task ReturnToSkuListAsync()
+    {
+        var stack = Navigation.NavigationStack.ToArray();
+        if (stack.Length > 1 && stack[^2] is ReceivingOrderSkuPage)
+        {
+            await Navigation.PopAsync();
+            return;
+        }
+
+        if (_order is null) return;
+        var section = Array.FindLastIndex(stack, page =>
+            page is ReceivingOrderSkuPage or ReceivingOrderLpnListPage);
+        if (section < 0) return;
+
+        var list = _services.GetRequiredService<ReceivingOrderSkuPage>();
+        list.Show(_order, _process);
+        await Navigation.PushAsync(list);
+        foreach (var page in stack.Skip(section))
+            Navigation.RemovePage(page);
+    }
+
     private void UpdateRecovery()
     {
         RetryButton.IsVisible = _process.HasPendingCommand;
@@ -518,7 +521,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         ScopeButton.IsEnabled = canEdit;
         SkuSearch.IsEnabled = canEdit;
         QuantityEntry.IsEnabled = canEdit;
-        ExpirationSwitch.IsEnabled = canEdit;
         ExpirationPicker.IsEnabled = canEdit;
         ApplyButton.IsEnabled = canEdit && _selectedSkuId is not null;
         NavigationPage.SetHasBackButton(this, !_busy && !_process.HasPendingCommand);
@@ -568,9 +570,16 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             ErrorLabel.Text = "Введите положительное количество с точностью до трёх знаков.";
             return false;
         }
-        if (ExpirationPanel.IsVisible && ExpirationSwitch.IsToggled && expiration is null)
+        var selectedSkuId = skuId;
+        if (_order?.Items.FirstOrDefault(x => x.SkuId == selectedSkuId)?.TracksExpirationDate == true
+            && expiration is null)
         {
             ErrorLabel.Text = "Выберите дату срока годности.";
+            return false;
+        }
+        if (expiration is DateOnly date && date < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            ErrorLabel.Text = "Срок годности не может быть раньше сегодняшней даты.";
             return false;
         }
         return true;
@@ -582,8 +591,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         && WarehouseQuantityInput.IsSupported(quantity) && quantity > 0;
 
     private DateOnly? SelectedExpiration() =>
-        ExpirationPanel.IsVisible && ExpirationSwitch.IsToggled
-            && ExpirationPicker.Date is DateTime date
+        ExpirationPanel.IsVisible && ExpirationPicker.Date is DateTime date
             ? DateOnly.FromDateTime(date) : null;
 
     private bool HasUnsavedChanges(MobileReceivingWorkLpnResponse lpn)

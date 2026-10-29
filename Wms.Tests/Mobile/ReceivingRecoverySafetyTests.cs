@@ -37,7 +37,7 @@ public sealed class ReceivingRecoverySafetyTests
     private static Task<MobileReceivingWorkOrderResponse> ExecuteAsync(
         ReceivingOrderReceivingProcess process, string kind, Guid orderId, Guid lpnId) => kind switch
         {
-            "close" => process.CloseLpnAsync(orderId, lpnId, false, null),
+            "close" => process.CloseLpnAsync(orderId, lpnId, null),
             "edit" => process.EditLpnAsync(orderId, lpnId,
                 Guid.Parse("22d96f33-94af-4f27-81cf-49caa448a93d"),
                 1.25m, new DateOnly(2027, 1, 1)),
@@ -73,7 +73,7 @@ public sealed class ReceivingRecoverySafetyTests
             {
                 Content = request.RequestUri.AbsolutePath.EndsWith("/close")
                     ? JsonContent.Create(new MobileReceivingCloseResultResponse(
-                        Guid.Empty, 1m, 1m, true, null, null, false, false))
+                        Guid.Empty, 1m, 1m, true, null, null, false))
                     : JsonContent.Create(new MobileReceivingCommandIdResponse(Guid.Empty))
             };
         }

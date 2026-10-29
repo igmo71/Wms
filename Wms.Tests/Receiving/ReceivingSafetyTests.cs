@@ -21,6 +21,28 @@ namespace Wms.Tests.Receiving;
 public sealed class ReceivingSafetyTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Expired_closed_lpn_cannot_increase_received_quantity()
+    {
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var state = await SeedNewOpenReceivingLpnAsync(date);
+        Value(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()));
+        var correction = new CorrectReceivingLpnQuantity(
+            new NewCommandExecutor(new CommandExecutionStore(database)),
+            new ReceivingWorkStore(database),
+            new NewPostInventoryMovement.Handler(new InventoryPostingStore()),
+            new WarehousePermission(new DeletionPermission()),
+            new FixedTimeProvider(DateTimeOffset.UtcNow.AddDays(2)));
+        var increase = new CorrectReceivingLpnQuantityCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, 4m, "close-test");
+
+        Error(await correction.ExecuteAsync(increase), OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        Assert.Single(await verify.InventoryMovements.Where(x =>
+            x.LicensePlateNumberId == state.LpnId).ToListAsync());
+        Assert.False(await verify.CommandReceipts.AnyAsync(x => x.RequestId == increase.RequestId));
+    }
+
+    [Fact]
     public async Task ReceivingLpnDeletion_reverses_own_dated_history_once_and_keeps_independent_stock_change()
     {
         var date = new DateOnly(2027, 1, 10);
@@ -451,6 +473,11 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
 
     private sealed record NewCloseState(
         Guid WarehouseId, Guid OrderId, Guid LocationId, Guid SkuId, Guid LpnId);
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 
     private sealed class PutawayPermission : IWarehousePermissionStore
     {

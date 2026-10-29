@@ -56,6 +56,20 @@ public sealed class CorrectReceivingLpnQuantity(
                 var oldQuantity = item.Quantity;
                 var oldFact = orderItem.FactQuantity;
                 var now = clock.GetUtcNow();
+                if (command.Quantity > oldQuantity)
+                {
+                    var sku = await store.LoadSkuAsync(session, item.StockKeepingUnitId, operationCt);
+                    if (sku is null)
+                        return OperationError.NotFound("SKU не найден.");
+                    if (sku.TracksExpirationDate && item.ExpirationDate is null)
+                        return OperationError.Conflict(
+                            "Для этого SKU не указан срок годности. Увеличение приёмки запрещено.");
+                    if (item.ExpirationDate is DateOnly date
+                        && date < DateOnly.FromDateTime(now.UtcDateTime))
+                        return OperationError.Conflict(
+                            "Срок годности LPN истёк. Увеличение приёмки запрещено.");
+                    store.GuardClosingInputs(session, orderItem, sku);
+                }
                 var corrected = order.CorrectClosedReceivingLpnQuantity(
                     lpn, command.Quantity, command.UserId, now);
                 if (!corrected.IsSuccess)

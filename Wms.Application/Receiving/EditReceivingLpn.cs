@@ -39,12 +39,20 @@ public sealed class EditReceivingLpn(
                 var lpn = await store.LoadLpnAsync(session, request.LpnId, operationCt);
                 if (lpn is null)
                     return OperationError.NotFound("LPN не найден.");
+                var sku = await store.LoadSkuAsync(session, request.SkuId, operationCt);
+                if (sku is null)
+                    return OperationError.NotFound("SKU не найден.");
                 var previous = lpn.Items.SingleOrDefault(x => !x.IsDeleted);
                 var before = previous is null ? null : new
                 {
                     previous.StockKeepingUnitId, previous.Quantity, previous.ExpirationDate
                 };
                 var now = clock.GetUtcNow();
+                if (sku.TracksExpirationDate && request.ExpirationDate is null)
+                    return OperationError.Invalid("Для этого SKU укажите срок годности.");
+                if (request.ExpirationDate is DateOnly expirationDate
+                    && expirationDate < DateOnly.FromDateTime(now.UtcDateTime))
+                    return OperationError.Invalid("Срок годности не может быть раньше сегодняшней даты.");
                 var changed = order.EditReceivingLpn(lpn, request.SkuId,
                     request.ExpirationDate, request.Quantity, request.UserId, now, canManage);
                 if (!changed.IsSuccess)

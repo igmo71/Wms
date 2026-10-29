@@ -40,7 +40,7 @@ public partial class Details
     private ReceivingOrderRefreshResult? _refreshResult;
     private Guid? _pendingCompleteRequestId;
     private Guid? _pendingReopenRequestId;
-    private (Guid LpnId, long Revision, bool ConfirmExpiredDate, Guid RequestId)? _pendingClose;
+    private (Guid LpnId, long Revision, Guid RequestId)? _pendingClose;
     private Guid? _expandedLpnId;
     private bool _canManage;
     private bool _loading = true;
@@ -274,14 +274,17 @@ public partial class Details
             return;
         }
 
-        var expired = item.ExpirationDate is DateOnly date
-            && date < DateOnly.FromDateTime(DateTime.UtcNow);
+        if (item.ExpirationDate is DateOnly date
+            && date < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            _error = $"Срок годности {lpn.Code} истёк. Приёмка запрещена.";
+            return;
+        }
         var name = item.SkuName ?? item.SkuCode ?? item.SkuId.ToString();
         var message = $"LPN {lpn.Code}. SKU: {name}. Количество: {Format(item.Quantity)} {item.UnitOfMeasure ?? "ед."}. "
             + $"План по ордеру: {Format(orderItem?.PlanQuantity)}. "
             + $"Срок годности: {item.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}. "
-            + "Закрытие проведёт приход. Менеджер подтверждает приёмку сверх плана или без известного плана."
-            + (expired ? " Срок годности прошёл; подтвердите закрытие с просроченным товаром." : string.Empty);
+            + "Закрытие проведёт приход. Менеджер подтверждает приёмку сверх плана или без известного плана.";
 
         _busy = true;
         _error = null;
@@ -292,12 +295,11 @@ public partial class Details
             if (confirmed != true) return;
 
             if (_pendingClose is null || _pendingClose.Value.LpnId != lpn.Id
-                || _pendingClose.Value.Revision != lpn.Revision
-                || _pendingClose.Value.ConfirmExpiredDate != expired)
-                _pendingClose = (lpn.Id, lpn.Revision, expired, Guid.NewGuid());
+                || _pendingClose.Value.Revision != lpn.Revision)
+                _pendingClose = (lpn.Id, lpn.Revision, Guid.NewGuid());
             var result = await CloseLpn.ExecuteAsync(new CloseReceivingLpnCommand(
                 _pendingClose.Value.RequestId, Id, lpn.Id, _userId,
-                ConfirmExpiredDate: expired, ExpectedLpnRevision: lpn.Revision,
+                ExpectedLpnRevision: lpn.Revision,
                 FromWeb: true));
             if (!result.IsSuccess)
             {

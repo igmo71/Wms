@@ -228,13 +228,7 @@ public partial class ReceivingOrderSkuPage : ContentPage
             "Завершить", "Отмена")) return;
         if (_busy || _process.HasPendingCommand
             || _order is not { MayCompleteOrder: true } current || HasOpenLpn(current)) return;
-        var completed = false;
-        await ExecuteAsync(async () =>
-        {
-            Apply(await _process.CompleteOrderAsync(current.Id));
-            completed = true;
-        });
-        if (completed) await Navigation.PopAsync();
+        await ExecuteAsync(async () => Apply(await _process.CompleteOrderAsync(current.Id)));
     }
 
     private async void OnZeroClicked(object? sender, EventArgs e)
@@ -302,7 +296,6 @@ public partial class ReceivingOrderSkuPage : ContentPage
         if (_busy || !_process.HasPendingCommand) return;
         SetBusy(true);
         Guid? openedId = null;
-        var completing = _process.PendingLabel == "Завершить ордер";
         var addingSku = _process.PendingLabel == "Добавить SKU";
         var succeeded = false;
         try
@@ -320,8 +313,7 @@ public partial class ReceivingOrderSkuPage : ContentPage
         }
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
-        if (succeeded && completing) await Navigation.PopAsync();
-        else if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
+        if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
         else if (succeeded && addingSku && _pendingSkuId is Guid skuId)
         {
             _pendingSkuId = null;

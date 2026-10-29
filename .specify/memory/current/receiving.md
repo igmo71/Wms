@@ -120,11 +120,11 @@ after confirming the saved SKU, quantity, and date. If the LPN changed since it 
 displayed for confirmation, Web closing is rejected and requires a refresh.
 
 The local SKU expiration-tracking flag belongs to WMS. A Web Manager can switch
-it with an audit event; catalog imports preserve it. An open LPN may keep a
-quantity while its date is unset. Closing a positive LPN for an SKU whose flag
-is enabled requires a date. A date before the UTC closing day requires explicit
-confirmation by the closer, with no higher role; today's date does not. Saved
-dates survive a later flag change and do not merge stock groups.
+it with an audit event; catalog imports preserve it. Saving an LPN item for an
+SKU whose flag is enabled requires an explicitly selected date. A date before
+the current UTC day cannot be saved, and closing rejects an LPN whose saved
+date has since expired, even if the flag was later disabled. Today's date is
+allowed. Saved dates survive a later flag change and do not merge stock groups.
 
 A current-cycle Operator in Mobile or Manager in Web can complete an order when
 no receiving LPN is open. Completion tries to check every linked source, then
@@ -165,7 +165,9 @@ groups do not participate.
 A Web Manager may correct a closed receiving LPN's quantity, including after
 order completion, until its first putaway. The nonnegative replacement keeps
 its SKU and expiration date. The difference posts at the original Receiving
-location and updates the order fact. Any putaway blocks correction.
+location and updates the order fact. An increase is rejected if the saved date
+has expired or the current SKU flag requires a date that the LPN lacks; a
+decrease remains available. Any putaway blocks correction.
 
 Before deleting a closed LPN, Web previews its receipt, corrections, and
 putaways in reverse order with original addresses and dates, plus forecast

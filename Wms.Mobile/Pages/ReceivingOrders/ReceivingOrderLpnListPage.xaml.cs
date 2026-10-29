@@ -249,7 +249,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
             Apply(await _process.CompleteOrderAsync(current.Id));
             completed = true;
         });
-        if (completed) await Navigation.PopAsync();
+        if (completed) await ReturnToSkuListAsync();
     }
 
     private async void OnLpnTapped(object? sender, TappedEventArgs e)
@@ -278,6 +278,12 @@ public partial class ReceivingOrderLpnListPage : ContentPage
     private async void OnSkuClicked(object? sender, EventArgs e)
     {
         if (_order is null || _busy || _process.HasPendingCommand) return;
+        await ReturnToSkuListAsync();
+    }
+
+    private async Task ReturnToSkuListAsync()
+    {
+        if (_order is null) return;
         var page = _services.GetRequiredService<ReceivingOrderSkuPage>();
         page.Show(_order, _process);
         await Navigation.PushAsync(page);
@@ -328,7 +334,7 @@ public partial class ReceivingOrderLpnListPage : ContentPage
         }
         catch (HttpRequestException) { ErrorLabel.Text = "Ответ не подтверждён. Повторите ту же команду."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
-        if (succeeded && completing) await Navigation.PopAsync();
+        if (succeeded && completing) await ReturnToSkuListAsync();
         else if (succeeded && openedId is Guid id) await OpenLpnPageAsync(id);
         else if (succeeded && addingSku && _pendingSkuId is Guid skuId)
         {

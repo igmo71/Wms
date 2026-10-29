@@ -207,9 +207,12 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Current_expiration_flag_blocks_undated_close_and_past_date_needs_confirmation()
+    public async Task Tracked_sku_requires_date_and_expired_date_never_posts_receipt()
     {
         var state = await SeedAsync(5m, 3m);
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var clock = new FixedTimeProvider(now);
         await using (var update = database.CreateDbContext())
         {
             var sku = await update.StockKeepingUnits.SingleAsync(x => x.Id == state.SkuId);
@@ -217,38 +220,46 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
             await update.SaveChangesAsync();
         }
 
-        var close = Handler(state.Reader);
+        var close = Handler(state.Reader, clock: clock);
         var missingDate = new CloseReceivingLpnCommand(
             Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
         var missing = await close.ExecuteAsync(missingDate);
         Error(missing, OperationErrorType.Conflict);
         Assert.Contains("укажите дату", missing.Error!.Message, StringComparison.OrdinalIgnoreCase);
 
-        var expiredDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
         var edit = new EditReceivingLpn(
             new CommandExecutor(new CommandExecutionStore(database)),
             new ReceivingWorkStore(database),
-            new WarehousePermission(new ReceivingPermission()), TimeProvider.System);
+            new WarehousePermission(new ReceivingPermission()), clock);
+        var missingEdit = new EditReceivingLpnRequest(
+            Guid.NewGuid(), state.OrderId, state.LpnId,
+            state.SkuId, 3m, null, "operator-test");
+        Error(await edit.ExecuteAsync(missingEdit), OperationErrorType.Invalid);
+        var expiredEdit = new EditReceivingLpnRequest(
+            Guid.NewGuid(), state.OrderId, state.LpnId,
+            state.SkuId, 3m, today.AddDays(-1), "operator-test");
+        Error(await edit.ExecuteAsync(expiredEdit), OperationErrorType.Invalid);
         Value(await edit.ExecuteAsync(new EditReceivingLpnRequest(
             Guid.NewGuid(), state.OrderId, state.LpnId,
-            state.SkuId, 3m, expiredDate, "operator-test")));
+            state.SkuId, 3m, today, "operator-test")));
 
-        var noConfirmation = new CloseReceivingLpnCommand(
+        var expiredClose = new CloseReceivingLpnCommand(
             Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
-        Error(await close.ExecuteAsync(noConfirmation), OperationErrorType.Conflict);
-        var confirmed = new CloseReceivingLpnCommand(
-            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test", ConfirmExpiredDate: true);
-        Assert.True(Value(await close.ExecuteAsync(confirmed)).ExpiredDateConfirmed);
+        Error(await Handler(state.Reader, clock: new FixedTimeProvider(now.AddDays(1)))
+            .ExecuteAsync(expiredClose), OperationErrorType.Conflict);
+        await using (var beforeClose = database.CreateDbContext())
+            Assert.False(await beforeClose.InventoryMovements.AnyAsync(x =>
+                x.LicensePlateNumberId == state.LpnId));
+        var validClose = new CloseReceivingLpnCommand(
+            Guid.NewGuid(), state.OrderId, state.LpnId, "operator-test");
+        Value(await close.ExecuteAsync(validClose));
 
         await using var verify = database.CreateDbContext();
-        Assert.Equal(expiredDate, (await verify.InventoryMovements.SingleAsync(x =>
+        Assert.Equal(today, (await verify.InventoryMovements.SingleAsync(x =>
             x.LicensePlateNumberId == state.LpnId)).ExpirationDate);
         Assert.False(await verify.CommandReceipts.AnyAsync(x =>
-            x.RequestId == missingDate.RequestId || x.RequestId == noConfirmation.RequestId));
-        var audit = await verify.WarehouseAuditEvents.SingleAsync(x =>
-            x.RequestId == confirmed.RequestId && x.CommandType == "receiving.lpn.close");
-        using var values = JsonDocument.Parse(audit.AfterValuesJson!);
-        Assert.True(values.RootElement.GetProperty("ExpiredDateConfirmed").GetBoolean());
+            x.RequestId == missingDate.RequestId || x.RequestId == missingEdit.RequestId
+            || x.RequestId == expiredEdit.RequestId || x.RequestId == expiredClose.RequestId));
     }
 
     [Fact]
@@ -290,7 +301,8 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
     }
 
     private CloseReceivingLpn Handler(
-        MutableReader reader, IDbContextFactory<ApplicationDbContext>? factory = null)
+        MutableReader reader, IDbContextFactory<ApplicationDbContext>? factory = null,
+        TimeProvider? clock = null)
     {
         factory ??= database;
         return new CloseReceivingLpn(
@@ -300,7 +312,7 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
                 new ReceivingSourceStore(database, new ReceivingSourceParser()), TimeProvider.System),
             new ReceivingSourceParser(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
-            new WarehousePermission(new ReceivingPermission()), TimeProvider.System);
+            new WarehousePermission(new ReceivingPermission()), clock ?? TimeProvider.System);
     }
 
     private async Task<CloseState> SeedAsync(decimal plan, decimal quantity)
@@ -349,6 +361,11 @@ public sealed class CloseReceivingLpnTests(SqlDatabase database)
 
     private sealed record CloseState(Guid WarehouseId, Guid OrderId, Guid LocationId,
         Guid SkuId, Guid LpnId, Guid SourceKey, MutableReader Reader);
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 
     private sealed class MutableReader(Guid key, Guid warehouseId, Guid skuId, decimal quantity)
         : IReceivingSourceReader

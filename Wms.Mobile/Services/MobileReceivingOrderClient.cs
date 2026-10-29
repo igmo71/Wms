@@ -96,11 +96,11 @@ public sealed class MobileReceivingOrderClient
         PostIdAsync($"{Route}/{orderId:D}/lpns/{lpnId:D}/cancel", requestId, ct);
 
     public Task<MobileReceivingCloseResultResponse> CloseLpnAsync(
-        Guid orderId, Guid lpnId, bool confirmExpiredDate, string? managerReason,
+        Guid orderId, Guid lpnId, string? managerReason,
         Guid requestId, CancellationToken ct = default) =>
         PostAsync<MobileReceivingCloseLpnRequest, MobileReceivingCloseResultResponse>(
             $"{Route}/{orderId:D}/lpns/{lpnId:D}/close",
-            new MobileReceivingCloseLpnRequest(requestId, confirmExpiredDate, managerReason), ct);
+            new MobileReceivingCloseLpnRequest(requestId, managerReason), ct);
 
     private Task<MobileReceivingCommandIdResponse> PostIdAsync(
         string route, Guid requestId, CancellationToken ct) =>

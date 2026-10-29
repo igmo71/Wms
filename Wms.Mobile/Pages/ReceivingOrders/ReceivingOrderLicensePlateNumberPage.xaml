@@ -38,10 +38,9 @@
                                Completed="OnQuantityCompleted" />
                         <VerticalStackLayout x:Name="ExpirationPanel" IsVisible="False" Spacing="3">
                             <Label x:Name="ExpirationHintLabel" FontSize="12" />
-                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                                <Switch x:Name="ExpirationSwitch" Toggled="OnExpirationToggled" VerticalOptions="Center" />
-                                <Label Grid.Column="1" Text="Срок годности" VerticalTextAlignment="Center" />
-                                <DatePicker x:Name="ExpirationPicker" Grid.Column="2" IsVisible="False"
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <Label Text="Срок годности" VerticalTextAlignment="Center" />
+                                <DatePicker x:Name="ExpirationPicker" Grid.Column="1"
                                             Format="dd.MM.yyyy" FontSize="14" VerticalOptions="Center" />
                             </Grid>
                         </VerticalStackLayout>
