@@ -52,6 +52,20 @@ own manual locks; an inventory-count draft owns its lock until posting or
 explicit deletion. Lock release removes the active record; separate lock
 history is not retained.
 
+Operational locations have an administrator-controlled permission to hold
+several SKUs, off by default for manual creation, range generation, and map
+import. It is applied to stock added to a Storage destination; Receiving,
+Transit, and Shipping positions remain flow locations. With permission off,
+the final recorded stock in a Storage location may contain nonzero balances
+of only one distinct SKU. Different expiration dates of that SKU are allowed;
+retained zero rows do not occupy the location, while negative balances count
+as nonzero. An administrator cannot turn permission off while several SKUs
+remain. Receiving putaway, direct and transit-backed transfers, inventory
+count posting, and current picking rollback reject a final mixed state
+without partial effects. A count may replace one SKU with another when its
+final state contains only the latter. Destination recommendations retain
+their existing scope; a scanned destination is checked at posting.
+
 Inventory uses one canonical unit per SKU. Operational quantities are C#
 `decimal` persisted as SQL Server `decimal(15,3)`, matching the current 1C
 `Number(15,3)` boundary; unsupported scale or range is rejected, not rounded.

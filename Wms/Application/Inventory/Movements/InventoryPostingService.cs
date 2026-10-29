@@ -63,7 +63,49 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
             }
         }
 
+        var mixingResult = await ValidateDestinationSkuMixingAsync(
+            movements, locationResult.Value!, dbContext, ct);
+        if (!mixingResult.IsSuccess)
+            return mixingResult;
+
         return OperationResult.Success();
+    }
+
+    private static async Task<OperationResult> ValidateDestinationSkuMixingAsync(
+        IReadOnlyCollection<InventoryMovement> movements,
+        IReadOnlyCollection<StorageLocation> locations,
+        ApplicationDbContext dbContext,
+        CancellationToken ct)
+    {
+        var destinationIds = movements
+            .Select(x => x.DestinationStorageLocationId)
+            .OfType<Guid>()
+            .ToHashSet();
+        var restricted = locations
+            .Where(x => destinationIds.Contains(x.Id)
+                && x.Zone?.Type == ZoneType.Storage
+                && !x.AllowsMultipleSkus)
+            .ToDictionary(x => x.Id);
+        if (restricted.Count == 0)
+            return OperationResult.Success();
+
+        var restrictedIds = restricted.Keys.ToArray();
+        var saved = await dbContext.InventoryBalances
+            .Where(x => restrictedIds.Contains(x.StorageLocationId))
+            .ToListAsync(ct);
+        var added = dbContext.ChangeTracker.Entries<InventoryBalance>()
+            .Where(x => x.State == EntityState.Added)
+            .Select(x => x.Entity)
+            .Where(x => restricted.ContainsKey(x.StorageLocationId));
+        var mixed = saved.Concat(added)
+            .Where(x => x.Quantity != 0)
+            .GroupBy(x => x.StorageLocationId)
+            .FirstOrDefault(x => x.Select(balance => balance.StockKeepingUnitId)
+                .Distinct().Take(2).Count() > 1);
+        return mixed is null
+            ? OperationResult.Success()
+            : OperationError.Conflict(
+                $"В ячейке {restricted[mixed.Key].DisplayAddress} запрещено хранить несколько SKU.");
     }
 
     private OperationResult ApplyMovement(

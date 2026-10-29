@@ -41,4 +41,29 @@ public sealed class InventoryPostingStore : IInventoryPostingStore
             balances.Add(added.StorageLocationId, added);
         return new InventoryPostingState(locations, balances);
     }
+
+    public async Task<bool> HasMultipleNonzeroSkusAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        Guid storageLocationId, CancellationToken ct)
+    {
+        if (context is not CommandExecutionStore.Session session)
+            throw new InvalidOperationException("Проведение должно использовать сессию команды.");
+
+        var db = session.Db;
+        var saved = await db.InventoryBalances
+            .Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == storageLocationId)
+            .ToListAsync(ct);
+        var added = db.ChangeTracker.Entries<InventoryBalance>()
+            .Where(x => x.State == EntityState.Added)
+            .Select(x => x.Entity)
+            .Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == storageLocationId);
+        return saved.Concat(added)
+            .Where(x => x.Quantity != 0)
+            .Select(x => x.StockKeepingUnitId)
+            .Distinct()
+            .Take(2)
+            .Count() > 1;
+    }
 }

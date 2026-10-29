@@ -10,6 +10,7 @@ public class StorageLocation
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public bool IsFolder { get; private set; }
+    public bool AllowsMultipleSkus { get; private set; }
     public bool DeletionMark { get; private set; }
 
     public Guid WarehouseId { get; private set; }
@@ -90,7 +91,8 @@ public class StorageLocation
         if (!details.IsFolder && ZoneId is null)
             return OperationError.Invalid("Для места хранения выберите функциональную зону.");
 
-        var eligibilityChanged = IsFolder != details.IsFolder;
+        var eligibilityChanged = IsFolder != details.IsFolder
+            || AllowsMultipleSkus != details.AllowsMultipleSkus;
         ApplyDetails(details);
         if (eligibilityChanged)
         {
@@ -124,6 +126,7 @@ public class StorageLocation
     {
         Name = details.Name;
         IsFolder = details.IsFolder;
+        AllowsMultipleSkus = details.AllowsMultipleSkus;
         Dimensions = details.Dimensions.Copy();
         Coordinates = details.Coordinates.Copy();
         PickSequence = details.PickSequence;
@@ -137,13 +140,15 @@ public sealed class StorageLocationDetails
         bool isFolder,
         LocationDimensions dimensions,
         LocationCoordinates coordinates,
-        long? pickSequence)
+        long? pickSequence,
+        bool allowsMultipleSkus)
     {
         Name = name.Trim();
         IsFolder = isFolder;
         Dimensions = dimensions;
         Coordinates = coordinates;
         PickSequence = pickSequence;
+        AllowsMultipleSkus = allowsMultipleSkus;
     }
 
     public string Name { get; }
@@ -151,13 +156,15 @@ public sealed class StorageLocationDetails
     public LocationDimensions Dimensions { get; }
     public LocationCoordinates Coordinates { get; }
     public long? PickSequence { get; }
+    public bool AllowsMultipleSkus { get; }
 
     public static OperationResult<StorageLocationDetails> Create(
         string name,
         bool isFolder,
         LocationDimensions? dimensions,
         LocationCoordinates? coordinates,
-        long? pickSequence)
+        long? pickSequence,
+        bool allowsMultipleSkus = false)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -174,7 +181,11 @@ public sealed class StorageLocationDetails
             return OperationError.Invalid("Координаты складской позиции обязательны.");
         }
 
-        return new StorageLocationDetails(name, isFolder, dimensions, coordinates, pickSequence);
+        if (isFolder && allowsMultipleSkus)
+            return OperationError.Invalid("Структурная группа не может разрешать смешение SKU.");
+
+        return new StorageLocationDetails(name, isFolder, dimensions, coordinates,
+            pickSequence, allowsMultipleSkus);
     }
 }
 

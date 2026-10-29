@@ -45,6 +45,8 @@ quantity means uncounted; zero is explicit. Scan adds one, and manual input may
 set an absolute nonnegative quantity or add an unexpected SKU. Posting requires
 every row, records only nonzero differences, and releases the lock. Leaving the
 screen retains the draft; explicit deletion removes it and releases the lock.
+Posting follows the [Storage location SKU-mixing rule](inventory.md) on the
+final counted state.
 
 ## Intra-warehouse transfer
 
@@ -56,7 +58,8 @@ Direct, pick-to-transit, and put-from-transit movements post immediately. One
 transit location belongs exclusively to one active transfer and must be empty
 before completion. Posted movements and completed transfers are immutable; an
 unused draft may be deleted. Rejected or uncertain Mobile commands remain on
-the operation screen for recovery.
+the operation screen for recovery. Storage destinations follow the
+[SKU-mixing rule](inventory.md).
 
 Mobile transit transfers expose pick-to-transit and put-from-transit actions;
 direct movement is offered only for transfers without a transit location.

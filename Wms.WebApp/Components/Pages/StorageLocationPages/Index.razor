@@ -79,6 +79,10 @@ else
                         }
                         <MudText><b>Зона:</b> @(_selectedLocation.Zone?.Name ?? "—")</MudText>
                         <MudText><b>Тип:</b> @(_selectedLocation.IsFolder ? "Структурная группа" : "Место хранения")</MudText>
+                        @if (!_selectedLocation.IsFolder && _selectedLocation.Zone?.Type == ZoneType.Storage)
+                        {
+                            <MudText><b>Несколько SKU:</b> @(_selectedLocation.AllowsMultipleSkus ? "Разрешено" : "Запрещено")</MudText>
+                        }
                         <MudText><b>Координаты:</b> @CoordinatesText</MudText>
                         <MudText><b>Порядок отбора:</b> @(_selectedLocation.PickSequence?.ToString() ?? "—")</MudText>
                         @if (!_selectedLocation.IsFolder && !_selectedLocation.DeletionMark)
