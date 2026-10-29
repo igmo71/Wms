@@ -85,8 +85,8 @@ The WMS order lifecycle is ready for receiving, in receiving, or received.
 Joining checks linked sources and their posting, deletion mark, and warehouse.
 The first current-cycle participant selects an active unlocked Receiving
 location in the fixed warehouse. Later participants use that same location.
-Joining does not write to 1C. Mobile lists WMS orders for the selected warehouse;
-the order screen shows plan and fact separately.
+Joining does not write to 1C. Mobile lists unfinished WMS orders for the
+selected warehouse; the order screen shows plan and fact separately.
 
 An Operator participating in the current cycle binds an issued label to an open
 receiving LPN. Its order,

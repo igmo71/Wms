@@ -37,7 +37,9 @@ login, and destination cell address; filters can be combined.
 
 ## Mobile receiving
 
-The Mobile receiving queue lists WMS orders for the selected warehouse.
+The Mobile receiving queue lists unfinished WMS orders for the selected
+warehouse; received orders are hidden from the queue. A linked received order
+can still be opened by scanning its 1C document.
 «Создать ордер» opens an empty document screen; the first successful scan creates
 the order, and later scans attach documents. Scanning on the queue opens a
 linked order or creates one from a free document. A scan of an already linked

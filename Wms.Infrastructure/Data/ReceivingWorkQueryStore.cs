@@ -87,7 +87,8 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         return await db.ReceivingOrders.AsNoTracking()
-            .Where(x => x.WarehouseId == warehouseId)
+            .Where(x => x.WarehouseId == warehouseId
+                && x.Status != ReceivingOrderStatus.Received)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(x => new ReceivingWorkOrderQueueView(
                 x.Id, x.Number, x.CreatedAtUtc, x.WarehouseId, x.Status))
