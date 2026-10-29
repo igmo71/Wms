@@ -27,7 +27,12 @@ public sealed record ReceivingWorkLpnView(
     LicensePlateNumberStatus Status, string? ResponsibleUserId,
     Guid? OriginalReceivingLocationId, long Revision,
     IReadOnlyList<ReceivingWorkLpnItemView> Items,
-    IReadOnlyList<ReceivingWorkPutawayView> Putaways);
+    IReadOnlyList<ReceivingWorkPutawayView> Putaways)
+{
+    public DateTimeOffset? DeletedAtUtc { get; init; }
+    public string? DeletedBy { get; init; }
+}
+
 
 public sealed record ReceivingLpnReversalHistoryView(
     Guid LpnId, Guid MovementId, Guid OriginalMovementId,
@@ -64,6 +69,8 @@ public sealed record ReceivingWorkOrderView(
 {
     public string? WarehouseName { get; init; }
     public string? ReceivingLocationAddress { get; init; }
+    public DateTimeOffset? DeletedAtUtc { get; init; }
+    public string? DeletedBy { get; init; }
     public IReadOnlyList<ReceivingWorkItemView> CurrentItems =>
         Items.Where(x => x.IsCurrent).ToArray();
 
@@ -110,7 +117,10 @@ public sealed record ReceivingPutawayHistoryRow(
     Guid SkuId, DateTimeOffset CreatedAtUtc, string CreatedBy,
     string LpnCode, string? SkuName, string? SkuCode,
     decimal Quantity, string? UnitOfMeasure,
-    string DestinationAddress, string? WarehouseName);
+    string DestinationAddress, string? WarehouseName)
+{
+    public Guid? ReceivingOrderId { get; init; }
+}
 
 public sealed record ReceivingPutawayHistoryPage(
     IReadOnlyList<ReceivingPutawayHistoryRow> Items, int TotalItems);

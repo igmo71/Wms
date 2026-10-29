@@ -57,7 +57,16 @@
             <CellTemplate>@UserName(context.Item.CreatedBy)</CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="LPN" Sortable="false">
-            <CellTemplate>@context.Item.LpnCode</CellTemplate>
+            <CellTemplate>
+                @if (context.Item.ReceivingOrderId is Guid orderId)
+                {
+                    <MudLink Href="@($"receiving-orders/{orderId}")">@context.Item.LpnCode</MudLink>
+                }
+                else
+                {
+                    @context.Item.LpnCode
+                }
+            </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="SKU" Sortable="false">
             <CellTemplate>@SkuText(context.Item)</CellTemplate>

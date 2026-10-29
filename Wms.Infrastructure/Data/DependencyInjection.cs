@@ -61,6 +61,9 @@ public static class DependencyInjection
         services.AddScoped<IReceivingLpnDeletionStore, ReceivingLpnDeletionStore>();
         services.AddScoped<PreviewReceivingLpnDeletion>();
         services.AddScoped<DeleteReceivingLpn>();
+        services.AddScoped<IReceivingOrderDeletionStore, ReceivingOrderDeletionStore>();
+        services.AddScoped<PreviewReceivingOrderDeletion>();
+        services.AddScoped<DeleteReceivingOrder>();
         services.AddScoped<IExpirationTrackingStore, ExpirationTrackingStore>();
         services.AddScoped<SetExpirationTracking>();
         services.AddScoped<IUndatedExpirationStockStore, UndatedExpirationStockStore>();

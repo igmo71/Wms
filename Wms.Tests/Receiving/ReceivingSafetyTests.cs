@@ -21,6 +21,177 @@ namespace Wms.Tests.Receiving;
 public sealed class ReceivingSafetyTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Receiving_order_deletion_compensates_all_lpns_once_and_retires_open_labels()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var batch = Value(LicensePlateNumberBatch.Issue(2, "close-test", DateTimeOffset.UtcNow));
+        var labels = batch.Labels.Select(x => x.Id).ToArray();
+        var source = Value(ReceivingSourceDocument.Create(Guid.NewGuid()));
+        var sourceLink = Value(ReceivingOrderSourceLink.Create(
+            state.OrderId, source.Id, DateTimeOffset.UtcNow));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(batch, source, sourceLink);
+            await seed.SaveChangesAsync();
+        }
+        await using (var prepare = database.CreateDbContext())
+        {
+            var order = await prepare.ReceivingOrders
+                .Include(x => x.Cycles).Include(x => x.Participants)
+                .Include(x => x.Items).Include(x => x.LicensePlateNumbers)
+                .ThenInclude(x => x.Items).SingleAsync(x => x.Id == state.OrderId);
+            foreach (var id in labels)
+            {
+                var lpn = await prepare.LicensePlateNumbers.Include(x => x.Items)
+                    .SingleAsync(x => x.Id == id);
+                Assert.True(Value(order.OpenReceivingLpn(lpn, "close-test", DateTimeOffset.UtcNow)));
+                if (id != labels[0])
+                    continue;
+                Success(order.EditReceivingLpn(lpn, state.SkuId, null, 2m,
+                    "close-test", DateTimeOffset.UtcNow, false));
+                prepare.LicensePlateNumberItems.Add(Assert.Single(lpn.Items));
+            }
+            await prepare.SaveChangesAsync();
+        }
+
+        Value(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()));
+        Value(await CloseThroughFoundationAsync(database,
+            state with { LpnId = labels[0] }, Guid.NewGuid()));
+        var permission = new WarehousePermission(new DeletionPermission());
+        var executor = new NewCommandExecutor(new CommandExecutionStore(database));
+        var posting = new NewPostInventoryMovement.Handler(new InventoryPostingStore());
+        Value(await new CorrectReceivingLpnQuantity(executor,
+            new ReceivingWorkStore(database), posting, permission, TimeProvider.System)
+            .ExecuteAsync(new CorrectReceivingLpnQuantityCommand(
+                Guid.NewGuid(), state.OrderId, state.LpnId, 4m, "close-test")));
+
+        var store = new ReceivingOrderDeletionStore(database);
+        var preview = Value(await new PreviewReceivingOrderDeletion(store, permission)
+            .ExecuteAsync(state.OrderId, "close-test"));
+        Assert.Equal(3, preview.Lpns.Count);
+        Assert.Equal(3, preview.Reversals.Count);
+        Assert.Equal(0m, Assert.Single(preview.Balances).After);
+        var delete = new DeleteReceivingOrder(executor, store, posting,
+            permission, TimeProvider.System);
+        var command = new DeleteReceivingOrderCommand(Guid.NewGuid(),
+            state.OrderId, preview.SnapshotToken, false, "close-test");
+        Assert.Equal(state.OrderId, Value(await delete.ExecuteAsync(command)));
+        Assert.Equal(state.OrderId, Value(await delete.ExecuteAsync(command)));
+
+        await using var verify = database.CreateDbContext();
+        var orderAfter = await verify.ReceivingOrders.SingleAsync(x => x.Id == state.OrderId);
+        Assert.Equal(ReceivingOrderStatus.Deleted, orderAfter.Status);
+        Assert.Equal("close-test", orderAfter.DeletedBy);
+        Assert.NotNull(orderAfter.DeletedAtUtc);
+        var lpnsAfter = await verify.LicensePlateNumbers
+            .Where(x => x.ReceivingOrderId == state.OrderId).ToArrayAsync();
+        Assert.Equal(3, lpnsAfter.Length);
+        Assert.All(lpnsAfter, x => Assert.Equal(LicensePlateNumberStatus.Deleted, x.Status));
+        Assert.All(lpnsAfter, x => Assert.Equal("close-test", x.DeletedBy));
+        var movements = await verify.InventoryMovements
+            .Where(x => x.RecorderType == RecorderType.ReceivingOrder
+                && x.RecorderId == state.OrderId).ToArrayAsync();
+        var originals = movements.Where(x => x.ReversedMovementId is null).ToArray();
+        var reversals = movements.Where(x => x.ReversedMovementId is not null).ToArray();
+        Assert.Equal(3, originals.Length);
+        Assert.Equal(3, reversals.Length);
+        Assert.True(originals.Select(x => x.Id).ToHashSet()
+            .SetEquals(reversals.Select(x => x.ReversedMovementId!.Value)));
+        var reversalIds = reversals.Select(x => x.Id).ToArray();
+        Assert.Equal(3, await verify.InventoryTurnovers.CountAsync(x =>
+            reversalIds.Contains(x.InventoryMovementId)));
+        Assert.Equal(0m, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == state.LocationId
+            && x.StockKeepingUnitId == state.SkuId)).Quantity);
+        var item = await verify.ReceivingOrderItems.SingleAsync(x =>
+            x.ReceivingOrderId == state.OrderId && x.StockKeepingUnitId == state.SkuId);
+        Assert.Equal(0m, item.CurrentPlanQuantity);
+        Assert.Null(item.FactQuantity);
+        Assert.NotNull((await verify.ReceivingOrderSourceLinks.SingleAsync(x =>
+            x.Id == sourceLink.Id)).DetachedAtUtc);
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "receiving.order.delete" && x.RequestId == command.RequestId));
+    }
+
+    [Fact]
+    public async Task Receiving_order_deletion_rejects_any_historical_putaway_even_after_lpn_deletion()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        var storageZone = Zone(state.WarehouseId, "HD", ZoneType.Storage);
+        var destination = Location(state.WarehouseId, storageZone, 2);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(storageZone, destination);
+            await seed.SaveChangesAsync();
+        }
+        Value(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()));
+        var permission = new WarehousePermission(new DeletionPermission());
+        var executor = new NewCommandExecutor(new CommandExecutionStore(database));
+        var posting = new NewPostInventoryMovement.Handler(new InventoryPostingStore());
+        var store = new ReceivingOrderDeletionStore(database);
+        var beforePutaway = Value(await new PreviewReceivingOrderDeletion(store, permission)
+            .ExecuteAsync(state.OrderId, "close-test"));
+        Guid itemId;
+        await using (var lookup = database.CreateDbContext())
+            itemId = await lookup.LicensePlateNumberItems
+                .Where(x => x.LicensePlateNumberId == state.LpnId)
+                .Select(x => x.Id).SingleAsync();
+        Value(await new PutAwayReceivingLpn(executor, new ReceivingWorkStore(database),
+            posting, permission, TimeProvider.System).ExecuteAsync(
+                new PutAwayReceivingLpnCommand(Guid.NewGuid(), state.LpnId,
+                    itemId, destination.Id, 1m, "close-test")));
+        var deleteOrder = new DeleteReceivingOrder(executor, store, posting,
+            permission, TimeProvider.System);
+        var rejectedRequestId = Guid.NewGuid();
+        Error(await deleteOrder.ExecuteAsync(new DeleteReceivingOrderCommand(
+            rejectedRequestId, state.OrderId, beforePutaway.SnapshotToken,
+            true, "close-test")), OperationErrorType.Conflict);
+
+        var lpnStore = new ReceivingLpnDeletionStore(database);
+        var lpnPreview = Value(await new PreviewReceivingLpnDeletion(lpnStore, permission)
+            .ExecuteAsync(state.OrderId, state.LpnId, "close-test"));
+        Value(await new DeleteReceivingLpn(executor, lpnStore, posting,
+            permission, TimeProvider.System).ExecuteAsync(new DeleteReceivingLpnCommand(
+                Guid.NewGuid(), state.OrderId, state.LpnId,
+                lpnPreview.SnapshotToken, true, "close-test")));
+        Error(await new PreviewReceivingOrderDeletion(store, permission)
+            .ExecuteAsync(state.OrderId, "close-test"), OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        Assert.NotEqual(ReceivingOrderStatus.Deleted,
+            (await verify.ReceivingOrders.SingleAsync(x => x.Id == state.OrderId)).Status);
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.CommandType == "receiving.order.delete"
+            && x.RequestId == rejectedRequestId));
+    }
+
+    [Fact]
+    public async Task Receiving_order_deletion_rejects_preview_after_independent_stock_change()
+    {
+        var state = await SeedNewOpenReceivingLpnAsync();
+        Value(await CloseThroughFoundationAsync(database, state, Guid.NewGuid()));
+        var permission = new WarehousePermission(new DeletionPermission());
+        var store = new ReceivingOrderDeletionStore(database);
+        var preview = Value(await new PreviewReceivingOrderDeletion(store, permission)
+            .ExecuteAsync(state.OrderId, "close-test"));
+        await PostIndependentCountAsync(state, state.LocationId, null);
+
+        var executor = new NewCommandExecutor(new CommandExecutionStore(database));
+        var posting = new NewPostInventoryMovement.Handler(new InventoryPostingStore());
+        Error(await new DeleteReceivingOrder(executor, store, posting,
+            permission, TimeProvider.System).ExecuteAsync(
+            new DeleteReceivingOrderCommand(Guid.NewGuid(), state.OrderId,
+                preview.SnapshotToken, true, "close-test")),
+            OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        Assert.NotEqual(ReceivingOrderStatus.Deleted,
+            (await verify.ReceivingOrders.SingleAsync(x => x.Id == state.OrderId)).Status);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x =>
+            x.RecorderType == RecorderType.ReceivingOrder
+            && x.RecorderId == state.OrderId && x.ReversedMovementId != null));
+    }
+
+    [Fact]
     public async Task Expired_closed_lpn_cannot_increase_received_quantity()
     {
         var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));

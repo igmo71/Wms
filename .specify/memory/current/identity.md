@@ -12,7 +12,8 @@ explicit `Manager` membership, including for an administrator. Mobile
 receiving and putaway require `Operator`; approving a Mobile manager exception
 also requires `Manager`. Web receiving is readable to either role. A Web
 `Manager` can change order sources, complete a cycle, close an already filled
-LPN, correct or delete a closed LPN, and reopen an order without `Operator`.
+LPN, correct or delete a closed LPN, delete an unplaced receiving order,
+and reopen an order without `Operator`.
 An `Operator` with `Manager` may edit, clear, or cancel another user's open LPN
 in Mobile. `Administrator` alone grants none of the new receiving commands.
 Imported catalog lists are visible to `Manager` and `Administrator`; manual

@@ -31,6 +31,8 @@ public class ReceivingOrder
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public string? StartedBy { get; private set; }
     public string? CompletedBy { get; private set; }
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+    public string? DeletedBy { get; private set; }
     public IReadOnlyCollection<ReceivingOrderItem> Items => _items;
     public IReadOnlyCollection<ReceivingOrderParticipant> Participants => _participants;
     public IReadOnlyCollection<LicensePlateNumber> LicensePlateNumbers => _licensePlateNumbers;
@@ -51,6 +53,24 @@ public class ReceivingOrder
     }
 
     public void RecordSourceCompositionChange() => AdvanceOperationalRevision();
+
+    public OperationResult Delete(string userId, DateTimeOffset deletedAtUtc)
+    {
+        if (Status == ReceivingOrderStatus.Deleted)
+            return OperationError.Conflict("Приходный ордер уже удалён.");
+        if (string.IsNullOrWhiteSpace(userId) || deletedAtUtc == default)
+            return OperationError.Invalid("Для удаления ордера обязательны пользователь и время.");
+        if (_licensePlateNumbers.Any(x => x.Putaways.Count > 0))
+            return OperationError.Conflict("После начала размещения LPN удалить приходный ордер нельзя.");
+        if (_licensePlateNumbers.Any(x => x.Status != LicensePlateNumberStatus.Deleted))
+            return OperationError.Conflict("Сначала удалите все LPN приходного ордера.");
+
+        Status = ReceivingOrderStatus.Deleted;
+        DeletedAtUtc = deletedAtUtc;
+        DeletedBy = userId.Trim();
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
 
     public OperationResult SetSender(Guid senderId)
     {

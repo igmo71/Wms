@@ -66,6 +66,8 @@ internal static class ReceivingLpnDeletionPreviewFactory
     {
         var order = state.Order;
         var lpn = state.Lpn;
+        if (order.Status == ReceivingOrderStatus.Deleted)
+            return OperationError.Conflict("Приходный ордер уже удалён.");
         if (lpn.ReceivingOrderId != order.Id || lpn.Status != LicensePlateNumberStatus.Closed
             || lpn.ReceivingCycleId is null || lpn.OriginalReceivingLocationId is not Guid receivingId)
             return OperationError.Conflict("Удалить можно только закрытый приёмный LPN.");

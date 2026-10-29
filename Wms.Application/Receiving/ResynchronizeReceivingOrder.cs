@@ -1,5 +1,6 @@
 using Wms.Application.Authorization;
 using Wms.Common;
+using Wms.Domain.Enums;
 
 namespace Wms.Application.Receiving;
 
@@ -27,6 +28,8 @@ public sealed class ResynchronizeReceivingOrder(
         var order = await orders.GetOrderAsync(orderId, userId, ct);
         if (order is null)
             return OperationError.NotFound("Приходный ордер не найден.");
+        if (order.Status == ReceivingOrderStatus.Deleted)
+            return OperationError.Conflict("Удалённый ордер нельзя сверять.");
         if (order.SourceRefKeys.Count == 0)
             return new ReceivingOrderRefreshResult(orderId, false, false, []);
 

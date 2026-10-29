@@ -28,6 +28,8 @@ public sealed class LicensePlateNumber
     public DateTimeOffset? CancelledAtUtc { get; private set; }
     public string? ClosedBy { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
+    public string? DeletedBy { get; private set; }
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
     public long OperationalRevision { get; private set; }
     public IReadOnlyCollection<LicensePlateNumberItem> Items => _items;
     public IReadOnlyCollection<LicensePlateNumberPutaway> Putaways => _putaways;
@@ -179,6 +181,26 @@ public sealed class LicensePlateNumber
             return OperationError.Invalid("Для удаления LPN обязательны пользователь и время.");
 
         Status = LicensePlateNumberStatus.Deleted;
+        DeletedBy = userId.Trim();
+        DeletedAtUtc = occurredAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult DeleteWithReceivingOrder(string userId, DateTimeOffset deletedAtUtc)
+    {
+        if (ReceivingOrderId is null || Status is not (
+                LicensePlateNumberStatus.Open or LicensePlateNumberStatus.Closed
+                    or LicensePlateNumberStatus.Cancelled))
+            return OperationError.Conflict("LPN нельзя удалить вместе с приходным ордером.");
+        if (_putaways.Count > 0)
+            return OperationError.Conflict("После начала размещения LPN удалить приходный ордер нельзя.");
+        if (string.IsNullOrWhiteSpace(userId) || deletedAtUtc == default)
+            return OperationError.Invalid("Для удаления LPN обязательны пользователь и время.");
+
+        Status = LicensePlateNumberStatus.Deleted;
+        DeletedBy = userId.Trim();
+        DeletedAtUtc = deletedAtUtc;
         OperationalRevision++;
         return OperationResult.Success();
     }

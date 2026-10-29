@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wms.Application.CommandExecution;
 using Wms.Application.Receiving;
 using Wms.Domain;
+using Wms.Domain.Enums;
 
 namespace Wms.Data;
 
@@ -27,7 +28,8 @@ public sealed class ReceivingWorkStore(IDbContextFactory<ApplicationDbContext> c
             .Include(x => x.Items)
             .Include(x => x.LicensePlateNumbers).ThenInclude(x => x.Items)
             .AsSplitQuery()
-            .SingleOrDefaultAsync(x => x.Id == orderId, ct);
+            .SingleOrDefaultAsync(x => x.Id == orderId
+                && x.Status != ReceivingOrderStatus.Deleted, ct);
 
     public async Task<IReadOnlyList<ReceivingWorkSource>> LoadSourcesAsync(
         ICommandExecutionContext session, Guid orderId, CancellationToken ct)

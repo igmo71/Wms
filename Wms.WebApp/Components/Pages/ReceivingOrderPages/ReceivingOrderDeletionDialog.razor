@@ -1,0 +1,175 @@
+@using Wms.Application.Receiving
+@using Wms.Common
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+            @if (_busy)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            @if (_preview is { } preview)
+            {
+                <MudText>Ордер @preview.OrderNumber и все его LPN будут помечены удалёнными. Документы 1С станут доступны для нового ордера.</MudText>
+                <MudText Typo="Typo.subtitle2">LPN ордера</MudText>
+                @if (preview.Lpns.Count == 0)
+                {
+                    <MudText>LPN нет.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingOrderDeletionLpnPreview" Items="preview.Lpns" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>LPN</MudTh><MudTh>Текущий статус</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="LPN">@context.Code</MudTd>
+                            <MudTd DataLabel="Текущий статус"><ReceivingStatusText Status="@context.Status" /></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                <MudText Typo="Typo.subtitle2">Компенсирующие движения</MudText>
+                @if (preview.Reversals.Count == 0)
+                {
+                    <MudText>Проведённых движений для компенсации нет.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingLpnReversalPreview" Items="preview.Reversals" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>Откуда</MudTh><MudTh>Куда</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Количество</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Откуда">@(context.SourceAddress ?? "—")</MudTd>
+                            <MudTd DataLabel="Куда">@(context.DestinationAddress ?? "—")</MudTd>
+                            <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
+                            <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                            <MudTd DataLabel="Количество">@Format(context.Quantity)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                <MudText Typo="Typo.subtitle2">Прогноз остатков после удаления</MudText>
+                @if (preview.Balances.Count == 0)
+                {
+                    <MudText>Остатки не изменятся.</MudText>
+                }
+                else
+                {
+                    <MudTable T="ReceivingLpnBalancePreview" Items="SortedBalances" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>Ячейка</MudTh><MudTh>SKU</MudTh><MudTh>Срок годности</MudTh><MudTh>Сейчас</MudTh><MudTh>После</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Ячейка">@context.Address</MudTd>
+                            <MudTd DataLabel="SKU">@SkuName(context.StockKeepingUnitId)</MudTd>
+                            <MudTd DataLabel="Срок годности">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                            <MudTd DataLabel="Сейчас">@Format(context.Before)</MudTd>
+                            <MudTd DataLabel="После">
+                                @if (context.After < 0)
+                                {
+                                    <MudText Color="Color.Error">@Format(context.After)</MudText>
+                                }
+                                else
+                                {
+                                    @Format(context.After)
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                @if (preview.RequiresNegativeConfirmation)
+                {
+                    <MudAlert Severity="Severity.Warning">После удаления появятся отрицательные остатки.</MudAlert>
+                    <MudCheckBox T="bool" @bind-Value="_confirmNegative"
+                                 Label="Подтверждаю отрицательные остатки по указанным ячейкам" Disabled="_busy" />
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="_busy" OnClick="Cancel">Отмена</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled"
+                   Disabled="@(_busy || _preview is null || _preview.RequiresNegativeConfirmation && !_confirmNegative)"
+                   OnClick="DeleteAsync">Подтвердить удаление ордера</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+    [Parameter, EditorRequired] public string UserId { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<ReceivingWorkItemView> OrderItems { get; set; } = [];
+
+    [Inject] private PreviewReceivingOrderDeletion PreviewDeletion { get; set; } = null!;
+    [Inject] private DeleteReceivingOrder DeleteOrder { get; set; } = null!;
+
+    private ReceivingOrderDeletionPreview? _preview;
+    private (string Token, bool ConfirmNegative, Guid RequestId)? _pending;
+    private string? _error;
+    private bool _confirmNegative;
+    private bool _busy;
+
+    private IReadOnlyList<ReceivingLpnBalancePreview> SortedBalances => _preview?.Balances
+        .OrderBy(x => SkuName(x.StockKeepingUnitId), StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(x => x.Address).ThenBy(x => x.ExpirationDate).ToArray() ?? [];
+
+    protected override async Task OnInitializedAsync() => await LoadPreviewAsync();
+
+    private async Task LoadPreviewAsync()
+    {
+        _busy = true;
+        _preview = null;
+        _confirmNegative = false;
+        _error = null;
+        try
+        {
+            var result = await PreviewDeletion.ExecuteAsync(OrderId, UserId);
+            if (result.IsSuccess)
+                _preview = result.Value;
+            else
+                _error = result.Error!.Message;
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_busy || _preview is not { } preview
+            || preview.RequiresNegativeConfirmation && !_confirmNegative)
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            if (_pending is not { } pending || pending.Token != preview.SnapshotToken
+                || pending.ConfirmNegative != _confirmNegative)
+                _pending = (preview.SnapshotToken, _confirmNegative, Guid.NewGuid());
+            var result = await DeleteOrder.ExecuteAsync(new DeleteReceivingOrderCommand(
+                _pending.Value.RequestId, OrderId, preview.SnapshotToken,
+                _confirmNegative, UserId));
+            if (result.IsSuccess)
+            {
+                _pending = null;
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                _pending = null;
+                if (result.Error!.Type == OperationErrorType.Conflict)
+                    await LoadPreviewAsync();
+                _error = result.Error.Message;
+            }
+        }
+        catch (Exception exception)
+        {
+            _error = $"Ответ не подтверждён. Повторите с тем же запросом. {exception.Message}";
+        }
+        finally { _busy = false; }
+    }
+
+    private string SkuName(Guid skuId) =>
+        OrderItems.FirstOrDefault(x => x.SkuId == skuId)?.SkuName ?? skuId.ToString();
+
+    private static string Format(decimal quantity) => quantity.ToString("0.###");
+
+    private void Cancel() => MudDialog.Cancel();
+}

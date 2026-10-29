@@ -81,7 +81,7 @@ Repetition does not duplicate it. Later source checks can update that row's plan
 
 ## Cycle and receiving work
 
-The WMS order lifecycle is ready for receiving, in receiving, or received.
+The active WMS order lifecycle is ready for receiving, in receiving, or received.
 Joining checks linked sources and their posting, deletion mark, and warehouse.
 The first current-cycle participant selects an active unlocked Receiving
 location in the fixed warehouse. Later participants use that same location.
@@ -178,6 +178,27 @@ operations, marks the LPN Deleted, and recalculates the order fact. With no
 other closed LPN for that SKU, the fact returns to checked zero only when an
 earlier explicit zero confirmation exists; otherwise it is unchecked. Deleted
 LPNs and their history remain visible.
+
+A Web Manager may delete a receiving order in any active lifecycle state only
+when none of its assigned LPNs has ever had a putaway, including an LPN already
+marked Deleted. The order remains with its number, terminal Deleted status,
+deletion actor and time. All assigned open, closed, and cancelled LPNs become
+Deleted; previously deleted LPNs keep their original deletion actor and time.
+Outstanding receipt and correction movements are compensated by linked reversal
+movements, preserving the original movements and turnover history. Existing
+reversals are not repeated. The command updates balances and turnover, resets
+current SKU fact according to remaining closed LPNs and explicit zero
+confirmations, clears the current source plan, detaches all active 1C source
+links, and records audit and command receipt in one transaction. It does not
+write to 1C. Detached documents can be used in a new WMS order.
+
+The Manager previews all LPNs, outstanding reversals, and one combined balance
+forecast before confirmation. A negative final balance needs explicit
+acknowledgement. A changed order, LPN, link, movement, or affected balance
+invalidates the preview; repeating the same request ID returns its original
+result. Deleted orders remain readable in Web but accept no new receiving,
+source, or putaway work. Mobile excludes them from work lists and direct work
+reads.
 
 ## LPN issuance
 

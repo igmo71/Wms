@@ -30,21 +30,39 @@ else
                     <MudItem xs="12" sm="6" md="3"><MudText Typo="Typo.subtitle2">Приёмка: @_order.ActiveCycleNumber</MudText></MudItem>
                 </MudGrid>
             </MudPaper>
-            @if (_order.Status == ReceivingOrderStatus.InReceiving && _canManage)
+            @if (_order.Status == ReceivingOrderStatus.Deleted)
             {
-                @if (_order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))
-                {
-                    <MudText Class="mt-2">Перед завершением закройте или отмените открытые LPN.</MudText>
-                }
-                <MudButton Class="mt-2" Color="Color.Primary" Variant="Variant.Filled"
-                           Disabled="@(_busy || _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open))"
-                           OnClick="CompleteOrderAsync">Завершить ордер</MudButton>
+                <MudAlert Severity="Severity.Info" Class="mt-2">
+                    Удалён @(_order.DeletedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")) пользователем @UserName(_order.DeletedBy). История сохранена.
+                </MudAlert>
             }
-            @if (_order.Status == ReceivingOrderStatus.Received && _canManage)
+            @if (_canManage && _order.Status != ReceivingOrderStatus.Deleted)
             {
-                <MudText Class="mt-2">Повторное открытие создаст новую приёмку без места приёмки и участников. Прежние данные сохранятся.</MudText>
-                <MudButton Class="mt-2" Variant="Variant.Outlined" Disabled="_busy"
-                           OnClick="ReopenOrderAsync">Начать новую приёмку</MudButton>
+                var hasOpenLpns = _order.Lpns.Any(x => x.Status == LicensePlateNumberStatus.Open);
+                var hasPutaways = _order.Lpns.Any(x => x.Putaways.Count > 0);
+                <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2" Class="mt-2">
+                    @if (_order.Status == ReceivingOrderStatus.InReceiving)
+                    {
+                        <span class="d-inline-block"
+                              title="@(hasOpenLpns ? "Перед завершением закройте или отмените открытые LPN." : null)">
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                                       Disabled="@(_busy || hasOpenLpns)"
+                                       OnClick="CompleteOrderAsync">Завершить ордер</MudButton>
+                        </span>
+                    }
+                    @if (_order.Status == ReceivingOrderStatus.Received)
+                    {
+                        <span class="d-inline-block" title="Повторное открытие создаст новую приёмку без места приёмки и участников. Прежние данные сохранятся.">
+                            <MudButton Variant="Variant.Outlined" Disabled="_busy"
+                                       OnClick="ReopenOrderAsync">Начать новую приёмку</MudButton>
+                        </span>
+                    }
+                    <span class="d-inline-block"
+                          title="@(hasPutaways ? "Удаление ордера недоступно: размещение хотя бы одного LPN уже началось." : null)">
+                        <MudButton Color="Color.Error" Variant="Variant.Outlined"
+                                   Disabled="@(_busy || hasPutaways)" OnClick="OpenOrderDeletionAsync">Удалить ордер</MudButton>
+                    </span>
+                </MudStack>
             }
         </MudPaper>
 
@@ -77,14 +95,14 @@ else
             {
                 <MudTable T="ReceivingWorkLpnView" Items="SortedLpns" Dense="true" Hover="true" Elevation="0">
                     <HeaderContent>
-                        <MudTh>LPN</MudTh><MudTh>Статус</MudTh><MudTh>SKU</MudTh>
+                        <MudTh>LPN</MudTh><MudTh>Статус</MudTh><MudTh>Размещён</MudTh><MudTh>SKU</MudTh>
                         <MudTh>Срок годности</MudTh><MudTh>План</MudTh>
                         <MudTh>Факт по ордеру</MudTh><MudTh>Факт по LPN</MudTh><MudTh>Действия</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         @{ var item = context.Items.SingleOrDefault(); var orderItem = item is null ? null : _order.Items.FirstOrDefault(x => x.SkuId == item.SkuId); }
                         <MudTd DataLabel="LPN">
-                            @if (context.Putaways.Count > 0 || _canManage && _deletionHistory.ContainsKey(context.Id))
+                            @if (context.Putaways.Count > 0 || _deletionHistory.ContainsKey(context.Id))
                             {
                                 <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => ToggleLpnDetails(context.Id)">@context.Code</MudButton>
                             }
@@ -93,7 +111,23 @@ else
                                 @context.Code
                             }
                         </MudTd>
-                        <MudTd DataLabel="Статус"><ReceivingStatusText Status="@context.Status" /></MudTd>
+                        <MudTd DataLabel="Статус">
+                            <ReceivingStatusText Status="@context.Status" />
+                            @if (context.DeletedAtUtc is { } deletedAt)
+                            {
+                                <MudText Typo="Typo.caption">@deletedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @UserName(context.DeletedBy)</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Размещён">
+                            @if (context.Putaways.Count > 0)
+                            {
+                                <span title="Размещение LPN начато"><MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" /></span>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </MudTd>
                         <MudTd DataLabel="SKU">
                             @(item is null ? "—" : item.SkuName ?? item.SkuId.ToString())
                             @if (item is not null)
@@ -106,30 +140,37 @@ else
                         <MudTd DataLabel="Факт по ордеру">@(orderItem is null ? "—" : orderItem.FactQuantity is null ? "Не проверено" : Format(orderItem.FactQuantity))</MudTd>
                         <MudTd DataLabel="Факт по LPN">@(item is null ? "—" : Format(item.Quantity))</MudTd>
                         <MudTd DataLabel="Действия">
-                            @if (_canManage && _order.Status == ReceivingOrderStatus.InReceiving
-                                && context.Status == LicensePlateNumberStatus.Open
-                                && context.Items.Count == 1 && context.Items[0].Quantity > 0)
-                            {
-                                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.CheckCircle"
-                                           Disabled="_busy" OnClick="() => CloseLpnAsync(context)">Закрыть</MudButton>
-                            }
-                            @if (_canManage && context.Status == LicensePlateNumberStatus.Closed)
-                            {
-                                @if (context.Putaways.Count == 0 && context.Items.Count == 1)
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+                                @if (_canManage && _order.Status == ReceivingOrderStatus.InReceiving
+                                    && context.Status == LicensePlateNumberStatus.Open
+                                    && context.Items.Count == 1 && context.Items[0].Quantity > 0)
                                 {
-                                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy"
-                                               OnClick="() => OpenCorrectionAsync(context)">Исправить</MudButton>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.CheckCircle"
+                                               Disabled="_busy" OnClick="() => CloseLpnAsync(context)">Закрыть</MudButton>
                                 }
-                                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteOutline"
-                                           Disabled="_busy" OnClick="() => OpenDeletionAsync(context)">Удалить</MudButton>
-                            }
+                                @if (_canManage && _order.Status != ReceivingOrderStatus.Deleted
+                                    && context.Status == LicensePlateNumberStatus.Closed)
+                                {
+                                    @if (context.Putaways.Count == 0 && context.Items.Count == 1)
+                                    {
+                                        <span title="Исправить">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                                           Disabled="_busy" OnClick="() => OpenCorrectionAsync(context)" />
+                                        </span>
+                                    }
+                                    <span title="Удалить">
+                                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" Size="Size.Small"
+                                                       Disabled="_busy" OnClick="() => OpenDeletionAsync(context)" />
+                                    </span>
+                                }
+                            </MudStack>
                         </MudTd>
                     </RowTemplate>
                     <ChildRowContent Context="lpn">
                         @if (_expandedLpnId == lpn.Id)
                         {
                             <MudTr>
-                            <MudTd colspan="8">
+                            <MudTd colspan="9">
                                 @foreach (var item in lpn.Items)
                                 {
                                     @if (lpn.Status != LicensePlateNumberStatus.Deleted)
@@ -149,7 +190,7 @@ else
                                         </RowTemplate>
                                     </MudTable>
                                 }
-                                @if (_canManage && _deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
+                                @if (_deletionHistory.TryGetValue(lpn.Id, out var history) && history.Count > 0)
                                 {
                                     <MudText Typo="Typo.subtitle2">История удаления</MudText>
                                     <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
@@ -178,6 +219,7 @@ else
         <ReceivingOrderDetailsView Sources="_sources"
                                    SourceHistory="_sourceHistory" SourceNames="_sourceNames"
                                    CanManage="_canManage" Busy="_busy"
+                                   CanChange="@(_order.Status != ReceivingOrderStatus.Deleted)"
                                    RefreshResult="_refreshResult" OnRefresh="RefreshSourcesAsync"
                                    OnChangeComposition="OpenSourceCompositionAsync" />
 

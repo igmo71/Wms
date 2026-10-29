@@ -18,7 +18,8 @@ public partial class Index
             : _orders.Where(x => x.Number.Contains(_orderFilter.Trim(), StringComparison.OrdinalIgnoreCase));
 
     private static string OrderRowStyle(ReceivingWorkOrderListView order, int _) =>
-        order.Status == ReceivingOrderStatus.ReadyForReceiving ? ""
+        order.Status is ReceivingOrderStatus.ReadyForReceiving
+            or ReceivingOrderStatus.Deleted ? ""
             : order.CurrentDiscrepancyCount > 0
                 ? "background-color: var(--mud-palette-warning-hover);"
                 : "background-color: var(--mud-palette-success-hover);";

@@ -74,7 +74,10 @@ public sealed class ReceivingWorkQueryStore(
                 x.StockKeepingUnit.BaseUnitOfMeasure?.Description
                     ?? x.StockKeepingUnit.BaseUnitOfMeasure?.Abbreviation,
                 x.DestinationStorageLocation.DisplayAddress,
-                x.DestinationStorageLocation.Warehouse?.Name)).ToArray(), totalItems);
+                x.DestinationStorageLocation.Warehouse?.Name)
+            {
+                ReceivingOrderId = x.LicensePlateNumber.ReceivingOrderId
+            }).ToArray(), totalItems);
     }
 
     private static DateTimeOffset StartOfLocalDayUtc(DateTime date) =>
@@ -88,7 +91,8 @@ public sealed class ReceivingWorkQueryStore(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         return await db.ReceivingOrders.AsNoTracking()
             .Where(x => x.WarehouseId == warehouseId
-                && x.Status != ReceivingOrderStatus.Received)
+                && x.Status != ReceivingOrderStatus.Received
+                && x.Status != ReceivingOrderStatus.Deleted)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(x => new ReceivingWorkOrderQueueView(
                 x.Id, x.Number, x.CreatedAtUtc, x.WarehouseId, x.Status))
@@ -204,7 +208,8 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var order = await OrderCoreQuery(db).AsSplitQuery()
-            .SingleOrDefaultAsync(x => x.Id == orderId, ct);
+            .SingleOrDefaultAsync(x => x.Id == orderId
+                && x.Status != ReceivingOrderStatus.Deleted, ct);
         if (order is null)
             return null;
         var isParticipant = await db.ReceivingOrderParticipants.AsNoTracking()
@@ -229,7 +234,8 @@ public sealed class ReceivingWorkQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         if (!await db.ReceivingOrders.AsNoTracking()
-            .AnyAsync(x => x.Id == orderId, ct))
+            .AnyAsync(x => x.Id == orderId
+                && x.Status != ReceivingOrderStatus.Deleted, ct))
             return null;
         return await db.ReceivingOrderSourceLinks.AsNoTracking()
             .Where(x => x.ReceivingOrderId == orderId
@@ -264,7 +270,8 @@ public sealed class ReceivingWorkQueryStore(
             ? await query.SingleOrDefaultAsync(x => x.Id == id, ct)
             : await query.SingleOrDefaultAsync(x => x.Code == code, ct);
         return lpn is null || lpn.ReceivingCycleId is null
-            || lpn.ReceivingOrder is null ? null
+            || lpn.ReceivingOrder is null
+            || lpn.ReceivingOrder.Status == ReceivingOrderStatus.Deleted ? null
             : MapLpn(lpn, lpn.ReceivingOrder.WarehouseId);
     }
 
@@ -427,7 +434,9 @@ public sealed class ReceivingWorkQueryStore(
                 .Select(MapCycle).ToArray() : [])
         {
             WarehouseName = order.Warehouse?.Name,
-            ReceivingLocationAddress = order.ReceivingLocation?.DisplayAddress
+            ReceivingLocationAddress = order.ReceivingLocation?.DisplayAddress,
+            DeletedAtUtc = order.DeletedAtUtc,
+            DeletedBy = order.DeletedBy
         };
     }
 
@@ -480,6 +489,10 @@ public sealed class ReceivingWorkQueryStore(
                 {
                     DestinationAddress = x.DestinationStorageLocation?.DisplayAddress,
                     CreatedBy = x.CreatedBy
-                }).ToArray());
+                }).ToArray())
+        {
+            DeletedAtUtc = lpn.DeletedAtUtc,
+            DeletedBy = lpn.DeletedBy
+        };
     }
 }

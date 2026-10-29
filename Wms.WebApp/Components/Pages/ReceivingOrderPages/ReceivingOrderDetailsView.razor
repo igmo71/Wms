@@ -8,7 +8,7 @@
     <ChildContent>
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2 mb-2">
         <MudSpacer />
-        @if (CanManage)
+        @if (CanManage && CanChange)
         {
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Disabled="@(Busy || !OnChangeComposition.HasDelegate)"
@@ -62,7 +62,7 @@
 </MudExpansionPanel>
 </MudExpansionPanels>
 
-@if (CanManage && SourceHistory.Count > 0)
+@if (SourceHistory.Count > 0)
 {
     <MudExpansionPanels Outlined="true" Elevation="0" Class="mt-3">
     <MudExpansionPanel Text="История связей с документами 1С" HeaderClass="mud-elevation-1" @bind-Expanded="_showSourceHistory">
@@ -84,6 +84,7 @@
     [Parameter] public IReadOnlyList<ReceivingSourceChangeHistoryView> SourceHistory { get; set; } = [];
     [Parameter] public IReadOnlyDictionary<Guid, string> SourceNames { get; set; } = new Dictionary<Guid, string>();
     [Parameter] public bool CanManage { get; set; }
+    [Parameter] public bool CanChange { get; set; } = true;
     [Parameter] public bool Busy { get; set; }
     [Parameter] public ReceivingOrderRefreshResult? RefreshResult { get; set; }
     [Parameter] public EventCallback OnRefresh { get; set; }

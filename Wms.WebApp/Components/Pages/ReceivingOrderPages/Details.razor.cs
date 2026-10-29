@@ -154,7 +154,8 @@ public partial class Details
 
     private async Task RefreshSourcesAsync()
     {
-        if (!_canManage || _busy || _userId is null)
+        if (!_canManage || _busy || _userId is null
+            || _order?.Status == ReceivingOrderStatus.Deleted)
             return;
         _busy = true;
         _error = null;
@@ -193,7 +194,7 @@ public partial class Details
                 return;
             }
             _order = await Orders.GetOrderAsync(Id, _userId, CancellationToken.None);
-            _sourceHistory = !_canManage || _order is null ? [] : await Orders.GetSourceChangeHistoryAsync(
+            _sourceHistory = _order is null ? [] : await Orders.GetSourceChangeHistoryAsync(
                 Id, CancellationToken.None);
             IReadOnlyList<ReceivingSourceView> sourceViews = _order is null ? [] : await Sources.GetByRefKeysAsync(
                 _order.SourceRefKeys
@@ -203,13 +204,15 @@ public partial class Details
             _sources = sourceViews.Where(x => activeRefKeys.Contains(x.RefKey)).ToArray();
             _sourceNames = sourceViews.ToDictionary(x => x.RefKey,
                 x => x.Number ?? "Документ 1С без номера");
-            _deletionHistory = _canManage && _order?.Lpns.Any(x =>
+            _deletionHistory = _order?.Lpns.Any(x =>
                 x.Status == LicensePlateNumberStatus.Deleted) == true
                 ? await Orders.GetDeletionHistoryAsync(Id, CancellationToken.None)
                 : new Dictionary<Guid, IReadOnlyList<ReceivingLpnReversalHistoryView>>();
             _userNames = _order is null
                 ? new Dictionary<string, string>()
                 : await UserNames.GetDisplayNamesAsync(_order.Cycles.Select(x => x.CompletedBy)
+                    .Append(_order.DeletedBy)
+                    .Concat(_order.Lpns.Select(x => x.DeletedBy))
                     .Concat(_order.Lpns.SelectMany(lpn => lpn.Putaways.Select(x => x.CreatedBy)))
                     .Concat(_deletionHistory.Values.SelectMany(history =>
                         history.Select(x => x.ConfirmedBy))));
@@ -234,7 +237,9 @@ public partial class Details
 
     private async Task OpenCorrectionAsync(ReceivingWorkLpnView lpn)
     {
-        if (!_canManage || _busy || _userId is null || lpn.Status != LicensePlateNumberStatus.Closed
+        if (!_canManage || _busy || _userId is null
+            || _order?.Status == ReceivingOrderStatus.Deleted
+            || lpn.Status != LicensePlateNumberStatus.Closed
             || lpn.Putaways.Count != 0 || lpn.Items.Count != 1)
             return;
         _busy = true;
@@ -327,6 +332,7 @@ public partial class Details
     private async Task OpenDeletionAsync(ReceivingWorkLpnView lpn)
     {
         if (!_canManage || _busy || _userId is null || _order is null
+            || _order.Status == ReceivingOrderStatus.Deleted
             || lpn.Status != LicensePlateNumberStatus.Closed)
             return;
         _busy = true;
@@ -343,6 +349,34 @@ public partial class Details
             };
             var dialog = await DialogService.ShowAsync<ReceivingLpnDeletionDialog>(
                 $"Удалить LPN {lpn.Code}", parameters,
+                new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true,
+                    BackdropClick = false, CloseOnEscapeKey = false });
+            var result = await dialog.Result;
+            if (result is { Canceled: false })
+                await ReloadAsync();
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task OpenOrderDeletionAsync()
+    {
+        if (!_canManage || _busy || _userId is null || _order is null
+            || _order.Status == ReceivingOrderStatus.Deleted
+            || _order.Lpns.Any(x => x.Putaways.Count > 0))
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var parameters = new DialogParameters<ReceivingOrderDeletionDialog>
+            {
+                { x => x.OrderId, Id },
+                { x => x.UserId, _userId },
+                { x => x.OrderItems, _order.Items }
+            };
+            var dialog = await DialogService.ShowAsync<ReceivingOrderDeletionDialog>(
+                $"Удалить ордер {_order.Number}", parameters,
                 new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true,
                     BackdropClick = false, CloseOnEscapeKey = false });
             var result = await dialog.Result;

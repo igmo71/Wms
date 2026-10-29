@@ -11,5 +11,8 @@ public enum ReceivingOrderStatus
     InReceiving = 1,
 
     [Display(Name = "Принят")]
-    Received = 2
+    Received = 2,
+
+    [Display(Name = "Удалён")]
+    Deleted = 3
 }

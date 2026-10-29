@@ -30,8 +30,9 @@ Independent putaway starts from its own LPN screen. Its placement history shows
 the destination cell address.
 
 Web has a read-only placement history page under «Размещение» for Operator and
-Manager. It lists the actor, LPN, SKU, quantity, destination address,
-warehouse and local time, newest first, with server paging. The page filters
+Manager. Its LPN number links to the associated WMS receiving order. It lists
+the actor, LPN, SKU, quantity, destination address, warehouse and local time,
+newest first, with server paging. The page filters
 by inclusive local date range, LPN number, SKU name substring, user name or
 login, and destination cell address; filters can be combined.
 
@@ -163,8 +164,9 @@ success, including after a confirmed retry.
 
 The Web menu group «Приёмка» opens separate 1C documents and WMS orders pages.
 `/receiving-orders` lists only WMS orders by their own numbers and actual
-creation times. `/receiving-sources` lists both free and linked 1C documents
-by 1C number ascending, with missing numbers last, and shows their WMS order
+creation times, including deleted orders. `/receiving-sources` lists both free
+and linked 1C documents by 1C number ascending, with missing numbers last,
+and shows their WMS order
 link. A direct link to a document brings it to the top of the filtered list.
 Managers may select free documents of one warehouse,
 inspect their summed plan and create an order. Clicking a source shows its last
@@ -185,9 +187,13 @@ A Web order card has no controls to select an SKU or enter a quantity into an
 open LPN; physical counting stays in Mobile. A Manager may close a saved,
 positive LPN after reviewing its SKU, quantity, plan and date. Closing rejects
 a changed LPN revision or an expired date; expired stock cannot be confirmed.
-Only a Manager may complete or reopen an order in Web. An uncertain completion
-retains its command ID for explicit retry; success reloads status and cycle
-snapshots.
+Only a Manager may complete or reopen an order in Web. The lifecycle and order
+deletion buttons share one aligned row with spacing. When open LPNs block
+completion, its disabled button explains that they must be closed or cancelled
+in its title. The reopen button's title explains that reopening starts a new
+cycle without a location or participants and retains prior data. An uncertain
+completion retains its command ID for explicit retry; success reloads status
+and cycle snapshots.
 The order card separates current plan/fact discrepancies from immutable cycle
 completion snapshots and shows source check failures and unknown-plan reasons.
 Below the heading, the order shows warehouse, status, receiving location and
@@ -197,11 +203,20 @@ and completing user and expand directly to a SKU plan/fact table. The current
 plan/fact table sorts by SKU name and shades known matches and differences;
 unchecked facts or unknown plans remain unshaded.
 The LPN table sorts by SKU name, with empty LPNs last and code breaking ties.
-It shows status, SKU, date, order plan and fact, and LPN quantity. Manager
-correction and deletion use dialogs; deletion previews reverse movements and
-forecast balances. An LPN with putaway or deletion history expands to placed
-and remaining quantity, putaway quantity, cell, date and user, and the deletion
-actor. Missing addresses use a dash.
+It shows status, a placement checkmark when any putaway exists for that LPN,
+SKU, date, order plan and fact, and LPN quantity. Manager correction and
+deletion use compact icon buttons with title text and dialogs; deletion
+previews reverse movements and forecast balances. An LPN with putaway or
+deletion history expands to placed and remaining quantity, putaway quantity,
+cell, date and user, and the deletion actor. Missing addresses use a dash.
+A Manager sees the order deletion button
+until the order is deleted. Once any LPN has putaway history, the button is
+disabled and its title explains why. The dialog shows all LPNs, compensating
+movements, and one combined balance forecast; a negative final balance needs
+explicit acknowledgement. An uncertain response retains the request ID for
+retry. Deleted orders remain in the Web list and open read-only, with the
+deletion actor and time, LPN deletion details, movement history, and detached
+source history. Mobile hides deleted orders from active work and direct reads.
 User-facing screens call linked sources "Документы 1С" and receiving cycles
 "Приёмки". Cycle history shows the completing user's name and a plan/fact
 snapshot; link history shows the actor's name. In the order list, ready orders
