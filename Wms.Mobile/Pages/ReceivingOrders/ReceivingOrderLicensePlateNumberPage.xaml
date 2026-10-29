@@ -13,7 +13,7 @@
                         <Label x:Name="StatusIcon" FontSize="21" VerticalTextAlignment="Center" />
                     </HorizontalStackLayout>
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                    <Label x:Name="ScanHintLabel" Text="Сканируйте SKU или найдите его вручную." FontSize="12" />
+                    <Label x:Name="ScanHintLabel" Text="Сканируйте SKU или выберите его из списка." FontSize="12" />
                     <VerticalStackLayout x:Name="EditorPanel" IsVisible="False" Spacing="6">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="20" LineBreakMode="WordWrap"
@@ -45,23 +45,24 @@
                             </Grid>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
-                    <VerticalStackLayout x:Name="SearchPanel" IsVisible="False" Spacing="4">
-                        <Button x:Name="ScopeButton" Text="Поиск: состав ордера" Clicked="OnScopeClicked" />
+                    <VerticalStackLayout x:Name="ChoicePanel" IsVisible="False" Spacing="4">
                         <SearchBar x:Name="SkuSearch" Placeholder="Наименование, код или штрихкод"
-                                   SearchButtonPressed="OnSearchClicked" />
+                                   IsVisible="False" SearchButtonPressed="OnSearchClicked" />
+                        <Label x:Name="CandidateHintLabel" FontSize="12" IsVisible="False" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding CandidateRows, Source={x:Reference Page}}" Spacing="4">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="local:ReceivingSkuChoiceRow">
-                                    <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}" StrokeThickness="2">
+                                    <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource ReceivingNeutralBackgroundLight}, Dark={StaticResource ReceivingNeutralBackgroundDark}}">
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnCandidateTapped" />
                                         </Border.GestureRecognizers>
                                         <Border.Triggers>
                                             <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
-                                                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource ReceivingMatchFactLight}, Dark={StaticResource ReceivingMatchFactDark}}" />
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchBackgroundLight}, Dark={StaticResource ReceivingMatchBackgroundDark}}" />
                                             </DataTrigger>
                                             <DataTrigger TargetType="Border" Binding="{Binding IsDifferent}" Value="True">
-                                                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentFactLight}, Dark={StaticResource ReceivingDifferentFactDark}}" />
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingDifferentBackgroundLight}, Dark={StaticResource ReceivingDifferentBackgroundDark}}" />
                                             </DataTrigger>
                                         </Border.Triggers>
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
@@ -88,6 +89,22 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду" Clicked="OnRetryClicked" IsVisible="False" />
             <Grid x:Name="ActionsGrid" ColumnDefinitions="*,*,*" ColumnSpacing="4">
+                <Grid x:Name="VisibilityControl" Grid.Column="0" IsVisible="False"
+                      WidthRequest="52" HorizontalOptions="Start">
+                    <Button x:Name="VisibilityButton" Text="" Clicked="OnVisibilityClicked"
+                            Loaded="OnNonScanControlLoaded"
+                            SemanticProperties.Description="Показать принятые SKU" />
+                    <Path Data="M2,12 C4.5,8 7.8,6 12,6 C16.2,6 19.5,8 22,12 C19.5,16 16.2,18 12,18 C7.8,18 4.5,16 2,12 Z M12,9 A3,3 0 1,0 12,15 A3,3 0 1,0 12,9"
+                          Fill="Transparent" Stroke="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource PrimaryDarkText}}"
+                          StrokeThickness="2" WidthRequest="24" HeightRequest="24"
+                          HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True" />
+                    <BoxView x:Name="HiddenEyeSlash" WidthRequest="27" HeightRequest="2.5" Rotation="-45"
+                             Color="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource PrimaryDarkText}}"
+                             HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True" />
+                </Grid>
+                <Button x:Name="SearchToggleButton" Grid.Column="1" Text="🔍 Поиск" FontSize="12"
+                        Padding="2,8" Clicked="OnSearchToggleClicked" Loaded="OnNonScanControlLoaded"
+                        SemanticProperties.Description="Поиск SKU во всём справочнике" IsVisible="False" />
                 <Button x:Name="ApplyButton" Text="Сохранить" FontSize="12" IsVisible="False"
                         Padding="2,8" Clicked="OnApplyClicked" Loaded="OnNonScanControlLoaded"
                         SemanticProperties.Description="Сохранить количество и выйти из LPN" />

@@ -72,9 +72,9 @@ document, actor, and time. Command receipt replay still returns the original
 result. Mobile source changes retain their existing
 request and receipt behavior.
 
-Mobile SKU search offers stored order SKU and the synchronized catalog by name,
-code, or barcode. A scanned barcode resolves against the entire catalog even
-when manual search is scoped to the order. Adding a catalog SKU creates one
+The Mobile LPN editor lists current order SKU from the order view and offers
+manual search of the synchronized catalog by name, code, or barcode. A scanned
+barcode resolves against the entire catalog. Adding a catalog SKU creates one
 stored order row with known plan zero and unchecked fact; it enters the current
 plan/fact list when it appears in a linked source or a receiving LPN is posted.
 Repetition does not duplicate it. Later source checks can update that row's plan.

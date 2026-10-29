@@ -90,9 +90,19 @@ appears only with the plan. A saved expiration date remains visible even if
 the SKU no longer requires one; otherwise the expiration line appears only
 when the SKU requires a date. The Mobile LPN list follows SKU name order, with
 empty LPNs last and code breaking ties. The card omits putaway quantities.
-Manual SKU search sorts by displayed name and uses the
-same right-aligned plan and fact, with a colored border for a known match or
-difference; unverified or unknown-plan candidates keep a neutral border.
+The empty receiving LPN editor immediately lists the same current SKU as the
+order SKU screen, sorted by displayed name. It hides matched SKU by default:
+a match has a known plan and a checked equal fact, including a confirmed zero.
+An eye button in the bottom action row shows or hides matched SKU; it starts
+crossed out for each newly opened LPN. Hiding changes only this list, not SKU
+selection by scan or catalog search. The adjacent search button opens manual
+search across the entire synchronized catalog and closes it back to the order
+list. The eye button is absent while catalog search is open. With no selected
+SKU, these buttons share the bottom row with Cancel; after selection the row
+shows Save, Close, and Cancel. Both the order list and catalog results sort by
+displayed name and show right-aligned plan and fact. Known matches use a soft
+green card background, checked differences a soft yellow one, and unchecked or
+unknown-plan candidates a neutral background.
 The receiving status vocabulary is shared across lists and details: «◇» means
 ready order or available LPN; «○» means order in progress or open LPN; «✓»
 means received order, closed LPN, or matched SKU; «≠» means a checked SKU
@@ -106,11 +116,12 @@ Each status symbol has its full meaning in an accessible description. Order and 
 numbers; SKU comparison symbols sit beside fact quantities; the document
 warning sits beside its number.
 An open LPN opens one editor from its list or a SKU distribution. An empty LPN
-starts in SKU search; a populated one shows its saved quantity. A closed LPN
-opens read-only, without edit actions or a SKU scanning hint.
+starts with the current order SKU list; a populated one shows its saved quantity.
+A closed LPN opens read-only, without edit actions or a SKU scanning hint.
 The editor has separate «Сохранить», «Закрыть» and «Отменить» actions in its
-bottom row; the «🔍 SKU» search action sits above the SKU content and becomes
-«✕ SKU» while search is open. «Сохранить» keeps the LPN open and returns to the
+bottom row after SKU selection; while no SKU is selected that row has the eye,
+«🔍 Поиск», and «Отменить» actions. Search becomes «✕ Поиск» while catalog
+search is open. «Сохранить» keeps the LPN open and returns to the
 LPN list, including after a confirmed retry and when opened from a SKU screen.
 «Закрыть» confirms receipt posting, saves changed SKU, quantity and date, then
 closes the LPN and opens the order SKU list, whether the LPN was entered from
@@ -135,12 +146,12 @@ LPN requires an explicit date no earlier than the current UTC day. A saved date
 remains visible after the flag turns off; closing rejects it if it has expired.
 A rejected close after a changed input refreshes the LPN and shows the specific
 server error.
-When an open LPN has no selected SKU, the editor immediately shows search in
-the order composition, with a switch to the whole catalog, and accepts SKU
-scans. A selected SKU replaces the search panel and has a cross beside its name.
+When an open LPN has no selected SKU, the editor shows the current order SKU
+list and accepts SKU scans. A selected SKU replaces the list and has a cross
+beside its name.
 The cross discards an unsaved selection locally or, after confirmation, clears
 the saved SKU, quantity and expiration date on the server. The LPN remains open
-and the order-scoped search appears again. A closed LPN has no cross.
+and the filtered order SKU list appears again. A closed LPN has no cross.
 
 A current-cycle Operator can complete an order from the SKU or
 LPN list when no LPN remains open. Mobile confirms the decision, retains the

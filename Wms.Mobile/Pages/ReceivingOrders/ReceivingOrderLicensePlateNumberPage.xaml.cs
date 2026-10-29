@@ -18,6 +18,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private Guid? _pendingSkuId;
     private Guid? _selectedSkuId;
     private bool _catalogSearch;
+    private bool _showMatchedSkus;
     private bool _visible;
     private bool _busy;
     private bool _closeAfterSave;
@@ -46,10 +47,10 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         _process = process;
         _selectedSkuId = selectedSkuId;
         _catalogSearch = false;
-        ScopeButton.Text = "Поиск: состав ордера";
+        _showMatchedSkus = false;
         SkuSearch.Text = string.Empty;
         _closeAfterSave = false;
-        SearchPanel.IsVisible = false;
+        ChoicePanel.IsVisible = false;
     }
 
     protected override async void OnAppearing()
@@ -58,7 +59,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         await RefreshAsync();
-        if (SearchPanel.IsVisible) await SearchAsync();
+        if (_catalogSearch && ChoicePanel.IsVisible) await SearchAsync();
         await UpdateCameraAsync();
     }
 
@@ -74,6 +75,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
     private async void OnRefreshing(object? sender, EventArgs e)
     {
         await RefreshAsync();
+        if (_catalogSearch && ChoicePanel.IsVisible) await SearchAsync();
         LpnRefreshView.IsRefreshing = false;
     }
 
@@ -110,7 +112,9 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             && order.IsParticipant;
         ScanHintLabel.IsVisible = editable && _selectedSkuId is null;
         ActionsGrid.IsVisible = editable;
-        SearchPanel.IsVisible = editable && _selectedSkuId is null;
+        ChoicePanel.IsVisible = editable && _selectedSkuId is null;
+        SkuSearch.IsVisible = ChoicePanel.IsVisible && _catalogSearch;
+        if (!_catalogSearch) ShowOrderCandidates();
         ShowSelectedSku();
         UpdateRecovery();
     }
@@ -125,8 +129,16 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         ApplyButton.IsVisible = sku is not null && Lpn?.Status == MobileLicensePlateNumberStatus.Open
             && _order?.IsParticipant == true;
         CloseButton.IsVisible = ApplyButton.IsVisible;
-        Grid.SetColumn(CancelButton, ApplyButton.IsVisible ? 2 : 0);
-        Grid.SetColumnSpan(CancelButton, ApplyButton.IsVisible ? 1 : 3);
+        VisibilityControl.IsVisible = ChoicePanel.IsVisible && !_catalogSearch;
+        SearchToggleButton.IsVisible = ChoicePanel.IsVisible;
+        SearchToggleButton.Text = _catalogSearch ? "✕ Поиск" : "🔍 Поиск";
+        SemanticProperties.SetDescription(SearchToggleButton, _catalogSearch
+            ? "Закрыть поиск по справочнику" : "Поиск SKU во всём справочнике");
+        Grid.SetColumn(SearchToggleButton, _catalogSearch ? 0 : 1);
+        Grid.SetColumnSpan(SearchToggleButton, _catalogSearch ? 2 : 1);
+        HiddenEyeSlash.IsVisible = !_showMatchedSkus;
+        SemanticProperties.SetDescription(VisibilityButton, _showMatchedSkus
+            ? "Скрыть принятые SKU" : "Показать принятые SKU");
         if (sku is null) return;
 
         var item = Lpn?.Items.SingleOrDefault(x => x.SkuId == sku.SkuId);
@@ -209,7 +221,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             ResetSkuSelection();
             ShowSelectedSku();
             UpdateRecovery();
-            await SearchAsync();
             return;
         }
 
@@ -218,19 +229,20 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             confirmation += " Несохранённые изменения тоже будут сброшены.";
         if (!await DisplayAlertAsync("Убрать SKU", confirmation,
                 "Убрать", "Назад")) return;
-        if (await ExecuteAsync(async () => ApplyClearedSku(
-                await _process.ClearLpnItemAsync(_orderId, _lpnId, lpn.Revision))))
-            await SearchAsync();
+        await ExecuteAsync(async () => ApplyClearedSku(
+            await _process.ClearLpnItemAsync(_orderId, _lpnId, lpn.Revision)));
     }
 
     private void ResetSkuSelection()
     {
         _selectedSkuId = null;
         _catalogSearch = false;
-        ScopeButton.Text = "Поиск: состав ордера";
+        _showMatchedSkus = false;
         SkuSearch.Text = string.Empty;
-        SearchPanel.IsVisible = true;
+        ChoicePanel.IsVisible = true;
+        SkuSearch.IsVisible = false;
         ScanHintLabel.IsVisible = true;
+        ShowOrderCandidates();
     }
 
     private void ApplyClearedSku(MobileReceivingWorkOrderResponse order)
@@ -239,55 +251,106 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         Apply(order);
     }
 
-    private async void OnScopeClicked(object? sender, EventArgs e)
+    private void OnVisibilityClicked(object? sender, EventArgs e)
     {
+        if (_busy || _process.HasPendingCommand || _catalogSearch
+            || !ChoicePanel.IsVisible) return;
+        _showMatchedSkus = !_showMatchedSkus;
+        ShowOrderCandidates();
+        ShowSelectedSku();
+    }
+
+    private void OnSearchToggleClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || !ChoicePanel.IsVisible) return;
         _catalogSearch = !_catalogSearch;
-        ScopeButton.Text = _catalogSearch ? "Поиск: весь справочник" : "Поиск: состав ордера";
-        await SearchAsync();
+        SkuSearch.Text = string.Empty;
+        SkuSearch.IsVisible = _catalogSearch;
+        if (_catalogSearch)
+            SetCandidateRows([], "Введите минимум 2 символа для поиска по справочнику.");
+        else
+            ShowOrderCandidates();
+        ShowSelectedSku();
     }
 
     private async void OnSearchClicked(object? sender, EventArgs e) => await SearchAsync();
 
+    private void ShowOrderCandidates()
+    {
+        if (_order is null || _catalogSearch) return;
+        var current = _order.Items.Where(x => x.IsCurrent).ToArray();
+        var rows = current
+            .Where(x => _showMatchedSkus
+                || !(x.PlanQuantity is decimal plan && x.FactQuantity == plan))
+            .Select(x => CreateChoiceRow(x.SkuId, x.SkuName, x.SkuCode,
+                x.UnitOfMeasure, x.PlanQuantity, x.FactQuantity, true))
+            .ToArray();
+        SetCandidateRows(SortCandidates(rows), current.Length == 0
+            ? "В ордере пока нет SKU."
+            : "Все SKU приняты. Нажмите значок глаза, чтобы показать их.");
+    }
+
     private async Task SearchAsync()
     {
-        if (_busy || _process.HasPendingCommand || _order?.IsParticipant != true
+        if (!_catalogSearch || _busy || _process.HasPendingCommand || _order?.IsParticipant != true
             || Lpn?.Status != MobileLicensePlateNumberStatus.Open) return;
+        if (SkuSearch.Text?.Trim().Length is null or < 2)
+        {
+            SetCandidateRows([], "Введите минимум 2 символа для поиска по справочнику.");
+            return;
+        }
         SetBusy(true);
         try
         {
-            var results = await _orders.SearchSkuAsync(_orderId, SkuSearch.Text, _catalogSearch);
-            CandidateRows = results.Select(x =>
+            var results = await _orders.SearchSkuAsync(_orderId, SkuSearch.Text);
+            var rows = results.Select(x =>
             {
                 var orderItem = _order?.Items.FirstOrDefault(item => item.SkuId == x.SkuId);
-                var name = !string.IsNullOrWhiteSpace(x.Name) ? x.Name
-                    : !string.IsNullOrWhiteSpace(x.Code) ? x.Code : x.SkuId.ToString();
-                var details = string.Join(" · ", new[]
-                {
-                    x.Code == name ? null : x.Code,
-                    x.IsInOrder ? null : "Вне плана"
-                }.Where(part => !string.IsNullOrWhiteSpace(part)));
-                var unit = string.IsNullOrWhiteSpace(orderItem?.UnitOfMeasure)
-                    ? string.Empty : $" {orderItem.UnitOfMeasure}";
-                var plan = x.IsInOrder ? x.CurrentPlanQuantity : null;
-                var fact = x.FactQuantity;
-                return new ReceivingSkuChoiceRow(x.SkuId, name, details,
-                    $"{Format(plan)}{unit}", ReceivingStatusSymbols.FactText(plan, fact),
-                    ReceivingStatusSymbols.FactDescription(plan, fact),
-                    ReceivingStatusSymbols.FactColor(plan, fact), x.IsInOrder,
-                    fact is null,
-                    x.IsInOrder && plan is decimal expected && fact == expected,
-                    x.IsInOrder && plan is decimal planned && fact is decimal actual && planned != actual);
-            })
-                .OrderBy(x => x.Name, StringComparer.Create(
-                    System.Globalization.CultureInfo.GetCultureInfo("ru-RU"), ignoreCase: true))
-                .ThenBy(x => x.Details, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(x => x.SkuId)
-                .ToArray();
-            OnPropertyChanged(nameof(CandidateRows));
+                return CreateChoiceRow(x.SkuId, x.Name, x.Code,
+                    orderItem?.UnitOfMeasure, x.CurrentPlanQuantity, x.FactQuantity, x.IsInOrder);
+            });
+            SetCandidateRows(SortCandidates(rows), "SKU не найдены.");
         }
         catch (MobileApiException ex) { ErrorLabel.Text = ex.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось найти SKU."; }
         finally { SetBusy(false); await UpdateCameraAsync(); }
+    }
+
+    private void SetCandidateRows(IReadOnlyList<ReceivingSkuChoiceRow> rows, string emptyMessage)
+    {
+        CandidateRows = rows;
+        OnPropertyChanged(nameof(CandidateRows));
+        CandidateHintLabel.Text = rows.Count == 0 ? emptyMessage : string.Empty;
+        CandidateHintLabel.IsVisible = rows.Count == 0;
+    }
+
+    private static ReceivingSkuChoiceRow[] SortCandidates(IEnumerable<ReceivingSkuChoiceRow> rows) =>
+        rows.OrderBy(x => x.Name, StringComparer.Create(
+                CultureInfo.GetCultureInfo("ru-RU"), ignoreCase: true))
+            .ThenBy(x => x.Details, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.SkuId)
+            .ToArray();
+
+    private static ReceivingSkuChoiceRow CreateChoiceRow(Guid skuId, string? skuName,
+        string? skuCode, string? unitOfMeasure, decimal? plan, decimal? fact, bool inOrder)
+    {
+        var name = !string.IsNullOrWhiteSpace(skuName) ? skuName
+            : !string.IsNullOrWhiteSpace(skuCode) ? skuCode : skuId.ToString();
+        var details = string.Join(" · ", new[]
+        {
+            skuCode == name ? null : skuCode,
+            inOrder ? null : "Вне плана"
+        }.Where(part => !string.IsNullOrWhiteSpace(part)));
+        var unit = inOrder && !string.IsNullOrWhiteSpace(unitOfMeasure)
+            ? $" {unitOfMeasure}" : string.Empty;
+        var currentPlan = inOrder ? plan : null;
+        return new ReceivingSkuChoiceRow(skuId, name, details,
+            $"{Format(currentPlan)}{unit}", ReceivingStatusSymbols.FactText(currentPlan, fact),
+            ReceivingStatusSymbols.FactDescription(currentPlan, fact),
+            ReceivingStatusSymbols.FactColor(currentPlan, fact), inOrder,
+            fact is null,
+            inOrder && currentPlan is decimal expected && fact == expected,
+            inOrder && currentPlan is decimal planned && fact is decimal actual && planned != actual);
     }
 
     private async void OnCandidateTapped(object? sender, TappedEventArgs e)
@@ -316,7 +379,7 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
             _pendingSkuId = null;
         }
         _selectedSkuId = skuId;
-        SearchPanel.IsVisible = false;
+        ChoicePanel.IsVisible = false;
         ScanHintLabel.IsVisible = false;
         ShowSelectedSku();
         UpdateRecovery();
@@ -460,8 +523,6 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         }
         else if (action == "Закрыть LPN")
             await FinishCloseAsync();
-        else if (action == "Убрать SKU")
-            await SearchAsync();
         else if (action == "Отменить LPN")
             await Navigation.PopAsync();
     }
@@ -518,7 +579,8 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         ClearSkuButton.IsEnabled = canEdit;
         CloseButton.IsEnabled = canEdit;
         CancelButton.IsEnabled = canEdit;
-        ScopeButton.IsEnabled = canEdit;
+        VisibilityButton.IsEnabled = canEdit;
+        SearchToggleButton.IsEnabled = canEdit;
         SkuSearch.IsEnabled = canEdit;
         QuantityEntry.IsEnabled = canEdit;
         ExpirationPicker.IsEnabled = canEdit;

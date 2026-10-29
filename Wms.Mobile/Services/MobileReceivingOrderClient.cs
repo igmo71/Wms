@@ -43,9 +43,9 @@ public sealed class MobileReceivingOrderClient
             Route, new MobileReceivingCreateOrderRequest(requestId, sourceRefKeys), ct);
 
     public Task<IReadOnlyList<MobileReceivingSkuCandidateResponse>> SearchSkuAsync(
-        Guid orderId, string? search, bool catalog, CancellationToken ct = default) =>
+        Guid orderId, string? search, CancellationToken ct = default) =>
         GetListAsync<MobileReceivingSkuCandidateResponse>(
-            $"{Route}/{orderId:D}/skus?scope={(catalog ? "Catalog" : "Order")}&search={Uri.EscapeDataString(search ?? string.Empty)}", ct);
+            $"{Route}/{orderId:D}/skus?scope=Catalog&search={Uri.EscapeDataString(search ?? string.Empty)}", ct);
 
     public Task<MobileReceivingSkuCandidateResponse> ResolveSkuAsync(
         Guid orderId, string barcode, CancellationToken ct = default) =>
