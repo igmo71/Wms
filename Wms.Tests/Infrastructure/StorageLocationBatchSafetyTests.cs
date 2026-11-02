@@ -48,4 +48,37 @@ public sealed class StorageLocationBatchSafetyTests(SqlDatabase database)
         Assert.Equal(3, await verify.StorageLocations.CountAsync(x => x.ParentId == folder.Id));
         Assert.False(await verify.StorageLocations.AnyAsync(x => x.WarehouseId == warehouse.Id && x.Code == "1A01D1"));
     }
+
+    [Fact]
+    public async Task Gate_descendants_reject_rack_ranges_and_imported_ancestors_keep_their_room()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Range path" };
+        var zone = Zone(warehouse.Id, "ST", ZoneType.Storage);
+        StorageLocation Folder(string code, Guid? parentId) => Value(StorageLocation.Create(
+            Guid.NewGuid(), warehouse.Id, null, parentId, code,
+            Value(StorageLocationDetails.Create(code, true,
+                LocationDimensions.Empty, LocationCoordinates.Empty, null))));
+        var gates = Folder("FGATES", null);
+        var gateChild = Folder("GATECART", gates.Id);
+        var room = Folder("FROOM1", null);
+        var roomChild = Folder("CUSTOM", room.Id);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, zone, gates, gateChild, room, roomChild);
+            await seed.SaveChangesAsync();
+        }
+
+        var service = new StorageLocationBatchService(database);
+        var range = new StorageLocationRange(warehouse.Id, zone.Id, gateChild.Id,
+            1, 1, "A", "A", 1, 1, "A", "A", 1, 1);
+        Assert.False((await service.PreviewAsync(range)).IsSuccess);
+        Assert.False((await service.CreateAsync(range, new string('A', 64))).IsSuccess);
+        Assert.False((await service.PreviewAsync(range with
+        {
+            ParentId = roomChild.Id, RoomFrom = 2, RoomTo = 2
+        })).IsSuccess);
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(4, await verify.StorageLocations.CountAsync(x => x.WarehouseId == warehouse.Id));
+    }
 }

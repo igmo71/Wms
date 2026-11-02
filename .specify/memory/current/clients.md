@@ -12,11 +12,32 @@ SKU name. Server-paged views apply that order before paging. Web grids honor an
 explicit sort chosen by the user. Lists of inventory movements and other event
 history retain their event order.
 
+The Administrator storage-location page opens a single-XLSX cutover import
+dialog. It previews and confirms topology first, then previews and confirms
+opening stock from the same export after SKU synchronization. It pages topology
+cells and decisions plus stock rows, totals and issues, shows source hash and
+signed/date/mixing exceptions, groups blocking stock issues by reason, and
+requires review before confirmation. The
+import rules are in [inventory](inventory.md).
+Reopening the dialog reads the saved stage result without the XLSX file. Its
+compact protocol shows source identity, actors and times, accepted and excluded
+counts, signed and undated stock exceptions, approved exclusions and corrections,
+and the current status of reviewed mixed cells.
+The storage-location page shows the addresses and count of cells with a current
+prohibited mixed-SKU balance, and the selected cell shows its distinct SKU count.
+Its cell editor and detail view show the multiple-SKU permission for both
+Комплектация and Хранение cells.
+
 Mobile is online-only. Urovo ScanWedge intent input and the ML Kit camera
 fallback implement one scanner boundary; operational screens prefer the
 embedded scanner when available. Manual SKU search, where present, uses name,
 code, or barcode and rejoins the same operation as scanning. Decimal 1C GUID
 barcodes accept and normalize leading zeroes.
+
+The receiving putaway destination scan accepts Комплектация and Хранение cells.
+Mobile V1 uses the `PutawayDestination` request context for that scan and returns
+the actual `Storage` or `Reserve` zone type. Other scans using `Storage` remain
+restricted to Комплектация cells.
 
 The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
 only. Simultaneous keyboard-wedge output is disabled because its trailing Enter

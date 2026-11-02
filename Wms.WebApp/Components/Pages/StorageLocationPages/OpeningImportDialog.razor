@@ -1,0 +1,305 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Wms.Application.OpeningImports
+@using Wms.Domain.Enums
+
+<MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true })">
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText>Склад: <b>@Warehouse.Name</b>.</MudText>
+            @if (!_loadingSavedResult && _savedResult?.Stock is null)
+            {
+                <MudText>Выберите выгрузку топологии и остатков 1С в формате XLSX.</MudText>
+                <InputFile OnChange="UploadAsync" accept=".xlsx" disabled="@_busy" />
+                <MudText Typo="Typo.caption">Сначала загрузите топологию, включая пустые ячейки. Затем синхронизируйте каталог SKU и отдельно загрузите остатки из той же выгрузки.</MudText>
+                @if (_sourceName is not null)
+                {
+                    <MudText>Файл: <b>@_sourceName</b> (@(_workbook?.Length ?? 0) байт)</MudText>
+                    @if (_savedResult is null)
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="@_busy" OnClick="PreviewAsync">
+                            Проверить топологию
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <label for="opening-snapshot-at">Момент выгрузки, МСК (UTC+03:00):</label>
+                            <input id="opening-snapshot-at" type="datetime-local" step="1"
+                                   value="@_snapshotLocalText" @onchange="OnSnapshotChanged" disabled="@_busy" />
+                            <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="@_busy" OnClick="PreviewStockAsync">
+                                Проверить остатки
+                            </MudButton>
+                        </MudStack>
+                    }
+                }
+            }
+            @if (_loadingSavedResult)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_resultError))
+            {
+                <MudAlert Severity="Severity.Error">@_resultError</MudAlert>
+                <MudButton Variant="Variant.Outlined" Disabled="@_loadingSavedResult" OnClick="LoadSavedResultAsync">Повторить чтение протокола</MudButton>
+            }
+            @if (_savedResult is { } saved)
+            {
+                <MudDivider />
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle1">Сохранённый протокол перехода</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" Disabled="@_loadingSavedResult" OnClick="LoadSavedResultAsync">Обновить</MudButton>
+                </MudStack>
+                <MudText><b>Статус:</b> @ImportStatusName(saved.Status)</MudText>
+                <MudText><b>Источник:</b> @saved.SourceName · SHA-256: <code>@saved.SourceSha256</code></MudText>
+                <MudText><b>Топология:</b> @MoscowTime(saved.TopologyImportedAtUtc) МСК · @saved.TopologyImportedBy</MudText>
+                <MudText>Строк: @saved.TopologyCounts.SourceRows; принято: @saved.TopologyCounts.AcceptedRows; исправлено: @saved.TopologyCounts.CorrectedRows; исключено: @saved.TopologyCounts.ExcludedRows; ячеек: @saved.TopologyCounts.DistinctCells (пустых: @saved.TopologyCounts.EmptyCells).</MudText>
+                @if (ZeroPrefixExclusions.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        Согласованная потеря остатков нулевых адресов:
+                        @foreach (var exclusion in ZeroPrefixExclusions)
+                        {
+                            <MudText>@exclusion.Address: @exclusion.Quantity.ToString("+#,##0.###;-#,##0.###;0") (@exclusion.Count строк).</MudText>
+                        }
+                    </MudAlert>
+                }
+                @if (saved.Exclusions.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Исключения (@saved.Exclusions.Count групп)</MudText>
+                    <MudTable T="OpeningImportExclusion" Items="saved.Exclusions" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>Адрес</MudTh><MudTh>Строк</MudTh><MudTh>Количество</MudTh><MudTh>Причина</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Address</MudTd>
+                            <MudTd>@context.Count</MudTd>
+                            <MudTd>@context.Quantity.ToString("+#,##0.###;-#,##0.###;0")</MudTd>
+                            <MudTd>@context.Reason</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                @if (saved.Corrections.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Исправления (@saved.Corrections.Count)</MudText>
+                    <MudTable T="OpeningImportCorrection" Items="saved.Corrections" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>Строка</MudTh><MudTh>Исходный адрес</MudTh><MudTh>Итоговый адрес</MudTh><MudTh>Причина</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.RowNumber</MudTd>
+                            <MudTd>@context.SourceAddress</MudTd>
+                            <MudTd>@context.TargetAddress</MudTd>
+                            <MudTd>@context.Reason</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                @if (saved.Stock is { } stock)
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.subtitle2">Начальные остатки</MudText>
+                    <MudText><b>Момент выгрузки:</b> @MoscowTime(saved.DeclaredSnapshotAt) МСК</MudText>
+                    <MudText><b>Подтверждено:</b> @MoscowTime(saved.StockImportedAtUtc) МСК · @saved.StockImportedBy</MudText>
+                    <MudText>Строк: @stock.SourceRows; принято: @stock.AcceptedRows; исправлено: @stock.CorrectedRows; исключено: @stock.ExcludedRows; ненулевых: @stock.NonzeroRows; движений: @stock.Movements; остатков: @stock.Balances.</MudText>
+                    <MudText>Количество со знаком: @stock.SignedQuantity.ToString("+#,##0.###;-#,##0.###;0"); отрицательных строк: @stock.NegativeRows; без обязательной даты: @stock.MissingRequiredDates; с прошедшей датой: @stock.PastDates; включено требований даты: @stock.ExpirationFlagsEnabled.</MudText>
+                    @if (stock.ReviewedMixedAddresses.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2">Согласованные ячейки с запретом смешения (@stock.ReviewedMixedAddresses.Count)</MudText>
+                        <MudTable T="string" Items="stock.ReviewedMixedAddresses" Dense="true" Elevation="0">
+                            <HeaderContent><MudTh>Адрес</MudTh><MudTh>Текущее состояние</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context</MudTd>
+                                <MudTd>@CurrentMixingState(context)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">Топология загружена. Начальные остатки ожидают проверки и подтверждения.</MudAlert>
+                }
+            }
+            @if (_busy)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+
+            @if (_plan is not null)
+            {
+                <MudDivider />
+                <MudText Typo="Typo.subtitle1">Предпросмотр топологии</MudText>
+                <MudText>Строк: @_plan.Counts.SourceRows; ячеек: @_plan.Counts.DistinctCells (пустых: @_plan.Counts.EmptyCells, новых: @_plan.Counts.NewCells, существующих: @_plan.Counts.ExistingCells).</MudText>
+                <MudText>Зон: @_plan.Zones.Count (новых: @_plan.Counts.NewZones); структурных групп: @_plan.Folders.Count (новых: @_plan.Counts.NewFolders).</MudText>
+                <MudText>Строк с остатками: @_plan.Counts.StockRows; повторов адреса: @_plan.Counts.RepeatedAddressRows; исключено: @_plan.Counts.ExcludedRows; исправлено: @_plan.Counts.CorrectedRows; блокирующих строк: @_plan.Counts.BlockingRows.</MudText>
+                @if (_plan.Counts.BlockingIssues > 0)
+                {
+                    <MudAlert Severity="Severity.Error">Найдены блокирующие замечания: @_plan.Counts.BlockingIssues. Подтверждение недоступно.</MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">Подтверждение создаст только зоны, группы и ячейки. Остатки пока не изменятся.</MudAlert>
+                }
+
+                <MudText Typo="Typo.subtitle2">Функциональные зоны</MudText>
+                <MudTable T="OpeningTopologyZonePlan" Items="_plan.Zones" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Код</MudTh><MudTh>Наименование</MudTh><MudTh>Назначение</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Code</MudTd><MudTd>@context.Name</MudTd><MudTd>@PurposeName(context.Type)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                @if (_specialDecisions.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Исключённые, исправленные и ошибочные строки</MudText>
+                    <MudTable T="OpeningImportRowDecision" Items="VisibleSpecialDecisions" Dense="true" Elevation="0">
+                        <HeaderContent><MudTh>Строка</MudTh><MudTh>Адрес источника</MudTh><MudTh>Решение</MudTh><MudTh>Количество</MudTh><MudTh>Причина / назначение</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Source.RowNumber</MudTd>
+                            <MudTd>@context.Source.Address</MudTd>
+                            <MudTd>@OutcomeName(context.Outcome)</MudTd>
+                            <MudTd>@(context.Source.Quantity?.ToString("0.###") ?? "—")</MudTd>
+                            <MudTd>@context.Reason @((context.Outcome == OpeningImportRowOutcome.Corrected && context.Purpose is not null) ? $"→ {PurposeName(context.Purpose.Value)}" : string.Empty)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                    <MudStack Row="true" AlignItems="AlignItems.Center">
+                        <MudButton Disabled="@(_specialPage <= 1)" OnClick="@(() => ChangeSpecialPage(-1))">Назад</MudButton>
+                        <MudText>Страница @_specialPage из @SpecialPageCount</MudText>
+                        <MudButton Disabled="@(_specialPage >= SpecialPageCount)" OnClick="@(() => ChangeSpecialPage(1))">Далее</MudButton>
+                    </MudStack>
+                }
+
+                <MudText Typo="Typo.subtitle2">Замечания (@_plan.Issues.Count)</MudText>
+                <MudTable T="OpeningTopologyIssue" Items="VisibleIssues" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Строка</MudTh><MudTh>Адрес</MudTh><MudTh>Тип</MudTh><MudTh>Сообщение</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@(context.RowNumber?.ToString() ?? "—")</MudTd>
+                        <MudTd>@context.Address</MudTd>
+                        <MudTd>@(context.BlocksConfirmation ? "Ошибка" : "Информация")</MudTd>
+                        <MudTd>@context.Message</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudButton Disabled="@(_issuePage <= 1)" OnClick="@(() => ChangeIssuePage(-1))">Назад</MudButton>
+                    <MudText>Страница @_issuePage из @IssuePageCount</MudText>
+                    <MudButton Disabled="@(_issuePage >= IssuePageCount)" OnClick="@(() => ChangeIssuePage(1))">Далее</MudButton>
+                </MudStack>
+
+                <MudText Typo="Typo.subtitle2">Ячейки (@_plan.Cells.Count)</MudText>
+                <MudTable T="OpeningTopologyCellPlan" Items="VisibleCells" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Адрес</MudTh><MudTh>Помещение</MudTh><MudTh>Назначение</MudTh><MudTh>Остаток</MudTh><MudTh>Несколько SKU</MudTh><MudTh>Состояние</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.CellGroup</MudTd>
+                        <MudTd>@PurposeName(context.Purpose)</MudTd>
+                        <MudTd>@(context.HasStockRows ? "Есть в файле" : "Пустая")</MudTd>
+                        <MudTd>@(context.AllowsMultipleSkus ? "Разрешено" : "Запрещено")</MudTd>
+                        <MudTd>@(context.Exists ? "Уже есть" : "Новая")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudButton Disabled="@(_cellPage <= 1)" OnClick="@(() => ChangeCellPage(-1))">Назад</MudButton>
+                    <MudText>Страница @_cellPage из @CellPageCount</MudText>
+                    <MudButton Disabled="@(_cellPage >= CellPageCount)" OnClick="@(() => ChangeCellPage(1))">Далее</MudButton>
+                </MudStack>
+
+                @if (_plan.Counts.ExcludedRows > 0 || _plan.Counts.CorrectedRows > 0)
+                {
+                    <label><input type="checkbox" @bind="_acknowledged" /> Я просмотрел исключения и исправления в файле.</label>
+                }
+            }
+            @if (_stockPlan is not null)
+            {
+                <MudDivider />
+                <MudText Typo="Typo.subtitle1">Предпросмотр начальных остатков</MudText>
+                <MudText>SHA-256 файла: <code>@_stockPlan.SourceSha256</code></MudText>
+                <MudText>Момент снимка: @_stockPlan.DeclaredSnapshotAt.ToString("dd.MM.yyyy HH:mm:ss zzz")</MudText>
+                <MudText>Строк: @_stockPlan.Counts.SourceRows; строк с товаром: @_stockPlan.Counts.SourceStockRows; принято: @_stockPlan.Counts.AcceptedStockRows; ненулевых: @_stockPlan.Counts.NonzeroRows; нулевых: @_stockPlan.Counts.ZeroRows.</MudText>
+                <MudText>Суммарное количество со знаком: @_stockPlan.Counts.SignedQuantity.ToString("+#,##0.###;-#,##0.###;0"); отрицательных строк: @_stockPlan.Counts.NegativeRows; исключённое количество: @_stockPlan.Counts.ExcludedQuantity.ToString("+#,##0.###;-#,##0.###;0").</MudText>
+                <MudText>Проверка каталога: @StockCatalogIssueCount замечаний; без обязательной даты: @_stockPlan.Counts.MissingRequiredDates; с прошедшей датой: @_stockPlan.Counts.PastDates.</MudText>
+                <MudText>Смешанные ячейки: @_stockPlan.Counts.ReviewedMixedCells согласованных с запретом, @_stockPlan.Counts.UnreviewedMixedCells без решения. Исключено строк: @_stockPlan.Counts.ExcludedRows; исправлено: @_stockPlan.Counts.CorrectedRows.</MudText>
+                @if (!_stockPlan.CanConfirm)
+                {
+                    <MudAlert Severity="Severity.Error">Блокирующих замечаний: @_stockPlan.Counts.BlockingIssues. Загрузка остатков недоступна.</MudAlert>
+                    @foreach (var reason in StockBlockingReasons)
+                    {
+                        <MudText Typo="Typo.body2">@reason.Count × @reason.Reason</MudText>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">Подтверждение запишет начальные остатки и движения. Даты останутся указанными в выгрузке или неизвестными; отрицательные количества сохранят знак.</MudAlert>
+                }
+
+                <MudText Typo="Typo.subtitle2">Замечания (@_stockPlan.Issues.Count)</MudText>
+                <MudTable T="OpeningStockIssue" Items="VisibleStockIssues" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Строка</MudTh><MudTh>Адрес</MudTh><MudTh>Тип</MudTh><MudTh>Сообщение</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@(context.RowNumber?.ToString() ?? "—")</MudTd>
+                        <MudTd>@context.Address</MudTd>
+                        <MudTd>@(context.BlocksConfirmation ? "Ошибка" : "Информация")</MudTd>
+                        <MudTd>@context.Message</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudButton Disabled="@(_stockIssuePage <= 1)" OnClick="@(() => ChangeStockIssuePage(-1))">Назад</MudButton>
+                    <MudText>Страница @_stockIssuePage из @StockIssuePageCount</MudText>
+                    <MudButton Disabled="@(_stockIssuePage >= StockIssuePageCount)" OnClick="@(() => ChangeStockIssuePage(1))">Далее</MudButton>
+                </MudStack>
+
+                <MudText Typo="Typo.subtitle2">Итоги по SKU и назначению зоны (@_stockPlan.Totals.Count)</MudText>
+                <MudTable T="OpeningStockTotal" Items="VisibleStockTotals" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>SKU</MudTh><MudTh>Зона</MudTh><MudTh>Строк</MudTh><MudTh>Количество со знаком</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.SkuName</MudTd>
+                        <MudTd>@PurposeName(context.Purpose)</MudTd>
+                        <MudTd>@context.Rows</MudTd>
+                        <MudTd>@context.SignedQuantity.ToString("+#,##0.###;-#,##0.###;0")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudButton Disabled="@(_stockTotalPage <= 1)" OnClick="@(() => ChangeStockTotalPage(-1))">Назад</MudButton>
+                    <MudText>Страница @_stockTotalPage из @StockTotalPageCount</MudText>
+                    <MudButton Disabled="@(_stockTotalPage >= StockTotalPageCount)" OnClick="@(() => ChangeStockTotalPage(1))">Далее</MudButton>
+                </MudStack>
+
+                <MudText Typo="Typo.subtitle2">Строки с товаром и решениями (@_stockRows.Count)</MudText>
+                <MudTable T="OpeningStockRowPlan" Items="VisibleStockRows" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Строка</MudTh><MudTh>Адрес</MudTh><MudTh>SKU</MudTh><MudTh>Количество</MudTh><MudTh>Дата</MudTh><MudTh>Решение</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.RowNumber</MudTd>
+                        <MudTd>@context.SourceAddress @((context.SourceAddress != context.Address) ? $"→ {context.Address}" : string.Empty)</MudTd>
+                        <MudTd>@StockSkuName(context.StockKeepingUnitId)</MudTd>
+                        <MudTd>@(context.Quantity?.ToString("+#,##0.###;-#,##0.###;0") ?? "—")</MudTd>
+                        <MudTd>@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Неизвестна")</MudTd>
+                        <MudTd>@OutcomeName(context.Outcome) @context.Reason</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudButton Disabled="@(_stockRowPage <= 1)" OnClick="@(() => ChangeStockRowPage(-1))">Назад</MudButton>
+                    <MudText>Страница @_stockRowPage из @StockRowPageCount</MudText>
+                    <MudButton Disabled="@(_stockRowPage >= StockRowPageCount)" OnClick="@(() => ChangeStockRowPage(1))">Далее</MudButton>
+                </MudStack>
+
+                @if (StockAcknowledgementRequired)
+                {
+                    <label><input type="checkbox" @bind="_stockAcknowledged" /> Я просмотрел исключения, даты, отрицательные остатки и смешанные ячейки.</label>
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_busy">Отмена</MudButton>
+        @if (_plan is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmAsync" Disabled="@ConfirmDisabled">
+                Загрузить топологию
+            </MudButton>
+        }
+        @if (_stockPlan is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmStockAsync" Disabled="@StockConfirmDisabled">
+                Загрузить начальные остатки
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>

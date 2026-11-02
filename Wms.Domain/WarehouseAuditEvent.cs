@@ -16,6 +16,7 @@ public sealed class WarehouseAuditEvent
     public Guid? LicensePlateNumberId { get; private set; }
     public Guid? StockKeepingUnitId { get; private set; }
     public Guid? ReceivingSourceDocumentId { get; private set; }
+    public Guid? WarehouseOpeningImportId { get; private set; }
     public string? BeforeValuesJson { get; private set; }
     public string? AfterValuesJson { get; private set; }
     public string MovementIdsJson { get; private set; } = "[]";
@@ -39,7 +40,8 @@ public sealed class WarehouseAuditEvent
         IReadOnlyCollection<Guid>? sourceVersionIds = null,
         string? commandUserId = null,
         string? commandType = null,
-        Guid? requestId = null)
+        Guid? requestId = null,
+        Guid? warehouseOpeningImportId = null)
     {
         if (string.IsNullOrWhiteSpace(eventType) || eventType.Length > 100
             || occurredAtUtc == default)
@@ -50,7 +52,7 @@ public sealed class WarehouseAuditEvent
             return OperationError.Invalid("Укажите исполнителя или источник события.");
 
         Guid?[] affectedIds = [receivingOrderId, licensePlateNumberId,
-            stockKeepingUnitId, receivingSourceDocumentId];
+            stockKeepingUnitId, receivingSourceDocumentId, warehouseOpeningImportId];
         if (affectedIds.All(x => x is null) || affectedIds.Any(x => x == Guid.Empty))
             return OperationError.Invalid("Событие должно ссылаться на затронутый объект.");
 
@@ -81,6 +83,7 @@ public sealed class WarehouseAuditEvent
             LicensePlateNumberId = licensePlateNumberId,
             StockKeepingUnitId = stockKeepingUnitId,
             ReceivingSourceDocumentId = receivingSourceDocumentId,
+            WarehouseOpeningImportId = warehouseOpeningImportId,
             BeforeValuesJson = beforeValuesJson,
             AfterValuesJson = afterValuesJson,
             MovementIdsJson = JsonSerializer.Serialize(movements),

@@ -2,10 +2,18 @@ namespace Wms.Data;
 
 public static class DatabaseObjectNames
 {
+    public const string WarehouseOpeningImportsWarehouseIndex =
+        "IX_WarehouseOpeningImports_WarehouseId";
+    public const string StorageLocationsWarehouseCodeIndex =
+        "IX_StorageLocations_WarehouseId_Code";
+    public const string ZonesWarehouseCodeIndex =
+        "IX_Zones_WarehouseId_Code";
     public const string InventoryBalancesBusinessKeyIndex =
         "UX_InventoryBalances_BusinessKey";
     public const string InventoryMovementsTransferLineIndex =
         "UX_InventoryMovements_TransferLine";
+    public const string InventoryMovementsOpeningBalanceLineIndex =
+        "UX_InventoryMovements_OpeningBalanceLine";
     public const string InventoryMovementsReversedMovementIndex =
         "UX_InventoryMovements_ReversedMovementId";
     public const string InventoryCountItemsSkuIndex =

@@ -87,8 +87,10 @@ public static class PostInventoryMovement
                 return OperationError.Invalid("Приход и поправка количества проводятся в зоне приемки.");
             if (command.Kind == InventoryPostingKind.Putaway
                 && (state.Locations[sourceId!.Value].Zone!.Type != ZoneType.Receiving
-                    || state.Locations[destinationId!.Value].Zone!.Type != ZoneType.Storage))
-                return OperationError.Invalid("Размещение проводится из зоны приемки в зону хранения.");
+                    || state.Locations[destinationId!.Value].Zone!.Type is not
+                        (ZoneType.Storage or ZoneType.Reserve)))
+                return OperationError.Invalid(
+                    "Размещение проводится из зоны приёмки в ячейку комплектации или хранения.");
 
             if (command.Kind == InventoryPostingKind.Putaway
                 && (!state.Balances.TryGetValue(sourceId!.Value, out var available)
@@ -114,12 +116,12 @@ public static class PostInventoryMovement
                     return destinationResult.Error!;
 
                 var location = state.Locations[destination];
-                if (location.Zone?.Type == ZoneType.Storage
+                if ((location.Zone?.Type is ZoneType.Storage or ZoneType.Reserve)
                     && !location.AllowsMultipleSkus
                     && await store.HasMultipleNonzeroSkusAsync(
                         context, movement.WarehouseId, destination, ct))
                     return OperationError.Conflict(
-                        $"В ячейке {location.DisplayAddress} запрещено хранить несколько SKU.");
+                        $"В ячейке {location.DisplayAddress} запрещено хранить несколько SKU; пополнение недоступно, пока смешение не устранено.");
             }
 
             context.Stage(movement);

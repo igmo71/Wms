@@ -6,7 +6,9 @@ public enum MobileStorageLocationContext
     Storage = 1,
     Transit = 2,
     Receiving = 3,
-    Shipping = 4
+    Shipping = 4,
+    Reserve = 5,
+    PutawayDestination = 6
 }
 
 public sealed record MobileResolveStorageLocationRequest(

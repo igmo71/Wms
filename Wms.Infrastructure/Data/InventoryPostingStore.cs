@@ -1,12 +1,43 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.OpeningImports;
 using Wms.Domain;
 
 namespace Wms.Data;
 
-public sealed class InventoryPostingStore : IInventoryPostingStore
+public sealed class InventoryPostingStore : IInventoryPostingStore,
+    IOpeningInventoryPostingStore
 {
+    public async Task<OpeningInventoryPostingState> LoadOpeningAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        IReadOnlyCollection<Guid> locationIds, CancellationToken ct)
+    {
+        if (context is not CommandExecutionStore.Session session)
+            throw new InvalidOperationException("Загрузка остатков требует сессию команды.");
+
+        var db = session.Db;
+        var locations = new Dictionary<Guid, StorageLocation>();
+        foreach (var batch in locationIds.Distinct().Chunk(500))
+        {
+            var loaded = await db.StorageLocations
+                .Include(x => x.Warehouse)
+                .Include(x => x.Zone)
+                .Include(x => x.ActiveLock)
+                .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.Id))
+                .ToArrayAsync(ct);
+            foreach (var location in loaded)
+                locations.Add(location.Id, location);
+        }
+        var balances = await db.InventoryBalances
+            .Where(x => x.WarehouseId == warehouseId)
+            .ToArrayAsync(ct);
+        return new OpeningInventoryPostingState(locations,
+            balances.ToDictionary(x => new OpeningBalanceKey(
+                x.WarehouseId, x.StorageLocationId,
+                x.StockKeepingUnitId, x.ExpirationDate)));
+    }
+
     public async Task<InventoryPostingState> LoadAsync(
         ICommandExecutionContext context,
         InventoryMovement movement,

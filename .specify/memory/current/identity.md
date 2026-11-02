@@ -21,8 +21,13 @@ Imported catalog lists are visible to `Manager` and `Administrator`; manual
 synchronization from WebApp or the catalog import API requires `Manager` at
 execution. Removing a local barcode association on the Web barcode page also
 requires `Manager` at execution; imported associations cannot be removed there.
-Changing the SKU expiration-tracking flag also requires `Manager` at execution. Zones and
-storage locations remain administrator-only configuration. Public
+Changing the SKU expiration-tracking flag also requires `Manager` at execution;
+the one-time opening-stock command may enable it from accepted source rows
+marked `Да` under explicit `Administrator` membership. This command never
+disables an already enabled flag. Zones and storage locations remain
+administrator-only configuration. The cutover topology confirmation command
+and the opening-stock confirmation command require explicit `Administrator`
+membership. Public
 self-registration is not offered; administrator-created accounts are confirmed
 local accounts with one or more WMS roles whose rights combine. An administrator
 may change their other roles but cannot block themselves or remove their own

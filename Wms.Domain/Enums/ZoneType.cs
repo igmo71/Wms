@@ -4,7 +4,7 @@ namespace Wms.Domain.Enums;
 
 public enum ZoneType
 {
-    [Display(Name = "Хранение")]
+    [Display(Name = "Комплектация")]
     Storage = 1,
 
     [Display(Name = "Транзит")]
@@ -14,5 +14,8 @@ public enum ZoneType
     Receiving = 3,
 
     [Display(Name = "Отгрузка")]
-    Shipping = 4
+    Shipping = 4,
+
+    [Display(Name = "Хранение")]
+    Reserve = 5
 }

@@ -355,11 +355,14 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
             x.CommandType == "receiving.lpn.delete" && x.RequestId == requestId));
     }
 
-    [Fact]
-    public async Task New_putaway_posts_partial_lpn_before_order_completion_once_and_rejects_overspend()
+    [Theory]
+    [InlineData(ZoneType.Storage)]
+    [InlineData(ZoneType.Reserve)]
+    public async Task New_putaway_posts_partial_lpn_before_order_completion_once_and_rejects_overspend(
+        ZoneType destinationPurpose)
     {
         var state = await SeedNewOpenReceivingLpnAsync();
-        var storageZone = Zone(state.WarehouseId, "PS", ZoneType.Storage);
+        var storageZone = Zone(state.WarehouseId, "PS", destinationPurpose);
         var destination = Location(state.WarehouseId, storageZone, 2);
         await using (var seed = database.CreateDbContext())
         {

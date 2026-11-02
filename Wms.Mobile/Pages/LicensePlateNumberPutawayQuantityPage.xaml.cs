@@ -200,11 +200,11 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         try
         {
             var location = await _reference.ResolveStorageLocationAsync(
-                barcode, _details.WarehouseId, MobileStorageLocationContext.Storage);
+                barcode, _details.WarehouseId, MobileStorageLocationContext.PutawayDestination);
             _pending = new(_details.Id, _item.Id, _quantity, location.Id, Guid.NewGuid());
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
-        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось проверить ячейку хранения."; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось проверить ячейку размещения."; }
         finally { SetBusy(false); }
         if (_pending is null) return;
         await ExecutePendingPutawayAsync();

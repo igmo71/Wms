@@ -570,6 +570,11 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("WarehouseId");
 
+                    b.HasIndex("RecorderId", "RecorderLineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InventoryMovements_OpeningBalanceLine")
+                        .HasFilter("[RecorderType] = 5");
+
                     b.HasIndex("RecorderType", "RecorderId", "RecorderLineNumber")
                         .IsUnique()
                         .HasDatabaseName("UX_InventoryMovements_TransferLine")
@@ -1718,6 +1723,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("WarehouseOpeningImportId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LicensePlateNumberId", "OccurredAtUtc");
@@ -1728,9 +1736,73 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("StockKeepingUnitId", "OccurredAtUtc");
 
+                    b.HasIndex("WarehouseOpeningImportId", "OccurredAtUtc");
+
                     b.HasIndex("CommandUserId", "CommandType", "RequestId");
 
                     b.ToTable("WarehouseAuditEvents");
+                });
+
+            modelBuilder.Entity("Wms.Domain.WarehouseOpeningImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeclaredSnapshotAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("SourceSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("StockImportedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("StockImportedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("StockSummary")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("TopologyImportedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TopologyImportedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("TopologySummary")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WarehouseId")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseOpeningImports");
                 });
 
             modelBuilder.Entity("Wms.Domain.Zone", b =>
@@ -2497,10 +2569,26 @@ namespace Wms.Data.Migrations
                         .HasForeignKey("StockKeepingUnitId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Wms.Domain.WarehouseOpeningImport", null)
+                        .WithMany()
+                        .HasForeignKey("WarehouseOpeningImportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Data.CommandReceipt", null)
                         .WithMany("AuditEvents")
                         .HasForeignKey("CommandUserId", "CommandType", "RequestId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Wms.Domain.WarehouseOpeningImport", b =>
+                {
+                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Wms.Domain.Zone", b =>

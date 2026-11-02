@@ -9,7 +9,7 @@
     <MudText Typo="Typo.h5">Складские позиции</MudText>
     <MudSpacer />
     <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.UploadFile"
-               Disabled="@(_warehouse is null)" OnClick="ImportMapsAsync">Импорт карт 1С</MudButton>
+               Disabled="@(_warehouse is null)" OnClick="ImportOpeningCutoverAsync">Загрузить топологию и остатки 1С</MudButton>
     <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
                Disabled="@(_warehouse is null)" OnClick="CreateRootAsync">Корневая группа</MudButton>
     <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.SubdirectoryArrowRight"
@@ -44,6 +44,17 @@ else if (_isLoading)
 }
 else
 {
+    @if (_mixedSkuViolations.Count > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            В @_mixedSkuViolations.Count ячейках запрещено несколько SKU, но фактически они лежат вместе.
+            @if (!string.IsNullOrWhiteSpace(MixedViolationAddresses))
+            {
+                <span>Адреса: @MixedViolationAddresses.</span>
+            }
+            Нарушение исчезнет, когда останется не более одного SKU с ненулевым остатком.
+        </MudAlert>
+    }
     <MudGrid>
         <MudItem xs="12" md="7">
             <MudPaper Class="pa-3" Elevation="1">
@@ -79,9 +90,15 @@ else
                         }
                         <MudText><b>Зона:</b> @(_selectedLocation.Zone?.Name ?? "—")</MudText>
                         <MudText><b>Тип:</b> @(_selectedLocation.IsFolder ? "Структурная группа" : "Место хранения")</MudText>
-                        @if (!_selectedLocation.IsFolder && _selectedLocation.Zone?.Type == ZoneType.Storage)
+                        @if (!_selectedLocation.IsFolder && _selectedLocation.Zone?.Type is ZoneType.Storage or ZoneType.Reserve)
                         {
                             <MudText><b>Несколько SKU:</b> @(_selectedLocation.AllowsMultipleSkus ? "Разрешено" : "Запрещено")</MudText>
+                            @if (_mixedSkuViolations.TryGetValue(_selectedLocation.Id, out var skuCount))
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true">
+                                    Фактически хранится @skuCount SKU с ненулевым остатком. Пополнение заблокировано до устранения смешения; вывод товара разрешён.
+                                </MudAlert>
+                            }
                         }
                         <MudText><b>Координаты:</b> @CoordinatesText</MudText>
                         <MudText><b>Порядок отбора:</b> @(_selectedLocation.PickSequence?.ToString() ?? "—")</MudText>

@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using Wms.Application.CommandExecution;
@@ -26,6 +27,13 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
     {
         internal ApplicationDbContext Db => db;
 
+        internal async Task BeginSerializableAsync(CancellationToken ct)
+        {
+            if (db.Database.CurrentTransaction is not null)
+                throw new InvalidOperationException("Транзакция команды уже открыта.");
+            await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        }
+
         public void Stage<TEntity>(TEntity entity) where TEntity : class => db.Add(entity);
 
         public async Task CommitAsync(
@@ -47,27 +55,45 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
             try
             {
                 await db.SaveChangesAsync(ct);
+                if (db.Database.CurrentTransaction is { } transaction)
+                    await transaction.CommitAsync(ct);
             }
-            catch (DbUpdateException exception) when (IsStockConflict(exception))
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                throw new CommandCommitConflictException(
-                    "Складское состояние изменилось. Обновите данные и повторите операцию.", exception);
+                if (db.Database.CurrentTransaction is { } transaction)
+                    await transaction.RollbackAsync(ct);
+                if (exception is DbUpdateException update && IsKnownConflict(update)
+                    || exception is SqlException { Number: 1205 })
+                    throw new CommandCommitConflictException(
+                        "Складское состояние изменилось. Обновите данные и повторите операцию.", exception);
+                throw;
             }
         }
 
         public ValueTask DisposeAsync() => db.DisposeAsync();
 
-        private static bool IsStockConflict(DbUpdateException exception)
+        private static bool IsKnownConflict(DbUpdateException exception)
         {
             if (exception is DbUpdateConcurrencyException concurrency)
                 return concurrency.Entries.Any(x => x.Entity is InventoryBalance
                     or StorageLocation or LicensePlateNumber or ReceivingOrder
-                    or ReceivingOrderItem or StockKeepingUnit or ReceivingSourceDocument);
+                    or ReceivingOrderItem or StockKeepingUnit or ReceivingSourceDocument
+                    or WarehouseOpeningImport);
 
             for (Exception? current = exception; current is not null; current = current.InnerException)
             {
+                if (current is SqlException { Number: 1205 })
+                    return true;
                 if (current is SqlException { Number: 2601 or 2627 } sql
-                    && (sql.Message.Contains(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex,
+                    && (sql.Message.Contains(DatabaseObjectNames.WarehouseOpeningImportsWarehouseIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.StorageLocationsWarehouseCodeIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ZonesWarehouseCodeIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsOpeningBalanceLineIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsReversedMovementIndex,
                             StringComparison.Ordinal)

@@ -61,5 +61,11 @@ internal class InventoryMovementConfiguration : IEntityTypeConfiguration<Invento
             .HasDatabaseName(DatabaseObjectNames.InventoryMovementsTransferLineIndex)
             .HasFilter(
                 $"[{nameof(InventoryMovement.RecorderType)}] = {(int)RecorderType.InventoryTransfer}");
+
+        builder.HasIndex(x => new { x.RecorderId, x.RecorderLineNumber })
+            .IsUnique()
+            .HasDatabaseName(DatabaseObjectNames.InventoryMovementsOpeningBalanceLineIndex)
+            .HasFilter(
+                $"[{nameof(InventoryMovement.RecorderType)}] = {(int)RecorderType.OpeningBalance}");
     }
 }

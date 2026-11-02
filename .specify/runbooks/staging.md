@@ -73,6 +73,41 @@ first. Both preserve Identity, EF migration history, and the issued-LPN sequence
 but invalidate previously printed pallet labels. Review existing data and
 migration compatibility separately before changing a non-disposable database.
 
+### Cutover rehearsal database
+
+Use a separate disposable database for each warehouse-cutover rehearsal. The
+opening import allows one topology stage and one stock snapshot per warehouse;
+a changed workbook or a new request cannot replace either stage. Keep the XLSX,
+snapshot time, source SHA-256 and saved import protocol with the rehearsal
+results. Inspect the protocol through the Administrator storage-location import
+dialog before accepting the rehearsal.
+Before catalog synchronization, check the effective `ONEC_BASEADDRESS` for
+that WebApp against the 1C UT database corresponding to the export. The
+repository's development defaults use `dobroga2025_dev2`; a production export
+may contain SKU GUIDs absent from that copy. A rehearsal that reads a different
+1C database needs its own isolated environment so its catalog and other 1C
+operations cannot affect shared dev/test work.
+
+For another rehearsal, stop that environment's WebApp, WebApi and integration
+workers. Restore a clean disposable database, or run
+`scripts/clear-database-except-identity.sql` against the intended disposable
+database, then resynchronize the 1C SKU and unit catalogs before loading stock.
+The full-clear script also removes opening-import records, audit, movements,
+balances, topology and catalogs, while preserving Identity and migration history.
+Recreate the target warehouse and its access settings before the next import.
+`scripts/clear-wms-operational-data.sql` keeps topology and its import record;
+it cannot prepare the warehouse for another cutover rehearsal. Database cleanup
+is an environment operation, never an import-dialog action.
+
+At the final transition, complete or separately resolve open work in the old
+WMS, stop its warehouse operations, and export the complete workbook. Preview
+and confirm topology in the new WMS; synchronize SKU and unit catalogs; preview
+and confirm stock from the same unchanged workbook with its recorded Moscow-time
+snapshot. Inspect the saved protocol and balances, then resume warehouse work
+only in the new WMS. The export does not migrate unfinished orders, LPNs or
+transfers. The detailed checks are in the
+[cutover validation guide](../../specs/010-topology-opening-balances/quickstart.md).
+
 ### 3. Publish and start applications
 
 Publish both container images with one tag. The script generates a timestamp tag

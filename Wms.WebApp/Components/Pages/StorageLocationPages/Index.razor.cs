@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.StorageLocations;
+using Wms.Application.OpeningImports;
 using Wms.Application.Users;
 using Wms.Application.Warehouses;
 using Wms.Common;
@@ -16,6 +17,7 @@ public partial class Index
     [Inject] private StorageLocationCommandService StorageLocationCommandService { get; set; } = null!;
     [Inject] private StorageLocationLockCommandService StorageLocationLockCommandService { get; set; } = null!;
     [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
+    [Inject] private IOpeningMixedStockViolationStore MixedStockViolationStore { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
@@ -27,6 +29,8 @@ public partial class Index
     private IReadOnlyList<StorageLocation> _rootLocations = [];
     private IReadOnlyDictionary<Guid, IReadOnlyList<StorageLocation>> _childrenByParent =
         new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
+    private IReadOnlyDictionary<Guid, int> _mixedSkuViolations = new Dictionary<Guid, int>();
+    private string _mixedViolationAddresses = string.Empty;
     private bool _includeDeleted;
     private bool _isLoading;
     private bool _isChangingLock;
@@ -37,6 +41,7 @@ public partial class Index
     private string CoordinatesText => _selectedLocation is null
         ? "—"
         : $"X: {Format(_selectedLocation.Coordinates.X)}, Y: {Format(_selectedLocation.Coordinates.Y)}, Z: {Format(_selectedLocation.Coordinates.Z)}";
+    private string MixedViolationAddresses => _mixedViolationAddresses;
 
     private bool CanPrintChildren
     {
@@ -67,6 +72,8 @@ public partial class Index
         _warehouse = warehouse;
         _selectedLocation = null;
         _locations = [];
+        _mixedSkuViolations = new Dictionary<Guid, int>();
+        _mixedViolationAddresses = string.Empty;
         await LoadTreeAsync();
     }
 
@@ -107,16 +114,17 @@ public partial class Index
             await LoadTreeAsync();
     }
 
-    private async Task ImportMapsAsync()
+    private async Task ImportOpeningCutoverAsync()
     {
         if (_warehouse is null)
             return;
 
-        var parameters = new DialogParameters<StorageMapImportDialog>
+        var parameters = new DialogParameters<OpeningImportDialog>
         {
             { x => x.Warehouse, _warehouse }
         };
-        var dialog = await DialogService.ShowAsync<StorageMapImportDialog>("Импорт карт 1С", parameters);
+        var dialog = await DialogService.ShowAsync<OpeningImportDialog>(
+            "Загрузка топологии и остатков 1С", parameters);
         var result = await dialog.Result;
         if (result is not null && !result.Canceled)
             await LoadTreeAsync();
@@ -234,6 +242,8 @@ public partial class Index
             _locations = [];
             _rootLocations = [];
             _childrenByParent = new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
+            _mixedSkuViolations = new Dictionary<Guid, int>();
+            _mixedViolationAddresses = string.Empty;
             _selectedLocation = null;
             return;
         }
@@ -242,6 +252,12 @@ public partial class Index
         try
         {
             _locations = await StorageLocationQueryService.GetTreeAsync(_warehouse.Id, _includeDeleted);
+            var violations = await MixedStockViolationStore.LoadViolationsAsync(
+                _warehouse.Id, CancellationToken.None);
+            _mixedSkuViolations = violations.ToDictionary(
+                x => x.StorageLocationId, x => x.DistinctSkuCount);
+            _mixedViolationAddresses = string.Join(", ", violations.Select(x =>
+                StorageLocationAddress.Format(x.Address)));
             _rootLocations = _locations.Where(x => x.ParentId is null).OrderBy(x => x.Code).ToArray();
             _childrenByParent = _locations.Where(x => x.ParentId is not null)
                 .GroupBy(x => x.ParentId!.Value)
@@ -262,6 +278,8 @@ public partial class Index
             _locations = [];
             _rootLocations = [];
             _childrenByParent = new Dictionary<Guid, IReadOnlyList<StorageLocation>>();
+            _mixedSkuViolations = new Dictionary<Guid, int>();
+            _mixedViolationAddresses = string.Empty;
             _errorMessage = "Не удалось загрузить дерево складских позиций.";
         }
         finally
