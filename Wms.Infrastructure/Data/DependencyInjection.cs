@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.OpeningImports;
 using Wms.Application.Receiving;
 using Wms.Application.Reports;
 using Wms.Application.SkuBarcodes;
@@ -28,9 +29,18 @@ public static class DependencyInjection
 
         services.AddDatabaseDeveloperPageExceptionFilter();
         services.AddScoped<IWarehousePermissionStore, WarehousePermissionStore>();
+        services.AddScoped<IWarehouseAdministratorPermissionStore, WarehousePermissionStore>();
         services.AddScoped<WarehousePermission>();
         services.AddScoped<ICommandExecutionStore, CommandExecutionStore>();
         services.AddScoped<CommandExecutor>();
+        services.AddScoped<OpeningImportStore>();
+        services.AddScoped<IOpeningTopologyStateStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<IOpeningTopologyStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<IOpeningStockStateStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<IOpeningStockConfirmationStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<IOpeningMixedStockViolationStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<IOpeningImportResultStore>(sp => sp.GetRequiredService<OpeningImportStore>());
+        services.AddScoped<GetOpeningImportResult>();
         services.AddScoped<SkuBarcodeStore>();
         services.AddScoped<ISkuBarcodeMutationLock>(sp => sp.GetRequiredService<SkuBarcodeStore>());
         services.AddScoped<ISkuBarcodeSynchronizationStore>(sp => sp.GetRequiredService<SkuBarcodeStore>());
@@ -42,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ListSkuBarcodes>();
         services.AddScoped<RemoveLocalSkuBarcode>();
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
+        services.AddScoped<IOpeningInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<PostInventoryMovement.Handler>();
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
         services.AddScoped<SynchronizeReceivingSource>();

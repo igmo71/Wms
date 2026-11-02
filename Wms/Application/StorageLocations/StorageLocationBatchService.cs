@@ -96,6 +96,25 @@ public sealed class StorageLocationBatchService(IDbContextFactory<ApplicationDbC
         if (parent is null || parent.WarehouseId != range.WarehouseId
             || parent.DeletionMark || !parent.IsFolder)
             return OperationError.Invalid("Выберите активную папку этого склада.");
+        var physicalPath = new List<string>();
+        var visited = new HashSet<Guid>();
+        StorageLocation? ancestor = parent;
+        while (ancestor is not null)
+        {
+            if (!visited.Add(ancestor.Id) || ancestor.WarehouseId != range.WarehouseId
+                || ancestor.DeletionMark || !ancestor.IsFolder)
+                return OperationError.Invalid("Структура выбранной папки склада некорректна.");
+            if (ancestor.Code == "FGATES")
+                return OperationError.Invalid(
+                    "Под группой «Ворота» нельзя создавать диапазон адресов стеллажей.");
+            physicalPath.Add(ancestor.Code);
+            if (ancestor.ParentId is not Guid parentId)
+                break;
+            ancestor = await db.StorageLocations.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == parentId, ct);
+            if (ancestor is null)
+                return OperationError.Invalid("Родительская группа выбранной папки не найдена.");
+        }
         if (!await db.Warehouses.AnyAsync(x => x.Id == range.WarehouseId && !x.DeletionMark, ct))
             return OperationError.Invalid("Склад недоступен.");
         if (!await db.Zones.AnyAsync(x => x.Id == range.ZoneId
@@ -128,7 +147,8 @@ public sealed class StorageLocationBatchService(IDbContextFactory<ApplicationDbC
         for (var cell = cellFrom.Value; cell <= cellTo.Value; cell++)
         for (var level = range.LevelFrom; level <= range.LevelTo; level++)
         {
-            if (!MatchesImportedParent(parent.Code, room, row, section, level))
+            if (physicalPath.Any(code =>
+                    !MatchesImportedParent(code, room, row, section, level)))
                 return OperationError.Invalid("Диапазон не соответствует выбранной папке склада. Выберите подходящую папку или скорректируйте сегменты.");
             codes.Add($"{room}{row}{section.ToString("00", CultureInfo.InvariantCulture)}{cell}{level}");
         }

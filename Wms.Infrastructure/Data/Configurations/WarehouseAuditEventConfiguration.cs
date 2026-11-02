@@ -36,10 +36,14 @@ internal sealed class WarehouseAuditEventConfiguration
         builder.HasOne<ReceivingSourceDocument>().WithMany()
             .HasForeignKey(x => x.ReceivingSourceDocumentId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WarehouseOpeningImport>().WithMany()
+            .HasForeignKey(x => x.WarehouseOpeningImportId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.ReceivingOrderId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.LicensePlateNumberId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.StockKeepingUnitId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.ReceivingSourceDocumentId, x.OccurredAtUtc });
+        builder.HasIndex(x => new { x.WarehouseOpeningImportId, x.OccurredAtUtc });
     }
 }

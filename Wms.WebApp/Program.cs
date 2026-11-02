@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
 using Serilog;
 using Wms.Application;
+using Wms.Application.OpeningImports;
 using Wms.Application.Users;
 using Wms.Data;
 using Wms.Integration;
@@ -60,6 +61,12 @@ public class Program
         // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddReceivingSourceReader(builder.Configuration);
+        builder.Services.AddOpeningExportReader();
+        builder.Services.AddScoped<PreviewOpeningTopology>();
+        builder.Services.AddScoped<ConfirmOpeningTopology>();
+        builder.Services.AddScoped<PreviewOpeningStock>();
+        builder.Services.AddScoped<PostOpeningStock>();
+        builder.Services.AddScoped<ConfirmOpeningStock>();
         builder.Services.AddApplicationServices(builder.Configuration);
 
         var app = builder.Build();

@@ -1,5 +1,21 @@
 # Current 1C integration
 
+## Warehouse cutover export
+
+The cutover XLSX reader accepts one worksheet with the ten known 1C columns,
+bounded to 20 MB and 100,000 data rows. It returns typed values, original row
+numbers and parse issues without changing WMS data. WebApp uses this reader for
+the topology preview and confirmation. After topology and SKU catalog loading,
+the separate opening-stock stage requires the same workbook hash and a declared
+snapshot time. It resolves source SKU GUIDs against the local catalog and
+requires the source unit to match the SKU's canonical unit; it does not infer
+package conversion or skip unknown stock. The exact source unit text may match
+the base unit's 1C display description, full name or abbreviation; all three
+labels belong to the same base-unit record. The application command rebuilds
+the preview inside a serializable transaction and posts accepted rows through
+WMS history. The cutover import reads 1C data and writes no stock result back
+to 1C.
+
 ## Catalogs and receiving sources
 
 Manual catalog imports are available from the WebApp catalog lists and the

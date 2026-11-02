@@ -137,7 +137,8 @@ public partial class StorageLocationDialog
             dimensionsResult.Value,
             coordinatesResult.Value,
             _pickSequence,
-            !_isFolder && _zone?.Type == ZoneType.Storage && _allowsMultipleSkus);
+            !_isFolder && (_zone?.Type is ZoneType.Storage or ZoneType.Reserve)
+                && _allowsMultipleSkus);
     }
 
     private void Cancel() => MudDialog.Cancel();

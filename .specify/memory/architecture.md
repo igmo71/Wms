@@ -12,7 +12,7 @@ conventions. Project-wide principles live in the
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
 | `Wms.Application` | New command execution, receiving source and order use cases and contracts; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
-| `Wms.Integration` | Receiving source HTTP reader and OData parser; references Application. |
+| `Wms.Integration` | Receiving source HTTP reader, OData parser and cutover XLSX reader; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
 | `Wms.WebApi` | Authenticated Mobile API and 1C integration endpoints. |
 | `Wms.WebApp` | Manager and warehouse Web interface. |
@@ -28,11 +28,47 @@ WebApi and WebApp directly reference Application, Infrastructure, and Integratio
 as composition roots, while retaining the legacy project for existing services.
 Their shared EF context and new command execution store registration come from Infrastructure;
 Integration registers the receiving source HTTP reader and parser in both hosts;
-Infrastructure registers the source, order, and barcode stores and their use
+its cutover XLSX reader is registered in WebApp only and returns source rows
+without warehouse mutations; WebApp registers both topology and opening-stock
+preview and confirmation use cases that depend on that reader;
+Infrastructure registers the opening-import, inventory-posting, source, order,
+and barcode stores and their use
 cases. `Wms.Mobile` uses
 `Wms.Contracts`. Closing a receiving LPN posts its receipt movement; putaway
 posts its placement movement. The label service issues and reads labels for
 listing and printing.
+
+The cutover topology preview reads warehouse zones, locations and any opening
+import through the Infrastructure store without tracking them. The same store
+can stage validated zones and locations in a command session; the command's
+final save commits them with the import identity, audit event and command receipt.
+The topology confirmation rebuilds the preview in that session and rejects a
+changed signature. It holds a serializable transaction from the saved-state
+read through that final commit, so a concurrent topology edit cannot invalidate
+the checked plan before import. WebApp exposes the topology stage from the
+storage-location page and keeps the parsed plan for bounded, paged display.
+The opening-stock preview reads the imported source identity, warehouse
+work/stock state, cell purposes and catalog units. Confirmation rebuilds and
+checks its signature inside a serializable command session, then posts one
+movement and turnover per nonzero row, accumulates balances by warehouse, cell,
+SKU and nullable date, enables accepted source date flags, and records the import
+status, audit event and command receipt in one final save. The Web cutover
+dialog presents the second-stage plan and submits its state-bound signature.
+The confirmation store takes an update lock on the warehouse's opening-import
+row before reading stock state, serializing concurrent stock confirmations.
+The storage-location page reads current prohibited mixed-SKU violations from
+nonzero balances; the violation is not a persisted cell flag.
+An import record is unique by warehouse. Opening movements use its id and
+worksheet row number as provenance; a filtered unique index protects those
+recorder lines. The balance key includes nullable date under SQL Server
+compatibility level 120. A repeated command receipt returns the prior result,
+while a new request cannot post another snapshot to an imported warehouse.
+The warehouse-unique import and filtered opening recorder-line constraint are
+classified as command conflicts if competing saves reach the database.
+The read-only opening-import result query projects the persisted source identity,
+stage actors and times, and compact JSON summaries. It does not require the
+workbook or recalculate historical counts from current balances. The Web dialog
+combines that saved protocol with a separate live query for mixed-cell violations.
 
 ## Direction
 
@@ -220,6 +256,11 @@ MAUI pages are grouped by operator workflow. Scanner adapters, feature HTTP
 clients, session handling, and platform helpers remain technical components.
 Feature clients and Mobile V1 contract source files are grouped by business
 feature over one authenticated transport.
+The Mobile V1 location contract preserves the existing numeric zone-context
+values. Receiving putaway requests a distinct `PutawayDestination` context;
+barcode resolution accepts either Storage or Reserve and responds with the
+location's actual purpose. Existing `Storage` requests retain their strict
+Storage check, including direct picking and older transfer scans.
 Receiving reads use separate Mobile queue, Web list, Mobile detail, and full
 order queries. Mobile detail omits cycle history and destination-address data
 used only by Web while preserving the Mobile V1 response.

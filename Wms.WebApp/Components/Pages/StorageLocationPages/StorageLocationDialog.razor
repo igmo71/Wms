@@ -31,7 +31,7 @@
                 <MudAutocomplete T="Zone" @bind-Value="_zone" SearchFunc="SearchZonesAsync"
                                  ToStringFunc="ZoneText" Label="Функциональная зона" Required="true"
                                  Disabled="@(StorageLocation is not null)" Clearable="true" />
-                @if (_zone?.Type == ZoneType.Storage)
+                @if (_zone?.Type is ZoneType.Storage or ZoneType.Reserve)
                 {
                     <MudSwitch T="bool" @bind-Value="_allowsMultipleSkus"
                                Label="Разрешить хранение нескольких SKU в ячейке"

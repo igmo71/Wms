@@ -13,15 +13,18 @@ namespace Wms.Tests.Inventory;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class NewInventoryPostingTests(SqlDatabase database)
 {
-    [Fact]
-    public async Task Putaway_cannot_add_second_sku_to_restricted_storage_location()
+    [Theory]
+    [InlineData(ZoneType.Storage)]
+    [InlineData(ZoneType.Reserve)]
+    public async Task Putaway_cannot_add_second_sku_to_restricted_storage_location(
+        ZoneType destinationPurpose)
     {
         var now = DateTimeOffset.UtcNow;
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Restricted putaway" };
         var firstSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "First SKU" };
         var secondSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Second SKU" };
         var receivingZone = Zone(warehouse.Id, "MR", ZoneType.Receiving);
-        var storageZone = Zone(warehouse.Id, "MS", ZoneType.Storage);
+        var storageZone = Zone(warehouse.Id, "MS", destinationPurpose);
         var receiving = Location(warehouse.Id, receivingZone, 1);
         var storage = Location(warehouse.Id, storageZone, 1);
         var batch = Value(LicensePlateNumberBatch.Issue(1, "test-user", now));
@@ -62,6 +65,40 @@ public sealed class NewInventoryPostingTests(SqlDatabase database)
         Assert.False(await verify.InventoryMovements.AnyAsync(x => x.Id == movement.Id));
         Assert.False(await verify.InventoryTurnovers.AnyAsync(x => x.InventoryMovementId == movement.Id));
         Assert.False(await verify.CommandReceipts.AnyAsync(x => x.RequestId == requestId));
+    }
+
+    [Fact]
+    public async Task Putaway_recommendations_include_reserve_but_skip_restricted_mixed_cells()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Reserve recommendations" };
+        var selectedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Selected" };
+        var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Other" };
+        var reserveZone = Zone(warehouse.Id, "RR", ZoneType.Reserve);
+        var storageZone = Zone(warehouse.Id, "RP", ZoneType.Storage);
+        var receivingZone = Zone(warehouse.Id, "RC", ZoneType.Receiving);
+        var allowedReserve = Location(warehouse.Id, reserveZone, 1, allowsMultipleSkus: true);
+        var restrictedReserve = Location(warehouse.Id, reserveZone, 2);
+        var picking = Location(warehouse.Id, storageZone, 1);
+        var receiving = Location(warehouse.Id, receivingZone, 1);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, selectedSku, otherSku,
+                reserveZone, storageZone, receivingZone,
+                allowedReserve, restrictedReserve, picking, receiving,
+                Balance(warehouse.Id, allowedReserve.Id, selectedSku.Id, 3m),
+                Balance(warehouse.Id, allowedReserve.Id, otherSku.Id, 2m),
+                Balance(warehouse.Id, restrictedReserve.Id, selectedSku.Id, 3m),
+                Balance(warehouse.Id, restrictedReserve.Id, otherSku.Id, 2m),
+                Balance(warehouse.Id, picking.Id, selectedSku.Id, 1m),
+                Balance(warehouse.Id, receiving.Id, selectedSku.Id, 1m));
+            await seed.SaveChangesAsync();
+        }
+
+        var recommendations = await new ReceivingWorkQueryStore(database)
+            .GetPutawayRecommendationsAsync(warehouse.Id, selectedSku.Id, default);
+        Assert.Equal(
+            new[] { allowedReserve.Id, picking.Id }.OrderBy(x => x),
+            recommendations.Select(x => x.StorageLocationId).OrderBy(x => x));
     }
 
     [Fact]

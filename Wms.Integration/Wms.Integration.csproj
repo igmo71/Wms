@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
     <ProjectReference Include="..\Wms.Application\Wms.Application.csproj" />
   </ItemGroup>
 </Project>

@@ -4,8 +4,18 @@ using Wms.Application.Authorization;
 namespace Wms.Data;
 
 internal sealed class WarehousePermissionStore(IDbContextFactory<ApplicationDbContext> contextFactory)
-    : IWarehousePermissionStore
+    : IWarehousePermissionStore, IWarehouseAdministratorPermissionStore
 {
+    public async Task<bool> HasAdministratorRoleAsync(string userId, CancellationToken ct)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(ct);
+        return await (
+            from membership in context.UserRoles
+            join role in context.Roles on membership.RoleId equals role.Id
+            where membership.UserId == userId && role.Name == ApplicationRoles.Administrator
+            select membership).AnyAsync(ct);
+    }
+
     public async Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct)
     {
         await using var context = await contextFactory.CreateDbContextAsync(ct);

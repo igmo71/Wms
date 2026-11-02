@@ -150,7 +150,7 @@ Mobile starts putaway from its independent LPN screen by scanning a closed
 receiving LPN, including before order completion. Receiving screens do not
 offer putaway actions. The operator selects SKU, confirms a positive quantity,
 and scans a destination. The command moves that quantity from the LPN's original Receiving
-location to an active unlocked Storage location in the same warehouse. It
+location to an active unlocked Storage or Reserve location in the same warehouse. It
 checks both the unplaced quantity of that LPN and physical source balance,
 retains its SKU and expiration date, and commits the linked movement, history,
 audit, and command receipt together. Receiving orders have no placement status
@@ -163,14 +163,19 @@ conflict, an insufficient remainder revokes confirmation. Busy or uncertain
 commands use the shared explicit retry flow. A rejected destination leaves the
 confirmed quantity available for another scan.
 
-The destination suggestions show active unlocked Storage locations with
+The destination suggestions show active unlocked Storage and Reserve locations with
 positive stock of the chosen SKU first, then locations with a retained zero
 balance row for that SKU and no nonzero balances. Locations with negative
-balances are not presented as empty; other empty locations are omitted. A location
+balances are not presented as empty; other empty locations are omitted. A
+location that prohibits multiple SKUs is omitted while another nonzero SKU
+remains in it. A location
 with no `PickSequence` follows locations with a sequence; ties use address and
-location ID. Suggestions are snapshots: any valid Storage destination may be
-scanned, and posting rechecks its topology and lock. Capacity and storage
-groups do not participate.
+location ID. Suggestions are snapshots; an eligible cell may also be scanned
+when absent from the list. Posting rechecks destination purpose, SKU-mixing
+permission, topology and lock. The Mobile putaway barcode context
+accepts Storage and Reserve destinations; the Storage context used by other
+operations remains restricted to Storage. Capacity and storage groups do not
+participate.
 
 A Web Manager may correct a closed receiving LPN's quantity, including after
 order completion, until its first putaway. The nonnegative replacement keeps

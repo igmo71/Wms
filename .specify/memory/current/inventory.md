@@ -2,10 +2,15 @@
 
 ## Storage and inventory
 
-A warehouse contains storage, transit, receiving, and shipping zones. Locations
-form an arbitrary-depth physical tree within one warehouse. A folder may have no
-functional zone; an operational location belongs to one active zone of its
-warehouse.
+A warehouse contains pickable storage (`Storage`, displayed as `Комплектация`),
+reserve (`Reserve`, displayed as `Хранение`), transit, receiving, and shipping
+zone types. New receiving putaway can post into either Storage or Reserve.
+Older picking, transfer, and count flows still use their former Storage-only
+rules and are not ready for reserve stock.
+
+Locations form an arbitrary-depth physical tree within one warehouse. A folder
+may have no functional zone; an operational location belongs to one active zone
+of its warehouse.
 
 - Folder locations are structural and cannot participate in inventory
   operations.
@@ -23,27 +28,66 @@ warehouse.
 - A location barcode carries the compact address, looked up within the selected
   warehouse. Printed Code 39 labels encode that value; scanner input must not
   add an unknown prefix or suffix.
-- Administrators can preview and import the existing 1C XLS warehouse maps into
-  a selected warehouse. Tier maps enumerate operational locations; overview
-  maps only check tier coverage and never generate additional addresses. The
-  imported physical hierarchy is room, row, section, level, then location.
-  Each nonempty area requires a chosen functional zone; racks and mezzanine
-  require a storage zone. Repeated map addresses create one location and appear
-  in the preview. Existing matching locations are reused; conflicting zone,
-  parent, type, or deactivation blocks the import. Preview warnings require an
-  explicit acknowledgement. Room-4 address `4A10A1` is deferred. Gate addresses
-  are deferred until their individual functional zones are known, and empty
-  maps create no locations.
+- Administrators can preview and confirm topology from one bounded XLSX export
+  containing both topology and source balances. This stage creates no inventory.
+  It includes accepted empty cells, derives functional zones from physical area
+  and cell kind, shares room-row-section-level folders between picking and
+  reserve, and places gate cells directly under a `Ворота` root. Repeated source
+  addresses create one cell; matching existing cells are reused. A changed
+  preview, conflicting parent, zone, activation or SKU-mixing permission blocks
+  confirmation. The preview shows excluded and corrected rows, including the
+  excluded `0A00A0`, `0A00A1` and virtual addresses, the empty mismatched-room
+  `4A10A1`, and the one `9Z99A1` correction to Shipping. Stock at `4A10A1`
+  blocks confirmation until its disposition is decided.
 - Administrators can generate up to 1,000 five-segment location addresses into
   a selected active folder. The preview expands room, row, section, cell, and
   level ranges, checks warehouse-wide code conflicts, and blocks creation when
-  an imported folder's physical path disagrees with the generated address.
+  any imported folder in the physical path disagrees with the generated address.
+  Range generation under the special `Ворота` root or its descendants is blocked.
   Creation saves the accepted batch atomically and does not make nested folders.
 - The A4 location-label preview prints active operational addresses above a
   Code 39 barcode carrying the compact address. Five-segment addresses use
   middle-dot separators in the printed text; other addresses print as stored.
   One label or up to 120 direct child locations of a folder can be printed; labels
   are approximately 40 mm high. Exact adhesive-stock dimensions remain open.
+
+## Opening stock cutover
+
+The Administrator confirms opening stock separately from topology in the Web
+cutover dialog, using the same XLSX file after SKU catalog synchronization. The
+preview requires the topology-stage source SHA-256, a declared snapshot time,
+active target cells with matching functional purposes, known SKU GUIDs, and
+matching canonical units. It blocks operational stock or work, unresolved mixed
+cells, unsupported quantities, and changed warehouse state. Missing SKUs and
+cells are not created during stock confirmation. Only one opening snapshot can
+be confirmed per warehouse. An exact retry with the original command key returns
+the recorded result; a new request for the same or another workbook conflicts.
+Another rehearsal starts with a cleaned database.
+
+Accepted source rows with nonzero quantities produce one posted movement of
+positive magnitude and one signed turnover per row. A positive source quantity
+has only a destination; a negative quantity has only a source. Shipping stock
+may remain negative. Balances accumulate by warehouse, cell, SKU and nullable
+expiration date, so repeated source rows share one balance while retaining
+separate movements and turnovers. A supplied past date remains as supplied;
+an absent required date remains unknown. An accepted source `Да` enables the
+SKU's local expiration requirement without disabling any existing requirement.
+Accepted zero rows make no movement. The import status, declared time, source
+summary, stock effects, SKU flags, audit and command receipt commit together;
+failed confirmation leaves the topology-only stage intact.
+
+Exactly these reviewed cells permit several SKUs: `1C09A1`, `1G09A1`,
+`1K09A1`, `1M09A1`, `1O09A1`, `1Q09A1`, `1U11A1`, `2O01A1`, `2O02A1`,
+`2O03A1`, `2O04A1`, `2O05A1`, `2O06A1`, `2O07A1`, `2O08A1`. These eight
+reviewed cells retain their mixed opening stock with mixing disabled:
+`1H05A7`, `1K03A5`, `1O08C6`, `1R04A5`, `1R05B1`, `1T03C3`, `2A02F2`,
+`3E07B1`. Their addresses are recorded in the import summary. The Web page
+applies this reviewed mixing policy to Storage and Reserve; Shipping and
+Receiving cells may contain several SKUs in the opening snapshot. It derives a
+violation whenever a Комплектация or Хранение cell with mixing
+disabled contains more than one distinct SKU with nonzero balance, across
+dates. The violation disappears when outward movement leaves at most one such
+SKU; ordinary inflow that would retain mixed stock is rejected.
 
 An active operational location may have one active lock. A lock keeps the
 location visible but excludes it from operational selection and final posting.
@@ -52,11 +96,12 @@ own manual locks; an inventory-count draft owns its lock until posting or
 explicit deletion. Lock release removes the active record; separate lock
 history is not retained.
 
-Operational locations have an administrator-controlled permission to hold
-several SKUs, off by default for manual creation, range generation, and map
-import. It is applied to stock added to a Storage destination; Receiving,
-Transit, and Shipping positions remain flow locations. With permission off,
-the final recorded stock in a Storage location may contain nonzero balances
+The Web editor exposes the administrator-controlled permission to hold several
+SKUs for Storage and Reserve locations and shows it in their detail view. It is
+off by default for manual creation and range generation.
+New receiving putaway applies it to both Storage and Reserve destinations;
+Receiving, Transit, and Shipping positions remain flow locations. With permission off,
+the final recorded stock in a storage-purpose location may contain nonzero balances
 of only one distinct SKU. Different expiration dates of that SKU are allowed;
 retained zero rows do not occupy the location, while negative balances count
 as nonzero. An administrator cannot turn permission off while several SKUs
@@ -91,8 +136,8 @@ date is `null`. Posted `InventoryMovement` records warehouse movement with
 its LPN provenance when applicable, and `InventoryTurnover` is its immutable
 before/delta/after history. Closing a receiving LPN posts the receipt at its
 original Receiving location. Each confirmed partial putaway posts immediately
-from there to Storage; order completion posts nothing. Draft picking movements
-do not change inventory. Zero balance rows are retained and support
+from there to Storage or Reserve; order completion posts nothing. Draft picking
+movements do not change inventory. Zero balance rows are retained and support
 historical-location suggestions.
 The Web balance list shows one row per warehouse, location, SKU and expiration
 date, with an explicit "Не указан" for a balance without a date. Different dates

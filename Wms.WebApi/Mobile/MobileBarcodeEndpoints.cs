@@ -63,6 +63,15 @@ internal static class MobileBarcodeEndpoints
         }
 
         var location = result.Value!;
+        if (request.Context == MobileStorageLocationContext.PutawayDestination
+            && location.Zone.Type is not (ZoneType.Storage or ZoneType.Reserve))
+        {
+            return Problem(
+                StatusCodes.Status422UnprocessableEntity,
+                "storage_location_not_allowed",
+                "Ячейка не подходит для текущей операции.");
+        }
+
         return TypedResults.Ok(new MobileStorageLocationResponse(
             location.Id,
             location.Name,
@@ -143,10 +152,13 @@ internal static class MobileBarcodeEndpoints
             MobileStorageLocationContext.Transit => ZoneType.Transit,
             MobileStorageLocationContext.Receiving => ZoneType.Receiving,
             MobileStorageLocationContext.Shipping => ZoneType.Shipping,
+            MobileStorageLocationContext.Reserve => ZoneType.Reserve,
+            MobileStorageLocationContext.PutawayDestination => null,
             _ => null
         };
 
-        return context == MobileStorageLocationContext.AnyOperational || zoneType is not null;
+        return context is MobileStorageLocationContext.AnyOperational
+            or MobileStorageLocationContext.PutawayDestination || zoneType is not null;
     }
 
     private static MobileStorageLocationContext MapContext(ZoneType type) => type switch
@@ -155,6 +167,7 @@ internal static class MobileBarcodeEndpoints
         ZoneType.Transit => MobileStorageLocationContext.Transit,
         ZoneType.Receiving => MobileStorageLocationContext.Receiving,
         ZoneType.Shipping => MobileStorageLocationContext.Shipping,
+        ZoneType.Reserve => MobileStorageLocationContext.Reserve,
         _ => MobileStorageLocationContext.AnyOperational
     };
 

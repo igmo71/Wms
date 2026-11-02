@@ -343,11 +343,11 @@ public sealed class ReceivingWorkQueryStore(
             .Where(x => x.WarehouseId == warehouseId
                 && x.Warehouse != null && !x.Warehouse.DeletionMark
                 && x.Zone != null && !x.Zone.DeletionMark
-                && x.Zone.Type == ZoneType.Storage
+                && (x.Zone.Type == ZoneType.Storage || x.Zone.Type == ZoneType.Reserve)
                 && !x.IsFolder && !x.DeletionMark && x.ActiveLock == null)
             .Select(x => new
             {
-                x.Id, x.Code, x.Name, x.PickSequence,
+                x.Id, x.Code, x.Name, x.PickSequence, x.AllowsMultipleSkus,
                 ZoneCode = x.Zone!.Code,
                 CurrentSkuQuantity = db.InventoryBalances
                     .Where(b => b.StorageLocationId == x.Id
@@ -357,11 +357,15 @@ public sealed class ReceivingWorkQueryStore(
                     b.StorageLocationId == x.Id
                     && b.StockKeepingUnitId == skuId),
                 HasAnyNonzeroBalance = db.InventoryBalances.Any(b =>
-                    b.StorageLocationId == x.Id && b.Quantity != 0)
+                    b.StorageLocationId == x.Id && b.Quantity != 0),
+                HasOtherNonzeroSku = db.InventoryBalances.Any(b =>
+                    b.StorageLocationId == x.Id && b.StockKeepingUnitId != skuId
+                    && b.Quantity != 0)
             })
-            .Where(x => x.CurrentSkuQuantity > 0
-                || x.CurrentSkuQuantity == 0 && !x.HasAnyNonzeroBalance
-                    && x.HasSelectedSkuBalance)
+            .Where(x => (x.AllowsMultipleSkus || !x.HasOtherNonzeroSku)
+                && (x.CurrentSkuQuantity > 0
+                    || x.CurrentSkuQuantity == 0 && !x.HasAnyNonzeroBalance
+                        && x.HasSelectedSkuBalance))
             .OrderByDescending(x => x.CurrentSkuQuantity > 0)
             .ThenBy(x => x.PickSequence.HasValue ? 0 : 1)
             .ThenBy(x => x.PickSequence)

@@ -18,4 +18,7 @@ public enum RecorderType
 
     [Display(Name = "Перемещение")]
     InventoryTransfer = 4,
+
+    [Display(Name = "Начальные остатки")]
+    OpeningBalance = 5,
 }
