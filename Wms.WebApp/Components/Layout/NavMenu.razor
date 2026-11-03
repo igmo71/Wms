@@ -45,7 +45,10 @@
             </AuthorizeView>
             @* <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink> *@
             <AuthorizeView Roles="@ApplicationRoles.Administrator" Context="administratorContext">
-                <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ManageAccounts">Пользователи</MudNavLink>
+                <MudNavGroup Title="Конфигурация" Icon="@Icons.Material.Filled.Settings">
+                    <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ManageAccounts">Пользователи</MudNavLink>
+                    <MudNavLink Href="opening-import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.UploadFile">Переход со старой WMS</MudNavLink>
+                </MudNavGroup>
             </AuthorizeView>
         </Authorized>
     </AuthorizeView>

@@ -12,15 +12,17 @@ SKU name. Server-paged views apply that order before paging. Web grids honor an
 explicit sort chosen by the user. Lists of inventory movements and other event
 history retain their event order.
 
-The Administrator storage-location page opens a single-XLSX cutover import
-dialog. It previews and confirms topology first, then previews and confirms
+The Administrator-only «Конфигурация» menu links to a separate «Переход со
+старой WMS» page for the single-XLSX cutover import. The page selects a
+warehouse, previews and confirms topology first, then previews and confirms
 opening stock from the same export after SKU synchronization. It pages topology
 cells and decisions plus stock rows, totals and issues, shows source hash and
 signed/date/mixing exceptions, groups blocking stock issues by reason, and
-requires review before confirmation. The
-import rules are in [inventory](inventory.md).
-Reopening the dialog reads the saved stage result without the XLSX file. Its
-compact protocol shows source identity, actors and times, accepted and excluded
+requires review before confirmation. The import rules are in
+[inventory](inventory.md).
+Reopening the page and selecting the warehouse reads the saved stage result
+without the XLSX file; the file must be selected again to preview the stock stage.
+Its compact protocol shows source identity, actors and times, accepted and excluded
 counts, signed and undated stock exceptions, approved exclusions and corrections,
 and the current status of reviewed mixed cells.
 The storage-location page shows the addresses and count of cells with a current

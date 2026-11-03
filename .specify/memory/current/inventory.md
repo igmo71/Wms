@@ -53,8 +53,8 @@ of its warehouse.
 
 ## Opening stock cutover
 
-The Administrator confirms opening stock separately from topology in the Web
-cutover dialog, using the same XLSX file after SKU catalog synchronization. The
+The Administrator confirms opening stock separately from topology on the Web
+cutover page, using the same XLSX file after SKU catalog synchronization. The
 preview requires the topology-stage source SHA-256, a declared snapshot time,
 active target cells with matching functional purposes, known SKU GUIDs, and
 matching canonical units. It blocks operational stock or work, unresolved mixed

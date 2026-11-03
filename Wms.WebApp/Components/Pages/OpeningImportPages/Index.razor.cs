@@ -5,19 +5,19 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 using MudBlazor;
 using Wms.Application.OpeningImports;
+using Wms.Application.Warehouses;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
 using Wms.Integration.OneS;
 
-namespace Wms.WebApp.Components.Pages.StorageLocationPages;
+namespace Wms.WebApp.Components.Pages.OpeningImportPages;
 
-public partial class OpeningImportDialog
+public partial class Index
 {
     private const int PageSize = 20;
 
-    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
-    [Parameter, EditorRequired] public Warehouse Warehouse { get; set; } = null!;
+    [Inject] private WarehouseService WarehouseService { get; set; } = null!;
     [Inject] private PreviewOpeningTopology PreviewService { get; set; } = null!;
     [Inject] private ConfirmOpeningTopology ConfirmService { get; set; } = null!;
     [Inject] private PreviewOpeningStock StockPreviewService { get; set; } = null!;
@@ -26,6 +26,7 @@ public partial class OpeningImportDialog
     [Inject] private IOpeningMixedStockViolationStore MixedStockViolationStore { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
+    private Warehouse? _warehouse;
     private byte[]? _workbook;
     private string? _sourceName;
     private OpeningTopologyPlan? _plan;
@@ -33,7 +34,6 @@ public partial class OpeningImportDialog
     private OpeningImportResult? _savedResult;
     private IReadOnlyDictionary<string, int> _currentMixedByAddress =
         new Dictionary<string, int>(StringComparer.Ordinal);
-    private Guid _resultWarehouseId;
     private bool _loadingSavedResult;
     private bool _currentViolationsLoaded;
     private string? _resultError;
@@ -54,9 +54,9 @@ public partial class OpeningImportDialog
     private int _stockIssuePage = 1;
     private int _stockTotalPage = 1;
 
-    private bool ConfirmDisabled => _busy || _plan is not { CanConfirm: true }
+    private bool ConfirmDisabled => _busy || _loadingSavedResult || _plan is not { CanConfirm: true }
         || (_plan.Counts.ExcludedRows > 0 || _plan.Counts.CorrectedRows > 0) && !_acknowledged;
-    private bool StockConfirmDisabled => _busy || _stockPlan is not { CanConfirm: true }
+    private bool StockConfirmDisabled => _busy || _loadingSavedResult || _stockPlan is not { CanConfirm: true }
         || StockAcknowledgementRequired && !_stockAcknowledged;
     private bool StockAcknowledgementRequired => _stockPlan is { } plan
         && (plan.Counts.ExcludedRows > 0 || plan.Counts.CorrectedRows > 0
@@ -96,16 +96,36 @@ public partial class OpeningImportDialog
         _savedResult?.Exclusions.Where(x => (x.Address is "0A00A0" or "0A00A1")
             && x.Quantity != 0).ToArray() ?? [];
 
-    protected override async Task OnParametersSetAsync()
+    private async Task<IEnumerable<Warehouse>> SearchWarehousesAsync(string? searchText, CancellationToken ct)
     {
-        if (Warehouse.Id == Guid.Empty || Warehouse.Id == _resultWarehouseId)
-            return;
-        _resultWarehouseId = Warehouse.Id;
-        await LoadSavedResultAsync();
+        var result = await WarehouseService.ListAsync(new ListQuery
+        {
+            SearchString = searchText,
+            SortBy = "Name",
+            Take = 20
+        }, ct);
+        return result.Items;
+    }
+
+    private async Task OnWarehouseChangedAsync(Warehouse? warehouse)
+    {
+        _warehouse = warehouse;
+        _workbook = null;
+        _sourceName = null;
+        _snapshotLocalText = string.Empty;
+        _savedResult = null;
+        _resultError = null;
+        InvalidatePreview();
+        if (warehouse is not null)
+            await LoadSavedResultAsync();
     }
 
     private async Task LoadSavedResultAsync()
     {
+        if (_warehouse is null)
+            return;
+        var warehouseId = _warehouse.Id;
+
         _loadingSavedResult = true;
         _resultError = null;
         _savedResult = null;
@@ -113,7 +133,9 @@ public partial class OpeningImportDialog
         _currentMixedByAddress = new Dictionary<string, int>(StringComparer.Ordinal);
         try
         {
-            var result = await ResultService.ExecuteAsync(Warehouse.Id);
+            var result = await ResultService.ExecuteAsync(warehouseId);
+            if (_warehouse?.Id != warehouseId)
+                return;
             if (!result.IsSuccess)
             {
                 if (result.Error?.Type != OperationErrorType.NotFound)
@@ -124,7 +146,9 @@ public partial class OpeningImportDialog
             if (_savedResult.Stock is not null)
             {
                 var violations = await MixedStockViolationStore.LoadViolationsAsync(
-                    Warehouse.Id, CancellationToken.None);
+                    warehouseId, CancellationToken.None);
+                if (_warehouse?.Id != warehouseId)
+                    return;
                 _currentMixedByAddress = violations.ToDictionary(
                     x => x.Address, x => x.DistinctSkuCount, StringComparer.Ordinal);
                 _currentViolationsLoaded = true;
@@ -196,14 +220,14 @@ public partial class OpeningImportDialog
 
     private async Task PreviewAsync()
     {
-        if (_workbook is null)
+        if (_warehouse is null || _workbook is null)
             return;
         _busy = true;
         _error = null;
         InvalidatePreview();
         try
         {
-            _plan = await PreviewService.BuildPlanAsync(Warehouse.Id, _workbook);
+            _plan = await PreviewService.BuildPlanAsync(_warehouse.Id, _workbook);
             _specialDecisions = _plan.Decisions.Where(x => x.Outcome is
                     OpeningImportRowOutcome.Excluded or OpeningImportRowOutcome.Corrected
                     or OpeningImportRowOutcome.Blocking)
@@ -222,7 +246,7 @@ public partial class OpeningImportDialog
 
     private async Task ConfirmAsync()
     {
-        if (ConfirmDisabled || _workbook is null || _sourceName is null || _plan is null)
+        if (_warehouse is null || ConfirmDisabled || _workbook is null || _sourceName is null || _plan is null)
             return;
         _busy = true;
         _error = null;
@@ -236,10 +260,11 @@ public partial class OpeningImportDialog
                 return;
             }
             var result = await ConfirmService.ExecuteAsync(new ConfirmOpeningTopologyCommand(
-                _requestId, Warehouse.Id, _sourceName, _workbook, _plan.Signature, userId));
+                _requestId, _warehouse.Id, _sourceName, _workbook, _plan.Signature, userId));
             if (result.IsSuccess)
             {
-                MudDialog.Close(DialogResult.Ok(result.Value));
+                InvalidatePreview();
+                await LoadSavedResultAsync();
                 return;
             }
             _error = result.Error?.Message ?? "Загрузка топологии не выполнена.";
@@ -259,7 +284,7 @@ public partial class OpeningImportDialog
 
     private async Task PreviewStockAsync()
     {
-        if (_workbook is null)
+        if (_warehouse is null || _workbook is null)
             return;
         _busy = true;
         _error = null;
@@ -276,7 +301,7 @@ public partial class OpeningImportDialog
 
             _snapshotAt = new DateTimeOffset(localTime, TimeSpan.FromHours(3));
             _stockPlan = await StockPreviewService.BuildPlanAsync(
-                Warehouse.Id, _workbook, _snapshotAt);
+                _warehouse.Id, _workbook, _snapshotAt);
             _stockRows = _stockPlan.Rows.Where(x => x.StockKeepingUnitId is not null
                 || x.Quantity is not null || x.Outcome != OpeningImportRowOutcome.Accepted)
                 .ToArray();
@@ -303,7 +328,7 @@ public partial class OpeningImportDialog
 
     private async Task ConfirmStockAsync()
     {
-        if (StockConfirmDisabled || _workbook is null || _stockPlan is null)
+        if (_warehouse is null || StockConfirmDisabled || _workbook is null || _stockPlan is null)
             return;
         _busy = true;
         _error = null;
@@ -317,11 +342,12 @@ public partial class OpeningImportDialog
                 return;
             }
             var result = await StockConfirmService.ExecuteAsync(new ConfirmOpeningStockCommand(
-                _requestId, Warehouse.Id, _workbook, _snapshotAt,
+                _requestId, _warehouse.Id, _workbook, _snapshotAt,
                 _stockPlan.Signature, userId));
             if (result.IsSuccess)
             {
-                MudDialog.Close(DialogResult.Ok(result.Value));
+                InvalidatePreview();
+                await LoadSavedResultAsync();
                 return;
             }
             _error = result.Error?.Message ?? "Загрузка начальных остатков не выполнена.";
@@ -366,7 +392,6 @@ public partial class OpeningImportDialog
     private string StockSkuName(Guid? skuId) => skuId is Guid id
         ? _stockSkuNames.GetValueOrDefault(id, id.ToString()) : "—";
 
-    private void Cancel() => MudDialog.Cancel();
     private void ChangeSpecialPage(int offset) =>
         _specialPage = Math.Clamp(_specialPage + offset, 1, SpecialPageCount);
     private void ChangeIssuePage(int offset) =>

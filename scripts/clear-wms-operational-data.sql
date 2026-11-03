@@ -7,7 +7,8 @@
 
     Сохраняются Identity (dbo.AspNet*), dbo.__EFMigrationsHistory,
     все справочники, штрихкоды, склады, зоны, места хранения, ручные блокировки,
-    а также историю и квитанции изменения признака срока годности SKU.
+    запись разовой загрузки топологии и остатков, а также аудит и квитанции
+    этой загрузки и изменений справочника SKU.
     Учитывает состав LPN, историю размещения и участников приемки.
     Последовательность LicensePlateNumberSequence не сбрасывается: старые коды
     не выдаются повторно. Распечатанные до очистки этикетки больше не действуют.
@@ -22,15 +23,22 @@ BEGIN TRY
     BEGIN TRANSACTION;
 
     -- Операционный аудит ссылается на удаляемые приемки, LPN и источники.
-    -- История настройки срока годности SKU остается со справочником.
+    -- Аудит загрузки ссылается на сохраняемую запись WarehouseOpeningImports;
+    -- история настройки срока годности и удаления локальных штрихкодов -- на SKU.
     DELETE FROM [dbo].[WarehouseAuditEvents]
     WHERE [ReceivingOrderId] IS NOT NULL
        OR [LicensePlateNumberId] IS NOT NULL
        OR [ReceivingSourceDocumentId] IS NOT NULL;
 
-    -- Квитанции сохраненной настройки SKU нужны для безопасного повтора команды.
+    -- Квитанции сохраненных изменений и разовой загрузки нужны для безопасного
+    -- повтора команд. Их аудит остается выше и ссылается на квитанции по FK.
     DELETE FROM [dbo].[CommandReceipts]
-    WHERE [CommandType] <> 'sku.expiration-tracking.set';
+    WHERE [CommandType] NOT IN (
+        'sku.expiration-tracking.set',
+        'sku.barcode.remove-local',
+        'warehouse.opening.topology.import',
+        'warehouse.opening.stock.import'
+    );
 
     -- История размещения ссылается на LPN, его строки и складские движения.
     DELETE FROM [dbo].[LicensePlateNumberPutaways];
@@ -64,6 +72,9 @@ BEGIN TRY
     DELETE FROM [dbo].[ReceivingSourceVersions];
     DELETE FROM [dbo].[ReceivingSourceDocuments];
     DELETE FROM [dbo].[ShippingOrders];
+
+    -- WarehouseOpeningImports, его протокол и топология остаются. Этот скрипт
+    -- удаляет и начальные остатки; повторную загрузку без полной очистки не выполнять.
 
     COMMIT TRANSACTION;
 END TRY

@@ -615,6 +615,103 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Maintenance_cleanup_preserves_import_and_catalog_receipts_until_full_clear()
+    {
+        var isolated = new SqlDatabase();
+        await isolated.InitializeAsync();
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            const string userId = "cleanup-administrator";
+            var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Cleanup" };
+            var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Cleanup SKU" };
+            var sourceHash = new string('A', 64);
+            var import = Value(WarehouseOpeningImport.CreateTopology(
+                warehouse.Id, "opening.xlsx", sourceHash, "{}", userId, now));
+            Success(import.ConfirmStock(sourceHash, now, "{}", userId, now));
+
+            var commandTypes = new[]
+            {
+                "warehouse.opening.topology.import",
+                "warehouse.opening.stock.import",
+                "sku.expiration-tracking.set",
+                "sku.barcode.remove-local"
+            };
+            var receipts = commandTypes.Select(commandType => new CommandReceipt
+            {
+                UserId = userId,
+                CommandType = commandType,
+                RequestId = Guid.NewGuid(),
+                RequestHash = new string('B', 64),
+                ResultResourceId = commandType.StartsWith("warehouse.opening.",
+                    StringComparison.Ordinal) ? import.Id : sku.Id,
+                CompletedAtUtc = now
+            }).ToArray();
+            var operationalReceipt = new CommandReceipt
+            {
+                UserId = userId,
+                CommandType = "lpn-label.issue-batch",
+                RequestId = Guid.NewGuid(),
+                RequestHash = new string('C', 64),
+                ResultResourceId = Guid.NewGuid(),
+                CompletedAtUtc = now
+            };
+            var audits = receipts.Select(receipt =>
+            {
+                var opening = receipt.CommandType.StartsWith("warehouse.opening.",
+                    StringComparison.Ordinal);
+                return Value(WarehouseAuditEvent.Create(
+                    $"{receipt.CommandType}.completed", now, userId, null,
+                    null, null, opening ? null : sku.Id, null,
+                    null, "{}",
+                    commandUserId: userId,
+                    commandType: receipt.CommandType,
+                    requestId: receipt.RequestId,
+                    warehouseOpeningImportId: opening ? import.Id : null));
+            }).ToArray();
+
+            await using (var seed = isolated.CreateDbContext())
+            {
+                seed.AddRange(warehouse, sku, import);
+                seed.CommandReceipts.AddRange(receipts);
+                seed.CommandReceipts.Add(operationalReceipt);
+                seed.WarehouseAuditEvents.AddRange(audits);
+                await seed.SaveChangesAsync();
+            }
+
+            await using (var operational = isolated.CreateDbContext())
+                await operational.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(
+                    Path.Combine(AppContext.BaseDirectory,
+                        "scripts/clear-wms-operational-data.sql")));
+            await using (var retained = isolated.CreateDbContext())
+            {
+                Assert.Equal(commandTypes.OrderBy(x => x).ToArray(),
+                    await retained.CommandReceipts.Select(x => x.CommandType)
+                        .OrderBy(x => x).ToArrayAsync());
+                Assert.Equal(4, await retained.WarehouseAuditEvents.CountAsync());
+                Assert.Equal(WarehouseOpeningImportStatus.StockImported,
+                    (await retained.WarehouseOpeningImports.SingleAsync()).Status);
+                Assert.Equal(1, await retained.StockKeepingUnits.CountAsync());
+            }
+
+            await using (var full = isolated.CreateDbContext())
+                await full.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(
+                    Path.Combine(AppContext.BaseDirectory,
+                        "scripts/clear-database-except-identity.sql")));
+            await using var cleared = isolated.CreateDbContext();
+            Assert.False(await cleared.CommandReceipts.AnyAsync());
+            Assert.False(await cleared.WarehouseAuditEvents.AnyAsync());
+            Assert.False(await cleared.WarehouseOpeningImports.AnyAsync());
+            Assert.False(await cleared.StockKeepingUnits.AnyAsync());
+            Assert.False(await cleared.Warehouses.AnyAsync());
+        }
+        finally
+        {
+            await isolated.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task Concurrent_lpn_issuance_is_unique_and_duplicate_request_is_once_only()
     {
         var duplicateContext = Command("lpn-race");

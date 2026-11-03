@@ -1,16 +1,41 @@
+@page "/opening-import"
+@attribute [Authorize(Roles = ApplicationRoles.Administrator)]
 @using Microsoft.AspNetCore.Components.Forms
 @using Wms.Application.OpeningImports
+@using Wms.Domain
 @using Wms.Domain.Enums
 
-<MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true })">
-    <DialogContent>
+<PageTitle>Переход со старой WMS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4 mb-6">
+    <MudText Typo="Typo.h5" Class="mb-2">Переход со старой WMS</MudText>
+    <MudText Class="mb-4">Загрузите топологию и начальные остатки из одной выгрузки XLSX. Каждый этап подтверждается отдельно.</MudText>
+    <MudPaper Class="pa-3 mb-4" Elevation="1">
+        <MudAutocomplete T="Warehouse" Value="_warehouse" ValueChanged="OnWarehouseChangedAsync"
+                         SearchFunc="SearchWarehousesAsync" ToStringFunc="x => x?.Name ?? string.Empty"
+                         Label="Склад" Clearable="true" Disabled="@(_busy || _loadingSavedResult)" />
+    </MudPaper>
+    @if (_warehouse is null)
+    {
+        <MudAlert Severity="Severity.Info">Выберите склад для загрузки.</MudAlert>
+    }
+    else
+    {
         <MudStack Spacing="2">
-            <MudText>Склад: <b>@Warehouse.Name</b>.</MudText>
-            @if (!_loadingSavedResult && _savedResult?.Stock is null)
+            @if (!_loadingSavedResult && string.IsNullOrWhiteSpace(_resultError)
+                && _savedResult?.Stock is null)
             {
+                <MudText Typo="Typo.h6">@(_savedResult is null ? "1. Топология" : "2. Начальные остатки")</MudText>
                 <MudText>Выберите выгрузку топологии и остатков 1С в формате XLSX.</MudText>
-                <InputFile OnChange="UploadAsync" accept=".xlsx" disabled="@_busy" />
-                <MudText Typo="Typo.caption">Сначала загрузите топологию, включая пустые ячейки. Затем синхронизируйте каталог SKU и отдельно загрузите остатки из той же выгрузки.</MudText>
+                <InputFile OnChange="UploadAsync" accept=".xlsx" disabled="@(_busy || _loadingSavedResult)" />
+                @if (_savedResult is null)
+                {
+                    <MudText Typo="Typo.caption">Сначала загрузите топологию, включая пустые ячейки. Затем синхронизируйте каталог SKU и отдельно загрузите остатки.</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">Для остатков выберите ту же неизменённую выгрузку. После обновления страницы файл нужно выбрать повторно.</MudText>
+                }
                 @if (_sourceName is not null)
                 {
                     <MudText>Файл: <b>@_sourceName</b> (@(_workbook?.Length ?? 0) байт)</MudText>
@@ -285,21 +310,24 @@
                     <label><input type="checkbox" @bind="_stockAcknowledged" /> Я просмотрел исключения, даты, отрицательные остатки и смешанные ячейки.</label>
                 }
             }
+            @if (_plan is not null || _stockPlan is not null)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-4">
+                    <MudSpacer />
+                    @if (_plan is not null)
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmAsync" Disabled="@ConfirmDisabled">
+                            Загрузить топологию
+                        </MudButton>
+                    }
+                    @if (_stockPlan is not null)
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmStockAsync" Disabled="@StockConfirmDisabled">
+                            Загрузить начальные остатки
+                        </MudButton>
+                    }
+                </MudStack>
+            }
         </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Cancel" Disabled="@_busy">Отмена</MudButton>
-        @if (_plan is not null)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmAsync" Disabled="@ConfirmDisabled">
-                Загрузить топологию
-            </MudButton>
-        }
-        @if (_stockPlan is not null)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmStockAsync" Disabled="@StockConfirmDisabled">
-                Загрузить начальные остатки
-            </MudButton>
-        }
-    </DialogActions>
-</MudDialog>
+    }
+</MudContainer>

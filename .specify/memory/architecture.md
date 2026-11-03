@@ -45,15 +45,15 @@ final save commits them with the import identity, audit event and command receip
 The topology confirmation rebuilds the preview in that session and rejects a
 changed signature. It holds a serializable transaction from the saved-state
 read through that final commit, so a concurrent topology edit cannot invalidate
-the checked plan before import. WebApp exposes the topology stage from the
-storage-location page and keeps the parsed plan for bounded, paged display.
+the checked plan before import. WebApp exposes both stages on an Administrator
+cutover page and keeps the parsed plan for bounded, paged display.
 The opening-stock preview reads the imported source identity, warehouse
 work/stock state, cell purposes and catalog units. Confirmation rebuilds and
 checks its signature inside a serializable command session, then posts one
 movement and turnover per nonzero row, accumulates balances by warehouse, cell,
 SKU and nullable date, enables accepted source date flags, and records the import
 status, audit event and command receipt in one final save. The Web cutover
-dialog presents the second-stage plan and submits its state-bound signature.
+page presents the second-stage plan and submits its state-bound signature.
 The confirmation store takes an update lock on the warehouse's opening-import
 row before reading stock state, serializing concurrent stock confirmations.
 The storage-location page reads current prohibited mixed-SKU violations from
@@ -67,7 +67,7 @@ The warehouse-unique import and filtered opening recorder-line constraint are
 classified as command conflicts if competing saves reach the database.
 The read-only opening-import result query projects the persisted source identity,
 stage actors and times, and compact JSON summaries. It does not require the
-workbook or recalculate historical counts from current balances. The Web dialog
+workbook or recalculate historical counts from current balances. The Web page
 combines that saved protocol with a separate live query for mixed-cell violations.
 
 ## Direction

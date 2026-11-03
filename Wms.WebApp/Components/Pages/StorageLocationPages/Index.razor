@@ -8,8 +8,6 @@
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h5">Складские позиции</MudText>
     <MudSpacer />
-    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.UploadFile"
-               Disabled="@(_warehouse is null)" OnClick="ImportOpeningCutoverAsync">Загрузить топологию и остатки 1С</MudButton>
     <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add"
                Disabled="@(_warehouse is null)" OnClick="CreateRootAsync">Корневая группа</MudButton>
     <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.SubdirectoryArrowRight"

@@ -114,22 +114,6 @@ public partial class Index
             await LoadTreeAsync();
     }
 
-    private async Task ImportOpeningCutoverAsync()
-    {
-        if (_warehouse is null)
-            return;
-
-        var parameters = new DialogParameters<OpeningImportDialog>
-        {
-            { x => x.Warehouse, _warehouse }
-        };
-        var dialog = await DialogService.ShowAsync<OpeningImportDialog>(
-            "Загрузка топологии и остатков 1С", parameters);
-        var result = await dialog.Result;
-        if (result is not null && !result.Canceled)
-            await LoadTreeAsync();
-    }
-
     private async Task ShowLocationDialogAsync(StorageLocation? location, StorageLocation? parent)
     {
         if (_warehouse is null)
