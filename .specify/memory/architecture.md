@@ -125,6 +125,22 @@ not need a structural rewrite for naming or type layout alone.
 
 ### Domain
 
+The outbound domain model distinguishes quantity reservations (`PickingReservation`),
+reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).
+Picking and replenishment have separate hold owner types. Replenishment tasks own
+source cycles and immutable transfer records linked to inventory movements. Finishing
+the transferred quantity and confirming return of the source pallet are distinct
+transitions. Their EF mappings use the shared Infrastructure context. Application
+commands must coordinate these records with balances and audit in a command session.
+
+The shared stock-availability reader and reservation store live in Infrastructure,
+behind Application-owned interfaces. Reservation and hold writes use a transaction
+with an update/serializable hold on the existing location row before reading the
+affected stock group. This protects empty reservation groups without serializing
+unrelated groups through a warehouse-wide range read. The owning location revision
+advances with every reservation or hold change. Queries include staged changes from
+the same EF context when a command performs several actions before its final save.
+
 Domain operations own local invariants and transitions, accept time and user
 identity as inputs, and expose controlled state rather than public mutation.
 Domain code does not depend on commands, EF Core, UI, or 1C DTOs.
@@ -155,19 +171,31 @@ the Application command executor and its Infrastructure store: receipt lookup
 precedes the operation, and one EF save commits staged business state, audit
 events, and receipt. The legacy executor remains for existing callers until
 their replacement. The two executors have distinct namespaces.
-The new inventory posting handler loads tracked locations and four-dimensional
-balances through an Infrastructure store bound to that command session. It
-stages the movement, balance changes and turnovers for the executor's single
-commit. Receiving LPN closure and putaway use this handler.
+The new inventory posting handler locks the affected location rows in stable
+order and loads tracked four-dimensional balances, reservations and shortages
+through the Infrastructure store bound to that command session. It stages the
+movement, balance changes and turnovers for the executor's single commit.
+Receiving LPN closure and putaway use this handler. It also supports picking
+issues, replenishment transfers and stock corrections with distinct recorder
+types. The posting owner can use its own source hold. A picking issue completes
+the exact entry's reservation, while replenishment keeps its source hold until
+the pallet-return command. Legacy transfer and count keep their existing path
+until their separate replacement.
 
 Other existing warehouse mutations in Web/Mobile enter legacy application commands
 through `CommandExecutor`: LPN issuance, picking, shipping/rollback, transfers
 and inventory counts. Receiving and putaway use the new Application executor.
 The executor owns receipt lookup before mutable validation and external access,
-replay, winning receipt recovery after final-save races, and atomic final save
+replay, winning receipt recovery after competing commits, and atomic final save
 of business state plus receipt. Callers supply `CommandContext` with request
 and user ids. A successful replay returns the recorded resource id without
 repeating business effects, synchronization or outbound calls.
+
+The new executor also handles a concurrent copy that reaches an expected rejection
+after the winning copy changed the stock. It disposes its session before looking
+up the winning receipt, and returns that recorded result when the request hash
+matches. Recognized stock conflicts raised during the command operation follow
+the same recovery as conflicts during the final save.
 Persisted command types are stable strings, not CLR type names. Hashes use only
 deterministic semantic input; Mobile V1 hash compatibility is preserved.
 

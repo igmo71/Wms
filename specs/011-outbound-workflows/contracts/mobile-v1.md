@@ -4,6 +4,8 @@
 
 ## Чтение
 
+DTO Отбора группируются в `Wms.Contracts/Mobile/V1/MobilePickingContracts.cs`, Подпитки — в `MobileReplenishmentContracts.cs`. Прикладные команды размещаются в `Wms.Application/Picking/` и `Wms.Application/Replenishment/`. Каждый именованный исполнитель использует существующий `Wms.Application.CommandExecution.CommandExecutor`, семантический хеш входа, аудит и квитанцию. HTTP endpoint преобразует скан документа в Ref_Key до вызова сценария. Чтение текущего источника и запись 1С принадлежат `ShippingSourceReader` и `ShippingSourceWriter` в `Wms.Integration/OneS/`. Протокол и отображение ошибок следуют существующему Mobile V1.
+
 | Метод | URL | Результат |
 |---|---|---|
 | GET | `/picking-assemblies?warehouseId=...` | Незакрытые сборки создателя и закреплённые за работником, а также их закрытые сборки с неподтверждённым обменом: номер, состояние, документы 1С, прогресс по строкам и предупреждения. |

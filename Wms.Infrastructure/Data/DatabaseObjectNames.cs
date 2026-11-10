@@ -2,6 +2,10 @@ namespace Wms.Data;
 
 public static class DatabaseObjectNames
 {
+    public const string PickingReservationsPrimaryKey = "PK_PickingReservations";
+    public const string StockShortagesActiveGroupIndex = "UX_StockShortages_ActiveGroup";
+    public const string ReplenishmentActiveSourceIndex = "UX_ReplenishmentSourceCycles_ActiveTask";
+    public const string ReplenishmentTransferMovementIndex = "UX_ReplenishmentTransfers_Movement";
     public const string WarehouseOpeningImportsWarehouseIndex =
         "IX_WarehouseOpeningImports_WarehouseId";
     public const string StorageLocationsWarehouseCodeIndex =

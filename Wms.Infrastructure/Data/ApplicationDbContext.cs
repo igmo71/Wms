@@ -39,6 +39,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StockKeepingUnit> StockKeepingUnits => Set<StockKeepingUnit>();
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();
     public DbSet<StorageLocationLock> StorageLocationLocks => Set<StorageLocationLock>();
+    public DbSet<PickingReservation> PickingReservations => Set<PickingReservation>();
+    public DbSet<StockShortage> StockShortages => Set<StockShortage>();
+    public DbSet<ReplenishmentTask> ReplenishmentTasks => Set<ReplenishmentTask>();
+    public DbSet<ReplenishmentSourceCycle> ReplenishmentSourceCycles => Set<ReplenishmentSourceCycle>();
+    public DbSet<ReplenishmentTransfer> ReplenishmentTransfers => Set<ReplenishmentTransfer>();
     public DbSet<InventoryTransfer> InventoryTransfers => Set<InventoryTransfer>();
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();

@@ -51,6 +51,30 @@ of its warehouse.
   One label or up to 120 direct child locations of a folder can be printed; labels
   are approximately 40 mm high. Exact adhesive-stock dimensions remain open.
 
+## Stock availability
+
+The Application stock-availability query distinguishes accounting quantity,
+active picking reservations, disputed shortage quantity and whole-location
+holds for each warehouse, cell, SKU and nullable expiration date. A negative
+available result is shown as zero. A hold excludes the whole cell from new
+work. Its owning picking assembly can continue selecting its own stock groups,
+with confirmed quantities still subtracted as reservations.
+
+Issuing a picking assembly's reserved quantity uses the accounting balance
+after protecting other reservations and disputed quantity. A fully reserved
+group can therefore have zero available for new work while covering the owning
+assembly's issue. The reservation store changes reservations and holds inside
+the command session under an update lock on the existing cell. Physical scans,
+FEFO and assembly authorization belong to their operational use cases.
+
+The shared posting handler supports a dated picking issue against the exact
+reservation of a picking entry, a Reserve-to-Storage replenishment under its
+own source hold, and stock corrections. A picking issue completes its reservation
+in the movement's commit. Replenishment retains the source hold after posting.
+Corrections preserve picked stock and can consume the disputed quantity of the
+referenced shortage. The Manager use case resolves that report in the same
+session. Receiving putaway cannot occupy a cell held by picking or replenishment.
+
 ## Opening stock cutover
 
 The Administrator confirms opening stock separately from topology on the Web

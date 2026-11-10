@@ -14,6 +14,49 @@ namespace Wms.Tests.Inventory;
 public sealed class NewInventoryPostingTests(SqlDatabase database)
 {
     [Theory]
+    [InlineData(StorageLocationLockOwnerType.PickingAssembly)]
+    [InlineData(StorageLocationLockOwnerType.ReplenishmentTask)]
+    public async Task Putaway_cannot_occupy_a_location_held_by_outbound_work(StorageLocationLockOwnerType ownerType)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Held putaway destination" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Putaway SKU" };
+        var receivingZone = Zone(warehouse.Id, "HC", ZoneType.Receiving);
+        var reserveZone = Zone(warehouse.Id, "HR", ZoneType.Reserve);
+        var receiving = Location(warehouse.Id, receivingZone, 1);
+        var destination = Location(warehouse.Id, reserveZone, 1);
+        var batch = Value(LicensePlateNumberBatch.Issue(1, "test-user", now));
+        var hold = Value(ownerType == StorageLocationLockOwnerType.PickingAssembly
+            ? StorageLocationLock.CreateForPicking(destination.Id, Guid.NewGuid(), now, "test-user")
+            : StorageLocationLock.CreateForReplenishment(destination.Id, Guid.NewGuid(), now, "test-user"));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, receivingZone, reserveZone, receiving, destination,
+                batch, hold, Balance(warehouse.Id, receiving.Id, sku.Id, 5));
+            await seed.SaveChangesAsync();
+        }
+        var movement = Value(InventoryMovement.Create(Guid.NewGuid(), warehouse.Id, receiving.Id,
+            destination.Id, sku.Id, 5, now, RecorderType.ReceivingOrder, Guid.NewGuid(), 1,
+            "test-user", licensePlateNumberId: batch.Labels.Single().Id));
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
+        var requestId = Guid.NewGuid();
+        var result = await executor.ExecuteAsync("test.held-putaway", requestId,
+            CommandExecutor.ComputeHash(movement.Id.ToString()), "test-user", async (context, ct) =>
+            {
+                var posted = await new PostInventoryMovement.Handler(new InventoryPostingStore())
+                    .HandleAsync(new(movement, InventoryPostingKind.Putaway, now.AddSeconds(1)), context, ct);
+                if (!posted.IsSuccess)
+                    return posted.Error!;
+                return new CommandExecutionResult(movement.Id, []);
+            }, default);
+        Error(result, OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(5m, (await verify.InventoryBalances.SingleAsync(x => x.WarehouseId == warehouse.Id)).Quantity);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.Id == movement.Id));
+        Assert.True(await verify.StorageLocationLocks.AnyAsync(x => x.StorageLocationId == destination.Id));
+    }
+
+    [Theory]
     [InlineData(ZoneType.Storage)]
     [InlineData(ZoneType.Reserve)]
     public async Task Putaway_cannot_add_second_sku_to_restricted_storage_location(

@@ -21,4 +21,13 @@ public enum RecorderType
 
     [Display(Name = "Начальные остатки")]
     OpeningBalance = 5,
+
+    [Display(Name = "Сборка WMS")]
+    PickingAssembly = 6,
+
+    [Display(Name = "Подпитка")]
+    ReplenishmentTask = 7,
+
+    [Display(Name = "Корректировка остатка")]
+    StockCorrection = 8,
 }

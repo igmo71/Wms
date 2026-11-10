@@ -78,7 +78,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                 return concurrency.Entries.Any(x => x.Entity is InventoryBalance
                     or StorageLocation or LicensePlateNumber or ReceivingOrder
                     or ReceivingOrderItem or StockKeepingUnit or ReceivingSourceDocument
-                    or WarehouseOpeningImport);
+                    or WarehouseOpeningImport or PickingReservation or StockShortage
+                    or ReplenishmentTask);
 
             for (Exception? current = exception; current is not null; current = current.InnerException)
             {
@@ -102,6 +103,16 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingCycleParticipantIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingSourceActiveLinkIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.StorageLocationLocksPrimaryKey,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.PickingReservationsPrimaryKey,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.StockShortagesActiveGroupIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ReplenishmentActiveSourceIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.ReplenishmentTransferMovementIndex,
                             StringComparison.Ordinal)))
                     return true;
             }

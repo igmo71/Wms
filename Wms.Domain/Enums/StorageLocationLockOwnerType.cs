@@ -8,5 +8,11 @@ public enum StorageLocationLockOwnerType
     Manual = 0,
 
     [Display(Name = "Инвентаризация")]
-    InventoryCount = 1
+    InventoryCount = 1,
+
+    [Display(Name = "Палетный отбор")]
+    PickingAssembly = 2,
+
+    [Display(Name = "Подпитка")]
+    ReplenishmentTask = 3
 }

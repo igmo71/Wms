@@ -9,6 +9,11 @@ stock from receiving is not established as production-ready:
 | Intra-warehouse transfers | Movements are created without an expiration date, so a dated group cannot be preserved. |
 | Inventory count | A draft covers one ordinary Storage location and snapshots only positive balances by SKU. It cannot represent several date groups of one SKU; negative balances are excluded. |
 
+Legacy transfer and inventory count retain their original posting paths. Their
+replacement will adopt the shared reservation and hold mechanism. The current
+outbound feature implements it in the new posting path used by receiving,
+putaway and the replacement outbound processes.
+
 ## Picking and shipping
 
 Picking starts against a scanned shipping location and creates split draft

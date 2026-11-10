@@ -63,23 +63,25 @@ public sealed class CommandExecutor(ICommandExecutionStore store)
         if (existing is not null)
             return ResolveReceipt(existing, requestHash);
 
-        await using var session = await store.OpenSessionAsync(ct);
-        var result = await operation(session, ct);
-        if (!result.IsSuccess)
-            return result.Error!;
-
-        var effect = result.Value!;
-        if (effect.AuditEvents is null || effect.AuditEvents.Count == 0
-            || effect.AuditEvents.Any(x => x.CommandUserId != userId
-                || x.CommandType != commandType || x.RequestId != requestId))
-            throw new InvalidOperationException("Успешная команда должна содержать события аудита с её ключом.");
-
-        var receipt = new CommandReceiptSnapshot(
-            userId, commandType, requestId, requestHash, effect.ResourceId);
+        OperationError? rejection = null;
         try
         {
-            await session.CommitAsync(receipt, effect.AuditEvents, ct);
-            return effect.ResourceId;
+            await using var session = await store.OpenSessionAsync(ct);
+            var result = await operation(session, ct);
+            if (result.IsSuccess)
+            {
+                var effect = result.Value!;
+                if (effect.AuditEvents is null || effect.AuditEvents.Count == 0
+                    || effect.AuditEvents.Any(x => x.CommandUserId != userId
+                        || x.CommandType != commandType || x.RequestId != requestId))
+                    throw new InvalidOperationException("Успешная команда должна содержать события аудита с её ключом.");
+
+                var receipt = new CommandReceiptSnapshot(
+                    userId, commandType, requestId, requestHash, effect.ResourceId);
+                await session.CommitAsync(receipt, effect.AuditEvents, ct);
+                return effect.ResourceId;
+            }
+            rejection = result.Error!;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -91,6 +93,11 @@ public sealed class CommandExecutor(ICommandExecutionStore store)
                 return OperationError.Conflict(exception.Message);
             throw;
         }
+
+        // A concurrent copy may have consumed the available stock before this copy acquired its lock.
+        // Release this session before looking up the winner on another connection.
+        var completed = await store.FindReceiptAsync(userId, commandType, requestId, ct);
+        return completed is not null ? ResolveReceipt(completed, requestHash) : rejection!;
     }
 
     public static string ComputeHash(string value) =>

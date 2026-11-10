@@ -46,6 +46,16 @@ public class StorageLocationLock
             lockedAtUtc,
             lockedBy);
 
+    public static OperationResult<StorageLocationLock> CreateForPicking(
+        Guid storageLocationId, Guid assemblyId, DateTimeOffset lockedAtUtc, string lockedBy) =>
+        Create(storageLocationId, StorageLocationLockOwnerType.PickingAssembly,
+            assemblyId, "Поддон снят для Отбора", lockedAtUtc, lockedBy);
+
+    public static OperationResult<StorageLocationLock> CreateForReplenishment(
+        Guid storageLocationId, Guid taskId, DateTimeOffset lockedAtUtc, string lockedBy) =>
+        Create(storageLocationId, StorageLocationLockOwnerType.ReplenishmentTask,
+            taskId, "Поддон снят для Подпитки", lockedAtUtc, lockedBy);
+
     private static OperationResult<StorageLocationLock> Create(
         Guid storageLocationId,
         StorageLocationLockOwnerType ownerType,
@@ -62,7 +72,9 @@ public class StorageLocationLock
         var ownerIsValid = ownerType switch
         {
             StorageLocationLockOwnerType.Manual => ownerId is null,
-            StorageLocationLockOwnerType.InventoryCount => ownerId is Guid id && id != Guid.Empty,
+            StorageLocationLockOwnerType.InventoryCount
+                or StorageLocationLockOwnerType.PickingAssembly
+                or StorageLocationLockOwnerType.ReplenishmentTask => ownerId is Guid id && id != Guid.Empty,
             _ => false
         };
         if (!ownerIsValid)

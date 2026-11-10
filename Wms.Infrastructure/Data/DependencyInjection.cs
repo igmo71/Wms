@@ -54,6 +54,10 @@ public static class DependencyInjection
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<IOpeningInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<PostInventoryMovement.Handler>();
+        services.AddScoped<StockAvailabilityStore>();
+        services.AddScoped<IStockAvailabilityStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
+        services.AddScoped<IStockReservationStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
+        services.AddScoped<GetStockAvailability>();
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
         services.AddScoped<SynchronizeReceivingSource>();
         services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();

@@ -50,12 +50,7 @@ public sealed class InventoryPostingStore : IInventoryPostingStore,
         var locationIds = new[]
             { movement.SourceStorageLocationId, movement.DestinationStorageLocationId }
             .OfType<Guid>().Distinct().ToArray();
-        var locations = await db.StorageLocations
-            .Include(x => x.Warehouse)
-            .Include(x => x.Zone)
-            .Include(x => x.ActiveLock)
-            .Where(x => locationIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, ct);
+        var locations = await InventoryLocationLock.AcquireAsync(db, locationIds, ct);
         var balances = await db.InventoryBalances
             .Where(x => x.WarehouseId == movement.WarehouseId
                 && locationIds.Contains(x.StorageLocationId)
@@ -70,7 +65,23 @@ public sealed class InventoryPostingStore : IInventoryPostingStore,
                 && x.StockKeepingUnitId == movement.StockKeepingUnitId
                 && x.ExpirationDate == movement.ExpirationDate))
             balances.Add(added.StorageLocationId, added);
-        return new InventoryPostingState(locations, balances);
+        await db.PickingReservations.Where(x => x.WarehouseId == movement.WarehouseId
+            && locationIds.Contains(x.StorageLocationId)
+            && x.StockKeepingUnitId == movement.StockKeepingUnitId
+            && x.ExpirationDate == movement.ExpirationDate && x.CompletedAtUtc == null).LoadAsync(ct);
+        await db.StockShortages.Where(x => x.WarehouseId == movement.WarehouseId
+            && locationIds.Contains(x.StorageLocationId)
+            && x.StockKeepingUnitId == movement.StockKeepingUnitId
+            && x.ExpirationDate == movement.ExpirationDate && x.ResolvedAtUtc == null).LoadAsync(ct);
+        return new InventoryPostingState(locations, balances)
+        {
+            Reservations = db.PickingReservations.Local.Where(x => x.WarehouseId == movement.WarehouseId
+                && locationIds.Contains(x.StorageLocationId) && x.StockKeepingUnitId == movement.StockKeepingUnitId
+                && x.ExpirationDate == movement.ExpirationDate && x.CompletedAtUtc is null).ToArray(),
+            Shortages = db.StockShortages.Local.Where(x => x.WarehouseId == movement.WarehouseId
+                && locationIds.Contains(x.StorageLocationId) && x.StockKeepingUnitId == movement.StockKeepingUnitId
+                && x.ExpirationDate == movement.ExpirationDate && x.ResolvedAtUtc is null).ToArray()
+        };
     }
 
     public async Task<bool> HasMultipleNonzeroSkusAsync(
