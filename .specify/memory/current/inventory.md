@@ -182,5 +182,4 @@ balance concurrency tokens plus named database constraints. Only recognized
 inventory concurrency failures become business conflicts.
 
 The current boundaries of picking, shipping, transfers, and inventory counts
-are in [other warehouse workflows](other-workflows.md); their replacement and
-count expansion are tracked in [the backlog](../backlog.md).
+are in [other warehouse workflows](other-workflows.md).

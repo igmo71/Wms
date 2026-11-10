@@ -80,7 +80,6 @@ or repeat-safe outbound target. Its item-table target, status, and posting
 calls are repeatable.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
-WMS-to-1C multi-step transitions are not atomic across systems; the shipping
-recovery procedure remains in [the backlog](../backlog.md). Replacement of
-picking, shipping, transfers, and expanded inventory is also deferred there;
-their old flows are not established as ready for production with dated stock.
+WMS-to-1C multi-step transitions are not atomic across systems. The operational
+shipping adapter still belongs to the legacy workflow. Its warehouse boundaries
+and date limitations are described in [other workflows](other-workflows.md).

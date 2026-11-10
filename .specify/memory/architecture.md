@@ -8,9 +8,9 @@ conventions. Project-wide principles live in the
 
 | Project | Current responsibility |
 |---|---|
-| `Wms` | Remaining older workflows and 1C adapters; consumes Application contracts and Infrastructure persistence. |
+| `Wms` | Temporary legacy workflows and 1C adapters pending replacement; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
-| `Wms.Application` | New command execution, receiving source and order use cases and contracts; references Domain. |
+| `Wms.Application` | Command execution, receiving use cases, shared stock availability and dated posting for receiving/outbound operations; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
 | `Wms.Integration` | Receiving source HTTP reader, OData parser and cutover XLSX reader; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
@@ -22,6 +22,10 @@ conventions. Project-wide principles live in the
 The new project references point inward: Application references Domain;
 Infrastructure and Integration reference Application. The legacy `Wms` project
 also references Domain, Application, and Infrastructure. New projects do not reference `Wms`.
+Each delivered replacement removes its obsolete legacy code, registrations and
+callers. The final replacement also removes the `Wms` project and its host
+references. Development replacement does not require a legacy-operation
+transition or compatibility workflow.
 Application owns the explicit Manager permission check; Infrastructure resolves
 membership from Identity storage for command execution.
 WebApi and WebApp directly reference Application, Infrastructure, and Integration

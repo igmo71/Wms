@@ -203,6 +203,29 @@ adb shell pm clear ru.igmo.wms.mobile
 3. Confirm that the path is Mobile → Wi-Fi/DNS → Caddy → test WebApi → test
    database.
 
+## Warehouse release rehearsal
+
+Before a warehouse release, record one rehearsal with the application tag,
+database migration version, Mobile build, warehouse, actors and results.
+
+1. Restore a backup into an isolated test database, apply the release migrations
+   and confirm that the selected application version works with that schema.
+2. Check the enabled Web and Mobile workflows on representative dated stock.
+   Include receiving, putaway, picking with replenishment and closing with
+   shipment. Include replacement transfer and count workflows when they enter
+   the release scope. Verify the explicit Operator, Manager and Administrator
+   permissions for the delivered operations.
+3. Interrupt a warehouse command and repeat it after reopening its state. Check
+   the single warehouse effect, movement history, balances and command receipt.
+   Simulate PATCH/POST failures in the test 1C database and verify the retained
+   warehouse fact and repeat of only the unconfirmed documents through the same
+   closing action.
+4. Verify the effective network access to incoming 1C endpoints and the
+   environment's logging settings. Keep endpoints without authentication inside
+   the trusted network. Review SQL/TLS compatibility and current dependency
+   advisories through [issue 41](https://github.com/igmo71/Wms/issues/41).
+5. Save the rehearsal results and link unresolved problems to their Issues.
+
 ## Routine update
 
 1. Publish and record one tag.

@@ -37,7 +37,9 @@ projects, interfaces or layers only for a concrete boundary needed by the
 feature. Domain has no WMS project dependencies; new Application references
 Domain; new Infrastructure and Integration reference Application. The legacy
 `Wms` project may reference Domain and Infrastructure while its services are
-replaced; new projects MUST NOT reference the legacy assembly. Dependency
+replaced. Remove replaced scenarios and references as each replacement is
+delivered, and eliminate the `Wms` project once its remaining responsibilities
+have been replaced. New projects MUST NOT reference the legacy assembly. Dependency
 cycles and duplicate operational paths are not acceptable.
 
 ### V. Verification follows material risk
@@ -54,7 +56,7 @@ in [`AGENTS.md`](../../AGENTS.md).
 `AGENTS.md` owns instructions for Codex. This constitution owns lasting
 engineering principles. `current/` describes implemented behavior by
 subcontext, and `architecture.md` describes current technical structure and
-engineering conventions. `backlog.md` contains deferred work; operational
+engineering conventions. GitHub Issues track deferred work; operational
 runbooks belong in `.specify/runbooks/`. When used, `spec.md` describes the
 intended business outcome, `plan.md` explains its implementation, and `tasks.md`
 records bounded increments. Keep each detailed rule in one owning document and
@@ -66,7 +68,7 @@ Completed feature directories remain historical records. Later changes that
 need a specification get a new feature directory; small follow-ups can be
 resolved in their issue and discussion. Lasting accepted rules move into the
 relevant current-state subcontext as the implementation becomes real.
-Top-level `archive/legacy-specs/` preserves older material but is not a source
+`specs/archive/legacy-specs/` preserves older material but is not a source
 for current decisions.
 
 ## Delivery Workflow
@@ -92,4 +94,4 @@ change. Increment MAJOR for incompatible governance changes, MINOR for new or
 materially expanded rules, and PATCH for clarification. User instructions take
 precedence over this document.
 
-**Version**: 1.2.2 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-11-09
+**Version**: 1.2.3 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-11-10

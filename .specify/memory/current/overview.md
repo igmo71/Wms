@@ -4,7 +4,7 @@ This directory describes implemented behavior. The code and database schema
 remain the source of truth for implementation details. Completed feature
 specifications preserve decisions made during delivery, not the current rules.
 
-Read only the relevant area: [identity](identity.md), [inventory](inventory.md), [receiving](receiving.md), [other warehouse workflows](other-workflows.md), [1C integration](integration.md), and [clients](clients.md). Current technical structure and conventions are in [architecture](../architecture.md); deferred work is in [backlog](../backlog.md).
+Read only the relevant area: [identity](identity.md), [inventory](inventory.md), [receiving](receiving.md), [other warehouse workflows](other-workflows.md), [1C integration](integration.md), and [clients](clients.md). Current technical structure and conventions are in [architecture](../architecture.md). Deferred work is tracked in [GitHub Issues](https://github.com/igmo71/Wms/issues).
 
 ## Product boundary
 
@@ -39,3 +39,9 @@ requires discrepancy confirmation when any shipping line differs from its plan;
 differences on separate SKUs cannot cancel each other.
 
 LPN tracks receiving provenance and initial putaway, not stored inventory.
+
+The replacement outbound workflow currently has domain models for reservations,
+shortages and replenishment, shared availability queries, and dated inventory
+posting primitives. The picking and shipping screens still use the legacy
+scenario. The legacy `Wms` project is being eliminated as its scenarios are
+replaced in the new projects.

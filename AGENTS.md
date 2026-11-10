@@ -7,22 +7,24 @@ For work on a feature with a specification, read its `spec.md`;
 `.specify/feature.json` points to the current Spec Kit feature. A completed
 feature is historical, even if that pointer still names it. Read other
 specifications only when the user names them or the current feature directly
-requires their decision history. The top-level
-`archive/legacy-specs/` is excluded from normal context gathering.
+requires their decision history. The `specs/archive/` directory is excluded
+from normal context gathering. Read archived material only when the user
+explicitly requests it.
 
 - Treat current documentation as the guide to implemented behavior and feature
   specifications as intended behavior. The code remains the source of truth for
   implementation details.
 - This is an MVP: prefer explicit, straightforward changes that fit the existing structure. Do not introduce abstractions, layers, or infrastructure unless the task needs them.
 - When replacing a screen, route, or workflow, remove obsolete code and links. Keep compatibility aliases or redirects only for a concrete, supported need; do not accumulate them by default.
-- Keep changes scoped to the request. Do not implement backlog processes prematurely.
+- Keep changes scoped to the request. Track deferred ideas in GitHub Issues and implement them only when brought into scope.
+- The `Wms` project is temporary legacy. Replace its scenarios in the corresponding new projects, remove replaced code and references, and eliminate `Wms` after its remaining responsibilities have been replaced.
 - When a task changes implemented business behavior or an integration boundary,
   update the owning file in `.specify/memory/current/` in the same change.
   Update `.specify/memory/architecture.md` when implemented technical structure
   or lasting engineering conventions change.
 - Keep each detailed rule in one owning document and link to it elsewhere.
-  Current-state files describe implemented rules; the backlog describes remaining
-  work. Neither contains implementation logs, test inventories, or repeated
+  Current-state files describe implemented rules; GitHub Issues track deferred
+  work. Current-state files contain no implementation logs, test inventories, or repeated
   handoffs; preserve decision history in frozen specs. Keep current-state and
   architecture documents self-contained instead of relying on links to completed
   feature artifacts or one-time migration steps.
