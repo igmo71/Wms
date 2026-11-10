@@ -62,8 +62,7 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
             {
                 if (db.Database.CurrentTransaction is { } transaction)
                     await transaction.RollbackAsync(ct);
-                if (exception is DbUpdateException update && IsKnownConflict(update)
-                    || exception is SqlException { Number: 1205 })
+                if (IsKnownConflict(exception))
                     throw new CommandCommitConflictException(
                         "Складское состояние изменилось. Обновите данные и повторите операцию.", exception);
                 throw;
@@ -72,17 +71,12 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
 
         public ValueTask DisposeAsync() => db.DisposeAsync();
 
-        private static bool IsKnownConflict(DbUpdateException exception)
+        private static bool IsKnownConflict(Exception exception)
         {
-            if (exception is DbUpdateConcurrencyException concurrency)
-                return concurrency.Entries.Any(x => x.Entity is InventoryBalance
-                    or StorageLocation or LicensePlateNumber or ReceivingOrder
-                    or ReceivingOrderItem or StockKeepingUnit or ReceivingSourceDocument
-                    or WarehouseOpeningImport or PickingReservation or StockShortage
-                    or ReplenishmentTask);
-
             for (Exception? current = exception; current is not null; current = current.InnerException)
             {
+                if (current is DbUpdateConcurrencyException)
+                    return true;
                 if (current is SqlException { Number: 1205 })
                     return true;
                 if (current is SqlException { Number: 2601 or 2627 } sql
@@ -103,6 +97,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingCycleParticipantIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.ReceivingSourceActiveLinkIndex,
+                            StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.PickingAssemblyActiveSourceIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.StorageLocationLocksPrimaryKey,
                             StringComparison.Ordinal)

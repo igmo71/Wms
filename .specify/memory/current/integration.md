@@ -72,6 +72,23 @@ receiving comments remain WMS-owned annotations, not warehouse facts.
 
 ## Remaining older processes
 
+Shipping notifications now use the replacement `Wms.Integration` reader and
+`SynchronizeShippingSource` use case. They read both item tables and preserve
+the current raw document JSON on the 1C source projection, including rows
+needed for later reconciliation and PATCH construction. A failed read or
+unsupported quantity records an error without turning it into a zero plan.
+For a linked draft assembly, a valid same-warehouse source updates its plan;
+after the first start attempt, source changes update only the 1C projection.
+Starting a picking assembly freezes its source set and WMS plan before any 1C
+write. The application then checks each source, PATCHes its status to `КОтбору`
+and calls `/Post` outside the warehouse transaction. A failed document leaves the
+assembly in preparation; confirmed documents are skipped on retry. Before PATCH,
+WMS records an intent for that source. A retry after an uncertain response reads
+1C again and can continue with POST when the status is already `КОтбору`;
+without WMS intent, that status requires investigation. A per-assembly lease
+prevents overlapping start attempts. The picking screens still use the legacy
+workflow.
+
 The older picking and shipping screens support pull-to-refresh of their source
 assessment. Picking completion and final shipping fetch a fresh checkpoint
 before effects. An unresolved decision, blocking assessment, or technical

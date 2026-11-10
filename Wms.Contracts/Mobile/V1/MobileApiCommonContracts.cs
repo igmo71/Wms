@@ -15,6 +15,7 @@ public static class MobileApiRoutes
     public const string ReceivingOrders = Base + "/receiving-orders";
     public const string LicensePlateNumberPutaway = Base + "/lpn-putaway";
     public const string ShippingOrders = Base + "/shipping-orders";
+    public const string PickingAssemblies = Base + "/picking-assemblies";
 }
 
 public static class MobileProblemCodes

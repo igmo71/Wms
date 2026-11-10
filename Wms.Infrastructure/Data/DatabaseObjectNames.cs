@@ -2,6 +2,7 @@ namespace Wms.Data;
 
 public static class DatabaseObjectNames
 {
+    public const string PickingAssemblyActiveSourceIndex = "UX_PickingAssemblySourceLinks_ActiveSource";
     public const string PickingReservationsPrimaryKey = "PK_PickingReservations";
     public const string StockShortagesActiveGroupIndex = "UX_StockShortages_ActiveGroup";
     public const string ReplenishmentActiveSourceIndex = "UX_ReplenishmentSourceCycles_ActiveTask";

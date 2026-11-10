@@ -1,0 +1,61 @@
+<ContentPage x:Class="Wms.Mobile.PickingSourcesPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Отбор › Документы 1С">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" Text="Новая сборка"
+                   FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="StatusLabel" FontSize="13" />
+            <Label x:Name="OwnerLabel" FontSize="13" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="SourcesRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label x:Name="ScanHintLabel" FontSize="12"
+                           Text="Сканируйте первый РО 1С, чтобы создать сборку." />
+                    <Label x:Name="EmptyLabel" Text="Документы 1С ещё не добавлены." />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SourceRows, Source={x:Reference Page}}"
+                                         Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingSourceRow">
+                                <Border Padding="8" Stroke="#D4D4D4">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding NumberText}" FontAttributes="Bold" />
+                                            <Label Text="{Binding StatusText}" FontSize="12" />
+                                            <Label Text="{Binding ErrorText}" TextColor="DarkOrange"
+                                                   FontSize="12" IsVisible="{Binding HasError}" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="×"
+                                                WidthRequest="40" HeightRequest="40" Padding="0"
+                                                IsVisible="{Binding CanDetach}"
+                                                CommandParameter="{Binding SourceRefKey}"
+                                                Clicked="OnDetachClicked"
+                                                SemanticProperties.Description="Открепить РО 1С" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="TakeOverButton" Text="Принять сборку"
+                    IsVisible="False" Clicked="OnTakeOverClicked" />
+            <Button x:Name="StartButton" Text="Начать Отбор"
+                    IsVisible="False" Clicked="OnStartClicked" />
+            <Button x:Name="SkuButton" Text="SKU"
+                    IsVisible="False" Clicked="OnSkuClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

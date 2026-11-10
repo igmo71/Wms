@@ -1,0 +1,49 @@
+<ContentPage x:Class="Wms.Mobile.PickingSkuPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Отбор › SKU">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="StatusLabel" FontSize="13" />
+            <Label x:Name="OwnerLabel" FontSize="13" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="SkuRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="7">
+                    <Label Text="План сборки" FontAttributes="Bold" FontSize="17" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SkuRows, Source={x:Reference Page}}"
+                                         Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingSkuPlanRow">
+                                <Border Padding="9" Stroke="#D4D4D4">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label Text="{Binding Name}" FontAttributes="Bold"
+                                               LineBreakMode="WordWrap" />
+                                        <Label Grid.Column="1" Text="{Binding QuantityText}"
+                                               FontFamily="OpenSansSemibold" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="TakeOverButton" Text="Принять сборку"
+                    IsVisible="False" Clicked="OnTakeOverClicked" />
+            <Button x:Name="StartButton" Text="Начать Отбор"
+                    IsVisible="False" Clicked="OnStartClicked" />
+            <Button x:Name="SourcesButton" Text="Документы 1С"
+                    Clicked="OnSourcesClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

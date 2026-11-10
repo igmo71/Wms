@@ -35,6 +35,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ShippingOrder> ShippingOrders => Set<ShippingOrder>();
     public DbSet<ShippingOrderBaseItem> ShippingOrderBaseItems => Set<ShippingOrderBaseItem>();
     public DbSet<ShippingOrderItem> ShippingOrderItems => Set<ShippingOrderItem>();
+    public DbSet<PickingAssembly> PickingAssemblies => Set<PickingAssembly>();
+    public DbSet<PickingAssemblySourceLink> PickingAssemblySourceLinks => Set<PickingAssemblySourceLink>();
+    public DbSet<PickingAssemblyPlanLine> PickingAssemblyPlanLines => Set<PickingAssemblyPlanLine>();
     public DbSet<SkuBarcode> SkuBarcodes => Set<SkuBarcode>();
     public DbSet<StockKeepingUnit> StockKeepingUnits => Set<StockKeepingUnit>();
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();

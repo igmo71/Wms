@@ -24,6 +24,19 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
         CancellationToken ct = default)
         => SendAsync(() => httpClient.PutAsJsonAsync(route, request, ct), ct);
 
+    public Task<HttpResponseMessage> DeleteAsync<TRequest>(
+        string route,
+        TRequest request,
+        CancellationToken ct = default)
+        => SendAsync(async () =>
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Delete, route)
+            {
+                Content = JsonContent.Create(request)
+            };
+            return await httpClient.SendAsync(message, ct);
+        }, ct);
+
     private static async Task<HttpResponseMessage> SendAsync(
         Func<Task<HttpResponseMessage>> send,
         CancellationToken ct)

@@ -12,6 +12,7 @@ namespace Wms.Tests.Infrastructure;
 internal static class TestSupport
 {
     private static long _receivingOrderNumberSequence;
+    private static long _pickingAssemblyNumberSequence;
 
     public static CommandContext Command(string user = "test-user") => new(Guid.NewGuid(), user);
 
@@ -27,6 +28,16 @@ internal static class TestSupport
         Success(order.AssignNumber(new DateTime(2099, 1, 1)
             .AddSeconds(Interlocked.Increment(ref _receivingOrderNumberSequence))
             .ToString("yyMMdd-HHmmss", CultureInfo.InvariantCulture)));
+
+    public static PickingAssembly PickingAssembly(Guid warehouseId, string userId = "test-user")
+    {
+        var assembly = Value(Wms.Domain.PickingAssembly.CreateNew(
+            warehouseId, userId, DateTimeOffset.UtcNow));
+        Success(assembly.AssignNumber(new DateTime(2098, 1, 1)
+            .AddSeconds(Interlocked.Increment(ref _pickingAssemblyNumberSequence))
+            .ToString("yyMMdd-HHmmss", CultureInfo.InvariantCulture)));
+        return assembly;
+    }
 
     public static void Error(OperationResult result, OperationErrorType type) => Assert.Equal(type, result.Error?.Type);
 

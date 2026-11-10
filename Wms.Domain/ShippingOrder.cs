@@ -1,5 +1,6 @@
 using Wms.Common;
 using Wms.Domain.Enums;
+using System.Text.Json;
 
 namespace Wms.Domain;
 
@@ -46,6 +47,9 @@ public class ShippingOrder
     public DateTimeOffset? SynchronizationAcknowledgedAtUtc { get; private set; }
     public string? SynchronizationAcknowledgedBy { get; private set; }
     public Guid ReceiverId { get; private set; }
+    public string? CurrentSourceJson { get; private set; }
+    public DateTimeOffset? LastSourceCheckAtUtc { get; private set; }
+    public string? LastSourceCheckError { get; private set; }
     public PartyType ReceiverType { get; private set; }
     public PartyInfo? Receiver { get; private set; }
     public IReadOnlyCollection<ShippingOrderBaseItem> BaseItems => _baseItems;
@@ -54,6 +58,51 @@ public class ShippingOrder
     public bool IsFullyShipped => _items.All(x => x.IsFullyShipped);
     public double KnownFactWeightKg => _items.Sum(x => x.FactWeightKg ?? 0);
     public bool IsFactWeightComplete => _items.All(x => x.FactQuantity == 0 || x.FactWeightKg.HasValue);
+
+    public OperationResult RecordSourceCheck(
+        string? currentSourceJson, string? error, DateTimeOffset checkedAtUtc)
+    {
+        if (checkedAtUtc == default || error is { Length: > 2000 })
+            return OperationError.Invalid("Время или ошибка сверки документа 1С недопустимы.");
+        if (currentSourceJson is not null)
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(currentSourceJson);
+                if (json.RootElement.ValueKind != JsonValueKind.Object)
+                    return OperationError.Invalid("Снимок документа 1С должен быть JSON-объектом.");
+            }
+            catch (JsonException)
+            {
+                return OperationError.Invalid("Снимок документа 1С должен быть JSON-объектом.");
+            }
+            CurrentSourceJson = currentSourceJson;
+        }
+        LastSourceCheckAtUtc = checkedAtUtc;
+        LastSourceCheckError = error;
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
+
+    public OperationResult ApplyCurrentSource(ShippingOrderImportSnapshot snapshot,
+        DateTimeOffset checkedAtUtc)
+    {
+        if (snapshot.Id != Id)
+            return OperationError.Invalid("Идентификатор источника не совпадает с документом.");
+        var validation = ValidateImport(snapshot, checkedAtUtc);
+        if (!validation.IsSuccess)
+            return validation;
+        var items = ReconcileItems(snapshot.Items);
+        if (!items.IsSuccess)
+            return items;
+        var basis = ReconcileBaseItems(snapshot.BaseItems);
+        if (!basis.IsSuccess)
+            return basis;
+        ApplyImport(snapshot);
+        UpdatedAtUtc = checkedAtUtc;
+        AdvanceOperationalRevision();
+        return OperationResult.Success();
+    }
 
     public static OperationResult<ShippingOrder> Create(
         ShippingOrderImportSnapshot snapshot,

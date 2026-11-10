@@ -962,6 +962,160 @@ namespace Wms.Data.Migrations
                     b.ToTable("Partners");
                 });
 
+            modelBuilder.Entity("Wms.Domain.PickingAssembly", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CancelledBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("ClosedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("FirstStartAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("nvarchar(13)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ResponsibleUserId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<Guid?>("StartLeaseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("StartLeaseUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("ResponsibleUserId", "Status");
+
+                    b.ToTable("PickingAssemblies", t =>
+                        {
+                            t.HasCheckConstraint("CK_PickingAssemblies_NumberFormat", "LEN([Number]) = 13 AND [Number] LIKE '[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]'");
+                        });
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingAssemblyPlanLine", b =>
+                {
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ShippingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.HasKey("PickingAssemblyId", "ShippingOrderId", "StockKeepingUnitId");
+
+                    b.HasIndex("ShippingOrderId");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.ToTable("PickingAssemblyPlanLines", t =>
+                        {
+                            t.HasCheckConstraint("CK_PickingAssemblyPlanLines_Quantity", "[Quantity] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingAssemblySourceLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AttachedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("AttachedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("DetachedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DetachedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateTimeOffset?>("LastStartAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastStartError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PlanSourceSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ShippingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("StartConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("StartPatchRequestedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PickingAssemblyId");
+
+                    b.HasIndex("ShippingOrderId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PickingAssemblySourceLinks_ActiveSource")
+                        .HasFilter("[DetachedAtUtc] IS NULL");
+
+                    b.ToTable("PickingAssemblySourceLinks");
+                });
+
             modelBuilder.Entity("Wms.Domain.PickingReservation", b =>
                 {
                     b.Property<Guid>("PickingEntryId")
@@ -1519,6 +1673,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CurrentSourceJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
@@ -1527,6 +1684,13 @@ namespace Wms.Data.Migrations
 
                     b.Property<Guid?>("DeliveryDirectionId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("LastSourceCheckAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastSourceCheckError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("Number")
                         .HasMaxLength(32)
@@ -2019,6 +2183,9 @@ namespace Wms.Data.Migrations
                     b.Property<DateTimeOffset>("OccurredAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ReceivingOrderId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2041,6 +2208,8 @@ namespace Wms.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LicensePlateNumberId", "OccurredAtUtc");
+
+                    b.HasIndex("PickingAssemblyId", "OccurredAtUtc");
 
                     b.HasIndex("ReceivingOrderId", "OccurredAtUtc");
 
@@ -2530,8 +2699,69 @@ namespace Wms.Data.Migrations
                     b.Navigation("StockKeepingUnit");
                 });
 
+            modelBuilder.Entity("Wms.Domain.PickingAssembly", b =>
+                {
+                    b.HasOne("Wms.Domain.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingAssemblyPlanLine", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", "PickingAssembly")
+                        .WithMany("PlanLines")
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ShippingOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ShippingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", "StockKeepingUnit")
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PickingAssembly");
+
+                    b.Navigation("StockKeepingUnit");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingAssemblySourceLink", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", "PickingAssembly")
+                        .WithMany("SourceLinks")
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ShippingOrder", "ShippingOrder")
+                        .WithMany()
+                        .HasForeignKey("ShippingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PickingAssembly");
+
+                    b.Navigation("ShippingOrder");
+                });
+
             modelBuilder.Entity("Wms.Domain.PickingReservation", b =>
                 {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Wms.Domain.StockKeepingUnit", null)
                         .WithMany()
                         .HasForeignKey("StockKeepingUnitId")
@@ -2718,6 +2948,12 @@ namespace Wms.Data.Migrations
 
             modelBuilder.Entity("Wms.Domain.ReplenishmentTask", b =>
                 {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Wms.Domain.StorageLocation", null)
                         .WithMany()
                         .HasForeignKey("RecommendedDestinationStorageLocationId")
@@ -2974,6 +3210,11 @@ namespace Wms.Data.Migrations
                         .HasForeignKey("LicensePlateNumberId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Wms.Domain.ReceivingOrder", null)
                         .WithMany()
                         .HasForeignKey("ReceivingOrderId")
@@ -3042,6 +3283,13 @@ namespace Wms.Data.Migrations
             modelBuilder.Entity("Wms.Domain.LicensePlateNumberBatch", b =>
                 {
                     b.Navigation("Labels");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingAssembly", b =>
+                {
+                    b.Navigation("PlanLines");
+
+                    b.Navigation("SourceLinks");
                 });
 
             modelBuilder.Entity("Wms.Domain.ReceivingCycle", b =>

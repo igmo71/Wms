@@ -22,6 +22,7 @@ internal class ShippingOrderConfiguration : IEntityTypeConfiguration<ShippingOrd
             .HasMaxLength(DefaultConfiguration.Fingerprint);
         builder.Property(x => x.SynchronizationAcknowledgedBy)
             .HasMaxLength(DefaultConfiguration.Guid);
+        builder.Property(x => x.LastSourceCheckError).HasMaxLength(2000);
         builder.Ignore(x => x.Receiver);
 
         builder.HasOne(x => x.Warehouse).WithMany()

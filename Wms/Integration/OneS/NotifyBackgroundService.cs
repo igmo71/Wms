@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wms.Application.Receiving;
-using Wms.Application.ShippingOrders;
+using Wms.Application.Picking;
 using Wms.Common;
 using Wms.Integration.OneS.Models;
 using Wms.Integration.OneS.Services;
@@ -76,7 +76,7 @@ internal class NotifyBackgroundService(
             "Document_ПриходныйОрдерНаТовары" =>
                 await SynchronizeReceivingDocumentAsync(services, notifyRecord.Ref_Key, ct),
             nameof(Document_РасходныйОрдерНаТовары) =>
-                await ImportShippingOrderAsync(services, notifyRecord.Ref_Key, ct),
+                await SynchronizeShippingDocumentAsync(services, notifyRecord.Ref_Key, ct),
             nameof(InformationRegister_ШтрихкодыНоменклатуры) =>
                 await services.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>()
                     .ImportAsync(notifyRecord.Ref_Key, ct),
@@ -101,7 +101,7 @@ internal class NotifyBackgroundService(
         return result.IsSuccess ? OperationResult.Success() : result.Error!;
     }
 
-    private async Task<OperationResult> ImportShippingOrderAsync(
+    private async Task<OperationResult> SynchronizeShippingDocumentAsync(
         IServiceProvider services,
         string refKey,
         CancellationToken ct)
@@ -110,10 +110,11 @@ internal class NotifyBackgroundService(
             refKey,
             "расходного",
             ct);
-        return orderIdResult.IsSuccess
-            ? await services.GetRequiredService<ShippingOrderSynchronizationService>()
-                .ImportNotificationAsync(orderIdResult.Value, ct)
-            : orderIdResult.Error!;
+        if (!orderIdResult.IsSuccess)
+            return orderIdResult.Error!;
+        var result = await services.GetRequiredService<SynchronizeShippingSource>()
+            .ExecuteAsync(orderIdResult.Value, ct);
+        return result.IsSuccess ? OperationResult.Success() : result.Error!;
     }
 
     private async Task<OperationResult<Guid>> ParseDocumentIdAfterDelayAsync(

@@ -13,6 +13,7 @@ public sealed class WarehouseAuditEvent
     public string? ActorUserId { get; private set; }
     public string? ActionSource { get; private set; }
     public Guid? ReceivingOrderId { get; private set; }
+    public Guid? PickingAssemblyId { get; private set; }
     public Guid? LicensePlateNumberId { get; private set; }
     public Guid? StockKeepingUnitId { get; private set; }
     public Guid? ReceivingSourceDocumentId { get; private set; }
@@ -41,7 +42,8 @@ public sealed class WarehouseAuditEvent
         string? commandUserId = null,
         string? commandType = null,
         Guid? requestId = null,
-        Guid? warehouseOpeningImportId = null)
+        Guid? warehouseOpeningImportId = null,
+        Guid? pickingAssemblyId = null)
     {
         if (string.IsNullOrWhiteSpace(eventType) || eventType.Length > 100
             || occurredAtUtc == default)
@@ -52,7 +54,8 @@ public sealed class WarehouseAuditEvent
             return OperationError.Invalid("Укажите исполнителя или источник события.");
 
         Guid?[] affectedIds = [receivingOrderId, licensePlateNumberId,
-            stockKeepingUnitId, receivingSourceDocumentId, warehouseOpeningImportId];
+            stockKeepingUnitId, receivingSourceDocumentId, warehouseOpeningImportId,
+            pickingAssemblyId];
         if (affectedIds.All(x => x is null) || affectedIds.Any(x => x == Guid.Empty))
             return OperationError.Invalid("Событие должно ссылаться на затронутый объект.");
 
@@ -80,6 +83,7 @@ public sealed class WarehouseAuditEvent
             ActorUserId = actorUserId?.Trim(),
             ActionSource = actionSource?.Trim(),
             ReceivingOrderId = receivingOrderId,
+            PickingAssemblyId = pickingAssemblyId,
             LicensePlateNumberId = licensePlateNumberId,
             StockKeepingUnitId = stockKeepingUnitId,
             ReceivingSourceDocumentId = receivingSourceDocumentId,

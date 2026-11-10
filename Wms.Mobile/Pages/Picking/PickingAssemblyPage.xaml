@@ -1,0 +1,51 @@
+<ContentPage x:Class="Wms.Mobile.PickingAssemblyPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Отбор">
+    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
+        <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="9">
+                    <Picker x:Name="WarehousePicker" Title="Выберите склад"
+                            ItemDisplayBinding="{Binding Name}"
+                            SelectedIndexChanged="OnWarehouseChanged" />
+                    <Label Text="Сканируйте РО 1С или выберите свою сборку." FontSize="13" />
+                    <Button x:Name="CameraButton" Text="Сканировать РО 1С"
+                            IsVisible="False" Clicked="OnCameraClicked" />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                    <Label Text="Мои сборки" FontAttributes="Bold" FontSize="17" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding AssemblyRows, Source={x:Reference Page}}"
+                                         Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingAssemblyQueueRow">
+                                <Border Padding="9" Stroke="#D4D4D4">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding Id}"
+                                                              Tapped="OnAssemblyTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                        <Label Text="{Binding DetailText}" FontSize="12" />
+                                        <Label Text="{Binding WarningText}" TextColor="DarkOrange"
+                                               IsVisible="{Binding HasWarning}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="1" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить создание сборки"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+            <Button x:Name="CreateButton" Text="Новая сборка"
+                    Clicked="OnCreateClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

@@ -27,6 +27,9 @@ internal sealed class WarehouseAuditEventConfiguration
         builder.HasOne<ReceivingOrder>().WithMany()
             .HasForeignKey(x => x.ReceivingOrderId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PickingAssembly>().WithMany()
+            .HasForeignKey(x => x.PickingAssemblyId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LicensePlateNumber>().WithMany()
             .HasForeignKey(x => x.LicensePlateNumberId)
             .OnDelete(DeleteBehavior.Restrict);
@@ -41,6 +44,7 @@ internal sealed class WarehouseAuditEventConfiguration
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.ReceivingOrderId, x.OccurredAtUtc });
+        builder.HasIndex(x => new { x.PickingAssemblyId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.LicensePlateNumberId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.StockKeepingUnitId, x.OccurredAtUtc });
         builder.HasIndex(x => new { x.ReceivingSourceDocumentId, x.OccurredAtUtc });

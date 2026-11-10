@@ -22,10 +22,12 @@ public sealed class OutboundInventoryPostingSafetyTests(SqlDatabase database)
         var (warehouseId, sourceId, destinationId, skuId) = await SeedAsync(ZoneType.Storage);
         var now = DateTimeOffset.UtcNow;
         var date = DateOnly.FromDateTime(now.UtcDateTime).AddDays(30);
-        var assemblyId = Guid.NewGuid();
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var assemblyId = assembly.Id;
         var entryId = Guid.NewGuid();
         await using (var db = database.CreateDbContext())
         {
+            db.Add(assembly);
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, sourceId, skuId, 10, now, date)));
             db.Add(Value(PickingReservation.Create(entryId, assemblyId, warehouseId,
                 sourceId, skuId, date, 10, UserId, now)));
@@ -90,12 +92,14 @@ public sealed class OutboundInventoryPostingSafetyTests(SqlDatabase database)
     {
         var (warehouseId, sourceId, _, skuId) = await SeedAsync(ZoneType.Storage);
         var now = DateTimeOffset.UtcNow;
-        var reservation = Value(PickingReservation.Create(Guid.NewGuid(), Guid.NewGuid(), warehouseId,
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var reservation = Value(PickingReservation.Create(Guid.NewGuid(), assembly.Id, warehouseId,
             sourceId, skuId, null, 7, UserId, now));
         var shortage = Value(StockShortage.Report(Guid.NewGuid(), warehouseId, sourceId, skuId,
             null, StockShortageOrigin.Picking, reservation.PickingAssemblyId, 10, 7, null, UserId, now));
         await using (var db = database.CreateDbContext())
         {
+            db.Add(assembly);
             db.AddRange(reservation, shortage,
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, sourceId, skuId, 10, now)));
             await db.SaveChangesAsync();

@@ -18,6 +18,8 @@ internal sealed class ReplenishmentTaskConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.CancelledBy).HasMaxLength(DefaultConfiguration.Guid);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasIndex(x => x.PickingAssemblyId);
+        builder.HasOne<PickingAssembly>().WithMany().HasForeignKey(x => x.PickingAssemblyId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.WarehouseId, x.Status, x.OrderedAtUtc });
         builder.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);

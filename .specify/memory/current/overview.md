@@ -40,8 +40,11 @@ differences on separate SKUs cannot cancel each other.
 
 LPN tracks receiving provenance and initial putaway, not stored inventory.
 
-The replacement outbound workflow currently has domain models for reservations,
-shortages and replenishment, shared availability queries, and dated inventory
-posting primitives. The picking and shipping screens still use the legacy
-scenario. The legacy `Wms` project is being eliminated as its scenarios are
-replaced in the new projects.
+The replacement outbound workflow currently has the WMS picking assembly model
+and schema, reservations, shortages and replenishment, shared availability
+queries, and dated inventory posting primitives. Its application services can
+list and read assemblies, and explicitly transfer an already started assembly
+to another Operator. The owner and revision change together; source plans,
+reservations and the actors of earlier physical records are retained. The
+picking and shipping screens still use the legacy scenario. The legacy `Wms`
+project is being eliminated as its scenarios are replaced in the new projects.

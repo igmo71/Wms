@@ -12,7 +12,7 @@ conventions. Project-wide principles live in the
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
 | `Wms.Application` | Command execution, receiving use cases, shared stock availability and dated posting for receiving/outbound operations; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
-| `Wms.Integration` | Receiving source HTTP reader, OData parser and cutover XLSX reader; references Application. |
+| `Wms.Integration` | Receiving and shipping source HTTP readers, OData parsers and cutover XLSX reader; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
 | `Wms.WebApi` | Authenticated Mobile API and 1C integration endpoints. |
 | `Wms.WebApp` | Manager and warehouse Web interface. |
@@ -129,6 +129,39 @@ not need a structural rewrite for naming or type layout alone.
 
 ### Domain
 
+`PickingAssembly` owns the WMS outbound document identity, responsible operator,
+status and operational revision. Its source links retain attach/detach history
+and the source JSON used for the working plan; plan lines are unique by assembly,
+source and SKU. A filtered database index permits one active link per 1C shipping
+order. Assembly relationships now constrain picking reservations and replenishment
+tasks; warehouse audit can point directly to the assembly. The existing
+`ShippingOrder` remains the 1C source projection while its legacy callers are
+replaced. The replacement shipping reader supplies an Application synchronization
+use case; the source projection retains its latest raw JSON and check outcome.
+Notification handling calls that use case, while the existing warehouse plan
+changes only for a linked draft assembly in the same EF transaction.
+New links and plan lines of an already tracked assembly are explicitly staged
+for insertion; source synchronization likewise stages newly added draft lines.
+The start use case records its freeze, short execution lease, source PATCH intent,
+per-source outcome, and completion through command receipts and audit. HTTP
+calls happen between those database commands; no EF transaction spans a 1C
+request. The Integration writer owns the outbound PATCH and POST protocol.
+The picking query store returns assembly lists and details with the current
+responsible user's display name, source check outcomes and WMS plan. Takeover
+uses the assembly operational revision and the same command receipt/audit path;
+readers observe the new owner on their next refresh.
+Mobile picking request and response contracts and endpoint handlers are prepared
+under Mobile V1. Their route group is not registered until the outbound screen
+replacement; when registered it requires the dedicated Operator-only policy.
+The new Integration barcode decoder converts the decimal 1C document label to
+its Ref_Key at that HTTP boundary.
+Mobile has an unlinked picking queue, source-document page and read-only SKU
+plan page registered with dependency injection. The shared picking process
+retains one ClientRequestId and its exact command input through an uncertain
+HTTP response, then fetches the assembly before clearing the pending command.
+The main navigation remains on the older shipping screen until the outbound
+workflow is switched over.
+
 The outbound domain model distinguishes quantity reservations (`PickingReservation`),
 reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).
 Picking and replenishment have separate hold owner types. Replenishment tasks own
@@ -200,6 +233,9 @@ after the winning copy changed the stock. It disposes its session before looking
 up the winning receipt, and returns that recorded result when the request hash
 matches. Recognized stock conflicts raised during the command operation follow
 the same recovery as conflicts during the final save.
+An EF optimistic concurrency failure during that final save is a command
+conflict for any tracked entity. SQL deadlocks and known unique-index collisions
+are also reported as conflicts, including when EF wraps their exceptions.
 Persisted command types are stable strings, not CLR type names. Hashes use only
 deterministic semantic input; Mobile V1 hash compatibility is preserved.
 

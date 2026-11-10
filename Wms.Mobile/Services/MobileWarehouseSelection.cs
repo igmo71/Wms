@@ -4,12 +4,14 @@ namespace Wms.Mobile.Services;
 
 public sealed class MobileWarehouseSelection
 {
+    public string? CurrentUserId { get; private set; }
     private Guid? _defaultWarehouseId;
     private Guid? _selectedWarehouseId;
     private string? _unavailableWarning;
 
     public void Initialize(MobileCurrentUserResponse user)
     {
+        CurrentUserId = user.Id;
         _defaultWarehouseId = user.DefaultWarehouseId;
         _selectedWarehouseId = user.DefaultWarehouseId;
         _unavailableWarning = null;
@@ -17,6 +19,7 @@ public sealed class MobileWarehouseSelection
 
     public void Clear()
     {
+        CurrentUserId = null;
         _defaultWarehouseId = null;
         _selectedWarehouseId = null;
         _unavailableWarning = null;

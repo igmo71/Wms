@@ -20,10 +20,12 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
     public async Task Dates_shortages_and_own_reservations_are_accounted_separately()
     {
         var (warehouseId, locationId, skuId) = await SeedAsync();
-        var assemblyId = Guid.NewGuid();
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var assemblyId = assembly.Id;
         var date = new DateOnly(2027, 1, 1);
         await using (var db = database.CreateDbContext())
         {
+            db.Add(assembly);
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
                 skuId, 5, DateTimeOffset.UtcNow, date)));
             db.Add(Reservation(warehouseId, locationId, skuId, assemblyId, Guid.NewGuid(), 7));
@@ -67,8 +69,16 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
         var store = new StockAvailabilityStore(database);
         var executor = new CommandExecutor(new CommandExecutionStore(database));
         var requestId = Guid.NewGuid();
-        var assemblyId = Guid.NewGuid();
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var assemblyId = assembly.Id;
         var entryId = Guid.NewGuid();
+        var competingAssembly = PickingAssembly(warehouseId, UserId);
+        var competingAssemblyId = competingAssembly.Id;
+        await using (var db = database.CreateDbContext())
+        {
+            db.AddRange(assembly, competingAssembly);
+            await db.SaveChangesAsync();
+        }
         var firstHasLock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -77,7 +87,7 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
         await firstHasLock.Task.WaitAsync(TimeSpan.FromSeconds(20));
         var second = ExecuteReservation(duplicateRequest ? requestId : Guid.NewGuid(),
             duplicateRequest ? entryId : Guid.NewGuid(),
-            duplicateRequest ? assemblyId : Guid.NewGuid(), firstAttempt: false);
+            duplicateRequest ? assemblyId : competingAssemblyId, firstAttempt: false);
         try
         {
             await secondEntered.Task.WaitAsync(TimeSpan.FromSeconds(20));
@@ -138,9 +148,11 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
     {
         var (warehouseId, locationId, skuId) = await SeedAsync();
         var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Other reserved SKU" };
-        var assemblyId = Guid.NewGuid();
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var assemblyId = assembly.Id;
         await using (var db = database.CreateDbContext())
         {
+            db.Add(assembly);
             db.Add(otherSku);
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
                 otherSku.Id, 3, DateTimeOffset.UtcNow)));

@@ -59,11 +59,15 @@ public class Program
                 policy => policy.RequireRole(ApplicationRoles.All))
             .AddPolicy(
                 MobileAuthorization.ReceivingWorkerPolicy,
+                policy => policy.RequireRole(ApplicationRoles.Operator))
+            .AddPolicy(
+                MobileAuthorization.PickingWorkerPolicy,
                 policy => policy.RequireRole(ApplicationRoles.Operator));
 
         // Existing service registrations remain in the legacy Wms assembly until their replacement.
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddReceivingSourceReader(builder.Configuration);
+        builder.Services.AddShippingSourceReader(builder.Configuration);
         builder.Services.AddApplicationServices(builder.Configuration);
         builder.Services.AddNotificationServices();
 

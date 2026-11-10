@@ -15,6 +15,8 @@ internal sealed class PickingReservationConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.CreatedBy).HasMaxLength(DefaultConfiguration.Guid).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasIndex(x => x.PickingAssemblyId);
+        builder.HasOne<PickingAssembly>().WithMany().HasForeignKey(x => x.PickingAssemblyId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new
         {
             x.WarehouseId, x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate
