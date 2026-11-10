@@ -6,9 +6,11 @@
 
 1C owns source documents and imported catalog fields; WMS may own local
 operational SKU flags. WMS owns receiving work, storage locations, movements,
-balances and operational history. After successful synchronization, a change
-in a source document MUST update the current plan without silently rewriting
-an already posted warehouse fact. Warehouse stock changes MUST be represented by
+balances and operational history. Successful synchronization MUST refresh the
+current source-document view. Its effect on the WMS working plan depends on
+workflow state: an unstarted plan may follow the source, while a started plan
+may require an explicit warehouse decision. A source change MUST NOT silently
+rewrite an already posted warehouse fact. Warehouse stock changes MUST be represented by
 movements; corrections add movements and preserve the original operation.
 
 ### II. One posting path for each physical event
@@ -90,4 +92,4 @@ change. Increment MAJOR for incompatible governance changes, MINOR for new or
 materially expanded rules, and PATCH for clarification. User instructions take
 precedence over this document.
 
-**Version**: 1.2.1 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-10-28
+**Version**: 1.2.2 | **Ratified**: 2026-10-14 | **Last Amended**: 2026-11-09
