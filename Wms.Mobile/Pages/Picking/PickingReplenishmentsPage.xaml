@@ -1,0 +1,59 @@
+<ContentPage x:Class="Wms.Mobile.PickingReplenishmentsPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Отбор › Подпитки">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
+        <VerticalStackLayout Spacing="3">
+            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
+            <Label x:Name="ReadyLabel" FontSize="13" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="ReplenishmentsRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="9">
+                    <Label Text="Предложения" FontAttributes="Bold" FontSize="17" />
+                    <Label x:Name="NoProposalsLabel" Text="Новых предложений нет." FontSize="12" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ProposalRows, Source={x:Reference Page}}" Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingReplenishmentProposalRow">
+                                <Border Padding="9" Stroke="#D4D4D4" BackgroundColor="White">
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label Text="{Binding SkuName}" FontAttributes="Bold" />
+                                        <Label Text="{Binding DetailText}" FontSize="12" />
+                                        <Label Text="{Binding GroupsText}" FontSize="12" />
+                                        <Button Text="Заказать" CommandParameter="{Binding .}"
+                                                Clicked="OnOrderClicked" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Label Text="Заказы и выполнение" FontAttributes="Bold" FontSize="17" />
+                    <Label x:Name="NoTasksLabel" Text="Подпитки ещё не заказаны." FontSize="12" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding TaskRows, Source={x:Reference Page}}" Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingReplenishmentTaskRow">
+                                <Border Padding="9" Stroke="#D4D4D4" BackgroundColor="{Binding BackgroundColor}">
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label Text="{Binding SkuName}" FontAttributes="Bold" />
+                                        <Label Text="{Binding ProgressText}" FontSize="13" />
+                                        <Label Text="{Binding AddressText}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Label x:Name="DeficitLabel" TextColor="DarkOrange" FontSize="12" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить заказ"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

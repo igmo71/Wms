@@ -79,6 +79,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
             new CommandExecutor(new CommandExecutionStore(database)), store,
             checker, new AllocatePickingFact(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            new ReplenishmentStore(database),
             permission, TimeProvider.System);
         var request = new ClosePickingAssemblyRequest(Guid.NewGuid(), assembly.Id,
             assembly.OperationalRevision, UserId);
@@ -178,6 +179,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
         var close = new ClosePickingAssembly(executor, store, checker,
             new AllocatePickingFact(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            new ReplenishmentStore(database),
             permission, TimeProvider.System);
         var takeOver = new TakeOverPickingAssembly(executor, store, permission,
             TimeProvider.System);

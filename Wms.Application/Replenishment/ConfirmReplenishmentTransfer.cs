@@ -119,6 +119,7 @@ public sealed class ConfirmReplenishmentTransfer(
                     destination.Id, request.ExpirationDate, request.Quantity,
                     movement.Value!.Id, request.UserId, now);
                 if (!transfer.IsSuccess) return transfer.Error!;
+                session.Stage(transfer.Value!);
                 var posted = await posting.HandleAsync(new PostInventoryMovement.Command(
                     movement.Value!, InventoryPostingKind.Replenishment, now),
                     session, token);

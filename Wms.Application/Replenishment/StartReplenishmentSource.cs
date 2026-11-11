@@ -117,6 +117,7 @@ public sealed class StartReplenishmentSource(
                 var cycle = task.StartSource(Guid.NewGuid(), location.Id,
                     request.UserId, now);
                 if (!cycle.IsSuccess) return cycle.Error!;
+                session.Stage(cycle.Value!);
 
                 // A scan may replace the original recommendation. Keep all
                 // other orders and redistribute only their suggested sources.

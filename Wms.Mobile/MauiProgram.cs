@@ -60,6 +60,10 @@ public static class MauiProgram
         builder.Services.AddTransient<PickingSkuPage>();
         builder.Services.AddTransient<PickingRoutePage>();
         builder.Services.AddTransient<PickingEntryPage>();
+        builder.Services.AddTransient<PickingReplenishmentsPage>();
+        builder.Services.AddTransient<ReplenishmentQueuePage>();
+        builder.Services.AddTransient<ReplenishmentTaskPage>();
+        builder.Services.AddTransient<ReplenishmentTaskProcess>();
         builder.Services.AddTransient<SkuLocationsPage>();
         builder.Services.AddTransient<PickingAssemblyProcess>();
         builder.Services.AddTransient<ScannerDiagnosticsPage>();
@@ -98,6 +102,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(serviceProvider => new MobileShippingOrderClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
         builder.Services.AddSingleton(serviceProvider => new MobilePickingClient(
+            serviceProvider.GetRequiredService<MobileApiTransport>()));
+        builder.Services.AddSingleton(serviceProvider => new MobileReplenishmentClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
         builder.Services.AddSingleton(serviceProvider => new MobileStockAvailabilityClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));

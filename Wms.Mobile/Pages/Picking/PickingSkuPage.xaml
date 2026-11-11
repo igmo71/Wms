@@ -68,6 +68,8 @@
                     Clicked="OnSourcesClicked" />
             <Button x:Name="RouteButton" Text="Маршрут" Clicked="OnRouteClicked"
                     IsVisible="False" />
+            <Button x:Name="ReplenishmentsButton" Text="Подпитки"
+                    Clicked="OnReplenishmentsClicked" IsVisible="False" />
             <Button x:Name="CloseButton" Text="Закрыть и отгрузить"
                     Clicked="OnCloseClicked" IsVisible="False" />
         </VerticalStackLayout>

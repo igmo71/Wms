@@ -2,7 +2,8 @@ using Wms.Contracts.Mobile.V1;
 
 namespace Wms.Mobile.Services;
 
-public sealed class PickingAssemblyProcess(MobilePickingClient client)
+public sealed class PickingAssemblyProcess(
+    MobilePickingClient client, MobileReplenishmentClient replenishments)
 {
     private PendingCommand? _pending;
     private bool _executing;
@@ -98,6 +99,17 @@ public sealed class PickingAssemblyProcess(MobilePickingClient client)
         Begin("Закрыть и отгрузить", warehouseId, async id =>
             (await client.CloseAsync(assemblyId,
                 new(id, warehouseId, revision))).AssemblyId);
+
+    public Task<MobilePickingAssemblyResponse> OrderReplenishmentAsync(
+        Guid assemblyId, Guid warehouseId, long revision,
+        Guid skuId, Guid sourceId, Guid? destinationId, decimal quantity) =>
+        Begin("Заказать Подпитку", warehouseId, async id =>
+        {
+            await replenishments.OrderAsync(assemblyId,
+                new(id, warehouseId, revision, skuId, sourceId,
+                    destinationId, quantity));
+            return assemblyId;
+        });
 
     private Task<MobilePickingAssemblyResponse> Begin(
         string label, Guid warehouseId, Func<Guid, Task<Guid>> execute)

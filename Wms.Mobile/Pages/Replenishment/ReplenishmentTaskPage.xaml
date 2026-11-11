@@ -1,0 +1,93 @@
+<ContentPage x:Class="Wms.Mobile.ReplenishmentTaskPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Подпитка › Задание"
+             HideSoftInputOnTapped="True">
+    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
+        <RefreshView x:Name="TaskRefreshView" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="SkuLabel" FontSize="21" FontAttributes="Bold" />
+                    <Label x:Name="ProgressLabel" FontSize="15" />
+                    <Label x:Name="StatusLabel" FontSize="13" />
+                    <Label x:Name="RecommendationLabel" FontSize="13" />
+                    <Button x:Name="CameraButton" Text="Сканировать ячейку"
+                            IsVisible="False" Clicked="OnCameraClicked" />
+                    <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+
+                    <VerticalStackLayout x:Name="StartPanel" Spacing="5">
+                        <Label Text="Снять исходный поддон" FontAttributes="Bold" />
+                        <Entry x:Name="SourceEntry" Placeholder="Сканируйте ячейку Хранения"
+                               Focused="OnSourceFocused" />
+                        <Button x:Name="StartButton" Text="Подтвердить снятие"
+                                Clicked="OnStartClicked" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="ActivePanel" Spacing="6" IsVisible="False">
+                        <Label x:Name="ActiveSourceLabel" FontAttributes="Bold" />
+                        <Label x:Name="ReturnRequiredLabel" TextColor="DarkOrange" />
+                        <Label Text="Остаток в исходной ячейке (другие SKU — для сведения)"
+                               FontSize="12" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding StockRows, Source={x:Reference Page}}"
+                                             Spacing="2">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="local:ReplenishmentStockRow">
+                                    <Label Text="{Binding Text}" FontSize="12" />
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Перенос только SKU задания" FontAttributes="Bold" />
+                        <Picker x:Name="GroupPicker" Title="Срок годности"
+                                ItemDisplayBinding="{Binding DisplayText}"
+                                SelectedIndexChanged="OnGroupChanged" />
+                        <Entry x:Name="QuantityEntry" Keyboard="Numeric" FontSize="22"
+                               Placeholder="Количество" />
+                        <Entry x:Name="DestinationEntry" Placeholder="Сканируйте ячейку Комплектации"
+                               Focused="OnDestinationFocused" />
+                        <Button x:Name="TransferButton" Text="Подтвердить перенос"
+                                Clicked="OnTransferClicked" />
+                        <Label Text="При недостаче укажите ожидаемое и найденное количество выбранного срока."
+                               FontSize="12" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                            <Entry x:Name="ExpectedEntry" Keyboard="Numeric" Placeholder="Ожидалось" />
+                            <Entry x:Name="FoundEntry" Grid.Column="1" Keyboard="Numeric"
+                                   Placeholder="Найдено" />
+                        </Grid>
+                        <Entry x:Name="CommentEntry" Placeholder="Комментарий (необязательно)" />
+                        <Button x:Name="ShortageButton" Text="Сообщить о недостаче"
+                                Clicked="OnShortageClicked" />
+                        <Label Text="После переноса верните поддон или подтвердите пустую ячейку."
+                               FontSize="12" />
+                        <Entry x:Name="ReturnEntry" Placeholder="Повторно сканируйте исходную ячейку"
+                               Focused="OnReturnFocused" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                            <Button x:Name="ReturnButton" Text="Вернуть поддон"
+                                    Clicked="OnReturnClicked" />
+                            <Button x:Name="EmptyButton" Grid.Column="1" Text="Ячейка пуста"
+                                    Clicked="OnEmptyClicked" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <Label Text="Проведённые переносы" FontAttributes="Bold" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding TransferRows, Source={x:Reference Page}}"
+                                         Spacing="3">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:ReplenishmentTransferRow">
+                                <Label Text="{Binding Text}" FontSize="12" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="1" Spacing="5">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+            <Button x:Name="RetryButton" Text="Повторить команду"
+                    IsVisible="False" Clicked="OnRetryClicked" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

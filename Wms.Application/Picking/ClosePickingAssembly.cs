@@ -3,6 +3,7 @@ using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -18,6 +19,7 @@ public sealed record ClosePickingAssemblyRequest(
 public sealed class ClosePickingAssembly(CommandExecutor executor,
     IPickingAssemblyStore assemblies, CheckPickingClosure checker,
     AllocatePickingFact allocator, PostInventoryMovement.Handler posting,
+    IReplenishmentStore replenishments,
     WarehousePermission permission, TimeProvider clock)
 {
     private const string CommandType = "picking.assembly.close";
@@ -110,6 +112,15 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                 if (allocation.RequiresManagerDecision.Count > 0)
                     return OperationError.Conflict("Не распределён недобор общего SKU.");
                 var now = clock.GetUtcNow();
+                var cancelledReplenishments = 0;
+                foreach (var task in await replenishments.LoadForAssemblyAsync(
+                    session, assembly.Id, token))
+                {
+                    if (task.Status != ReplenishmentTaskStatus.Ordered) continue;
+                    var cancelled = task.Cancel(request.UserId, now);
+                    if (!cancelled.IsSuccess) return cancelled.Error!;
+                    cancelledReplenishments++;
+                }
                 var movements = new List<Guid>();
                 var picked = state.Entries.Where(x => x.Quantity > 0)
                     .OrderBy(x => x.StorageLocationId)
@@ -180,6 +191,7 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                         Status = assembly.Status.ToString(),
                         EntryCount = picked.Length,
                         DocumentCount = review.Sources.Count,
+                        CancelledReplenishments = cancelledReplenishments,
                         ManagerOverride = request.ManagerOverride,
                         Reason = request.DecisionReason?.Trim() }),
                     movements, commandUserId: request.UserId,

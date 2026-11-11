@@ -67,6 +67,12 @@
                 Text="Отбор и отгрузка" />
 
             <Button
+                Clicked="OnReplenishmentsClicked"
+                FontSize="16"
+                HeightRequest="52"
+                Text="Подпитка" />
+
+            <Button
                 Clicked="OnInventoryTransferClicked"
                 FontSize="16"
                 HeightRequest="52"

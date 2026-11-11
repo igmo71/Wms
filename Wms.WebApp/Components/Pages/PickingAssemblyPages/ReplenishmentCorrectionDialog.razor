@@ -1,0 +1,19 @@
+@using Wms.Application.Replenishment
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Корректировка Подпитки: @(Transfer.SkuName ?? Transfer.StockKeepingUnitId.ToString())</MudText>
+            <MudText>@Transfer.SourceLocationCode → @Transfer.DestinationLocationCode · Срок: @(Transfer.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudText>
+            <MudText>Исходный шаг: @Transfer.OriginalQuantity.ToString("0.###") · Текущий итог: @Transfer.EffectiveQuantity.ToString("0.###")</MudText>
+            <MudAlert Severity="Severity.Info">Разница будет проведена отдельным движением между этими ячейками. Исходный шаг останется в истории.</MudAlert>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+            <MudNumericField T="decimal?" @bind-Value="_correctedQuantity" Label="Фактически перенесено" Min="0" Step="@(0.001m)" HideSpinButtons="true" Disabled="@(_pendingRequest is not null)" />
+            <MudTextField T="string" @bind-Value="_reason" Label="Причина корректировки" Lines="2" MaxLength="1000" Disabled="@(_pendingRequest is not null)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="@(_busy || _pendingRequest is not null)" OnClick="Close">Закрыть</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="_busy" OnClick="CorrectAsync">Провести корректировку</MudButton>
+    </DialogActions>
+</MudDialog>

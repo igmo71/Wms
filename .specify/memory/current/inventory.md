@@ -133,6 +133,22 @@ the common inventory posting operation. The source hold remains until its
 separate completion scan. The movement, both balances and turnovers, task
 progress, transfer record, audit and command receipt are saved together;
 repeating the request ID does not move stock again.
+An Operator can report a shortage in the held source's SKU and expiration
+group. The disputed quantity is blocked separately from the whole-cell hold;
+the found quantity remains available for a dated transfer. A source cycle ends
+only after scanning that same cell and confirming either the physical return
+of its remaining pallet or an empty cell. Empty-cell confirmation checks all
+SKU and expiration groups, excluding separately blocked disputed quantities.
+The command releases the whole-cell hold but keeps shortage blocks. If the
+ordered quantity remains incomplete, the same task awaits another source;
+its prior transfers and assigned replenisher remain recorded.
+The Manager can correct a posted replenishment step by entering its actual
+transferred quantity and a reason. The original step remains immutable; a
+separate dated stock-correction movement, recorded against that step, transfers
+the difference between its original source and destination. The shared posting
+checks current balances, reservations, shortage blocks, cell holds and SKU
+mixing. Task progress reflects the corrected total in the same command. The
+assembly audit retains the reason, old and new quantities and movement ID.
 
 Closing the replacement picking assembly is the sole outbound stock posting
 point. It rechecks each positive entry against its own active reservation and
@@ -141,6 +157,9 @@ original cell and date group. All movements, signed turnovers, balances,
 allocation rows, closure result, released pallet holds, audit and command
 receipt commit together. A zero fact creates no stock movements. There is no
 intermediate Shipping-zone balance.
+Closing cancels replenishment orders that have not scanned a source. Started
+tasks continue independently of the closed picking fact and retain their
+transfers in the destination cell.
 
 A Manager can request cancellation of an unclosed picking assembly only after
 every picked quantity has been returned through its original-cell scan, all
@@ -150,6 +169,8 @@ replenishments are cancelled in the same command; completed transfers remain
 in their destination cells. An already started replenishment keeps the assembly
 in `CancellationPending` until that task finishes. An unresolved physical
 shortage remains a separate blocked stock group for Manager review.
+When the last started task finishes and no linked 1C source remains, the same
+source-completion command finishes the pending assembly cancellation.
 
 ## Opening stock cutover
 

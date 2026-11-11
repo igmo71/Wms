@@ -106,6 +106,9 @@ public partial class MainPage : ContentPage
     private async void OnShippingOrdersClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ShippingOrderPage>());
 
+    private async void OnReplenishmentsClicked(object? sender, EventArgs e) =>
+        await Navigation.PushAsync(_services.GetRequiredService<ReplenishmentQueuePage>());
+
     private async void OnScannerDiagnosticsClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ScannerDiagnosticsPage>());
 

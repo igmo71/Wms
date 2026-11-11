@@ -1,6 +1,7 @@
 @page "/picking-assemblies/{Id:guid}"
 @attribute [Authorize(Roles = "Manager")]
 @using Wms.Application.Picking
+@using Wms.Application.Replenishment
 @using Wms.Domain.Enums
 
 <PageTitle>Сборка WMS @(_assembly?.Number)</PageTitle>
@@ -141,6 +142,29 @@ else
                                 <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="() => OpenShortageAsync(context)">Разобрать</MudButton>
                             }
                         </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6">Проведённая Подпитка</MudText>
+            @if (_replenishmentTransfers.Count == 0)
+            {
+                <MudText>Проведённых шагов пока нет.</MudText>
+            }
+            else
+            {
+                <MudTable T="ReplenishmentTransferView" Items="_replenishmentTransfers" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>SKU</MudTh><MudTh>Источник → назначение</MudTh><MudTh>Срок</MudTh><MudTh>Исходный шаг</MudTh><MudTh>Текущий итог</MudTh><MudTh>Время</MudTh><MudTh></MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@(context.SkuName ?? context.StockKeepingUnitId.ToString())</MudTd>
+                        <MudTd>@context.SourceLocationCode → @context.DestinationLocationCode</MudTd>
+                        <MudTd>@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                        <MudTd>@context.OriginalQuantity.ToString("0.###")</MudTd>
+                        <MudTd>@context.EffectiveQuantity.ToString("0.###")</MudTd>
+                        <MudTd>@context.ConfirmedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                        <MudTd><MudButton Variant="Variant.Text" Disabled="@(_busy || _pendingCloseRequest is not null || _pendingCancelRequest is not null)" OnClick="() => OpenReplenishmentCorrectionAsync(context)">Исправить</MudButton></MudTd>
                     </RowTemplate>
                 </MudTable>
             }

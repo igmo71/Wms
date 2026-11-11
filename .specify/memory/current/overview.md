@@ -66,3 +66,14 @@ warehouse, cell and expiration group without changing balances.
 The replacement cancellation command can stop unclosed work after physical
 returns, cancel unstarted replenishments and retain linked 1C documents while
 their status restoration is pending.
+Replenishment can now report and separately block source shortages, transfer
+the found stock, and finish a source with a return or empty-cell scan. Closing
+a picking assembly cancels orders without a source scan while started tasks
+continue; completing the last started task can finish a pending cancellation
+once the linked 1C sources have been released.
+A Manager can also correct a posted replenishment step in Web. The correction
+posts a separate dated movement linked to that step and updates task progress;
+the original transfer remains in history.
+Mobile V1 now has replacement replenishment routes and a client for proposals,
+task queue and detail, ordering and physical commands. The replenishment
+screens and main navigation switch still await implementation.

@@ -150,6 +150,34 @@ public sealed class ReplenishmentTask
         return OperationResult.Success();
     }
 
+    public OperationResult CorrectTransfer(Guid transferId, decimal quantityChange,
+        DateTimeOffset correctedAtUtc)
+    {
+        if (Status is not (ReplenishmentTaskStatus.InProgress or ReplenishmentTaskStatus.Completed)
+            || !_sourceCycles.SelectMany(x => x.Transfers).Any(x => x.Id == transferId))
+            return OperationError.Conflict("Проведённый шаг Подпитки не принадлежит заданию.");
+        if (quantityChange == 0 || !WarehouseQuantity.IsPositive(Math.Abs(quantityChange))
+            || correctedAtUtc == default || correctedAtUtc < UpdatedAtUtc)
+            return OperationError.Invalid("Изменение количества или время корректировки недопустимы.");
+        var total = TransferredQuantity + quantityChange;
+        if (total < 0 || total > OrderedQuantity)
+            return OperationError.Conflict("Итог Подпитки выйдет за пределы заказа.");
+
+        TransferredQuantity = total;
+        UpdatedAtUtc = correctedAtUtc;
+        if (total == OrderedQuantity && _sourceCycles.All(x => x.CompletedAtUtc is not null))
+        {
+            Status = ReplenishmentTaskStatus.Completed;
+            CompletedAtUtc = correctedAtUtc;
+        }
+        else
+        {
+            Status = ReplenishmentTaskStatus.InProgress;
+            CompletedAtUtc = null;
+        }
+        return OperationResult.Success();
+    }
+
     public OperationResult Cancel(string userId, DateTimeOffset cancelledAtUtc)
     {
         if (Status != ReplenishmentTaskStatus.Ordered || _sourceCycles.Count != 0)

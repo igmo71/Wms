@@ -8,19 +8,23 @@ namespace Wms.Mobile;
 public partial class PickingSkuPage : ContentPage
 {
     private readonly MobilePickingClient _client;
+    private readonly MobileReplenishmentClient _replenishments;
     private readonly MobileWarehouseSelection _selection;
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
     private MobilePickingWorkResponse? _work;
     private bool _busy;
+    private bool _replenishmentsReady;
 
     public PickingSkuPage(MobilePickingClient client,
+        MobileReplenishmentClient replenishments,
         MobileWarehouseSelection selection, PickingAssemblyProcess process,
         IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
+        _replenishments = replenishments;
         _selection = selection;
         _process = process;
         _services = services;
@@ -57,8 +61,29 @@ public partial class PickingSkuPage : ContentPage
         {
             var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
             _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            _replenishmentsReady = false;
+            string? replenishmentError = null;
+            if (assembly.Status == MobilePickingAssemblyStatus.InProgress
+                && assembly.ResponsibleUserId == _selection.CurrentUserId)
+            {
+                try
+                {
+                    var list = await _replenishments.AssemblyAsync(assembly.Id,
+                        assembly.WarehouseId);
+                    var active = list.Tasks.Where(x =>
+                        x.Status != MobileReplenishmentTaskStatus.Cancelled).ToArray();
+                    _replenishmentsReady = active.Length > 0
+                        && active.All(x => x.TransferredQuantity == x.OrderedQuantity)
+                        && list.Proposals.Count == 0 && list.Deficits.Count == 0;
+                }
+                catch (MobileApiException exception)
+                { replenishmentError = exception.Message; }
+                catch (HttpRequestException)
+                { replenishmentError = "Не удалось обновить Подпитки."; }
+            }
             Apply(assembly);
-            if (!_process.HasPendingCommand) ErrorLabel.Text = string.Empty;
+            if (!_process.HasPendingCommand)
+                ErrorLabel.Text = replenishmentError ?? string.Empty;
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить сборку."; }
@@ -127,6 +152,15 @@ public partial class PickingSkuPage : ContentPage
         if (_busy || _process.HasPendingCommand || _assembly is null
             || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
         var page = _services.GetRequiredService<PickingRoutePage>();
+        page.Show(_assembly, _process);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnReplenishmentsClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
+        var page = _services.GetRequiredService<PickingReplenishmentsPage>();
         page.Show(_assembly, _process);
         await Navigation.PushAsync(page);
     }
@@ -232,6 +266,9 @@ public partial class PickingSkuPage : ContentPage
         RouteButton.IsVisible = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
             && IsOwner;
         RouteButton.IsEnabled = !_busy && !pending;
+        ReplenishmentsButton.IsVisible = RouteButton.IsVisible;
+        ReplenishmentsButton.IsEnabled = !_busy && !pending;
+        ReplenishmentsButton.Text = _replenishmentsReady ? "Подпитки ✓" : "Подпитки";
         CloseButton.IsVisible = RouteButton.IsVisible;
         CloseButton.IsEnabled = !_busy && !pending;
         NavigationPage.SetHasBackButton(this, !_busy && !pending);

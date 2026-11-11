@@ -95,8 +95,13 @@ public static class DependencyInjection
         services.AddScoped<BuildReplenishmentProposals>();
         services.AddScoped<OrderReplenishment>();
         services.AddScoped<GetReplenishmentTasks>();
+        services.AddScoped<GetReplenishmentTask>();
+        services.AddScoped<GetPickingReplenishments>();
         services.AddScoped<StartReplenishmentSource>();
         services.AddScoped<ConfirmReplenishmentTransfer>();
+        services.AddScoped<ReportReplenishmentShortage>();
+        services.AddScoped<CompleteReplenishmentSource>();
+        services.AddScoped<CorrectReplenishmentTransfer>();
         services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();
         services.AddScoped<CreateReceivingOrder>();
         services.AddScoped<GetReceivingSources>();

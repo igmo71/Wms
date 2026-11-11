@@ -81,6 +81,10 @@ reviewed source snapshot, explicitly distribute a partial shared SKU across
 documents, and close the assembly with a recorded reason. The close action
 checks 1C again and retains the same request ID if its response is uncertain.
 Physical picking quantities remain editable only through the TSD workflow.
+The same page shows posted replenishment steps with their original and current
+effective quantities. A Manager can enter the actual transferred quantity and
+reason; the dialog keeps its command ID for an uncertain response. The separate
+correction movement and task progress are described in [inventory](inventory.md).
 The same Manager detail page lists picking shortage reports with the cell,
 expiration group, expected and found quantities, current held fact, blocked
 quantity and resolution. Its decision dialog explains the stock effect:
@@ -110,6 +114,28 @@ Returning a confirmed fact requires scanning its original cell and confirming
 the physical return. The route shows unavailable demand while other SKU remain
 selectable. A fresh closure check prevents the TSD Operator from overriding
 plan or source discrepancies.
+
+Mobile V1 also exposes Operator-only replenishment proposals and existing tasks
+for a picking assembly, an explicit order command, the replenisher's ordered
+and active queue, and task detail with source cycles, actual addresses, dated
+transfer history and stock groups on the currently held source. Source scans,
+dated transfers, shortage reports and return or empty-cell confirmation use
+separate commands. Each mutation carries a client request ID; callers retain
+the exact request for an explicit retry after an uncertain response. These
+routes and the client serve the replacement Mobile screens. The picking SKU
+screen opens a replenishment list with white proposals and ordered tasks,
+yellow started tasks and green tasks whose full quantity has posted, including
+when the source pallet still awaits return. Partial posted quantity is visible;
+the SKU screen marks replenishments ready only when all active tasks have
+posted and no proposal or deficit remains. The home screen opens the
+replenisher's warehouse queue in shipping priority order. Its task card shows
+the held source, actual dated stock groups for the requested SKU and other SKU
+for information, posted transfers and the pending pallet return. A worker
+scans the source, destination and source again at completion, explicitly
+confirms quantities and either returns the pallet or confirms the source is
+physically empty. A second source can start after the previous cycle is
+complete. The task page retains the same command ID for explicit retry after
+an uncertain response and reconstructs unfinished work from server detail.
 
 ## Mobile receiving
 

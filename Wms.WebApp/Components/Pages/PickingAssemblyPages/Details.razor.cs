@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using Wms.Application.Picking;
+using Wms.Application.Replenishment;
 using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.PickingAssemblyPages;
@@ -14,6 +15,7 @@ public partial class Details
     [Inject] private CheckPickingClosure Checker { get; set; } = null!;
     [Inject] private ClosePickingAssembly Closer { get; set; } = null!;
     [Inject] private CancelPickingAssembly Canceller { get; set; } = null!;
+    [Inject] private IReplenishmentStore Replenishments { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
 
@@ -23,6 +25,7 @@ public partial class Details
     private IReadOnlyList<PickingAuditView> _audit = [];
     private IReadOnlyList<PickingAllocationView> _postedAllocations = [];
     private IReadOnlyList<PickingShortageView> _shortages = [];
+    private IReadOnlyList<ReplenishmentTransferView> _replenishmentTransfers = [];
     private IReadOnlyCollection<PickingAllocationInput>? _manualAllocations;
     private ClosePickingAssemblyRequest? _pendingCloseRequest;
     private CancelPickingAssemblyRequest? _pendingCancelRequest;
@@ -65,6 +68,8 @@ public partial class Details
         _audit = _assembly is null ? [] : await Assemblies.GetAuditAsync(Id, CancellationToken.None);
         _postedAllocations = _assembly is null ? [] : await Assemblies.GetPostedAllocationsAsync(Id, CancellationToken.None);
         _shortages = _assembly is null ? [] : await Assemblies.GetShortagesAsync(Id, CancellationToken.None);
+        _replenishmentTransfers = _assembly is null ? []
+            : await Replenishments.ReadTransfersAsync(Id, CancellationToken.None);
     }
 
     private async Task CheckAsync()
@@ -199,6 +204,27 @@ public partial class Details
         }
     }
 
+    private async Task OpenReplenishmentCorrectionAsync(ReplenishmentTransferView transfer)
+    {
+        if (_userId is null || _busy || _pendingCloseRequest is not null
+            || _pendingCancelRequest is not null) return;
+        var parameters = new DialogParameters<ReplenishmentCorrectionDialog>
+        {
+            { x => x.Transfer, transfer }, { x => x.UserId, _userId }
+        };
+        var dialog = await DialogService.ShowAsync<ReplenishmentCorrectionDialog>(
+            "Исправить проведённую Подпитку", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true,
+                BackdropClick = false, CloseOnEscapeKey = false });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            _check = null;
+            await ReloadViewsAsync();
+            _message = "Корректирующее движение сохранено. Перед закрытием выполните новую сверку.";
+        }
+    }
+
     private async Task CancelAsync()
     {
         if (_userId is null || _pendingCloseRequest is not null
@@ -257,6 +283,7 @@ public partial class Details
         "picking.pick.reduced" => "Исправлен отбор",
         "picking.shortage.reported" => "Сообщено о недостаче",
         "inventory.shortage.resolved" => "Недостача разобрана",
+        "replenishment.transfer.corrected" => "Подпитка скорректирована",
         "picking.assembly.cancellation-requested" => "Запрошена отмена сборки",
         _ => eventType
     };
