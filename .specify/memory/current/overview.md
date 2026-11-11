@@ -46,7 +46,9 @@ queries, and dated inventory posting primitives. Its application services can
 list and read assemblies, and explicitly transfer an already started assembly
 to another Operator. The owner and revision change together; source plans,
 reservations and the actors of earlier physical records are retained. The
-picking and shipping screens still use the legacy scenario. The legacy `Wms`
+picking and shipping button on the Mobile home screen still opens the legacy
+scenario; replacement picking pages and API routes are registered but have not
+replaced that entry point. The legacy `Wms`
 project is being eliminated as its scenarios are replaced in the new projects.
 The new outbound fact and per-document exchange tables are prepared. New
 application commands can scan picking stock, hold and return a direct-pick

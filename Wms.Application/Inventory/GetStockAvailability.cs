@@ -48,6 +48,14 @@ public sealed record StockAvailability(
         return Math.Min(owned, Math.Max(0,
             AccountingQuantity - (ReservedQuantity - owned) - BlockedQuantity));
     }
+
+    public decimal AvailableForReplenishment(Guid replenishmentTaskId)
+    {
+        if (Hold is null || Hold.OwnerType != StorageLocationLockOwnerType.ReplenishmentTask
+            || Hold.OwnerId != replenishmentTaskId)
+            return 0;
+        return Math.Max(0, AccountingQuantity - ReservedQuantity - BlockedQuantity);
+    }
 }
 
 public interface IStockAvailabilityStore

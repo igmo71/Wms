@@ -77,10 +77,23 @@ public sealed class ReplenishmentTask
             return result.Error!;
 
         _sourceCycles.Add(result.Value!);
+        RecommendedSourceStorageLocationId = sourceId;
         AssignedTo = userId.Trim();
         UpdatedAtUtc = startedAtUtc;
         Status = ReplenishmentTaskStatus.InProgress;
         return result.Value!;
+    }
+
+    public OperationResult UpdateRecommendedSource(Guid? sourceId,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (Status != ReplenishmentTaskStatus.Ordered || sourceId == Guid.Empty)
+            return OperationError.Conflict("Рекомендацию можно изменить только до начала Подпитки.");
+        if (updatedAtUtc == default || updatedAtUtc < UpdatedAtUtc)
+            return OperationError.Invalid("Время пересчёта рекомендации недопустимо.");
+        RecommendedSourceStorageLocationId = sourceId;
+        UpdatedAtUtc = updatedAtUtc;
+        return OperationResult.Success();
     }
 
     public OperationResult<ReplenishmentTransfer> ConfirmTransfer(

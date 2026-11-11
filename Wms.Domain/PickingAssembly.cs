@@ -258,6 +258,18 @@ public sealed class PickingAssembly
         return OperationResult.Success();
     }
 
+    public OperationResult RecordReplenishmentOrder(string userId, long expectedRevision)
+    {
+        if (Status != PickingAssemblyStatus.InProgress)
+            return OperationError.Conflict("Заказать Подпитку можно только для начатой сборки.");
+        if (ResponsibleUserId != userId?.Trim())
+            return OperationError.Conflict("Сначала примите сборку на себя.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Обновите предложения Подпитки.");
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
     public OperationResult ChangePlan(Guid shippingOrderId,
         IReadOnlyDictionary<Guid, decimal> planBySku, long expectedRevision)
     {

@@ -150,13 +150,12 @@ The picking query store returns assembly lists and details with the current
 responsible user's display name, source check outcomes and WMS plan. Takeover
 uses the assembly operational revision and the same command receipt/audit path;
 readers observe the new owner on their next refresh.
-Mobile picking request and response contracts and endpoint handlers are prepared
-under Mobile V1. Their route group is not registered until the outbound screen
-replacement; when registered it requires the dedicated Operator-only policy.
+Mobile picking request and response contracts and endpoint handlers are
+registered under Mobile V1 with the dedicated Operator-only policy.
 The new Integration barcode decoder converts the decimal 1C document label to
 its Ref_Key at that HTTP boundary.
-Mobile has an unlinked picking queue, source-document page and read-only SKU
-plan page registered with dependency injection. The shared picking process
+Mobile has a picking queue, source-document, SKU, route and fact-entry pages
+registered with dependency injection. The shared picking process
 retains one ClientRequestId and its exact command input through an uncertain
 HTTP response, then fetches the assembly before clearing the pending command.
 The main navigation remains on the older shipping screen until the outbound
@@ -176,7 +175,8 @@ Application has a pure address comparer and picking-route builder over the
 shared stock-availability view and supplied location metadata. The builder
 keeps FEFO before cell-clearing choices, selects only fully available one-SKU
 reserve cells for direct pallet picking, and reports unmet quantities. It is
-not yet wired to physical picking screens or command confirmation.
+used by the replacement route query; physical confirmation repeats stock and
+location checks in its own command.
 
 The outbound domain model distinguishes quantity reservations (`PickingReservation`),
 reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).

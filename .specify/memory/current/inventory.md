@@ -92,8 +92,47 @@ for that quantity or releases a mistaken block, preserving the report and
 decision. A direct Reserve pick first holds the whole one-SKU cell; each
 confirmed date group must be taken in full. The
 hold can be released after a confirming scan only when no positive fact remains
-from that cell. These operations are not yet wired to the mobile screen; the
-legacy picking screen still uses its former flow.
+from that cell. Replacement Mobile screens use these operations; the main
+home-screen button still opens the legacy picking and shipping flow until the
+final workflow switch.
+
+The replacement replenishment proposal calculator uses the remaining assembly
+demand, suggested picking steps, shared stock availability and existing tasks.
+It recommends all currently usable Reserve sources in expiration order, counts
+unselected Storage stock before proposing extra transfers, and reports any
+remaining warehouse deficit. An ordered task consumes its suggested source
+quantity in the recommendation; a physically held cell is unavailable. A
+Storage destination with the SKU is preferred, followed by an empty cell with
+history for that SKU. This read-only calculation creates no replenishment task;
+ordering and physical scans require their own checks. An Operator responsible
+for an active assembly can explicitly order one currently offered proposal.
+The command rechecks the route, stock, source, destination and existing tasks
+in one transaction, then saves the task, assembly revision, audit and command
+receipt together. Repeating its request ID returns the same task. No stock
+movement or physical source hold occurs when the task is ordered.
+The replenisher's active-task query lists ordered and in-progress tasks for
+one warehouse. It reads the current queue of every linked 1C document on each
+request and uses the highest priority in a multi-document assembly: live queue,
+collect by date, own delivery, then unspecified. Equal priorities sort by the
+original order time and task ID. The query does not change a started task's
+assignee or order time.
+Starting a replenishment source requires an Operator's source-cell scan. The
+command checks an active Reserve cell in the task's warehouse, available SKU
+stock after group-specific shortages, expiration order and other reservations before
+holding the whole cell for the task. The actual scanned cell replaces its
+recommendation. Other ordered tasks keep their original order time and receive
+new source recommendations from remaining stock; a task without a free source
+shows no recommendation. Task start, cell hold, recommendation changes, audit
+and receipt commit together. A later source cycle can start only after the
+previous pallet has been completed.
+Confirming a replenishment transfer checks the scanned Storage destination,
+its active hold and SKU mixing, the active source pallet held by this task,
+and the earliest available expiration group on that pallet. One confirmed
+quantity moves one SKU and one expiration group from Reserve to Storage through
+the common inventory posting operation. The source hold remains until its
+separate completion scan. The movement, both balances and turnovers, task
+progress, transfer record, audit and command receipt are saved together;
+repeating the request ID does not move stock again.
 
 Closing the replacement picking assembly is the sole outbound stock posting
 point. It rechecks each positive entry against its own active reservation and
