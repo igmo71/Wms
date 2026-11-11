@@ -8,6 +8,11 @@ public interface IShippingSourceReader
     Task<OperationResult<ShippingSourceSnapshot>> ReadAsync(Guid refKey, CancellationToken ct);
 }
 
+public interface IShippingStoredSnapshotParser
+{
+    OperationResult<ShippingSourceSnapshot> Parse(Guid refKey, string storedDocumentJson);
+}
+
 public sealed record ShippingSourceSnapshot(
     Guid RefKey,
     string RawDocumentJson,

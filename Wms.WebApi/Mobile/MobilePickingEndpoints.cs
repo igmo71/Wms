@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Wms.Application.Picking;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
+using Wms.Domain.Enums;
 using Wms.Integration.OneS;
 
 namespace Wms.WebApi.Mobile;
@@ -33,6 +34,28 @@ internal static class MobilePickingEndpoints
         group.MapPost("/{assemblyId:guid}/start", StartAsync)
             .WithMobileResponses<MobilePickingStartResponse>();
         group.MapPost("/{assemblyId:guid}/take-over", TakeOverAsync)
+            .WithMobileResponses<MobilePickingCommandIdResponse>();
+        group.MapGet("/{assemblyId:guid}/work", GetWorkAsync)
+            .WithMobileResponses<MobilePickingWorkResponse>();
+        group.MapGet("/{assemblyId:guid}/route", GetRouteAsync)
+            .WithMobileResponses<MobilePickingRouteResponse>();
+        group.MapGet("/{assemblyId:guid}/skus/{skuId:guid}", GetSkuAsync)
+            .WithMobileResponses<MobilePickingSkuResponse>();
+        group.MapPost("/{assemblyId:guid}/source/scan", ScanSourceAsync)
+            .WithMobileResponses<MobilePickingScannedSourceResponse>();
+        group.MapPost("/{assemblyId:guid}/pallets/hold", HoldPalletAsync)
+            .WithMobileResponses<MobilePickingResourceIdResponse>();
+        group.MapPost("/{assemblyId:guid}/pallets/return", ReturnPalletAsync)
+            .WithMobileResponses<MobilePickingResourceIdResponse>();
+        group.MapPost("/{assemblyId:guid}/picks", ConfirmPickAsync)
+            .WithMobileResponses<MobilePickingResourceIdResponse>();
+        group.MapPost("/{assemblyId:guid}/picks/{entryId:guid}/return", ReducePickAsync)
+            .WithMobileResponses<MobilePickingResourceIdResponse>();
+        group.MapPost("/{assemblyId:guid}/shortages", ReportShortageAsync)
+            .WithMobileResponses<MobilePickingResourceIdResponse>();
+        group.MapGet("/{assemblyId:guid}/closure-check", CheckClosureAsync)
+            .WithMobileResponses<MobilePickingClosureCheckResponse>();
+        group.MapPost("/{assemblyId:guid}/close", CloseAsync)
             .WithMobileResponses<MobilePickingCommandIdResponse>();
         return endpoints;
     }
@@ -219,6 +242,232 @@ internal static class MobilePickingEndpoints
                 assemblyId, request.ExpectedRevision, userId), ct));
     }
 
+    private static async Task<IResult> GetSkuAsync(
+        Guid assemblyId, Guid skuId, Guid warehouseId,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        GetPickingSku get, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies, assemblyId, warehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        var result = await get.ExecuteAsync(assemblyId, skuId, userId, ct);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        var sku = result.Value!;
+        return TypedResults.Ok(new MobilePickingSkuResponse(sku.StockKeepingUnitId,
+            sku.PlannedQuantity, sku.ConfirmedQuantity, sku.RemainingQuantity,
+            sku.Availability.Select(x => new MobilePickingAvailabilityResponse(
+                x.Group.StorageLocationId, x.LocationCode,
+                x.Group.ExpirationDate, x.AccountingQuantity,
+                x.AvailableForNewPick(assemblyId), x.ReservedQuantity,
+                x.BlockedQuantity, x.Hold is not null)).ToArray()));
+    }
+
+    private static async Task<IResult> GetWorkAsync(
+        Guid assemblyId, Guid warehouseId, ClaimsPrincipal principal,
+        GetPickingWork get, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        if (warehouseId == Guid.Empty)
+            return MobileEndpointResults.CommandProblem(
+                OperationError.Invalid("Выберите склад."));
+        var result = await get.ExecuteAsync(assemblyId, userId, ct);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        var work = result.Value!;
+        if (work.WarehouseId != warehouseId)
+            return MobileEndpointResults.CommandProblem(
+                OperationError.Conflict("Сборка относится к другому складу."));
+        return TypedResults.Ok(new MobilePickingWorkResponse(work.Id,
+            (MobilePickingAssemblyStatus)work.Status, work.Revision,
+            work.ResponsibleUserId,
+            work.Skus.Select(x => new MobilePickingWorkSkuResponse(x.SkuId,
+                x.Code, x.Name, x.Unit, x.TracksExpirationDate,
+                x.PlannedQuantity, x.ConfirmedQuantity)).ToArray(),
+            work.Entries.Select(x => new MobilePickingWorkEntryResponse(x.Id,
+                x.StorageLocationId, x.LocationCode, x.SkuId,
+                x.ExpirationDate, x.Quantity, x.ConfirmedBy,
+                x.ConfirmedAtUtc, x.FromReserve)).ToArray()));
+    }
+
+    private static async Task<IResult> GetRouteAsync(
+        Guid assemblyId, Guid warehouseId, Guid? previousLocationId,
+        Guid? nextLocationId, ClaimsPrincipal principal,
+        IPickingAssemblyStore assemblies, GetPickingRoute get,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies, assemblyId, warehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        var result = await get.ExecuteAsync(assemblyId, userId,
+            previousLocationId, nextLocationId, ct);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        var route = result.Value!;
+        return TypedResults.Ok(new MobilePickingRouteResponse(route.Revision,
+            route.Steps.Select(x => new MobilePickingRouteStepResponse(
+                x.StorageLocationId, x.LocationCode, x.StockKeepingUnitId,
+                x.ExpirationDate, x.Quantity, x.DirectPalletPick)).ToArray(),
+            route.Gaps.Select(x => new MobilePickingRouteGapResponse(
+                x.StockKeepingUnitId, x.ExpirationDate, x.Quantity)).ToArray()));
+    }
+
+    private static async Task<IResult> ScanSourceAsync(
+        Guid assemblyId, MobilePickingScanSourceRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        GetPickingSource get, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        var result = await get.ExecuteAsync(assemblyId, request.SkuId,
+            request.LocationCode, userId, request.ScannedSkuId,
+            request.ExpirationDate, request.DateGroupSelected, ct);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        var source = result.Value!;
+        return TypedResults.Ok(new MobilePickingScannedSourceResponse(
+            source.StorageLocationId, source.LocationCode,
+            source.StockKeepingUnitId, source.ExpirationDate,
+            source.AccountingQuantity, source.AvailableQuantity,
+            source.SuggestedQuantity, source.ReservedQuantity,
+            source.BlockedQuantity, source.RequiresVisualExpiryCheck));
+    }
+
+    private static async Task<IResult> HoldPalletAsync(
+        Guid assemblyId, MobilePickingHoldPalletRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        HoldPickingPallet hold, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        return ResourceId(await hold.ExecuteAsync(new HoldPickingPalletRequest(
+            request.ClientRequestId, assemblyId, request.ExpectedRevision,
+            request.LocationCode, request.SkuId, userId), ct));
+    }
+
+    private static async Task<IResult> ReturnPalletAsync(
+        Guid assemblyId, MobilePickingReturnPalletRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        ReturnPickingPallet returnPallet, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        return ResourceId(await returnPallet.ExecuteAsync(new ReturnPickingPalletRequest(
+            request.ClientRequestId, assemblyId, request.ExpectedRevision,
+            request.ScannedLocationCode, userId), ct));
+    }
+
+    private static async Task<IResult> ConfirmPickAsync(
+        Guid assemblyId, MobilePickingConfirmRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        ConfirmPick confirm, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        return ResourceId(await confirm.ExecuteAsync(new ConfirmPickRequest(
+            request.ClientRequestId, assemblyId, request.ExpectedRevision,
+            request.ScannedLocationCode, request.SkuId, request.ExpirationDate,
+            request.Quantity, userId, request.ScannedSkuId), ct));
+    }
+
+    private static async Task<IResult> ReducePickAsync(
+        Guid assemblyId, Guid entryId, MobilePickingReduceRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        ReducePick reduce, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        return ResourceId(await reduce.ExecuteAsync(new ReducePickRequest(
+            request.ClientRequestId, assemblyId, entryId, request.ExpectedRevision,
+            request.ScannedLocationCode, request.Quantity,
+            request.PhysicalReturnConfirmed, userId, request.Explanation), ct));
+    }
+
+    private static async Task<IResult> ReportShortageAsync(
+        Guid assemblyId, MobilePickingShortageRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        ReportPickingShortage report, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        return ResourceId(await report.ExecuteAsync(new ReportPickingShortageRequest(
+            request.ClientRequestId, assemblyId, request.ExpectedRevision,
+            request.ScannedLocationCode, request.SkuId, request.ExpirationDate,
+            request.ExpectedQuantity, request.FoundQuantity, userId,
+            request.ExistingPickingEntryId, request.Comment), ct));
+    }
+
+    private static async Task<IResult> CheckClosureAsync(
+        Guid assemblyId, Guid warehouseId, ClaimsPrincipal principal,
+        IPickingAssemblyStore assemblies, CheckPickingClosure check,
+        CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies, assemblyId, warehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        var result = await check.ExecuteAsync(assemblyId, userId, ct: ct);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+        var review = result.Value!;
+        return TypedResults.Ok(new MobilePickingClosureCheckResponse(
+            review.Revision, review.FactMatchesPlan, review.CanOperatorClose,
+            review.HardBlocks, review.ManagerIssues));
+    }
+
+    private static async Task<IResult> CloseAsync(
+        Guid assemblyId, MobilePickingCloseRequest request,
+        ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
+        ClosePickingAssembly close, CancellationToken ct)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return TypedResults.Unauthorized();
+        var warehouse = await CheckWarehouseAsync(assemblies,
+            assemblyId, request.WarehouseId, ct);
+        if (!warehouse.IsSuccess)
+            return MobileEndpointResults.CommandProblem(warehouse.Error!);
+        var result = await close.ExecuteAsync(new ClosePickingAssemblyRequest(
+            request.ClientRequestId, assemblyId, request.ExpectedRevision,
+            userId), ct);
+        if (result.IsSuccess)
+            return CommandId(result);
+        var assembly = await assemblies.ReadAssemblyAsync(assemblyId, ct);
+        if (assembly?.Status == PickingAssemblyStatus.Closed)
+            return MobileEndpointResults.CommandProblem(OperationError.Conflict(
+                "Сборка уже закрыта. Повтор обмена с 1С станет доступен после подключения интеграции."));
+        return MobileEndpointResults.CommandProblem(result.Error!);
+    }
+
     private static async Task<OperationResult> CheckWarehouseAsync(
         IPickingAssemblyStore store, Guid assemblyId, Guid warehouseId,
         CancellationToken ct)
@@ -236,6 +485,11 @@ internal static class MobilePickingEndpoints
     private static IResult CommandId(OperationResult<Guid> result) =>
         result.IsSuccess
             ? TypedResults.Ok(new MobilePickingCommandIdResponse(result.Value))
+            : MobileEndpointResults.CommandProblem(result.Error!);
+
+    private static IResult ResourceId(OperationResult<Guid> result) =>
+        result.IsSuccess
+            ? TypedResults.Ok(new MobilePickingResourceIdResponse(result.Value))
             : MobileEndpointResults.CommandProblem(result.Error!);
 
     private static MobilePickingAssemblyListResponse MapList(

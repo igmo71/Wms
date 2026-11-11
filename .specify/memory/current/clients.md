@@ -30,6 +30,16 @@ prohibited mixed-SKU balance, and the selected cell shows its distinct SKU count
 Its cell editor and detail view show the multiple-SKU permission for both
 Комплектация and Хранение cells.
 
+Operator SKU cards and lists in the replacement receiving, putaway and picking
+workflows provide a small «i» action, except the picking SKU selection list.
+The read-only detail shows the SKU's locations and expiration groups in the
+selected warehouse. Available quantity is primary; accounting quantity is
+shown separately only when it differs because of reservations, shortage blocks
+or a whole-cell hold. The unit is shown once, or marked unknown. The Web
+receiving plan and LPN rows use the same view.
+Mobile reads it through an Operator-only endpoint; Web uses the shared
+application availability query with the same role check.
+
 Mobile is online-only. Urovo ScanWedge intent input and the ML Kit camera
 fallback implement one scanner boundary; operational screens prefer the
 embedded scanner when available. Manual SKU search, where present, uses name,
@@ -59,7 +69,50 @@ newest first, with server paging. The page filters
 by inclusive local date range, LPN number, SKU name substring, user name or
 login, and destination cell address; filters can be combined.
 
+## Web picking manager
+
+The Manager-only «Сборки WMS» page lists picking assemblies across warehouses
+and opens a detail page. The detail page keeps the WMS plan per 1C document,
+physical WMS fact by SKU and cell, current imported 1C lines, posted allocation,
+and action history separate. A fresh «Сверить с 1С» action retrieves each
+document before a decision and shows hard blocks and issues requiring Manager
+review. A Manager may change one document's WMS plan with a reason and the
+reviewed source snapshot, explicitly distribute a partial shared SKU across
+documents, and close the assembly with a recorded reason. The close action
+checks 1C again and retains the same request ID if its response is uncertain.
+Physical picking quantities remain editable only through the TSD workflow.
+The same Manager detail page lists picking shortage reports with the cell,
+expiration group, expected and found quantities, current held fact, blocked
+quantity and resolution. Its decision dialog explains the stock effect:
+confirming a shortage posts a correction for the blocked quantity; rejecting
+the report releases the block without a stock movement. Both require a reason
+and preserve the command ID for an uncertain reply. The cancellation action
+requires a reason and zero remaining picked fact; the server also checks
+reservations and returned pallets. An accepted cancellation may wait for
+started replenishment and 1C status restoration.
+
+## Mobile picking API
+
+The replacement Mobile V1 picking API exposes the assembly work list with
+per-SKU plan and confirmed fact, original-cell fact entries, a recalculated
+route, SKU availability, scanned-cell inspection, pallet hold/return, pick
+confirmation, scanned return and shortage reporting. It also exposes a fresh
+closure check and operator-only warehouse close. Every mutating request carries
+a client request ID and the expected assembly revision. A closed assembly
+accepts a replay of its original close request without posting stock again;
+the separate 1C exchange retry is not wired yet. The replacement TSD screens
+show plan and confirmed fact per SKU with white, yellow and green progress,
+and preserve the unit next to the plan quantity. The route is a recommendation;
+the worker may open an SKU directly, scan a different allowed cell, and confirm
+the offered quantity explicitly. The fact card refreshes the next route step
+in place. A shortage is reported separately, with the found quantity retained.
+Returning a confirmed fact requires scanning its original cell and confirming
+the physical return. The route shows unavailable demand while other SKU remain
+selectable. A fresh closure check prevents the TSD Operator from overriding
+plan or source discrepancies.
+
 ## Mobile receiving
+
 
 The Mobile receiving queue lists unfinished WMS orders for the selected
 warehouse; received orders are hidden from the queue. A linked received order

@@ -13,6 +13,7 @@ public static class ShippingIntegrationRegistration
     public static IServiceCollection AddShippingSourceReader(
         this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IShippingStoredSnapshotParser, ShippingStoredSnapshotParser>();
         services.AddHttpClient<IShippingSourceReader, ShippingSourceReader>(
             client => ConfigureClient(client, configuration));
         services.AddHttpClient<IShippingSourceWriter, ShippingSourceWriter>(

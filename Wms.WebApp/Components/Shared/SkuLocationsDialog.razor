@@ -1,0 +1,70 @@
+@namespace Wms.WebApp.Components
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Wms.Application.Inventory
+@inject GetStockAvailability Availability
+@inject AuthenticationStateProvider Authentication
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">@(SkuName ?? "SKU") — остатки по ячейкам</MudText>
+            <MudText Typo="Typo.caption">@(string.IsNullOrWhiteSpace(Unit) ? "Ед. изм. неизвестна" : $"Ед. изм.: {Unit}")</MudText>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+            @if (_loading) { <MudProgressLinear Indeterminate="true" /> }
+            else if (_rows.Count == 0) { <MudText>Учётного остатка нет.</MudText> }
+            else
+            {
+                <MudTable T="StockAvailability" Items="_rows" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>Ячейка</MudTh><MudTh>Срок годности</MudTh><MudTh>Доступно</MudTh><MudTh>Учётный остаток</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.LocationCode</MudTd>
+                        <MudTd>@(context.Group.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
+                        <MudTd>@context.AvailableQuantity.ToString("0.###")</MudTd>
+                        <MudTd>@(context.AccountingQuantity == context.AvailableQuantity ? "—" : context.AccountingQuantity.ToString("0.###"))</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions><MudButton OnClick="() => Dialog.Close()">Закрыть</MudButton></DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid WarehouseId { get; set; }
+    [Parameter, EditorRequired] public Guid SkuId { get; set; }
+    [Parameter] public string? SkuName { get; set; }
+    [Parameter] public string? Unit { get; set; }
+
+    private IReadOnlyList<StockAvailability> _rows = [];
+    private string? _error;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await Authentication.GetAuthenticationStateAsync()).User;
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId is null)
+            {
+                _error = "Не удалось определить сотрудника.";
+                return;
+            }
+            var result = await Availability.ExecuteAsync(WarehouseId, SkuId, userId);
+            if (!result.IsSuccess)
+            {
+                _error = result.Error!.Message;
+                return;
+            }
+            _rows = result.Value!.Where(x => x.AccountingQuantity != 0
+                    || x.AvailableQuantity != 0)
+                .OrderBy(x => x.LocationCode, StringComparer.Ordinal)
+                .ThenBy(x => x.Group.ExpirationDate is null)
+                .ThenBy(x => x.Group.ExpirationDate).ToArray();
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _loading = false; }
+    }
+}

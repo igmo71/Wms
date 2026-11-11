@@ -76,6 +76,16 @@ public partial class ReceivingOrderSkuDistributionPage : ContentPage
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
+    private async void OnInfoClicked(object? sender, EventArgs e)
+    {
+        if (_order is null || _skuId == Guid.Empty || _busy
+            || _process.HasPendingCommand) return;
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_order.WarehouseId, _skuId, SkuNameLabel.Text,
+            _order.Items.FirstOrDefault(x => x.SkuId == _skuId)?.UnitOfMeasure);
+        await Navigation.PushAsync(page);
+    }
+
     private void Apply(MobileReceivingWorkOrderResponse order)
     {
         var item = order.Items.SingleOrDefault(x => x.SkuId == _skuId)

@@ -1,0 +1,23 @@
+@using Wms.Application.Picking
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Недостача: @(Shortage.SkuName ?? Shortage.SkuId.ToString())</MudText>
+            <MudText>Ячейка: @Shortage.LocationCode · Срок: @(Shortage.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudText>
+            <MudText>Ожидалось: @Shortage.ExpectedQuantity.ToString("0.###") · Найдено при сообщении: @Shortage.FoundQuantity.ToString("0.###")</MudText>
+            <MudText>Сейчас удержано фактом этой сборки в группе: @Shortage.HeldFactQuantity.ToString("0.###")</MudText>
+            <MudText>Заблокировано как недостача: @Shortage.BlockedQuantity.ToString("0.###")</MudText>
+            <MudText Typo="Typo.caption">Сообщил @Shortage.ReportedBy · @Shortage.ReportedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+            @if (Shortage.Comment is not null) { <MudAlert Severity="Severity.Info">Сообщение сборщика: @Shortage.Comment</MudAlert> }
+            <MudAlert Severity="Severity.Warning">Подтвердить недостачу: списать @Shortage.BlockedQuantity.ToString("0.###") из учётного остатка и снять блокировку. Сообщение ошибочно: снять блокировку без движения остатков. Найденный и удержанный факт эти решения не меняют.</MudAlert>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+            <MudTextField T="string" @bind-Value="_reason" Label="Причина решения" Lines="2" MaxLength="1000" Disabled="@(_pendingRequest is not null)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="@(_busy || _pendingRequest is not null)" OnClick="Close">Закрыть</MudButton>
+        <MudButton Variant="Variant.Outlined" Disabled="@(_busy || _pendingRequest?.ShortageConfirmed == true)" OnClick="() => ResolveAsync(false)">Снять блокировку</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="@(_busy || _pendingRequest?.ShortageConfirmed == false)" OnClick="() => ResolveAsync(true)">Подтвердить и списать</MudButton>
+    </DialogActions>
+</MudDialog>

@@ -1,0 +1,26 @@
+@using Wms.Application.Picking
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.body2">Распределите физически отобранное количество общего SKU по документам 1С. Для каждого документа укажите число, в том числе ноль.</MudText>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+            @foreach (var group in _rows.GroupBy(x => x.SkuId))
+            {
+                <MudText Typo="Typo.subtitle1">@group.First().SkuName — отобрано @group.First().Fact.ToString("0.###")</MudText>
+                <MudTable T="AllocationRow" Items="group" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>РО 1С</MudTh><MudTh>План WMS</MudTh><MudTh>Выделить</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.SourceName</MudTd>
+                        <MudTd>@context.Plan.ToString("0.###")</MudTd>
+                        <MudTd><MudNumericField T="decimal" @bind-Value="context.Quantity" Min="0" Step="1" /></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Accept">Применить распределение</MudButton>
+    </DialogActions>
+</MudDialog>

@@ -53,6 +53,29 @@ public partial class ReceivingOrderLicensePlateNumberPage : ContentPage
         ChoicePanel.IsVisible = false;
     }
 
+    private async void OnSelectedInfoClicked(object? sender, EventArgs e)
+    {
+        if (_selectedSkuId is not Guid skuId || _order is null
+            || _busy || _process.HasPendingCommand) return;
+        await OpenSkuLocationsAsync(skuId, SkuNameLabel.Text);
+    }
+
+    private async void OnCandidateInfoClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button { CommandParameter: Guid skuId } || _order is null
+            || _busy || _process.HasPendingCommand) return;
+        await OpenSkuLocationsAsync(skuId,
+            CandidateRows.FirstOrDefault(x => x.SkuId == skuId)?.Name);
+    }
+
+    private async Task OpenSkuLocationsAsync(Guid skuId, string? name)
+    {
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_order!.WarehouseId, skuId, name,
+            _order.Items.FirstOrDefault(x => x.SkuId == skuId)?.UnitOfMeasure);
+        await Navigation.PushAsync(page);
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();

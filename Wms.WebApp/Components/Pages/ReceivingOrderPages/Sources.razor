@@ -98,7 +98,13 @@
                         <MudTh>План</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="SKU">@SkuName(context.SkuId)</MudTd>
+                        <MudTd DataLabel="SKU">@SkuName(context.SkuId)
+                            @if (SelectedWarehouseId is Guid warehouseId)
+                            {
+                                <SkuInfoButton WarehouseId="warehouseId" SkuId="context.SkuId"
+                                               SkuName="@SkuName(context.SkuId)" />
+                            }
+                        </MudTd>
                         <MudTd DataLabel="План">@(context.Quantity?.ToString("0.###") ?? "Неизвестно")</MudTd>
                     </RowTemplate>
                     <PagerContent><MudTablePager /></PagerContent>
@@ -145,6 +151,12 @@
                             <MudTd DataLabel="№">@context.LineNumber</MudTd>
                             <MudTd DataLabel="SKU">
                                 <MudText>@SourceSkuName(source, context)</MudText>
+                                @if (source.WarehouseId is Guid warehouseId
+                                    && context.StockKeepingUnitId is Guid skuId)
+                                {
+                                    <SkuInfoButton WarehouseId="warehouseId" SkuId="skuId"
+                                                   SkuName="@SourceSkuName(source, context)" />
+                                }
                                 @if (context.Error is not null)
                                 {
                                     <MudText Typo="Typo.caption" Color="Color.Error">@context.Error</MudText>

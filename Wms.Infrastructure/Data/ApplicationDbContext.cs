@@ -38,6 +38,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<PickingAssembly> PickingAssemblies => Set<PickingAssembly>();
     public DbSet<PickingAssemblySourceLink> PickingAssemblySourceLinks => Set<PickingAssemblySourceLink>();
     public DbSet<PickingAssemblyPlanLine> PickingAssemblyPlanLines => Set<PickingAssemblyPlanLine>();
+    public DbSet<PickingEntry> PickingEntries => Set<PickingEntry>();
+    public DbSet<PickingAllocation> PickingAllocations => Set<PickingAllocation>();
+    public DbSet<PickingClosure> PickingClosures => Set<PickingClosure>();
+    public DbSet<ShippingExchangeTarget> ShippingExchangeTargets => Set<ShippingExchangeTarget>();
     public DbSet<SkuBarcode> SkuBarcodes => Set<SkuBarcode>();
     public DbSet<StockKeepingUnit> StockKeepingUnits => Set<StockKeepingUnit>();
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();

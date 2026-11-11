@@ -12,8 +12,8 @@ public partial class PickingSkuPage : ContentPage
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
+    private MobilePickingWorkResponse? _work;
     private bool _busy;
-    private bool _useSuppliedAssembly;
 
     public PickingSkuPage(MobilePickingClient client,
         MobileWarehouseSelection selection, PickingAssemblyProcess process,
@@ -28,21 +28,19 @@ public partial class PickingSkuPage : ContentPage
     }
 
     public IReadOnlyList<PickingSkuPlanRow> SkuRows { get; private set; } = [];
+    public IReadOnlyList<PickingEntryListRow> EntryRows { get; private set; } = [];
     private bool IsOwner => _assembly?.ResponsibleUserId == _selection.CurrentUserId;
 
     public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
     {
         _process = process;
-        _useSuppliedAssembly = true;
         Apply(assembly);
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_useSuppliedAssembly)
-            _useSuppliedAssembly = false;
-        else await RefreshAsync();
+        await RefreshAsync();
     }
 
     private async void OnRefreshing(object? sender, EventArgs e)
@@ -57,7 +55,9 @@ public partial class PickingSkuPage : ContentPage
         SetBusy(true);
         try
         {
-            Apply(await _client.GetAsync(_assembly.Id, _assembly.WarehouseId));
+            var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
+            _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            Apply(assembly);
             if (!_process.HasPendingCommand) ErrorLabel.Text = string.Empty;
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
@@ -78,14 +78,83 @@ public partial class PickingSkuPage : ContentPage
             _ => "Сборка отменяется или отменена"
         };
         OwnerLabel.Text = $"Ответственный: {assembly.ResponsibleDisplayName}";
-        SkuRows = assembly.PlanLines.GroupBy(x => x.SkuId)
-            .Select(group => new PickingSkuPlanRow(group.Key,
-                group.First().SkuName ?? group.First().SkuCode ?? group.Key.ToString(),
-                group.Sum(x => x.Quantity).ToString("0.###", CultureInfo.CurrentCulture)))
-            .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(x => x.SkuId).ToArray();
+        SkuRows = _work?.Skus.Select(x => new PickingSkuPlanRow(
+            x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
+            x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)).ToArray()
+            ?? assembly.PlanLines.GroupBy(x => x.SkuId)
+                .Select(group => new PickingSkuPlanRow(group.Key,
+                    group.First().SkuName ?? group.First().SkuCode ?? group.Key.ToString(),
+                    group.Sum(x => x.Quantity), 0, null))
+                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.SkuId).ToArray();
         OnPropertyChanged(nameof(SkuRows));
+        EntryRows = _work?.Entries.Select(x => new PickingEntryListRow(x.Id,
+            $"{SkuRows.FirstOrDefault(sku => sku.SkuId == x.SkuId)?.Name ?? x.SkuId.ToString()} · "
+            + $"{x.LocationCode} · {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}"
+            + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : string.Empty),
+            assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
+            .ToArray() ?? [];
+        OnPropertyChanged(nameof(EntryRows));
         UpdateActions();
+    }
+
+    private async void OnSkuTapped(object? sender, TappedEventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress
+            || !IsOwner || e.Parameter is not Guid skuId) return;
+        var row = SkuRows.FirstOrDefault(x => x.SkuId == skuId);
+        if (row is null || row.PlannedQuantity <= row.ConfirmedQuantity) return;
+        var page = _services.GetRequiredService<PickingEntryPage>();
+        page.ShowPick(_assembly, _process, skuId, null, false);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnReturnClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress
+            || !IsOwner || sender is not Button { CommandParameter: Guid entryId }) return;
+        var entry = _work?.Entries.SingleOrDefault(x => x.Id == entryId);
+        if (entry is null) return;
+        var page = _services.GetRequiredService<PickingEntryPage>();
+        page.ShowReturn(_assembly, _process, entry);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnRouteClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
+        var page = _services.GetRequiredService<PickingRoutePage>();
+        page.Show(_assembly, _process);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnCloseClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
+        SetBusy(true);
+        try
+        {
+            var check = await _client.CheckClosureAsync(_assembly.Id, _assembly.WarehouseId);
+            if (!check.CanOperatorClose)
+            {
+                ErrorLabel.Text = string.Join("\n", check.HardBlocks.Concat(check.ManagerIssues));
+                if (string.IsNullOrWhiteSpace(ErrorLabel.Text))
+                    ErrorLabel.Text = "Сборка требует решения руководителя склада.";
+                return;
+            }
+            if (!await DisplayAlertAsync("Закрыть и отгрузить",
+                "Складской факт будет проведён. Продолжить?", "Закрыть", "Отмена")) return;
+            SetBusy(false);
+            await RunCommandAsync(() => _process.CloseAsync(_assembly.Id,
+                _assembly.WarehouseId, check.Revision));
+        }
+        catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
+        catch (HttpRequestException) { ErrorLabel.Text = "Не удалось сверить документы 1С."; }
+        finally { SetBusy(false); }
     }
 
     private async void OnSourcesClicked(object? sender, EventArgs e)
@@ -128,7 +197,9 @@ public partial class PickingSkuPage : ContentPage
         ErrorLabel.Text = string.Empty;
         try
         {
-            Apply(await action());
+            var assembly = await action();
+            _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            Apply(assembly);
             if (_process.LastStartResult is { Status: MobilePickingAssemblyStatus.Preparing } start)
                 ErrorLabel.Text = string.Join("\n", start.Sources
                     .Where(x => x.Error is not null).Select(x => x.Error));
@@ -158,6 +229,11 @@ public partial class PickingSkuPage : ContentPage
             or MobilePickingAssemblyStatus.InProgress } && !IsOwner;
         TakeOverButton.IsEnabled = !_busy && !pending;
         SourcesButton.IsEnabled = !_busy && !pending;
+        RouteButton.IsVisible = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
+            && IsOwner;
+        RouteButton.IsEnabled = !_busy && !pending;
+        CloseButton.IsVisible = RouteButton.IsVisible;
+        CloseButton.IsEnabled = !_busy && !pending;
         NavigationPage.SetHasBackButton(this, !_busy && !pending);
     }
 
@@ -176,4 +252,14 @@ public partial class PickingSkuPage : ContentPage
     }
 }
 
-public sealed record PickingSkuPlanRow(Guid SkuId, string Name, string QuantityText);
+public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
+    decimal PlannedQuantity, decimal ConfirmedQuantity, string? Unit)
+{
+    public string PlanText => $"План {PlannedQuantity:0.###} {Unit ?? "—"}";
+    public string FactText => $"Факт {ConfirmedQuantity:0.###}";
+    public Color BackgroundColor => ConfirmedQuantity == PlannedQuantity
+        ? Color.FromArgb("#E4F5E7")
+        : ConfirmedQuantity > 0 ? Color.FromArgb("#FFF1CF") : Colors.White;
+}
+
+public sealed record PickingEntryListRow(Guid Id, string Text, bool CanReturn);

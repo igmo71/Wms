@@ -75,6 +75,77 @@ public sealed class MobilePickingClient
             $"{Route}/{assemblyId:D}/take-over",
             new MobilePickingTakeOverRequest(requestId, warehouseId, expectedRevision), ct);
 
+    public Task<MobilePickingWorkResponse> WorkAsync(
+        Guid assemblyId, Guid warehouseId, CancellationToken ct = default) =>
+        GetAsync<MobilePickingWorkResponse>(
+            $"{Route}/{assemblyId:D}/work?warehouseId={warehouseId:D}", ct);
+
+    public Task<MobilePickingRouteResponse> RouteAsync(
+        Guid assemblyId, Guid warehouseId, CancellationToken ct = default) =>
+        GetAsync<MobilePickingRouteResponse>(
+            $"{Route}/{assemblyId:D}/route?warehouseId={warehouseId:D}", ct);
+
+    public Task<MobilePickingSkuResponse> SkuAsync(
+        Guid assemblyId, Guid warehouseId, Guid skuId,
+        CancellationToken ct = default) =>
+        GetAsync<MobilePickingSkuResponse>(
+            $"{Route}/{assemblyId:D}/skus/{skuId:D}?warehouseId={warehouseId:D}", ct);
+
+    public Task<MobilePickingScannedSourceResponse> ScanSourceAsync(
+        Guid assemblyId, MobilePickingScanSourceRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingScanSourceRequest, MobilePickingScannedSourceResponse>(
+            $"{Route}/{assemblyId:D}/source/scan", request, ct);
+
+    public Task<MobilePickingResourceIdResponse> HoldPalletAsync(
+        Guid assemblyId, MobilePickingHoldPalletRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingHoldPalletRequest, MobilePickingResourceIdResponse>(
+            $"{Route}/{assemblyId:D}/pallets/hold", request, ct);
+
+    public Task<MobilePickingResourceIdResponse> ReturnPalletAsync(
+        Guid assemblyId, MobilePickingReturnPalletRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingReturnPalletRequest, MobilePickingResourceIdResponse>(
+            $"{Route}/{assemblyId:D}/pallets/return", request, ct);
+
+    public Task<MobilePickingResourceIdResponse> ConfirmPickAsync(
+        Guid assemblyId, MobilePickingConfirmRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingConfirmRequest, MobilePickingResourceIdResponse>(
+            $"{Route}/{assemblyId:D}/picks", request, ct);
+
+    public Task<MobilePickingResourceIdResponse> ReducePickAsync(
+        Guid assemblyId, Guid entryId, MobilePickingReduceRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingReduceRequest, MobilePickingResourceIdResponse>(
+            $"{Route}/{assemblyId:D}/picks/{entryId:D}/return", request, ct);
+
+    public Task<MobilePickingResourceIdResponse> ReportShortageAsync(
+        Guid assemblyId, MobilePickingShortageRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingShortageRequest, MobilePickingResourceIdResponse>(
+            $"{Route}/{assemblyId:D}/shortages", request, ct);
+
+    public Task<MobilePickingClosureCheckResponse> CheckClosureAsync(
+        Guid assemblyId, Guid warehouseId, CancellationToken ct = default) =>
+        GetAsync<MobilePickingClosureCheckResponse>(
+            $"{Route}/{assemblyId:D}/closure-check?warehouseId={warehouseId:D}", ct);
+
+    public Task<MobilePickingCommandIdResponse> CloseAsync(
+        Guid assemblyId, MobilePickingCloseRequest request,
+        CancellationToken ct = default) =>
+        PostAsync<MobilePickingCloseRequest, MobilePickingCommandIdResponse>(
+            $"{Route}/{assemblyId:D}/close", request, ct);
+
+    private async Task<TResponse> GetAsync<TResponse>(string route, CancellationToken ct)
+    {
+        using var response = await transport.GetAsync(route, ct);
+        return await response.Content.ReadFromJsonAsync<TResponse>(ct)
+            ?? throw MobileApiTransport.InvalidResponse(response,
+                "Сервер вернул некорректные данные Отбора.");
+    }
+
     private async Task<TResponse> PostAsync<TRequest, TResponse>(
         string route, TRequest request, CancellationToken ct)
     {

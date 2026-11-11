@@ -18,9 +18,14 @@
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="20" LineBreakMode="WordWrap"
                                    VerticalTextAlignment="Center" />
-                            <Button x:Name="ClearSkuButton" Grid.Column="1" Text="✕" FontSize="18"
-                                    Padding="10,4" Clicked="OnClearSkuClicked" Loaded="OnNonScanControlLoaded"
-                                    SemanticProperties.Description="Убрать SKU из LPN" />
+                            <HorizontalStackLayout Grid.Column="1" Spacing="2">
+                                <Button Text="ⓘ" FontSize="17" WidthRequest="34" BackgroundColor="Transparent"
+                                        Clicked="OnSelectedInfoClicked" Loaded="OnNonScanControlLoaded"
+                                        SemanticProperties.Description="Остатки SKU по ячейкам" />
+                                <Button x:Name="ClearSkuButton" Text="✕" FontSize="18"
+                                        Padding="10,4" Clicked="OnClearSkuClicked" Loaded="OnNonScanControlLoaded"
+                                        SemanticProperties.Description="Убрать SKU из LPN" />
+                            </HorizontalStackLayout>
                         </Grid>
                         <Label x:Name="SkuCodeLabel" FontSize="12" />
                         <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="4">
@@ -54,9 +59,6 @@
                                 <DataTemplate x:DataType="local:ReceivingSkuChoiceRow">
                                     <Border Padding="8" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}"
                                             BackgroundColor="{AppThemeBinding Light={StaticResource ReceivingNeutralBackgroundLight}, Dark={StaticResource ReceivingNeutralBackgroundDark}}">
-                                        <Border.GestureRecognizers>
-                                            <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnCandidateTapped" />
-                                        </Border.GestureRecognizers>
                                         <Border.Triggers>
                                             <DataTrigger TargetType="Border" Binding="{Binding IsMatched}" Value="True">
                                                 <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource ReceivingMatchBackgroundLight}, Dark={StaticResource ReceivingMatchBackgroundDark}}" />
@@ -67,6 +69,9 @@
                                         </Border.Triggers>
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                             <VerticalStackLayout Spacing="2">
+                                                <VerticalStackLayout.GestureRecognizers>
+                                                    <TapGestureRecognizer CommandParameter="{Binding SkuId}" Tapped="OnCandidateTapped" />
+                                                </VerticalStackLayout.GestureRecognizers>
                                                 <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="WordWrap" />
                                                 <Label Text="{Binding Details}" FontSize="12" IsVisible="{Binding HasDetails}" />
                                             </VerticalStackLayout>
@@ -74,6 +79,11 @@
                                                 <Label Text="{Binding PlanText}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End" />
                                                 <Label Text="{Binding FactText}" TextColor="{Binding FactColor}" FontFamily="OpenSansSemibold" FontSize="13" HorizontalTextAlignment="End"
                                                        SemanticProperties.Description="{Binding FactDescription}" />
+                                                <Button Text="ⓘ" FontSize="17" WidthRequest="32" HeightRequest="30"
+                                                        BackgroundColor="Transparent" HorizontalOptions="End"
+                                                        CommandParameter="{Binding SkuId}" Clicked="OnCandidateInfoClicked"
+                                                        Loaded="OnNonScanControlLoaded"
+                                                        SemanticProperties.Description="Остатки SKU по ячейкам" />
                                             </VerticalStackLayout>
                                         </Grid>
                                     </Border>

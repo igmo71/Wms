@@ -75,6 +75,43 @@ Corrections preserve picked stock and can consume the disputed quantity of the
 referenced shortage. The Manager use case resolves that report in the same
 session. Receiving putaway cannot occupy a cell held by picking or replenishment.
 
+The replacement picking-route builder uses the shared availability view. It
+orders known expiration dates before unknown dates, excludes expired groups,
+and can recommend a full one-SKU Reserve cell before Storage top-up. It reports
+unmet demand separately. New picking application operations read a scanned
+Storage or Reserve cell and show its actual SKU, date group, accounting balance,
+available balance, and suggested quantity. A null date prompts a visual expiry
+check only for a SKU that tracks expiration; the fact retains null. Confirming
+a pick reserves its exact group and records editable fact without moving stock.
+Reducing a fact requires a scan of its original cell and confirmation that the
+released quantity is physically there; the matching reservation is reduced
+in the same command. Reporting a physical shortage is a separate command:
+the found quantity is reserved once, while the disputed free quantity is
+blocked by a dated shortage record. A Manager either posts a stock correction
+for that quantity or releases a mistaken block, preserving the report and
+decision. A direct Reserve pick first holds the whole one-SKU cell; each
+confirmed date group must be taken in full. The
+hold can be released after a confirming scan only when no positive fact remains
+from that cell. These operations are not yet wired to the mobile screen; the
+legacy picking screen still uses its former flow.
+
+Closing the replacement picking assembly is the sole outbound stock posting
+point. It rechecks each positive entry against its own active reservation and
+protects other reservations and shortage blocks before issuing from the
+original cell and date group. All movements, signed turnovers, balances,
+allocation rows, closure result, released pallet holds, audit and command
+receipt commit together. A zero fact creates no stock movements. There is no
+intermediate Shipping-zone balance.
+
+A Manager can request cancellation of an unclosed picking assembly only after
+every picked quantity has been returned through its original-cell scan, all
+active picking reservations are gone, and any direct-pick pallet hold has been
+released after its return scan. Cancellation posts no stock movement. Ordered
+replenishments are cancelled in the same command; completed transfers remain
+in their destination cells. An already started replenishment keeps the assembly
+in `CancellationPending` until that task finishes. An unresolved physical
+shortage remains a separate blocked stock group for Manager review.
+
 ## Opening stock cutover
 
 The Administrator confirms opening stock separately from topology on the Web

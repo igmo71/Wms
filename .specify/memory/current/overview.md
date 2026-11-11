@@ -48,3 +48,19 @@ to another Operator. The owner and revision change together; source plans,
 reservations and the actors of earlier physical records are retained. The
 picking and shipping screens still use the legacy scenario. The legacy `Wms`
 project is being eliminated as its scenarios are replaced in the new projects.
+The new outbound fact and per-document exchange tables are prepared. New
+application commands can scan picking stock, hold and return a direct-pick
+pallet, reserve and correct picked quantities, and report and resolve shortages.
+A Manager can revise a started WMS plan against a reviewed 1C snapshot; the
+allocation preview separates automatic from unresolved shared-SKU splits.
+The replacement closing command can post picked stock and prepare one exchange
+target per 1C document. The replacement Mobile picking screens execute this work;
+the Web Manager can review WMS plan, physical fact, current 1C projections and
+audit, change a started plan, distribute a shared-SKU shortage, resolve physical
+shortage reports, request cancellation and approve a warehouse close. The actual
+1C closing exchange still awaits implementation.
+Operator SKU information in the replacement clients reads available stock by
+warehouse, cell and expiration group without changing balances.
+The replacement cancellation command can stop unclosed work after physical
+returns, cancel unstarted replenishments and retain linked 1C documents while
+their status restoration is pending.

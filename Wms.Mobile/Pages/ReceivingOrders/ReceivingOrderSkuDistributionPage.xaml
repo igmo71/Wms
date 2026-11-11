@@ -7,7 +7,12 @@
     Title="SKU">
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
         <VerticalStackLayout Spacing="5">
-            <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="16" LineBreakMode="WordWrap" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="16" LineBreakMode="WordWrap" />
+                <Button Grid.Column="1" Text="ⓘ" FontSize="17" WidthRequest="34"
+                        BackgroundColor="Transparent" Clicked="OnInfoClicked"
+                        SemanticProperties.Description="Остатки SKU по ячейкам" />
+            </Grid>
             <Label x:Name="SkuCodeLabel" FontSize="12" />
             <Grid ColumnDefinitions="Auto,*,Auto,*,Auto" ColumnSpacing="6">
                 <Label FontSize="12" Text="План:" />

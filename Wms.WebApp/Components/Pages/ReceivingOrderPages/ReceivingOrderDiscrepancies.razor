@@ -27,6 +27,8 @@
         <RowTemplate>
             <MudTd DataLabel="SKU">
                 @(context.SkuName ?? context.SkuId.ToString())
+                <SkuInfoButton WarehouseId="Order.WarehouseId" SkuId="context.SkuId"
+                               SkuName="context.SkuName" Unit="context.UnitOfMeasure" />
                 @if (!context.IsCurrent)
                 {
                     <MudText Typo="Typo.caption">Есть открытый LPN</MudText>

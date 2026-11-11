@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
 using Wms.Mobile.Services;
@@ -10,6 +11,7 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
     private readonly MobileLicensePlateNumberPutawayClient _client;
     private readonly MobileReferenceDataClient _reference;
     private readonly IOperationalBarcodeScanner _scanner;
+    private readonly IServiceProvider _services;
     private MobileReceivingWorkLpnResponse? _details;
     private MobileReceivingWorkLpnItemResponse? _item;
     private IReadOnlyList<MobileReceivingPutawayRecommendationResponse> _recommendations = [];
@@ -24,12 +26,13 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
     public LicensePlateNumberPutawayQuantityPage(
         MobileLicensePlateNumberPutawayClient client,
         MobileReferenceDataClient reference,
-        IOperationalBarcodeScanner scanner)
+        IOperationalBarcodeScanner scanner, IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
         _reference = reference;
         _scanner = scanner;
+        _services = services;
         ErrorLabel.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(Label.Text))
@@ -59,6 +62,15 @@ public partial class LicensePlateNumberPutawayQuantityPage : ContentPage
         _quantityConfirmed = false;
         QuantityEntry.Text = string.Empty;
         UpdateQuantityStatus();
+    }
+
+    private async void OnInfoClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _pending is not null || _details is null || _item is null) return;
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_details.WarehouseId, _item.SkuId, SelectedSkuLabel.Text,
+            _item.UnitOfMeasure);
+        await Navigation.PushAsync(page);
     }
 
     protected override async void OnAppearing()

@@ -37,6 +37,68 @@ public sealed class PickingAssemblyProcess(MobilePickingClient client)
         Begin("Принять сборку", warehouseId, async id =>
             (await client.TakeOverAsync(assemblyId, warehouseId, revision, id)).AssemblyId);
 
+    public Task<MobilePickingAssemblyResponse> HoldPalletAsync(
+        Guid assemblyId, Guid warehouseId, long revision,
+        string locationCode, Guid skuId) =>
+        Begin("Снять поддон", warehouseId, async id =>
+        {
+            await client.HoldPalletAsync(assemblyId,
+                new(id, warehouseId, revision, locationCode, skuId));
+            return assemblyId;
+        });
+
+    public Task<MobilePickingAssemblyResponse> ReturnPalletAsync(
+        Guid assemblyId, Guid warehouseId, long revision,
+        string locationCode) =>
+        Begin("Вернуть поддон", warehouseId, async id =>
+        {
+            await client.ReturnPalletAsync(assemblyId,
+                new(id, warehouseId, revision, locationCode));
+            return assemblyId;
+        });
+
+    public Task<MobilePickingAssemblyResponse> ConfirmPickAsync(
+        Guid assemblyId, Guid warehouseId, long revision,
+        string locationCode, Guid skuId, DateOnly? expirationDate,
+        decimal quantity) =>
+        Begin("Подтвердить Отбор", warehouseId, async id =>
+        {
+            await client.ConfirmPickAsync(assemblyId,
+                new(id, warehouseId, revision, locationCode, skuId,
+                    expirationDate, quantity));
+            return assemblyId;
+        });
+
+    public Task<MobilePickingAssemblyResponse> ReducePickAsync(
+        Guid assemblyId, Guid warehouseId, Guid entryId, long revision,
+        string locationCode, decimal quantity, string? explanation) =>
+        Begin("Вернуть товар", warehouseId, async id =>
+        {
+            await client.ReducePickAsync(assemblyId, entryId,
+                new(id, warehouseId, revision, locationCode, quantity,
+                    PhysicalReturnConfirmed: true, Explanation: explanation));
+            return assemblyId;
+        });
+
+    public Task<MobilePickingAssemblyResponse> ReportShortageAsync(
+        Guid assemblyId, Guid warehouseId, long revision,
+        string locationCode, Guid skuId, DateOnly? expirationDate,
+        decimal expectedQuantity, decimal foundQuantity, string? comment) =>
+        Begin("Сообщить о недостаче", warehouseId, async id =>
+        {
+            await client.ReportShortageAsync(assemblyId,
+                new(id, warehouseId, revision, locationCode, skuId,
+                    expirationDate, expectedQuantity, foundQuantity,
+                    Comment: comment));
+            return assemblyId;
+        });
+
+    public Task<MobilePickingAssemblyResponse> CloseAsync(
+        Guid assemblyId, Guid warehouseId, long revision) =>
+        Begin("Закрыть и отгрузить", warehouseId, async id =>
+            (await client.CloseAsync(assemblyId,
+                new(id, warehouseId, revision))).AssemblyId);
+
     private Task<MobilePickingAssemblyResponse> Begin(
         string label, Guid warehouseId, Func<Guid, Task<Guid>> execute)
     {

@@ -1,0 +1,46 @@
+<ContentPage x:Class="Wms.Mobile.SkuLocationsPage"
+             x:Name="Page"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Wms.Mobile"
+             Title="Остатки SKU">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
+        <VerticalStackLayout Spacing="4">
+            <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="19" LineBreakMode="WordWrap" />
+            <Label x:Name="UnitLabel" FontSize="12" />
+            <Label Text="Доступно для новой работы по ячейкам и срокам годности" FontSize="12" />
+        </VerticalStackLayout>
+        <RefreshView x:Name="LocationsRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
+            <ScrollView>
+                <VerticalStackLayout Spacing="6">
+                    <Label x:Name="EmptyLabel" Text="Учётного остатка нет." IsVisible="False" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Locations, Source={x:Reference Page}}"
+                                         Spacing="5">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:SkuLocationRow">
+                                <Border Padding="9" Stroke="#D4D4D4">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                                        <Label Text="{Binding LocationCode}" FontAttributes="Bold" />
+                                        <Label Grid.Row="1" Text="{Binding ExpirationText}" FontSize="12" />
+                                        <VerticalStackLayout Grid.Column="1" Grid.RowSpan="2" Spacing="2">
+                                            <Label Text="{Binding AvailableText}" FontAttributes="Bold"
+                                                   HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding AccountingText}" FontSize="12"
+                                                   HorizontalTextAlignment="End"
+                                                   IsVisible="{Binding HasDifferentAccounting}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <VerticalStackLayout Grid.Row="2" Spacing="4">
+            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
+                     HeightRequest="3" IsVisible="False" />
+            <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

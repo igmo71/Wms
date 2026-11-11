@@ -962,6 +962,33 @@ namespace Wms.Data.Migrations
                     b.ToTable("Partners");
                 });
 
+            modelBuilder.Entity("Wms.Domain.PickingAllocation", b =>
+                {
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ShippingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.HasKey("PickingAssemblyId", "ShippingOrderId", "StockKeepingUnitId");
+
+                    b.HasIndex("ShippingOrderId");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.ToTable("PickingAllocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_PickingAllocations_Quantity", "[Quantity] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Wms.Domain.PickingAssembly", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1114,6 +1141,99 @@ namespace Wms.Data.Migrations
                         .HasFilter("[DetachedAtUtc] IS NULL");
 
                     b.ToTable("PickingAssemblySourceLinks");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingClosure", b =>
+                {
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ClosedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ClosedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("ManagerOverride")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MovementIdsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewedSourcesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("PickingAssemblyId");
+
+                    b.ToTable("PickingClosures");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ConfirmedBy")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("LastChangedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastChangedBy")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.HasIndex("StorageLocationId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("PickingAssemblyId", "StockKeepingUnitId");
+
+                    b.ToTable("PickingEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_PickingEntries_Quantity", "[Quantity] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Wms.Domain.PickingReservation", b =>
@@ -1658,6 +1778,57 @@ namespace Wms.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_ReplenishmentTransfers_Quantity", "[Quantity] > 0");
                         });
+                });
+
+            modelBuilder.Entity("Wms.Domain.ShippingExchangeTarget", b =>
+                {
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ShippingOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("DecisionRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("OperationalRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("PatchConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("PostConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReviewedSourceJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetDocumentJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TargetStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("PickingAssemblyId", "ShippingOrderId");
+
+                    b.HasIndex("ShippingOrderId");
+
+                    b.HasIndex("Stage", "LastAttemptAtUtc");
+
+                    b.ToTable("ShippingExchangeTargets");
                 });
 
             modelBuilder.Entity("Wms.Domain.ShippingOrder", b =>
@@ -2699,6 +2870,27 @@ namespace Wms.Data.Migrations
                     b.Navigation("StockKeepingUnit");
                 });
 
+            modelBuilder.Entity("Wms.Domain.PickingAllocation", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ShippingOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ShippingOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", null)
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Wms.Domain.PickingAssembly", b =>
                 {
                     b.HasOne("Wms.Domain.Warehouse", "Warehouse")
@@ -2752,6 +2944,42 @@ namespace Wms.Data.Migrations
                     b.Navigation("PickingAssembly");
 
                     b.Navigation("ShippingOrder");
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingClosure", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithOne()
+                        .HasForeignKey("Wms.Domain.PickingClosure", "PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingEntry", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", null)
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StorageLocation", null)
+                        .WithMany()
+                        .HasForeignKey("StorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.Warehouse", null)
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Wms.Domain.PickingReservation", b =>
@@ -2994,6 +3222,21 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.ReplenishmentSourceCycle", null)
                         .WithMany("Transfers")
                         .HasForeignKey("ReplenishmentSourceCycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Wms.Domain.ShippingExchangeTarget", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.ShippingOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ShippingOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

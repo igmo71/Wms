@@ -12,7 +12,13 @@
         <ScrollView>
             <VerticalStackLayout Spacing="10">
                 <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                    <Label x:Name="SelectedSkuLabel" FontAttributes="Bold" FontSize="20" />
+                    <Button Grid.Column="1" Text="ⓘ" FontSize="17" WidthRequest="34"
+                            BackgroundColor="Transparent" Clicked="OnInfoClicked"
+                            Loaded="OnNonScanControlLoaded"
+                            SemanticProperties.Description="Остатки SKU по ячейкам" />
+                </Grid>
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Label x:Name="RemainingLabel" />
                     <Label x:Name="QuantityStatusLabel" Grid.Column="1" FontAttributes="Bold"

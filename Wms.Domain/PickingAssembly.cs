@@ -246,6 +246,130 @@ public sealed class PickingAssembly
         return OperationResult.Success();
     }
 
+    public OperationResult RecordPhysicalWork(string userId, long expectedRevision)
+    {
+        if (Status != PickingAssemblyStatus.InProgress)
+            return OperationError.Conflict("Физический Отбор доступен только в начатой сборке.");
+        if (ResponsibleUserId != userId?.Trim())
+            return OperationError.Conflict("Сначала примите сборку на себя.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Обновите экран и повторите действие.");
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult ChangePlan(Guid shippingOrderId,
+        IReadOnlyDictionary<Guid, decimal> planBySku, long expectedRevision)
+    {
+        if (Status != PickingAssemblyStatus.InProgress)
+            return OperationError.Conflict("План можно изменить только в начатой сборке.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Обновите данные перед изменением плана.");
+        if (ActiveLink(shippingOrderId) is null)
+            return OperationError.NotFound("РО 1С не привязан к этой сборке.");
+        var validation = ValidatePlan(planBySku);
+        if (!validation.IsSuccess) return validation;
+        var totals = new Dictionary<Guid, decimal>();
+        foreach (var line in _planLines.Where(x => x.ShippingOrderId != shippingOrderId))
+            totals[line.StockKeepingUnitId] = line.Quantity + totals.GetValueOrDefault(line.StockKeepingUnitId);
+        foreach (var (skuId, quantity) in planBySku)
+        {
+            var total = totals.GetValueOrDefault(skuId) + quantity;
+            if (!WarehouseQuantity.IsNonNegative(total))
+                return OperationError.Invalid("Общий план SKU превышает допустимое количество.");
+            totals[skuId] = total;
+        }
+        var existing = _planLines.Where(x => x.ShippingOrderId == shippingOrderId)
+            .ToDictionary(x => x.StockKeepingUnitId);
+        foreach (var line in existing.Values)
+        {
+            if (planBySku.TryGetValue(line.StockKeepingUnitId, out var quantity))
+                line.SetQuantity(quantity);
+            else
+                _planLines.Remove(line);
+        }
+        foreach (var (skuId, quantity) in planBySku)
+        {
+            if (!existing.ContainsKey(skuId))
+                _planLines.Add(PickingAssemblyPlanLine.Create(Id,
+                    shippingOrderId, skuId, quantity).Value!);
+        }
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult Close(string userId, long expectedRevision,
+        DateTimeOffset closedAtUtc)
+    {
+        if (Status != PickingAssemblyStatus.InProgress)
+            return OperationError.Conflict("Закрыть можно только начатую сборку.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Повторите проверку закрытия.");
+        if (!ValidUser(userId) || closedAtUtc == default
+            || StartedAtUtc is not DateTimeOffset startedAt
+            || closedAtUtc < startedAt)
+            return OperationError.Invalid("Исполнитель или время закрытия недопустимы.");
+        Status = PickingAssemblyStatus.Closed;
+        ClosedAtUtc = closedAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult RequestCancellation(string userId,
+        long expectedRevision, DateTimeOffset requestedAtUtc)
+    {
+        if (Status is not (PickingAssemblyStatus.Draft
+            or PickingAssemblyStatus.Preparing or PickingAssemblyStatus.InProgress))
+            return OperationError.Conflict("Отменить можно только незакрытую сборку.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Обновите данные перед отменой.");
+        if (!ValidUser(userId) || requestedAtUtc == default
+            || requestedAtUtc < CreatedAtUtc)
+            return OperationError.Invalid("Исполнитель или время отмены недопустимы.");
+        if (StartLeaseId is not null && StartLeaseUntilUtc > requestedAtUtc)
+            return OperationError.Conflict("Дождитесь завершения текущей попытки начала Отбора.");
+
+        Status = PickingAssemblyStatus.CancellationPending;
+        CancelledBy = userId.Trim();
+        StartLeaseId = null;
+        StartLeaseUntilUtc = null;
+        foreach (var link in ActiveSources.Where(x => x.StartConfirmedAtUtc is null
+            && x.StartPatchRequestedAtUtc is null))
+            link.ReleaseAfterCancellation(userId, requestedAtUtc);
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult ReleaseCancelledSource(Guid shippingOrderId,
+        string userId, DateTimeOffset releasedAtUtc)
+    {
+        if (Status != PickingAssemblyStatus.CancellationPending)
+            return OperationError.Conflict("Сборка не ожидает возврата статусов 1С.");
+        var link = ActiveLink(shippingOrderId);
+        if (link is null)
+            return OperationError.NotFound("РО 1С не ожидает завершения отмены.");
+        if (!ValidUser(userId) || releasedAtUtc == default
+            || releasedAtUtc < CreatedAtUtc)
+            return OperationError.Invalid("Исполнитель или время освобождения недопустимы.");
+        link.ReleaseAfterCancellation(userId, releasedAtUtc);
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult CompleteCancellation(DateTimeOffset completedAtUtc,
+        bool hasActiveReplenishments)
+    {
+        if (Status != PickingAssemblyStatus.CancellationPending
+            || ActiveSources.Count != 0 || hasActiveReplenishments)
+            return OperationError.Conflict("Отмена ожидает завершения Подпиток и возврата статусов РО 1С.");
+        if (completedAtUtc == default || completedAtUtc < CreatedAtUtc)
+            return OperationError.Invalid("Время завершения отмены недопустимо.");
+        Status = PickingAssemblyStatus.Cancelled;
+        CancelledAtUtc = completedAtUtc;
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
     private PickingAssemblySourceLink? ActiveLink(Guid shippingOrderId) =>
         _sourceLinks.SingleOrDefault(x =>
             x.ShippingOrderId == shippingOrderId && x.DetachedAtUtc is null);

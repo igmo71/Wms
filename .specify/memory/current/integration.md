@@ -89,6 +89,43 @@ without WMS intent, that status requires investigation. A per-assembly lease
 prevents overlapping start attempts. The picking screens still use the legacy
 workflow.
 
+For a started assembly, a Manager may change the WMS plan of one linked 1C
+document. The command checks the assembly revision and requires the source JSON
+shown during review to match the current stored projection. It records the
+reviewed source fingerprint, reason and each changed SKU quantity in audit;
+the source projection itself is not edited. A later source check still applies
+before closure. Allocation preview uses the approved per-document WMS plan and
+the physically confirmed aggregate fact: a single document or a complete
+multi-document SKU allocates automatically; a partial shared SKU needs an
+explicit Manager split within every document's plan. The allocation becomes
+warehouse history only when closure posts it.
+
+The replacement closure check fetches every linked 1C document again, updates
+its current projection, and compares it with the stored start snapshot. An
+unreadable source, missing posting, changed warehouse or warehouse operation,
+unexpected status or deletion mark blocks both roles. A changed receiver or
+item plan is shown for Manager review; queue, planned date and direction do
+not block closure. The check also compares the aggregate WMS plan with picked
+fact, flags known expired groups and previews the document allocation. A
+failed GET leaves the former projection visible as historical data, not as a
+successful current check. Closure still has to recheck its database state
+under the command revision before posting.
+
+The replacement close command performs the fresh check before opening its
+stock transaction, then verifies the same source JSON and assembly revision
+inside that transaction. It stores an immutable per-document target decision:
+the approved WMS plan, allocated SKU quantities, intended `Shipped` status and
+reviewed source JSON. The Integration target builder will turn that decision
+into concrete 1C item rows for PATCH. The stock commit does not call 1C.
+
+Cancelling an unclosed picking assembly does not call 1C inside the warehouse
+transaction. Source links with no confirmed or intended start PATCH are
+released immediately. Sources with a confirmed start or an uncertain PATCH
+intent remain linked to the assembly in `CancellationPending`, preventing a
+new assembly from taking them. Their return to `Prepared` requires a separate
+safe 1C exchange, which is not wired yet; until then, the links remain pending.
+The cancellation request and its reason are audited.
+
 The older picking and shipping screens support pull-to-refresh of their source
 assessment. Picking completion and final shipping fetch a fresh checkpoint
 before effects. An unresolved decision, blocking assessment, or technical

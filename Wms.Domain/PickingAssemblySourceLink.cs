@@ -63,6 +63,12 @@ public sealed class PickingAssemblySourceLink
         return OperationResult.Success();
     }
 
+    internal void ReleaseAfterCancellation(string userId, DateTimeOffset releasedAtUtc)
+    {
+        DetachedAtUtc = releasedAtUtc;
+        DetachedBy = userId.Trim();
+    }
+
     internal void RecordStartAttempt(DateTimeOffset atUtc, string? error)
     {
         LastStartAttemptAtUtc = atUtc;

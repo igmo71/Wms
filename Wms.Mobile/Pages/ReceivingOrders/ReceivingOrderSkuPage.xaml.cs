@@ -83,6 +83,17 @@ public partial class ReceivingOrderSkuPage : ContentPage
         finally { SetBusy(false); }
     }
 
+    private async void OnInfoClicked(object? sender, EventArgs e)
+    {
+        if (_order is null || _busy || _process.HasPendingCommand
+            || sender is not Button { CommandParameter: Guid skuId }) return;
+        var row = ItemRows.FirstOrDefault(x => x.SkuId == skuId);
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_order.WarehouseId, skuId, row?.Name,
+            _order.Items.FirstOrDefault(x => x.SkuId == skuId)?.UnitOfMeasure);
+        await Navigation.PushAsync(page);
+    }
+
     private void Apply(MobileReceivingWorkOrderResponse order)
     {
         _order = order;

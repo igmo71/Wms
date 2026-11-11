@@ -66,3 +66,86 @@ public sealed record MobilePickingCommandRequest(
     Guid ClientRequestId, Guid WarehouseId);
 public sealed record MobilePickingTakeOverRequest(
     Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision);
+
+public sealed record MobilePickingResourceIdResponse(Guid Id);
+
+public sealed record MobilePickingWorkSkuResponse(
+    Guid SkuId, string? Code, string? Name, string? Unit,
+    bool TracksExpirationDate, decimal PlannedQuantity,
+    decimal ConfirmedQuantity);
+
+public sealed record MobilePickingWorkEntryResponse(
+    Guid Id, Guid StorageLocationId, string LocationCode,
+    Guid SkuId, DateOnly? ExpirationDate, decimal Quantity,
+    string ConfirmedBy, DateTimeOffset ConfirmedAtUtc,
+    bool FromReserve);
+
+public sealed record MobilePickingWorkResponse(
+    Guid Id, MobilePickingAssemblyStatus Status, long Revision,
+    string ResponsibleUserId,
+    IReadOnlyList<MobilePickingWorkSkuResponse> Skus,
+    IReadOnlyList<MobilePickingWorkEntryResponse> Entries);
+
+public sealed record MobilePickingRouteStepResponse(
+    Guid StorageLocationId, string LocationCode, Guid SkuId,
+    DateOnly? ExpirationDate, decimal Quantity, bool DirectPalletPick);
+
+public sealed record MobilePickingRouteGapResponse(
+    Guid SkuId, DateOnly? ExpirationDate, decimal Quantity);
+
+public sealed record MobilePickingRouteResponse(
+    long Revision, IReadOnlyList<MobilePickingRouteStepResponse> Steps,
+    IReadOnlyList<MobilePickingRouteGapResponse> Gaps);
+
+public sealed record MobilePickingAvailabilityResponse(
+    Guid StorageLocationId, string LocationCode, DateOnly? ExpirationDate,
+    decimal AccountingQuantity, decimal AvailableQuantity,
+    decimal ReservedQuantity, decimal BlockedQuantity, bool Held);
+
+public sealed record MobilePickingSkuResponse(
+    Guid SkuId, decimal PlannedQuantity, decimal ConfirmedQuantity,
+    decimal RemainingQuantity,
+    IReadOnlyList<MobilePickingAvailabilityResponse> Locations);
+
+public sealed record MobilePickingScanSourceRequest(
+    Guid WarehouseId, Guid SkuId, string LocationCode,
+    Guid? ScannedSkuId = null, DateOnly? ExpirationDate = null,
+    bool DateGroupSelected = false);
+
+public sealed record MobilePickingScannedSourceResponse(
+    Guid StorageLocationId, string LocationCode, Guid SkuId,
+    DateOnly? ExpirationDate, decimal AccountingQuantity,
+    decimal AvailableQuantity, decimal SuggestedQuantity,
+    decimal ReservedQuantity, decimal BlockedQuantity,
+    bool RequiresVisualExpiryCheck);
+
+public sealed record MobilePickingHoldPalletRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
+    string LocationCode, Guid SkuId);
+
+public sealed record MobilePickingReturnPalletRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
+    string ScannedLocationCode);
+
+public sealed record MobilePickingConfirmRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
+    string ScannedLocationCode, Guid SkuId, DateOnly? ExpirationDate,
+    decimal Quantity, Guid? ScannedSkuId = null);
+
+public sealed record MobilePickingReduceRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
+    string ScannedLocationCode, decimal Quantity,
+    bool PhysicalReturnConfirmed, string? Explanation = null);
+
+public sealed record MobilePickingShortageRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
+    string ScannedLocationCode, Guid SkuId, DateOnly? ExpirationDate,
+    decimal ExpectedQuantity, decimal FoundQuantity,
+    Guid? ExistingPickingEntryId = null, string? Comment = null);
+
+public sealed record MobilePickingClosureCheckResponse(
+    long Revision, bool FactMatchesPlan, bool CanOperatorClose,
+    IReadOnlyList<string> HardBlocks, IReadOnlyList<string> ManagerIssues);
+
+public sealed record MobilePickingCloseRequest(
+    Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision);

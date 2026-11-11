@@ -49,6 +49,15 @@ public partial class Sources
     private IEnumerable<ReceivingSourceView> SelectedSources =>
         _sources.Where(x => x.LinkedOrderId is null && _selected.Contains(x.RefKey));
 
+    private Guid? SelectedWarehouseId
+    {
+        get
+        {
+            var warehouses = SelectedSources.Select(x => x.WarehouseId).Distinct().ToArray();
+            return warehouses.Length == 1 ? warehouses[0] : null;
+        }
+    }
+
     private ReceivingSourceView? ActiveSource => _activeSourceRefKey is Guid refKey
         ? _sources.FirstOrDefault(x => x.RefKey == refKey) : null;
 

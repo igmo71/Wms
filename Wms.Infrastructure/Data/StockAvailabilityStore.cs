@@ -8,7 +8,7 @@ using Wms.Domain.Enums;
 namespace Wms.Data;
 
 public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContext> factory)
-    : IStockAvailabilityStore, IStockReservationStore
+    : IStockAvailabilityStore, IStockReservationStore, IStockShortageStore
 {
     public async Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct)
@@ -16,6 +16,11 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
         await using var db = await factory.CreateDbContextAsync(ct);
         return await ReadSkuAsync(db, warehouseId, stockKeepingUnitId, ct);
     }
+
+    public Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        Guid stockKeepingUnitId, CancellationToken ct) =>
+        ReadSkuAsync(RequireSession(context).Db, warehouseId, stockKeepingUnitId, ct);
 
     public async Task<OperationResult> ReserveAsync(
         ICommandExecutionContext context, PickingReservation reservation, CancellationToken ct)
@@ -93,6 +98,54 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             return reduced;
         location.AdvanceOperationalRevision();
         return OperationResult.Success();
+    }
+
+    public async Task<OperationResult> ReportAsync(
+        ICommandExecutionContext context, StockShortage shortage, CancellationToken ct)
+    {
+        var session = RequireSession(context);
+        var location = await LockLocationAsync(session, shortage.WarehouseId,
+            shortage.StorageLocationId, ct);
+        if (location is null)
+            return OperationError.NotFound("Ячейка сообщения о недостаче не найдена.");
+        if (!IsOperational(location))
+            return OperationError.Conflict("Ячейка недоступна для сообщения о недостаче.");
+        var state = await ReadSkuAsync(session.Db, shortage.WarehouseId,
+            shortage.StockKeepingUnitId, ct, shortage.StorageLocationId);
+        var group = state.SingleOrDefault(x => x.Group.StorageLocationId == shortage.StorageLocationId
+            && x.Group.ExpirationDate == shortage.ExpirationDate);
+        var hold = group?.Hold;
+        var ownsHold = hold is null
+            || hold.OwnerId == shortage.OriginId
+                && (shortage.Origin == StockShortageOrigin.Picking
+                    && hold.OwnerType == StorageLocationLockOwnerType.PickingAssembly
+                    || shortage.Origin == StockShortageOrigin.Replenishment
+                    && hold.OwnerType == StorageLocationLockOwnerType.ReplenishmentTask);
+        if (group is null || !ownsHold || group.BlockedQuantity > 0
+            || group.AccountingQuantity - group.ReservedQuantity - group.BlockedQuantity
+                < shortage.BlockedQuantity)
+            return OperationError.Conflict("Спорная группа уже заблокирована или свободного остатка недостаточно.");
+        location.AdvanceOperationalRevision();
+        context.Stage(shortage);
+        return OperationResult.Success();
+    }
+
+    public async Task<StockShortageResolutionState?> LoadForResolutionAsync(
+        ICommandExecutionContext context, Guid shortageId, CancellationToken ct)
+    {
+        var session = RequireSession(context);
+        await session.BeginSerializableAsync(ct);
+        var group = await session.Db.StockShortages.AsNoTracking()
+            .Where(x => x.Id == shortageId)
+            .Select(x => new { x.WarehouseId, x.StorageLocationId })
+            .SingleOrDefaultAsync(ct);
+        if (group is null) return null;
+        var location = await LockLocationAsync(session, group.WarehouseId,
+            group.StorageLocationId, ct);
+        if (location is null) return null;
+        var shortage = await session.Db.StockShortages.SingleOrDefaultAsync(
+            x => x.Id == shortageId, ct);
+        return shortage is null ? null : new StockShortageResolutionState(shortage, location);
     }
 
     private static CommandExecutionStore.Session RequireSession(ICommandExecutionContext context) =>

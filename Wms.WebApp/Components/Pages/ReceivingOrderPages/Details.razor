@@ -132,6 +132,11 @@ else
                             @(item is null ? "—" : item.SkuName ?? item.SkuId.ToString())
                             @if (item is not null)
                             {
+                                <SkuInfoButton WarehouseId="_order.WarehouseId" SkuId="item.SkuId"
+                                               SkuName="item.SkuName" Unit="item.UnitOfMeasure" />
+                            }
+                            @if (item is not null)
+                            {
                                 <MudText Typo="Typo.caption">@(item.UnitOfMeasure ?? "Ед. изм. неизвестна")</MudText>
                             }
                         </MudTd>

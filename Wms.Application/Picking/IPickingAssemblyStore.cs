@@ -8,6 +8,19 @@ namespace Wms.Application.Picking;
 public sealed record PickingAssemblyChangeState(
     ShippingOrder? Source, PickingAssembly? Assembly, Guid? LinkedAssemblyId);
 
+public sealed record PickingCellSku(Guid Id, string? Code, string? Name,
+    bool TracksExpirationDate);
+
+public sealed record PickingWorkState(
+    PickingAssembly? Assembly, IReadOnlyList<PickingEntry> Entries,
+    StorageLocation? Location, IReadOnlyList<PickingCellSku> CellSkus);
+
+public sealed record PickingCancellationState(
+    PickingAssembly? Assembly, IReadOnlyList<PickingEntry> Entries,
+    IReadOnlyList<PickingReservation> ActiveReservations,
+    IReadOnlyList<StorageLocationLock> PalletHolds,
+    IReadOnlyList<ReplenishmentTask> Replenishments);
+
 public interface IPickingAssemblyStore
 {
     Task<Guid?> FindLinkedAssemblyIdAsync(Guid sourceId, CancellationToken ct);
@@ -15,6 +28,23 @@ public interface IPickingAssemblyStore
     Task<ShippingOrder?> ReadSourceAsync(Guid sourceId, CancellationToken ct);
     Task<PickingAssembly?> LoadAssemblyAsync(
         ICommandExecutionContext session, Guid assemblyId, CancellationToken ct);
+    Task<ShippingOrder?> LoadSourceAsync(
+        ICommandExecutionContext session, Guid sourceId, CancellationToken ct);
+    Task<bool> AreKnownSkusAsync(ICommandExecutionContext session,
+        IReadOnlyCollection<Guid> skuIds, CancellationToken ct);
+    Task<PickingWorkState> ReadWorkAsync(Guid assemblyId, string? locationCode,
+        CancellationToken ct);
+    Task<PickingWorkState> LoadWorkAsync(ICommandExecutionContext session,
+        Guid assemblyId, string? locationCode, CancellationToken ct);
+    Task<PickingCancellationState> LoadCancellationAsync(
+        ICommandExecutionContext session, Guid assemblyId, CancellationToken ct);
+    Task<OperationResult> ReleasePickingHoldAsync(ICommandExecutionContext session,
+        Guid warehouseId, Guid locationId, Guid assemblyId, CancellationToken ct);
+    Task<OperationResult> ValidatePickingClosureStockAsync(
+        ICommandExecutionContext session, PickingAssembly assembly,
+        IReadOnlyCollection<PickingEntry> entries, CancellationToken ct);
+    Task ReleasePickingClosureHoldsAsync(ICommandExecutionContext session,
+        Guid assemblyId, CancellationToken ct);
     Task<PickingAssemblyChangeState> LoadAsync(
         ICommandExecutionContext session, Guid? assemblyId, Guid sourceId, CancellationToken ct);
     Task<OperationResult> AssignNumberAsync(

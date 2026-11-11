@@ -54,6 +54,9 @@ public interface IStockAvailabilityStore
 {
     Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct);
+    Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        Guid stockKeepingUnitId, CancellationToken ct);
 }
 
 public interface IStockReservationStore
@@ -68,6 +71,18 @@ public interface IStockReservationStore
         ICommandExecutionContext context, Guid pickingEntryId, decimal quantity,
         DateTimeOffset changedAtUtc, CancellationToken ct);
 }
+
+public interface IStockShortageStore
+{
+    Task<OperationResult> ReportAsync(
+        ICommandExecutionContext context, StockShortage shortage, CancellationToken ct);
+
+    Task<StockShortageResolutionState?> LoadForResolutionAsync(
+        ICommandExecutionContext context, Guid shortageId, CancellationToken ct);
+}
+
+public sealed record StockShortageResolutionState(
+    StockShortage Shortage, StorageLocation Location);
 
 public sealed class GetStockAvailability(IStockAvailabilityStore store, WarehousePermission permission)
 {

@@ -1,0 +1,30 @@
+@namespace Wms.WebApp.Components
+@inject IDialogService DialogService
+
+<AuthorizeView Roles="Operator">
+    <MudTooltip Text="Где находится SKU и сколько доступно">
+        <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Small"
+                       Color="Color.Info" Disabled="@(WarehouseId == Guid.Empty || SkuId == Guid.Empty)"
+                       OnClick="OpenAsync" />
+    </MudTooltip>
+</AuthorizeView>
+
+@code {
+    [Parameter, EditorRequired] public Guid WarehouseId { get; set; }
+    [Parameter, EditorRequired] public Guid SkuId { get; set; }
+    [Parameter] public string? SkuName { get; set; }
+    [Parameter] public string? Unit { get; set; }
+
+    private async Task OpenAsync()
+    {
+        var parameters = new DialogParameters<SkuLocationsDialog>
+        {
+            { x => x.WarehouseId, WarehouseId },
+            { x => x.SkuId, SkuId },
+            { x => x.SkuName, SkuName },
+            { x => x.Unit, Unit }
+        };
+        await DialogService.ShowAsync<SkuLocationsDialog>("Остатки SKU", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+}

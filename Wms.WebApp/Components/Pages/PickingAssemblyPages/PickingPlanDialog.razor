@@ -1,0 +1,25 @@
+@using Wms.Application.Picking
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText>РО 1С: @(Source.Number ?? Source.ShippingOrderId.ToString())</MudText>
+            <MudText Typo="Typo.body2">Показаны план WMS и актуальные строки 1С после сверки. Снимите отметку, чтобы удалить SKU из плана.</MudText>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+            <MudTable T="PlanRow" Items="_rows" Dense="true" Elevation="0">
+                <HeaderContent><MudTh>В плане</MudTh><MudTh>SKU</MudTh><MudTh>Текущий план 1С</MudTh><MudTh>План WMS</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd><MudCheckBox T="bool" @bind-Value="context.Included" Disabled="@(_busy || _pendingRequest is not null)" /></MudTd>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.SourceQuantity.ToString("0.###")</MudTd>
+                    <MudTd><MudNumericField T="decimal" @bind-Value="context.Quantity" Min="0" Step="1" Disabled="@(_busy || _pendingRequest is not null || !context.Included)" /></MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudTextField T="string" @bind-Value="_reason" Label="Причина решения руководителя" Lines="2" Disabled="@(_pendingRequest is not null)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="@(_busy || _pendingRequest is not null)" OnClick="Close">Закрыть</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="SaveAsync">@(_pendingRequest is null ? "Сохранить план" : "Повторить сохранение")</MudButton>
+    </DialogActions>
+</MudDialog>

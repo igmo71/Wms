@@ -161,6 +161,22 @@ retains one ClientRequestId and its exact command input through an uncertain
 HTTP response, then fetches the assembly before clearing the pending command.
 The main navigation remains on the older shipping screen until the outbound
 workflow is switched over.
+The outbound fact schema has dated picking entries, per-source SKU allocations,
+one immutable closure record per assembly, and one exchange target per
+assembly/source. The closure factory compares aggregate fact and allocation
+per SKU and rejects movements for a zero fact. Exchange targets retain the
+reviewed source, neutral WMS target decision, status and independent PATCH/POST
+progress. The target decision stores approved SKU plans and allocated fact;
+the Integration adapter derives concrete 1C rows for PATCH. The close command
+uses the shared posting handler and the command executor's transaction to
+commit stock issues, reservations, holds, allocation, target decisions, audit
+and receipt together. It does not hold a database transaction across the fresh
+1C GET. Actual exchange remains a separate later increment.
+Application has a pure address comparer and picking-route builder over the
+shared stock-availability view and supplied location metadata. The builder
+keeps FEFO before cell-clearing choices, selects only fully available one-SKU
+reserve cells for direct pallet picking, and reports unmet quantities. It is
+not yet wired to physical picking screens or command confirmation.
 
 The outbound domain model distinguishes quantity reservations (`PickingReservation`),
 reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).

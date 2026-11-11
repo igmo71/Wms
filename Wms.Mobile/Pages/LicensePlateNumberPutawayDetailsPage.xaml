@@ -15,13 +15,19 @@
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="local:ReceivingPutawayItemRow">
                             <Border Padding="8" Stroke="#D4D4D4">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnItemTapped" />
-                                </Border.GestureRecognizers>
-                                <VerticalStackLayout>
-                                    <Label Text="{Binding Name}" FontAttributes="Bold" />
-                                    <Label Text="{Binding QuantityText}" FontSize="12" />
-                                </VerticalStackLayout>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                    <VerticalStackLayout>
+                                        <VerticalStackLayout.GestureRecognizers>
+                                            <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnItemTapped" />
+                                        </VerticalStackLayout.GestureRecognizers>
+                                        <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                        <Label Text="{Binding QuantityText}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1" Text="ⓘ" FontSize="17" WidthRequest="34"
+                                            BackgroundColor="Transparent" CommandParameter="{Binding SkuId}"
+                                            Clicked="OnInfoClicked"
+                                            SemanticProperties.Description="Остатки SKU по ячейкам" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>

@@ -35,7 +35,7 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
         CodeLabel.Text = lpn.Code;
         StatusLabel.Text = lpn.Status == MobileLicensePlateNumberStatus.Closed
             ? "Закрыт: доступен для размещения" : "Размещение доступно только после закрытия LPN";
-        Items = lpn.Items.Select(x => new ReceivingPutawayItemRow(x.Id,
+        Items = lpn.Items.Select(x => new ReceivingPutawayItemRow(x.Id, x.SkuId,
             x.SkuName ?? x.SkuId.ToString(),
             $"Принято {x.Quantity:0.###} · размещено {x.PlacedQuantity:0.###} · осталось {x.RemainingQuantity:0.###} {x.UnitOfMeasure ?? "—"} · срок {x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "не указан"}")).ToArray();
         History = lpn.Putaways.Select(x => new ReceivingPutawayHistoryRow(
@@ -99,6 +99,17 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
+    private async void OnInfoClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _lpn is null
+            || sender is not Button { CommandParameter: Guid skuId }) return;
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_lpn.WarehouseId, skuId,
+            Items.FirstOrDefault(x => x.SkuId == skuId)?.Name,
+            _lpn.Items.FirstOrDefault(x => x.SkuId == skuId)?.UnitOfMeasure);
+        await Navigation.PushAsync(page);
+    }
+
     private async Task OpenQuantityAsync(MobileReceivingPutawaySelectionResponse selection)
     {
         var page = _services.GetRequiredService<LicensePlateNumberPutawayQuantityPage>();
@@ -147,5 +158,5 @@ public partial class LicensePlateNumberPutawayDetailsPage : ContentPage
     }
 }
 
-public sealed record ReceivingPutawayItemRow(Guid Id, string Name, string QuantityText);
+public sealed record ReceivingPutawayItemRow(Guid Id, Guid SkuId, string Name, string QuantityText);
 public sealed record ReceivingPutawayHistoryRow(string Description);

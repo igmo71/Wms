@@ -72,6 +72,11 @@
                                                    SemanticProperties.Description="{Binding FactDescription}">
                                             </Label>
                                             <HorizontalStackLayout Spacing="4" HorizontalOptions="End">
+                                                <Button Text="ⓘ" FontSize="17" WidthRequest="32" HeightRequest="30"
+                                                        MinimumWidthRequest="0" MinimumHeightRequest="0"
+                                                        Padding="0" BackgroundColor="Transparent"
+                                                        SemanticProperties.Description="Остатки SKU по ячейкам"
+                                                        CommandParameter="{Binding SkuId}" Clicked="OnInfoClicked" />
                                                 <Button Text="0" FontSize="12" WidthRequest="32" HeightRequest="30"
                                                         MinimumWidthRequest="0" MinimumHeightRequest="0"
                                                         Padding="0" HorizontalOptions="End"
