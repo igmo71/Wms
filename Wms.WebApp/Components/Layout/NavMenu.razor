@@ -15,10 +15,9 @@
                 </MudNavGroup>
                 <MudNavLink Href="putaway-history" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Размещение</MudNavLink>
             </AuthorizeView>
-            <AuthorizeView Roles="Manager" Context="pickingContext">
-                <MudNavLink Href="picking-assemblies" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AssignmentTurnedIn">Сборки WMS</MudNavLink>
+            <AuthorizeView Roles="Operator,Manager" Context="pickingContext">
+                <MudNavLink Href="picking-assemblies" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AssignmentTurnedIn">Отбор</MudNavLink>
             </AuthorizeView>
-            <MudNavLink Href="shipping-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Отгрузка</MudNavLink>
             <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
             <MudNavLink Href="inventory-transfers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoveUp">Перемещения</MudNavLink>
             <MudNavGroup Title="Остатки и Обороты" Icon="@Icons.Material.Filled.Inventory">

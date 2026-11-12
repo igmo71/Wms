@@ -46,6 +46,16 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
             .Select(x => x.InventoryMovement!.RecorderId!.Value)
             .Distinct()
             .ToArray();
+        var pickingAssemblyIds = items
+            .Where(x => x.InventoryMovement?.RecorderType == RecorderType.PickingAssembly
+                && x.InventoryMovement.RecorderId is not null)
+            .Select(x => x.InventoryMovement!.RecorderId!.Value)
+            .Distinct().ToArray();
+        var replenishmentTaskIds = items
+            .Where(x => x.InventoryMovement?.RecorderType == RecorderType.ReplenishmentTask
+                && x.InventoryMovement.RecorderId is not null)
+            .Select(x => x.InventoryMovement!.RecorderId!.Value)
+            .Distinct().ToArray();
         var transferIds = items
             .Where(x => x.InventoryMovement?.RecorderType == RecorderType.InventoryTransfer
                 && x.InventoryMovement.RecorderId is not null)
@@ -60,6 +70,14 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
         var shippingOrders = await dbContext.ShippingOrders
             .AsNoTracking()
             .Where(x => shippingOrderIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+        var replenishmentTasks = await dbContext.ReplenishmentTasks.AsNoTracking()
+            .Where(x => replenishmentTaskIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+        var relatedAssemblyIds = pickingAssemblyIds.Concat(replenishmentTasks.Values
+            .Select(x => x.PickingAssemblyId)).Distinct().ToArray();
+        var pickingAssemblies = await dbContext.PickingAssemblies.AsNoTracking()
+            .Where(x => relatedAssemblyIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
         var transfers = await dbContext.InventoryTransfers
             .AsNoTracking()
@@ -77,6 +95,11 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.Id.ToString(),
                     RecorderType.ShippingOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Number,
+                    RecorderType.PickingAssembly when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && pickingAssemblies.TryGetValue(recorderId, out var assembly) => assembly.Number,
+                    RecorderType.ReplenishmentTask when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && replenishmentTasks.TryGetValue(recorderId, out var task) =>
+                            pickingAssemblies.GetValueOrDefault(task.PickingAssemblyId)?.Number,
                     RecorderType.InventoryTransfer when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && transfers.TryGetValue(recorderId, out var transfer) => transfer.Number,
                     _ => null
@@ -87,6 +110,10 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
                         && receivingOrders.TryGetValue(recorderId, out var order) => order.CreatedAtUtc.UtcDateTime,
                     RecorderType.ShippingOrder when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && shippingOrders.TryGetValue(recorderId, out var order) => order.Date,
+                    RecorderType.PickingAssembly when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && pickingAssemblies.TryGetValue(recorderId, out var assembly) => assembly.CreatedAtUtc.UtcDateTime,
+                    RecorderType.ReplenishmentTask when turnover.InventoryMovement.RecorderId is Guid recorderId
+                        && replenishmentTasks.TryGetValue(recorderId, out var task) => task.OrderedAtUtc.UtcDateTime,
                     RecorderType.InventoryTransfer when turnover.InventoryMovement.RecorderId is Guid recorderId
                         && transfers.TryGetValue(recorderId, out var transfer) => transfer.Date,
                     _ => null
@@ -126,6 +153,12 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
                 .ToArrayAsync(ct);
+            var pickingAssemblyIds = await dbContext.PickingAssemblies
+                .Where(x => x.Number.Contains(searchString))
+                .Select(x => x.Id).ToArrayAsync(ct);
+            var replenishmentTaskIds = await dbContext.ReplenishmentTasks
+                .Where(x => pickingAssemblyIds.Contains(x.PickingAssemblyId))
+                .Select(x => x.Id).ToArrayAsync(ct);
             var transferIds = await dbContext.InventoryTransfers
                 .Where(x => x.Number!.Contains(searchString))
                 .Select(x => x.Id)
@@ -136,6 +169,10 @@ public class InventoryTurnoverQueryService(IDbContextFactory<ApplicationDbContex
                         && receivingOrderIds.Contains(x.InventoryMovement.RecorderId.Value))
                     || (x.InventoryMovement.RecorderType == RecorderType.ShippingOrder
                         && shippingOrderIds.Contains(x.InventoryMovement.RecorderId.Value))
+                    || (x.InventoryMovement.RecorderType == RecorderType.PickingAssembly
+                        && pickingAssemblyIds.Contains(x.InventoryMovement.RecorderId.Value))
+                    || (x.InventoryMovement.RecorderType == RecorderType.ReplenishmentTask
+                        && replenishmentTaskIds.Contains(x.InventoryMovement.RecorderId.Value))
                     || (x.InventoryMovement.RecorderType == RecorderType.InventoryTransfer
                         && transferIds.Contains(x.InventoryMovement.RecorderId.Value))));
         }

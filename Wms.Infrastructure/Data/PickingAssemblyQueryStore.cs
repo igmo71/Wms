@@ -27,6 +27,11 @@ public sealed class PickingAssemblyQueryStore(
             .AsSplitQuery().ToArrayAsync(ct);
         if (assemblies.Length == 0)
             return [];
+        var assemblyIds = assemblies.Select(x => x.Id).ToArray();
+        var targets = await db.ShippingExchangeTargets.AsNoTracking()
+            .Where(x => assemblyIds.Contains(x.PickingAssemblyId))
+            .ToArrayAsync(ct);
+        var exchange = targets.ToDictionary(x => (x.PickingAssemblyId, x.ShippingOrderId));
         var ids = assemblies.Select(x => x.ResponsibleUserId).Distinct().ToArray();
         var users = await db.Users.AsNoTracking().Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.DisplayName, x.UserName }).ToArrayAsync(ct);
@@ -37,7 +42,11 @@ public sealed class PickingAssemblyQueryStore(
             .Where(x => warehouseIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
 
-        return assemblies.Select(x => new PickingAssemblyListItem(
+        return assemblies.Where(x => userId is null
+            || x.Status != PickingAssemblyStatus.Closed
+            || x.ActiveSources.Any(link => !exchange.TryGetValue(
+                (x.Id, link.ShippingOrderId), out var target) || !target.IsConfirmed))
+            .Select(x => new PickingAssemblyListItem(
             x.Id, x.Number, x.WarehouseId, x.Status,
             x.OperationalRevision, x.CreatedBy, x.ResponsibleUserId,
             names.GetValueOrDefault(x.ResponsibleUserId, x.ResponsibleUserId),
@@ -45,7 +54,13 @@ public sealed class PickingAssemblyQueryStore(
             x.ActiveSources.Select(link => new PickingAssemblyListSource(
                 link.ShippingOrderId, link.ShippingOrder?.Number,
                 link.StartConfirmedAtUtc is not null, link.LastStartError,
-                link.ShippingOrder?.LastSourceCheckError)).ToArray())
+                link.ShippingOrder?.LastSourceCheckError)
+                {
+                    ExchangeStage = exchange.GetValueOrDefault(
+                        (x.Id, link.ShippingOrderId))?.Stage,
+                    ExchangeError = exchange.GetValueOrDefault(
+                        (x.Id, link.ShippingOrderId))?.LastError
+                }).ToArray())
             { WarehouseName = warehouseNames.GetValueOrDefault(x.WarehouseId) })
             .ToArray();
     }
@@ -69,6 +84,9 @@ public sealed class PickingAssemblyQueryStore(
             .Where(x => x.Id == assembly.WarehouseId)
             .Select(x => x.Name).SingleOrDefaultAsync(ct);
         var sourceIds = assembly.ActiveSources.Select(x => x.ShippingOrderId).ToArray();
+        var targets = await db.ShippingExchangeTargets.AsNoTracking()
+            .Where(x => x.PickingAssemblyId == assemblyId)
+            .ToDictionaryAsync(x => x.ShippingOrderId, ct);
         var currentLines = await db.ShippingOrderItems.AsNoTracking()
             .Where(x => sourceIds.Contains(x.ShippingOrderId))
             .Include(x => x.StockKeepingUnit)
@@ -101,6 +119,9 @@ public sealed class PickingAssemblyQueryStore(
                     ReceiverName = source?.Receiver?.Name,
                     Queue = source?.Queue.ToString(),
                     PlannedShippingDate = source?.PlannedShippingDate,
+                    ExchangeStage = targets.GetValueOrDefault(link.ShippingOrderId)?.Stage,
+                    ExchangeError = targets.GetValueOrDefault(link.ShippingOrderId)?.LastError,
+                    ExchangeRevision = targets.GetValueOrDefault(link.ShippingOrderId)?.OperationalRevision,
                     CurrentLines = currentLines.Where(x => x.ShippingOrderId == link.ShippingOrderId)
                         .Select(x => x.Line).ToArray()
                 };

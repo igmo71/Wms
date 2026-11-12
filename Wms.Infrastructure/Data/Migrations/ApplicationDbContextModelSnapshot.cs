@@ -1108,6 +1108,13 @@ namespace Wms.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<DateTimeOffset?>("LastReturnAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastReturnError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<DateTimeOffset?>("LastStartAttemptAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -1121,6 +1128,15 @@ namespace Wms.Data.Migrations
                     b.Property<string>("PlanSourceSnapshotJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ReturnPatchConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ReturnPatchRequestedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ReturnPostConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("ShippingOrderId")
                         .HasColumnType("uniqueidentifier");
@@ -1828,7 +1844,10 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("Stage", "LastAttemptAtUtc");
 
-                    b.ToTable("ShippingExchangeTargets");
+                    b.ToTable("ShippingExchangeTargets", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShippingExchangeTargets_Stage", "[DecisionRevision] >= 0 AND [OperationalRevision] >= 0 AND (([Stage] = 0 AND [PatchConfirmedAtUtc] IS NULL AND [PostConfirmedAtUtc] IS NULL) OR ([Stage] = 1 AND [PatchConfirmedAtUtc] IS NOT NULL AND [PostConfirmedAtUtc] IS NULL AND [LastAttemptAtUtc] IS NOT NULL) OR ([Stage] = 2 AND [PatchConfirmedAtUtc] IS NOT NULL AND [PostConfirmedAtUtc] IS NOT NULL AND [PostConfirmedAtUtc] >= [PatchConfirmedAtUtc] AND [LastError] IS NULL) OR ([Stage] = 3 AND [PostConfirmedAtUtc] IS NULL AND [LastAttemptAtUtc] IS NOT NULL AND [LastError] IS NOT NULL))");
+                        });
                 });
 
             modelBuilder.Entity("Wms.Domain.ShippingOrder", b =>

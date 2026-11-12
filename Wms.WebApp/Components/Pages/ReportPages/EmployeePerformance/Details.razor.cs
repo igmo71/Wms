@@ -132,10 +132,10 @@ public partial class Details
     }
 
     private static string GetDocumentHref(EmployeePerformanceDocumentItem item) =>
-        $"shipping-orders/{item.DocumentId}";
+        $"picking-assemblies/{item.DocumentId}";
 
     private static string GetDocumentTypeName(EmployeePerformanceDocumentType documentType) =>
-        "Комплектация";
+        "Отбор";
 
     private static string FormatTimestamp(DateTimeOffset value) =>
         value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");

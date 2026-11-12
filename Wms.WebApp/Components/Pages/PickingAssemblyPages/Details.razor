@@ -1,5 +1,5 @@
 @page "/picking-assemblies/{Id:guid}"
-@attribute [Authorize(Roles = "Manager")]
+@attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Application.Picking
 @using Wms.Application.Replenishment
 @using Wms.Domain.Enums
@@ -29,11 +29,16 @@ else
             {
                 <MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="_busy" OnClick="CloseAsync">Повторить закрытие</MudButton>
             }
+            else if (_assembly.Status == PickingAssemblyStatus.Closed
+                && _assembly.Sources.Any(x => x.ExchangeStage != ShippingExchangeStage.PostConfirmed))
+            {
+                <MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="_busy" OnClick="CloseAsync">Закрыть и отгрузить · повторить обмен</MudButton>
+            }
             @if (_pendingCancelRequest is not null)
             {
                 <MudButton Color="Color.Warning" Variant="Variant.Filled" Disabled="_busy" OnClick="CancelAsync">Повторить отмену</MudButton>
             }
-            @if (_assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null)
+            @if (_isManager && _assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null)
             {
                 <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="CheckAsync">Сверить с 1С</MudButton>
             }
@@ -87,7 +92,7 @@ else
                 <MudStack Row="true" AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6">РО 1С @(source.Number ?? source.SourceRefKey.ToString())</MudText>
                     <MudSpacer />
-                    @if (_assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null && checkedSource?.CurrentSourceJson is not null)
+                    @if (_isManager && _assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null && checkedSource?.CurrentSourceJson is not null)
                     {
                         <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="() => OpenPlanAsync(source.SourceRefKey)">Изменить план</MudButton>
                     }
@@ -95,6 +100,40 @@ else
                 <MudText Typo="Typo.body2">Статус: @source.Status · Проведён: @(source.Posted ? "да" : "нет") · Удалён: @(source.DeletionMark ? "да" : "нет")</MudText>
                 <MudText Typo="Typo.body2">Склад: @(source.WarehouseName ?? source.WarehouseId?.ToString() ?? "—") · Получатель: @(source.ReceiverName ?? source.ReceiverId?.ToString() ?? "—") · Очередь: @source.Queue · Дата отгрузки: @(source.PlannedShippingDate?.ToString("dd.MM.yyyy") ?? "—")</MudText>
                 <MudText Typo="Typo.body2">Сверка: @(source.LastCheckedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "не выполнена")</MudText>
+                @if (_assembly.Status == PickingAssemblyStatus.Closed)
+                {
+                    <MudText Typo="Typo.body2">Обмен с 1С: @ExchangeText(source.ExchangeStage)</MudText>
+                    @if (source.ExchangeError is not null) { <MudAlert Severity="Severity.Warning">@source.ExchangeError</MudAlert> }
+                    @if (_exchangeAttemptErrors.TryGetValue(source.SourceRefKey, out var attemptError)
+                        && attemptError != source.ExchangeError)
+                    {
+                        <MudAlert Severity="Severity.Warning">@attemptError</MudAlert>
+                    }
+                    @if (_isManager && source.ExchangeStage == ShippingExchangeStage.NeedsReview)
+                    {
+                        <MudButton Variant="Variant.Outlined" Disabled="@(_busy || _pendingExchangeApproval is not null)" OnClick="() => ReviewExchangeAsync(source.SourceRefKey)">Прочитать текущий РО 1С</MudButton>
+                        @if (_reviewedExchangeSources.TryGetValue(source.SourceRefKey, out var reviewed))
+                        {
+                            <MudText Typo="Typo.body2">Текущая 1С: @reviewed.Status · Проведён: @reviewed.Posted · Удалён: @reviewed.DeletionMark · Получатель: @reviewed.ReceiverId · Склад: @reviewed.WarehouseId</MudText>
+                            @foreach (var line in reviewed.Items)
+                            {
+                                <MudText Typo="Typo.caption">Строка @line.LineNumber · SKU @line.StockKeepingUnitId · @line.RawQuantity · @line.Action</MudText>
+                            }
+                            <details><summary>Полное текущее состояние 1С</summary><pre>@reviewed.RawDocumentJson</pre></details>
+                            <MudTextField T="string" Label="Причина нового решения" Lines="2" MaxLength="500"
+                                          Value="@_exchangeReasons.GetValueOrDefault(source.SourceRefKey)"
+                                          ValueChanged="@(value => _exchangeReasons[source.SourceRefKey] = value ?? string.Empty)" />
+                            @if (_pendingExchangeApproval is null)
+                            {
+                                <MudButton Color="Color.Primary" Disabled="_busy" OnClick="() => ApproveExchangeAsync(source.SourceRefKey)">Принять новое состояние</MudButton>
+                            }
+                        }
+                        @if (_pendingExchangeApproval?.ShippingOrderId == source.SourceRefKey)
+                        {
+                            <MudButton Color="Color.Warning" Disabled="_busy" OnClick="() => ApproveExchangeAsync(source.SourceRefKey)">Повторить решение</MudButton>
+                        }
+                    }
+                }
                 @if (source.LastCheckError is not null) { <MudAlert Severity="Severity.Warning">@source.LastCheckError</MudAlert> }
                 @if (checkedSource?.BlockingError is not null) { <MudAlert Severity="Severity.Error">@checkedSource.BlockingError</MudAlert> }
                 @if (checkedSource?.ReceiverChanged == true) { <MudAlert Severity="Severity.Warning">Получатель изменился после начала отбора. Проверьте физическое разделение товара.</MudAlert> }
@@ -137,7 +176,7 @@ else
                         <MudTd>@context.BlockedQuantity.ToString("0.###")</MudTd>
                         <MudTd>@(context.ResolvedAtUtc is null ? "Ожидает решения" : context.CorrectionMovementId is null ? "Блокировка снята" : "Недостача подтверждена")</MudTd>
                         <MudTd>
-                            @if (context.ResolvedAtUtc is null)
+                            @if (_isManager && context.ResolvedAtUtc is null)
                             {
                                 <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="() => OpenShortageAsync(context)">Разобрать</MudButton>
                             }
@@ -164,13 +203,13 @@ else
                         <MudTd>@context.OriginalQuantity.ToString("0.###")</MudTd>
                         <MudTd>@context.EffectiveQuantity.ToString("0.###")</MudTd>
                         <MudTd>@context.ConfirmedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
-                        <MudTd><MudButton Variant="Variant.Text" Disabled="@(_busy || _pendingCloseRequest is not null || _pendingCancelRequest is not null)" OnClick="() => OpenReplenishmentCorrectionAsync(context)">Исправить</MudButton></MudTd>
+                        <MudTd>@if (_isManager) { <MudButton Variant="Variant.Text" Disabled="@(_busy || _pendingCloseRequest is not null || _pendingCancelRequest is not null)" OnClick="() => OpenReplenishmentCorrectionAsync(context)">Исправить</MudButton> }</MudTd>
                     </RowTemplate>
                 </MudTable>
             }
         </MudPaper>
 
-        @if (_assembly.Status is PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing or PickingAssemblyStatus.InProgress)
+        @if (_isManager && _assembly.Status is (PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing or PickingAssemblyStatus.InProgress))
         {
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h6">Отмена сборки</MudText>
@@ -193,7 +232,7 @@ else
             <MudAlert Severity="Severity.Info">Отмена запрошена. Ожидается завершение начатых Подпиток и освобождение связанных РО 1С.</MudAlert>
         }
 
-        @if (_check is not null)
+        @if (_isManager && _check is not null)
         {
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h6">Проверка закрытия</MudText>

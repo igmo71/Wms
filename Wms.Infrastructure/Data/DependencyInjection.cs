@@ -91,6 +91,11 @@ public static class DependencyInjection
         services.AddScoped<CheckPickingClosure>();
         services.AddScoped<ClosePickingAssembly>();
         services.AddScoped<CancelPickingAssembly>();
+        services.AddScoped<IShippingExchangeStore, ShippingExchangeStore>();
+        services.AddScoped<ExchangeShippingDocument>();
+        services.AddScoped<CloseAndShipPickingAssembly>();
+        services.AddScoped<ApproveShippingExchange>();
+        services.AddScoped<RestoreShippingSourceStatus>();
         services.AddScoped<IReplenishmentStore, ReplenishmentStore>();
         services.AddScoped<BuildReplenishmentProposals>();
         services.AddScoped<OrderReplenishment>();

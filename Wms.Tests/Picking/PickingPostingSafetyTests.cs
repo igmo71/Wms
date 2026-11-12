@@ -259,6 +259,10 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
     {
         public OperationResult<ShippingSourceSnapshot> Parse(Guid refKey,
             string storedDocumentJson) => source;
+
+        public OperationResult<bool> UnchangedApartFromStatusAndPosting(
+            Guid refKey, string originalDocumentJson,
+            ShippingSourceSnapshot current) => true;
     }
 
     private sealed class OperatorPermission : IWarehousePermissionStore

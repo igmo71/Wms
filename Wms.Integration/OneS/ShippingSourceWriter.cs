@@ -1,12 +1,27 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Wms.Application.Picking;
 using Wms.Common;
+using Wms.Domain;
 
 namespace Wms.Integration.OneS;
 
 public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourceWriter
 {
+    public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
+        string planSourceSnapshotJson, ShippingSourceSnapshot current)
+    {
+        if (target is null || current is null
+            || target.ShippingOrderId != current.RefKey)
+            return OperationError.Invalid("Цель обмена и прочитанный РО 1С не совпадают.");
+        var builder = new ShippingTargetBuilder();
+        var built = builder.Build(target, planSourceSnapshotJson);
+        return built.IsSuccess
+            ? builder.MatchesCurrent(built.Value!, current)
+            : built.Error!;
+    }
+
     public async Task<OperationResult> SetReadyForPickingAsync(Guid sourceId, CancellationToken ct)
     {
         var uri = DocumentUri(sourceId) + "?$format=json";
@@ -15,6 +30,39 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
             Content = JsonContent.Create(new { Статус = "КОтбору" })
         };
         return await SendAsync(request, expectedStatus: "КОтбору", ct);
+    }
+
+    public async Task<OperationResult> SetPreparedAsync(Guid sourceId,
+        CancellationToken ct)
+    {
+        var uri = DocumentUri(sourceId) + "?$format=json";
+        using var request = new HttpRequestMessage(HttpMethod.Patch, uri)
+        {
+            Content = JsonContent.Create(new { Статус = "Подготовлен" })
+        };
+        return await SendAsync(request, expectedStatus: "Подготовлен", ct);
+    }
+
+    public async Task<OperationResult> ApplyTargetAsync(ShippingExchangeTarget target,
+        string planSourceSnapshotJson, ShippingSourceSnapshot current,
+        CancellationToken ct)
+    {
+        if (target is null || current is null
+            || target.ShippingOrderId != current.RefKey)
+            return OperationError.Invalid("Цель обмена и прочитанный РО 1С не совпадают.");
+        var builder = new ShippingTargetBuilder();
+        var built = builder.Build(target, planSourceSnapshotJson);
+        if (!built.IsSuccess) return built.Error!;
+        if (builder.MatchesCurrent(built.Value!, current))
+            return OperationResult.Success();
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch,
+            DocumentUri(target.ShippingOrderId) + "?$format=json")
+        {
+            Content = new StringContent(built.Value!.PatchJson,
+                Encoding.UTF8, "application/json")
+        };
+        return await SendAsync(request, expectedStatus: null, ct);
     }
 
     public async Task<OperationResult> PostAsync(Guid sourceId, CancellationToken ct)
@@ -43,7 +91,7 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
                 || status.ValueKind != JsonValueKind.String
                 || status.GetString() != expectedStatus)
                 return OperationError.Conflict(
-                    "1С не подтвердила переход расходного документа в статус КОтбору.");
+                    $"1С не подтвердила переход расходного документа в статус {expectedStatus}.");
             return OperationResult.Success();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

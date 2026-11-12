@@ -81,7 +81,7 @@
             </MudCard>
         </MudItem>
 
-        @* Shipping *@
+        @* Picking *@
         <MudItem xs="12" sm="6" lg="3">
             <MudCard Style="height: 100%;">
                 <MudCardContent>
@@ -91,18 +91,17 @@
                              Class="mb-3" />
 
                     <MudText Typo="Typo.h5" GutterBottom="true">
-                        Отгрузка
+                        Отбор
                     </MudText>
 
                     <MudText Typo="Typo.body2">
-                        Расходные ордера, подготовка товара к отгрузке,
-                        контроль исполнения заказа и движения товара
-                        со склада.
+                        Сборки WMS, физический Отбор и закрытие с обменом
+                        расходных ордеров 1С.
                     </MudText>
                 </MudCardContent>
 
                 <MudCardActions>
-                    <MudButton Href="shipping-orders"
+                    <MudButton Href="picking-assemblies"
                                Color="Color.Primary"
                                EndIcon="@Icons.Material.Filled.ArrowForward">
                         Перейти

@@ -123,7 +123,7 @@ public partial class Index
         return item.RecorderType switch
         {
             RecorderType.ReceivingOrder => $"receiving-orders/{recorderId}",
-            RecorderType.ShippingOrder => $"shipping-orders/{recorderId}",
+            RecorderType.PickingAssembly => $"picking-assemblies/{recorderId}",
             RecorderType.InventoryCount => $"inventory-counts/{recorderId}",
             RecorderType.InventoryTransfer => $"inventory-transfers/{recorderId}",
             _ => null

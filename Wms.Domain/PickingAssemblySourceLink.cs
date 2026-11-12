@@ -21,6 +21,11 @@ public sealed class PickingAssemblySourceLink
     public DateTimeOffset? StartPatchRequestedAtUtc { get; private set; }
     public DateTimeOffset? LastStartAttemptAtUtc { get; private set; }
     public string? LastStartError { get; private set; }
+    public DateTimeOffset? ReturnPatchRequestedAtUtc { get; private set; }
+    public DateTimeOffset? ReturnPatchConfirmedAtUtc { get; private set; }
+    public DateTimeOffset? ReturnPostConfirmedAtUtc { get; private set; }
+    public DateTimeOffset? LastReturnAttemptAtUtc { get; private set; }
+    public string? LastReturnError { get; private set; }
 
     internal static OperationResult<PickingAssemblySourceLink> Create(
         Guid assemblyId, Guid shippingOrderId, string sourceSnapshotJson,
@@ -80,6 +85,33 @@ public sealed class PickingAssemblySourceLink
     internal void RecordStartPatchIntent(DateTimeOffset atUtc)
     {
         StartPatchRequestedAtUtc ??= atUtc;
+    }
+
+    internal void RecordReturnPatchIntent(DateTimeOffset atUtc)
+    {
+        ReturnPatchRequestedAtUtc ??= atUtc;
+        LastReturnAttemptAtUtc = atUtc;
+        LastReturnError = null;
+    }
+
+    internal void ConfirmReturnPatch(DateTimeOffset atUtc)
+    {
+        ReturnPatchConfirmedAtUtc = atUtc;
+        LastReturnAttemptAtUtc = atUtc;
+        LastReturnError = null;
+    }
+
+    internal void RecordReturnError(DateTimeOffset atUtc, string error)
+    {
+        LastReturnAttemptAtUtc = atUtc;
+        LastReturnError = error;
+    }
+
+    internal void ConfirmReturnPost(DateTimeOffset atUtc)
+    {
+        ReturnPostConfirmedAtUtc = atUtc;
+        LastReturnAttemptAtUtc = atUtc;
+        LastReturnError = null;
     }
 
     private static bool ValidSnapshot(string value)

@@ -13,10 +13,10 @@ shipping documents. WMS imports them, executes warehouse work, and owns
 operational inventory by storage location. Outbound exchange with 1C depends on
 the workflow, as described in [integration](integration.md).
 
-Receiving and putaway use replacement workflows. Older picking and
-shipping, direct and transit intra-warehouse transfers, and location inventory
-counts still exist but await replacement for dated and signed stock; they are
-not established as production-ready with the new receiving inventory. Inventory
+Receiving, putaway, picking and shipping use replacement workflows. Direct and
+transit intra-warehouse transfers and location inventory counts still exist but
+await replacement for dated and signed stock; they are not established as
+production-ready with the new receiving inventory. Inventory
 history, employee-performance reporting, topology administration, synchronized
 catalogs, and WMS user administration also exist.
 
@@ -34,46 +34,22 @@ Each SKU quantity group shows its base unit once, with an unknown unit shown
 explicitly. Quantity inputs retain their existing validation and compact
 editing behavior. Counts of lines and pallets are integers, and weight is a
 separate kg measure. Order progress does not total quantities across SKUs;
-TSD receiving and shipping show progress by line count instead. TSD picking
-requires discrepancy confirmation when any shipping line differs from its plan;
-differences on separate SKUs cannot cancel each other.
+TSD receiving shows progress by line count. TSD picking shows plan and
+confirmed fact per SKU.
 
 LPN tracks receiving provenance and initial putaway, not stored inventory.
 
-The replacement outbound workflow currently has the WMS picking assembly model
-and schema, reservations, shortages and replenishment, shared availability
-queries, and dated inventory posting primitives. Its application services can
-list and read assemblies, and explicitly transfer an already started assembly
-to another Operator. The owner and revision change together; source plans,
-reservations and the actors of earlier physical records are retained. The
-picking and shipping button on the Mobile home screen still opens the legacy
-scenario; replacement picking pages and API routes are registered but have not
-replaced that entry point. The legacy `Wms`
-project is being eliminated as its scenarios are replaced in the new projects.
-The new outbound fact and per-document exchange tables are prepared. New
-application commands can scan picking stock, hold and return a direct-pick
-pallet, reserve and correct picked quantities, and report and resolve shortages.
-A Manager can revise a started WMS plan against a reviewed 1C snapshot; the
-allocation preview separates automatic from unresolved shared-SKU splits.
-The replacement closing command can post picked stock and prepare one exchange
-target per 1C document. The replacement Mobile picking screens execute this work;
-the Web Manager can review WMS plan, physical fact, current 1C projections and
-audit, change a started plan, distribute a shared-SKU shortage, resolve physical
-shortage reports, request cancellation and approve a warehouse close. The actual
-1C closing exchange still awaits implementation.
-Operator SKU information in the replacement clients reads available stock by
-warehouse, cell and expiration group without changing balances.
-The replacement cancellation command can stop unclosed work after physical
-returns, cancel unstarted replenishments and retain linked 1C documents while
-their status restoration is pending.
-Replenishment can now report and separately block source shortages, transfer
-the found stock, and finish a source with a return or empty-cell scan. Closing
-a picking assembly cancels orders without a source scan while started tasks
-continue; completing the last started task can finish a pending cancellation
-once the linked 1C sources have been released.
-A Manager can also correct a posted replenishment step in Web. The correction
-posts a separate dated movement linked to that step and updates task progress;
-the original transfer remains in history.
-Mobile V1 now has replacement replenishment routes and a client for proposals,
-task queue and detail, ordering and physical commands. The replenishment
-screens and main navigation switch still await implementation.
+Outbound work uses WMS picking assemblies linked to 1C shipping documents.
+Mobile opens separate picking and replenishment workplaces; Web supports
+Manager review and decisions. Picking records physical fact and reservations
+before a single stock posting at closure. Replenishment posts dated transfers
+when their destinations are confirmed. The same close action starts or retries
+per-document 1C exchange without repeating the stock posting. Cancellation
+keeps started replenishment and unresolved source restoration visible until
+they finish. The former shipping screens, Mobile API and posting commands have
+been removed; `ShippingOrder` remains the imported 1C source projection.
+
+The detailed stock rules are in [inventory](inventory.md), source and exchange
+rules in [integration](integration.md), and workplaces in [clients](clients.md).
+The legacy `Wms` project still hosts unrelated processes while they are being
+replaced; its remaining boundary is described in [architecture](../architecture.md).

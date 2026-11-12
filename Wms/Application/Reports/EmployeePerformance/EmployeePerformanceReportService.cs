@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Data;
+using Wms.Domain.Enums;
 
 namespace Wms.Application.Reports.EmployeePerformance;
 
@@ -169,37 +170,61 @@ public sealed class EmployeePerformanceReportService(
     private static IQueryable<EmployeePerformanceDocumentProjection> BuildDocuments(
         ApplicationDbContext dbContext)
     {
+        var facts =
+            from entry in dbContext.PickingEntries.AsNoTracking()
+            where entry.Quantity > 0
+            join assembly in dbContext.PickingAssemblies.AsNoTracking()
+                on entry.PickingAssemblyId equals assembly.Id
+            where assembly.Status == PickingAssemblyStatus.Closed
+            join warehouse in dbContext.Warehouses.AsNoTracking()
+                on assembly.WarehouseId equals warehouse.Id
+            join sku in dbContext.StockKeepingUnits.AsNoTracking()
+                on entry.StockKeepingUnitId equals sku.Id
+            group new { entry.Quantity, entry.ConfirmedAtUtc, sku.WeightKg } by new
+            {
+                assembly.Id, assembly.Number, assembly.CreatedAtUtc,
+                assembly.WarehouseId, WarehouseName = warehouse.Name,
+                entry.ConfirmedBy
+            } into groupByWorker
+            select new
+            {
+                groupByWorker.Key.Id,
+                groupByWorker.Key.Number,
+                groupByWorker.Key.CreatedAtUtc,
+                groupByWorker.Key.WarehouseId,
+                groupByWorker.Key.WarehouseName,
+                groupByWorker.Key.ConfirmedBy,
+                PositiveLineCount = groupByWorker.Count(),
+                KnownFactWeightKg = groupByWorker.Sum(x => x.WeightKg != null
+                    ? (double)x.Quantity * x.WeightKg.Value : 0d),
+                IsFactWeightComplete = groupByWorker.Count(x => x.WeightKg == null) == 0,
+                StartedAtUtc = groupByWorker.Min(x => x.ConfirmedAtUtc),
+                CompletedAtUtc = groupByWorker.Max(x => x.ConfirmedAtUtc)
+            };
+
         var picking =
-            from order in dbContext.ShippingOrders.AsNoTracking()
-            where order.ReadyForShipmentBy != null
-                && order.PickingStartedAtUtc != null
-                && order.ReadyForShipmentAtUtc != null
-                && order.ReadyForShipmentAtUtc >= order.PickingStartedAtUtc
+            from fact in facts
             from user in dbContext.Users
-                .Where(x => x.Id == order.ReadyForShipmentBy)
-                .DefaultIfEmpty()
+                .Where(x => x.Id == fact.ConfirmedBy).DefaultIfEmpty()
             select new EmployeePerformanceDocumentProjection
             {
                 DocumentType = EmployeePerformanceDocumentType.Picking,
-                DocumentId = order.Id,
-                Number = order.Number,
-                DocumentDate = order.Date,
-                WarehouseId = order.WarehouseId,
-                WarehouseName = order.Warehouse!.Name ?? string.Empty,
-                UserId = order.ReadyForShipmentBy!,
+                DocumentId = fact.Id,
+                Number = fact.Number,
+                DocumentDate = fact.CreatedAtUtc.UtcDateTime,
+                WarehouseId = fact.WarehouseId,
+                WarehouseName = fact.WarehouseName,
+                UserId = fact.ConfirmedBy,
                 UserName = user != null && !string.IsNullOrWhiteSpace(user.DisplayName)
                     ? user.DisplayName
                     : user != null && user.UserName != null
                     ? user.UserName
-                    : "Удаленный пользователь (" + order.ReadyForShipmentBy + ")",
-                PositiveLineCount = order.Items.Count(x => x.FactQuantity > 0),
-                KnownFactWeightKg = order.Items
-                    .Where(x => x.FactQuantity > 0 && x.StockKeepingUnit!.WeightKg != null)
-                    .Sum(x => (double?)((double)x.FactQuantity * x.StockKeepingUnit!.WeightKg!.Value)) ?? 0,
-                IsFactWeightComplete = !order.Items.Any(x => x.FactQuantity > 0
-                    && x.StockKeepingUnit!.WeightKg == null),
-                StartedAtUtc = order.PickingStartedAtUtc!.Value,
-                CompletedAtUtc = order.ReadyForShipmentAtUtc!.Value
+                    : "Удаленный пользователь (" + fact.ConfirmedBy + ")",
+                PositiveLineCount = fact.PositiveLineCount,
+                KnownFactWeightKg = fact.KnownFactWeightKg,
+                IsFactWeightComplete = fact.IsFactWeightComplete,
+                StartedAtUtc = fact.StartedAtUtc,
+                CompletedAtUtc = fact.CompletedAtUtc
             };
 
         return picking;

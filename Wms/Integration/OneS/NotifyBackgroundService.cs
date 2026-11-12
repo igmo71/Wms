@@ -75,7 +75,7 @@ internal class NotifyBackgroundService(
                     .ImportAsync(notifyRecord.Ref_Key, ct),
             "Document_ПриходныйОрдерНаТовары" =>
                 await SynchronizeReceivingDocumentAsync(services, notifyRecord.Ref_Key, ct),
-            nameof(Document_РасходныйОрдерНаТовары) =>
+            "Document_РасходныйОрдерНаТовары" =>
                 await SynchronizeShippingDocumentAsync(services, notifyRecord.Ref_Key, ct),
             nameof(InformationRegister_ШтрихкодыНоменклатуры) =>
                 await services.GetRequiredService<InformationRegister_ШтрихкодыНоменклатуры_Service>()

@@ -61,10 +61,10 @@
             </Grid>
 
             <Button
-                Clicked="OnShippingOrdersClicked"
+                Clicked="OnPickingClicked"
                 FontSize="16"
                 HeightRequest="52"
-                Text="Отбор и отгрузка" />
+                Text="Отбор" />
 
             <Button
                 Clicked="OnReplenishmentsClicked"

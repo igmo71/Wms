@@ -33,6 +33,7 @@ public partial class PickingSkuPage : ContentPage
 
     public IReadOnlyList<PickingSkuPlanRow> SkuRows { get; private set; } = [];
     public IReadOnlyList<PickingEntryListRow> EntryRows { get; private set; } = [];
+    public IReadOnlyList<PickingExchangeRow> ExchangeRows { get; private set; } = [];
     private bool IsOwner => _assembly?.ResponsibleUserId == _selection.CurrentUserId;
 
     public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
@@ -99,7 +100,10 @@ public partial class PickingSkuPage : ContentPage
             MobilePickingAssemblyStatus.Draft => "Черновик",
             MobilePickingAssemblyStatus.Preparing => "Ожидается перевод РО 1С в КОтбору",
             MobilePickingAssemblyStatus.InProgress => "Отбор в работе",
-            MobilePickingAssemblyStatus.Closed => "Сборка закрыта",
+            MobilePickingAssemblyStatus.Closed => assembly.Sources.All(x =>
+                x.ExchangeStage == MobileShippingExchangeStage.PostConfirmed)
+                ? "Сборка закрыта · обмен с 1С подтверждён"
+                : "Складской факт проведён · обмен с 1С ожидается",
             _ => "Сборка отменяется или отменена"
         };
         OwnerLabel.Text = $"Ответственный: {assembly.ResponsibleDisplayName}";
@@ -120,6 +124,17 @@ public partial class PickingSkuPage : ContentPage
             assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
             .ToArray() ?? [];
         OnPropertyChanged(nameof(EntryRows));
+        ExchangeRows = assembly.Status == MobilePickingAssemblyStatus.Closed
+            ? assembly.Sources.Select(x => new PickingExchangeRow(
+                x.Number ?? x.SourceRefKey.ToString(),
+                x.ExchangeStage switch
+                {
+                    MobileShippingExchangeStage.PostConfirmed => "Обмен подтверждён",
+                    MobileShippingExchangeStage.PatchConfirmed => "Ожидается проведение в 1С",
+                    MobileShippingExchangeStage.NeedsReview => "Требуется решение руководителя",
+                    _ => "Ожидается запись в 1С"
+                }, x.ExchangeError)).ToArray() : [];
+        OnPropertyChanged(nameof(ExchangeRows));
         UpdateActions();
     }
 
@@ -167,11 +182,22 @@ public partial class PickingSkuPage : ContentPage
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || _assembly is null
-            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
+        if (_busy || _process.HasPendingCommand || _assembly is null || !IsOwner
+            || _assembly.Status is not (MobilePickingAssemblyStatus.InProgress
+                or MobilePickingAssemblyStatus.Closed)) return;
         SetBusy(true);
         try
         {
+            if (_assembly.Status == MobilePickingAssemblyStatus.Closed)
+            {
+                var assemblyId = _assembly.Id;
+                var warehouseId = _assembly.WarehouseId;
+                var revision = _assembly.Revision;
+                SetBusy(false);
+                await RunCommandAsync(() => _process.CloseAsync(assemblyId,
+                    warehouseId, revision));
+                return;
+            }
             var check = await _client.CheckClosureAsync(_assembly.Id, _assembly.WarehouseId);
             if (!check.CanOperatorClose)
             {
@@ -237,6 +263,10 @@ public partial class PickingSkuPage : ContentPage
             if (_process.LastStartResult is { Status: MobilePickingAssemblyStatus.Preparing } start)
                 ErrorLabel.Text = string.Join("\n", start.Sources
                     .Where(x => x.Error is not null).Select(x => x.Error));
+            if (_process.LastCloseResult is { AllConfirmed: false } close)
+                ErrorLabel.Text = string.Join("\n", close.Documents
+                    .Where(x => x.Error is not null)
+                    .Select(x => $"{assembly.Sources.FirstOrDefault(s => s.SourceRefKey == x.SourceRefKey)?.Number ?? x.SourceRefKey.ToString()}: {x.Error}"));
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException)
@@ -269,7 +299,12 @@ public partial class PickingSkuPage : ContentPage
         ReplenishmentsButton.IsVisible = RouteButton.IsVisible;
         ReplenishmentsButton.IsEnabled = !_busy && !pending;
         ReplenishmentsButton.Text = _replenishmentsReady ? "Подпитки ✓" : "Подпитки";
-        CloseButton.IsVisible = RouteButton.IsVisible;
+        CloseButton.IsVisible = RouteButton.IsVisible
+            || _assembly is { Status: MobilePickingAssemblyStatus.Closed }
+                && IsOwner && _assembly.Sources.Any(x =>
+                    x.ExchangeStage != MobileShippingExchangeStage.PostConfirmed);
+        CloseButton.Text = _assembly?.Status == MobilePickingAssemblyStatus.Closed
+            ? "Закрыть и отгрузить · повторить обмен" : "Закрыть и отгрузить";
         CloseButton.IsEnabled = !_busy && !pending;
         NavigationPage.SetHasBackButton(this, !_busy && !pending);
     }
@@ -300,3 +335,5 @@ public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
 }
 
 public sealed record PickingEntryListRow(Guid Id, string Text, bool CanReturn);
+
+public sealed record PickingExchangeRow(string Number, string Stage, string? Error);

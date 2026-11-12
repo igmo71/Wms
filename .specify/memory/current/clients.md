@@ -69,10 +69,11 @@ newest first, with server paging. The page filters
 by inclusive local date range, LPN number, SKU name substring, user name or
 login, and destination cell address; filters can be combined.
 
-## Web picking manager
+## Web picking assemblies
 
-The Manager-only «Сборки WMS» page lists picking assemblies across warehouses
-and opens a detail page. The detail page keeps the WMS plan per 1C document,
+The Manager «Сборки WMS» page lists picking assemblies across warehouses;
+Operator sees only assigned closed assemblies awaiting 1C exchange and can
+retry that exchange. The detail page keeps the WMS plan per 1C document,
 physical WMS fact by SKU and cell, current imported 1C lines, posted allocation,
 and action history separate. A fresh «Сверить с 1С» action retrieves each
 document before a decision and shows hard blocks and issues requiring Manager
@@ -80,6 +81,10 @@ review. A Manager may change one document's WMS plan with a reason and the
 reviewed source snapshot, explicitly distribute a partial shared SKU across
 documents, and close the assembly with a recorded reason. The close action
 checks 1C again and retains the same request ID if its response is uncertain.
+After warehouse closure, the same action retries exchange for unconfirmed
+1C documents and shows their individual stages and errors. For a new source
+discrepancy, the Manager reads and reviews the fresh 1C document, records a
+reason, and then retries the exchange without changing the warehouse fact.
 Physical picking quantities remain editable only through the TSD workflow.
 The same page shows posted replenishment steps with their original and current
 effective quantities. A Manager can enter the actual transferred quantity and
@@ -97,6 +102,9 @@ started replenishment and 1C status restoration.
 
 ## Mobile picking API
 
+The Mobile home «Отбор» button opens the replacement assembly queue. The Web
+navigation links to the replacement «Отбор» list for Operator and Manager.
+
 The replacement Mobile V1 picking API exposes the assembly work list with
 per-SKU plan and confirmed fact, original-cell fact entries, a recalculated
 route, SKU availability, scanned-cell inspection, pallet hold/return, pick
@@ -104,7 +112,10 @@ confirmation, scanned return and shortage reporting. It also exposes a fresh
 closure check and operator-only warehouse close. Every mutating request carries
 a client request ID and the expected assembly revision. A closed assembly
 accepts a replay of its original close request without posting stock again;
-the separate 1C exchange retry is not wired yet. The replacement TSD screens
+the same close action with a new request ID retries unconfirmed 1C documents.
+The response and refreshed card show the result for each document. Closed
+assemblies awaiting exchange remain in the Operator work list until all
+documents are confirmed. The replacement TSD screens
 show plan and confirmed fact per SKU with white, yellow and green progress,
 and preserve the unit next to the plan quantity. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm

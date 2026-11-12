@@ -96,7 +96,6 @@ public class Program
         app.MapMobileLicensePlateNumberPutawayEndpoints();
         app.MapMobileInventoryTransferEndpoints();
         app.MapMobileInventoryCountEndpoints();
-        app.MapMobileShippingOrderEndpoints();
         app.MapMobilePickingEndpoints();
         app.MapMobileReplenishmentEndpoints();
         app.MapMobileStockAvailabilityEndpoints();

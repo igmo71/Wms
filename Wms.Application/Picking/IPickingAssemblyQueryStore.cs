@@ -4,7 +4,11 @@ namespace Wms.Application.Picking;
 
 public sealed record PickingAssemblyListSource(
     Guid SourceRefKey, string? Number, bool StartConfirmed,
-    string? StartError, string? SourceCheckError);
+    string? StartError, string? SourceCheckError)
+{
+    public ShippingExchangeStage? ExchangeStage { get; init; }
+    public string? ExchangeError { get; init; }
+}
 
 public sealed record PickingAssemblyListItem(
     Guid Id, string Number, Guid WarehouseId, PickingAssemblyStatus Status,
@@ -14,7 +18,10 @@ public sealed record PickingAssemblyListItem(
     IReadOnlyList<PickingAssemblyListSource> Sources)
 {
     public bool HasWarning => Status == PickingAssemblyStatus.Preparing
-        || Sources.Any(x => x.StartError is not null || x.SourceCheckError is not null);
+        || Sources.Any(x => x.StartError is not null || x.SourceCheckError is not null
+            || x.ExchangeError is not null
+            || Status == PickingAssemblyStatus.Closed
+                && x.ExchangeStage != ShippingExchangeStage.PostConfirmed);
     public string? WarehouseName { get; init; }
 }
 
@@ -32,6 +39,9 @@ public sealed record PickingAssemblySourceView(
     public string? Queue { get; init; }
     public DateTime? PlannedShippingDate { get; init; }
     public IReadOnlyList<PickingSourceLineView> CurrentLines { get; init; } = [];
+    public ShippingExchangeStage? ExchangeStage { get; init; }
+    public string? ExchangeError { get; init; }
+    public long? ExchangeRevision { get; init; }
 }
 
 public sealed record PickingSourceLineView(int LineNumber, Guid SkuId,

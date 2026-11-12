@@ -103,8 +103,8 @@ public partial class MainPage : ContentPage
     private async void OnPutawayClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<LicensePlateNumberPutawayPage>());
 
-    private async void OnShippingOrdersClicked(object? sender, EventArgs e) =>
-        await Navigation.PushAsync(_services.GetRequiredService<ShippingOrderPage>());
+    private async void OnPickingClicked(object? sender, EventArgs e) =>
+        await Navigation.PushAsync(_services.GetRequiredService<PickingAssemblyPage>());
 
     private async void OnReplenishmentsClicked(object? sender, EventArgs e) =>
         await Navigation.PushAsync(_services.GetRequiredService<ReplenishmentQueuePage>());

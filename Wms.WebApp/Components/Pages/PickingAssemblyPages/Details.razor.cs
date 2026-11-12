@@ -13,7 +13,9 @@ public partial class Details
     [Parameter] public Guid Id { get; set; }
     [Inject] private IPickingAssemblyQueryStore Assemblies { get; set; } = null!;
     [Inject] private CheckPickingClosure Checker { get; set; } = null!;
-    [Inject] private ClosePickingAssembly Closer { get; set; } = null!;
+    [Inject] private CloseAndShipPickingAssembly Closer { get; set; } = null!;
+    [Inject] private IShippingSourceReader ShippingSources { get; set; } = null!;
+    [Inject] private ApproveShippingExchange Approver { get; set; } = null!;
     [Inject] private CancelPickingAssembly Canceller { get; set; } = null!;
     [Inject] private IReplenishmentStore Replenishments { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
@@ -29,7 +31,12 @@ public partial class Details
     private IReadOnlyCollection<PickingAllocationInput>? _manualAllocations;
     private ClosePickingAssemblyRequest? _pendingCloseRequest;
     private CancelPickingAssemblyRequest? _pendingCancelRequest;
+    private ApproveShippingExchangeRequest? _pendingExchangeApproval;
+    private readonly Dictionary<Guid, ShippingSourceSnapshot> _reviewedExchangeSources = [];
+    private readonly Dictionary<Guid, string> _exchangeReasons = [];
+    private readonly Dictionary<Guid, string> _exchangeAttemptErrors = [];
     private string? _userId;
+    private bool _isManager;
     private string? _closeReason;
     private string? _cancelReason;
     private string? _error;
@@ -41,12 +48,16 @@ public partial class Details
 
     protected override async Task OnParametersSetAsync()
     {
-        _userId = (await Authentication.GetAuthenticationStateAsync()).User
-            .FindFirstValue(ClaimTypes.NameIdentifier);
+        var principal = (await Authentication.GetAuthenticationStateAsync()).User;
+        _userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        _isManager = principal.IsInRole("Manager");
         _check = null;
         _manualAllocations = null;
         _pendingCloseRequest = null;
         _pendingCancelRequest = null;
+        _pendingExchangeApproval = null;
+        _reviewedExchangeSources.Clear();
+        _exchangeAttemptErrors.Clear();
         await ReloadAsync();
     }
 
@@ -64,6 +75,15 @@ public partial class Details
     private async Task ReloadViewsAsync()
     {
         _assembly = await Assemblies.GetAsync(Id, CancellationToken.None);
+        if (!_isManager && _assembly is not null
+            && (_assembly.Status != PickingAssemblyStatus.Closed
+                || _assembly.ResponsibleUserId != _userId
+                || _assembly.Sources.All(x =>
+                    x.ExchangeStage == ShippingExchangeStage.PostConfirmed)))
+        {
+            _assembly = null;
+            _error = "Эта сборка недоступна для повтора обмена.";
+        }
         _work = _assembly is null ? null : await Assemblies.GetWorkAsync(Id, CancellationToken.None);
         _audit = _assembly is null ? [] : await Assemblies.GetAuditAsync(Id, CancellationToken.None);
         _postedAllocations = _assembly is null ? [] : await Assemblies.GetPostedAllocationsAsync(Id, CancellationToken.None);
@@ -74,7 +94,7 @@ public partial class Details
 
     private async Task CheckAsync()
     {
-        if (_userId is null || _pendingCancelRequest is not null
+        if (!_isManager || _userId is null || _pendingCancelRequest is not null
             || _assembly?.Status != PickingAssemblyStatus.InProgress) return;
         _busy = true;
         _error = null;
@@ -97,7 +117,7 @@ public partial class Details
 
     private async Task OpenPlanAsync(Guid sourceId)
     {
-        if (_userId is null || _pendingCloseRequest is not null || _pendingCancelRequest is not null
+        if (!_isManager || _userId is null || _pendingCloseRequest is not null || _pendingCancelRequest is not null
             || _assembly?.Status != PickingAssemblyStatus.InProgress) return;
         await CheckAsync();
         var source = _check?.Sources.SingleOrDefault(x => x.ShippingOrderId == sourceId);
@@ -143,23 +163,31 @@ public partial class Details
     private async Task CloseAsync()
     {
         if (_pendingCancelRequest is not null || _userId is null
-            || (_assembly?.Status != PickingAssemblyStatus.InProgress
+            || !_isManager && _assembly?.Status != PickingAssemblyStatus.Closed
+            || (_assembly?.Status is not (PickingAssemblyStatus.InProgress
+                or PickingAssemblyStatus.Closed)
             && _pendingCloseRequest is null))
             return;
         if (_pendingCloseRequest is null)
         {
-            if (string.IsNullOrWhiteSpace(_closeReason))
+            if (_assembly?.Status == PickingAssemblyStatus.Closed)
+                _pendingCloseRequest = new ClosePickingAssemblyRequest(
+                    Guid.NewGuid(), Id, _assembly.Revision, _userId);
+            else
             {
-                _error = "Укажите причину решения руководителя.";
-                return;
+                if (string.IsNullOrWhiteSpace(_closeReason))
+                {
+                    _error = "Укажите причину решения руководителя.";
+                    return;
+                }
+                await CheckAsync();
+                if (_check?.CanManagerClose != true) return;
+                _pendingCloseRequest = new ClosePickingAssemblyRequest(Guid.NewGuid(), Id,
+                    _check.Revision, _userId, ManagerOverride: true,
+                    DecisionReason: _closeReason.Trim(), ManagerAllocations: _manualAllocations,
+                    ReviewedSourcesById: _check.Sources.ToDictionary(
+                        x => x.ShippingOrderId, x => x.CurrentSourceJson!));
             }
-            await CheckAsync();
-            if (_check?.CanManagerClose != true) return;
-            _pendingCloseRequest = new ClosePickingAssemblyRequest(Guid.NewGuid(), Id,
-                _check.Revision, _userId, ManagerOverride: true,
-                DecisionReason: _closeReason.Trim(), ManagerAllocations: _manualAllocations,
-                ReviewedSourcesById: _check.Sources.ToDictionary(
-                    x => x.ShippingOrderId, x => x.CurrentSourceJson!));
         }
         _busy = true;
         _error = null;
@@ -173,9 +201,14 @@ public partial class Details
                 return;
             }
             await ReloadViewsAsync();
+            _exchangeAttemptErrors.Clear();
+            foreach (var document in result.Value!.Documents.Where(x => x.Error is not null))
+                _exchangeAttemptErrors[document.ShippingOrderId] = document.Error!;
             _pendingCloseRequest = null;
             _check = null;
-            _message = "Складской факт проведён. Цели обмена с 1С сохранены по каждому документу.";
+            _message = result.Value!.AllConfirmed
+                ? "Складской факт проведён. Обмен всех РО 1С подтверждён."
+                : "Складской факт проведён. По неподтверждённым РО 1С показаны ошибки и доступен повтор.";
         }
         catch (Exception exception)
         {
@@ -184,9 +217,72 @@ public partial class Details
         finally { _busy = false; }
     }
 
+    private async Task ReviewExchangeAsync(Guid sourceId)
+    {
+        if (!_isManager || _busy || _pendingCloseRequest is not null
+            || _pendingExchangeApproval is not null || _userId is null
+            || _assembly?.Status != PickingAssemblyStatus.Closed) return;
+        _busy = true;
+        _error = null;
+        _reviewedExchangeSources.Remove(sourceId);
+        try
+        {
+            var result = await ShippingSources.ReadAsync(sourceId, CancellationToken.None);
+            if (!result.IsSuccess) _error = result.Error!.Message;
+            else _reviewedExchangeSources[sourceId] = result.Value!;
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task ApproveExchangeAsync(Guid sourceId)
+    {
+        if (!_isManager || _busy || _userId is null || _assembly?.Status != PickingAssemblyStatus.Closed)
+            return;
+        if (_pendingExchangeApproval is null)
+        {
+            var source = _assembly.Sources.FirstOrDefault(x => x.SourceRefKey == sourceId);
+            if (source?.ExchangeStage != ShippingExchangeStage.NeedsReview
+                || source.ExchangeRevision is null
+                || !_reviewedExchangeSources.TryGetValue(sourceId, out var reviewed)
+                || !_exchangeReasons.TryGetValue(sourceId, out var reason)
+                || string.IsNullOrWhiteSpace(reason))
+            {
+                _error = "Прочитайте текущий РО 1С и укажите причину решения.";
+                return;
+            }
+            _pendingExchangeApproval = new ApproveShippingExchangeRequest(
+                Guid.NewGuid(), Id, sourceId, source.ExchangeRevision.Value,
+                reviewed.RawDocumentJson, reason.Trim(), _userId);
+        }
+        else if (_pendingExchangeApproval.ShippingOrderId != sourceId) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Approver.ExecuteAsync(_pendingExchangeApproval);
+            if (!result.IsSuccess)
+            {
+                _pendingExchangeApproval = null;
+                _error = result.Error!.Message;
+                return;
+            }
+            _pendingExchangeApproval = null;
+            _reviewedExchangeSources.Remove(sourceId);
+            _exchangeReasons.Remove(sourceId);
+            await ReloadViewsAsync();
+            _message = "Новое состояние РО 1С рассмотрено. Повторите обмен кнопкой «Закрыть и отгрузить».";
+        }
+        catch (Exception exception)
+        {
+            _error = $"Ответ на решение не получен: {exception.Message} Повторите решение тем же запросом.";
+        }
+        finally { _busy = false; }
+    }
+
     private async Task OpenShortageAsync(PickingShortageView shortage)
     {
-        if (_userId is null || _busy || shortage.ResolvedAtUtc is not null) return;
+        if (!_isManager || _userId is null || _busy || shortage.ResolvedAtUtc is not null) return;
         var parameters = new DialogParameters<ShortageResolutionDialog>
         {
             { x => x.Shortage, shortage }, { x => x.UserId, _userId }
@@ -206,7 +302,7 @@ public partial class Details
 
     private async Task OpenReplenishmentCorrectionAsync(ReplenishmentTransferView transfer)
     {
-        if (_userId is null || _busy || _pendingCloseRequest is not null
+        if (!_isManager || _userId is null || _busy || _pendingCloseRequest is not null
             || _pendingCancelRequest is not null) return;
         var parameters = new DialogParameters<ReplenishmentCorrectionDialog>
         {
@@ -227,7 +323,7 @@ public partial class Details
 
     private async Task CancelAsync()
     {
-        if (_userId is null || _pendingCloseRequest is not null
+        if (!_isManager || _userId is null || _pendingCloseRequest is not null
             || (_pendingCancelRequest is null && _assembly?.Status is not
                 (PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing
                     or PickingAssemblyStatus.InProgress))) return;
@@ -273,6 +369,14 @@ public partial class Details
     private string SkuName(Guid skuId) =>
         _work?.Skus.FirstOrDefault(x => x.SkuId == skuId) is { } sku
             ? sku.Name ?? sku.Code ?? skuId.ToString() : skuId.ToString();
+
+    private static string ExchangeText(ShippingExchangeStage? stage) => stage switch
+    {
+        ShippingExchangeStage.PostConfirmed => "Подтверждён",
+        ShippingExchangeStage.PatchConfirmed => "Ожидается проведение в 1С",
+        ShippingExchangeStage.NeedsReview => "Требуется решение руководителя",
+        _ => "Ожидается запись в 1С"
+    };
 
     private static string AuditText(string eventType) => eventType switch
     {

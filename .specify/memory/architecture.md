@@ -8,7 +8,7 @@ conventions. Project-wide principles live in the
 
 | Project | Current responsibility |
 |---|---|
-| `Wms` | Temporary legacy workflows and 1C adapters pending replacement; consumes Application contracts and Infrastructure persistence. |
+| `Wms` | Temporary legacy transfer/count workflows, catalog and notification adapters pending replacement; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
 | `Wms.Application` | Command execution, receiving use cases, shared stock availability and dated posting for receiving/outbound operations; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
@@ -19,12 +19,13 @@ conventions. Project-wide principles live in the
 | `Wms.Mobile` | Android operator workflows. |
 | `Wms.Tests` | Risk-based automated checks. |
 
-The new project references point inward: Application references Domain;
+The core project references point inward: Application references Domain;
 Infrastructure and Integration reference Application. The legacy `Wms` project
-also references Domain, Application, and Infrastructure. New projects do not reference `Wms`.
-Each delivered replacement removes its obsolete legacy code, registrations and
-callers. The final replacement also removes the `Wms` project and its host
-references. Development replacement does not require a legacy-operation
+also references Domain, Application, and Infrastructure. Core projects do not
+reference `Wms`; WebApi and WebApp still reference it for remaining legacy
+responsibilities. Each delivered replacement removes its obsolete legacy code,
+registrations and callers. The final replacement also removes the `Wms`
+project and its host references. Development replacement does not require a legacy-operation
 transition or compatibility workflow.
 Application owns the explicit Manager permission check; Infrastructure resolves
 membership from Identity storage for command execution.
@@ -135,8 +136,8 @@ and the source JSON used for the working plan; plan lines are unique by assembly
 source and SKU. A filtered database index permits one active link per 1C shipping
 order. Assembly relationships now constrain picking reservations and replenishment
 tasks; warehouse audit can point directly to the assembly. The existing
-`ShippingOrder` remains the 1C source projection while its legacy callers are
-replaced. The replacement shipping reader supplies an Application synchronization
+`ShippingOrder` remains the 1C source projection after the old picking and
+shipping commands were removed. The shipping reader supplies an Application synchronization
 use case; the source projection retains its latest raw JSON and check outcome.
 Notification handling calls that use case, while the existing warehouse plan
 changes only for a linked draft assembly in the same EF transaction.
@@ -158,19 +159,32 @@ Mobile has a picking queue, source-document, SKU, route and fact-entry pages
 registered with dependency injection. The shared picking process
 retains one ClientRequestId and its exact command input through an uncertain
 HTTP response, then fetches the assembly before clearing the pending command.
-The main navigation remains on the older shipping screen until the outbound
-workflow is switched over.
+The main navigation opens the replacement picking assembly queue; the old
+Mobile shipping pages, contracts and endpoints have been removed.
 The outbound fact schema has dated picking entries, per-source SKU allocations,
 one immutable closure record per assembly, and one exchange target per
 assembly/source. The closure factory compares aggregate fact and allocation
 per SKU and rejects movements for a zero fact. Exchange targets retain the
 reviewed source, neutral WMS target decision, status and independent PATCH/POST
 progress. The target decision stores approved SKU plans and allocated fact;
-the Integration adapter derives concrete 1C rows for PATCH. The close command
+the Integration adapter derives concrete 1C rows for PATCH. Domain transitions
+and a database stage constraint require PATCH confirmation before POST
+confirmation; an approved new source review advances only that target's
+decision revision. The close command
 uses the shared posting handler and the command executor's transaction to
 commit stock issues, reservations, holds, allocation, target decisions, audit
 and receipt together. It does not hold a database transaction across the fresh
-1C GET. Actual exchange remains a separate later increment.
+1C GET. The per-document exchange executor holds a session-owned SQL
+application lock for the Ref_Key across its HTTP calls, with no warehouse
+transaction open during those calls. Short command transactions persist each
+PATCH/POST confirmation or error with audit and receipt. A combined application
+command uses the close command's receipt for warehouse posting and records a
+separate response receipt after independent document attempts. Mobile and Web
+close actions call this combined command.
+Cancellation return progress lives on each active source link, and the same
+per-document SQL application lock serializes its 1C calls. PATCH intent is
+committed before HTTP; short command transactions persist return confirmations
+and release the active source link only after the return is verified.
 Application has a pure address comparer and picking-route builder over the
 shared stock-availability view and supplied location metadata. The builder
 keeps FEFO before cell-clearing choices, selects only fully available one-SKU
@@ -236,8 +250,8 @@ the pallet-return command. Legacy transfer and count keep their existing path
 until their separate replacement.
 
 Other existing warehouse mutations in Web/Mobile enter legacy application commands
-through `CommandExecutor`: LPN issuance, picking, shipping/rollback, transfers
-and inventory counts. Receiving and putaway use the new Application executor.
+through `CommandExecutor`: LPN issuance, transfers and inventory counts.
+Receiving, putaway, picking and replenishment use the new Application executor.
 The executor owns receipt lookup before mutable validation and external access,
 replay, winning receipt recovery after competing commits, and atomic final save
 of business state plus receipt. Callers supply `CommandContext` with request
@@ -263,16 +277,11 @@ types, hashes and results. Location barcode parsing may precede the application
 command at the API boundary; inventory-count barcode resolution follows receipt lookup.
 
 The active receiving completion command checks linked source mirrors and saves
-an immutable cycle decision without posting stock or calling a legacy
-completion checkpoint. Receiving LPN close posts the receipt, and putaway posts
-each placement through the new executor. Shipping uses
-`PersistReadyForShipmentCheckpointAsync` and
-`PersistShippedCheckpointAsync` in its older workflow. These explicitly
-named checkpoints run after receipt lookup and before final effects. Each is
-an independent synchronization commit and survives a failed final phase.
-Other intermediate saves require explicit application semantics. SQL and 1C
-remain separate boundaries; receipt uniqueness does not prevent concurrent
-external calls before final persistence.
+an immutable cycle decision without posting stock. Receiving LPN close posts
+the receipt, and putaway posts each placement through the new executor.
+Picking closure posts stock and saves per-document exchange targets atomically;
+1C PATCH and POST run afterward through per-document serialization and short
+database commands. SQL and 1C remain separate boundaries.
 
 Warehouse commands do not expose staging methods for Mobile receipt
 orchestration. Use business-named private helpers only where they clarify

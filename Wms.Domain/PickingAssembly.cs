@@ -352,20 +352,74 @@ public sealed class PickingAssembly
         return OperationResult.Success();
     }
 
+    public OperationResult RecordReturnPatchIntent(Guid shippingOrderId,
+        long expectedRevision, DateTimeOffset atUtc)
+    {
+        var checkedLink = ReturnLink(shippingOrderId, expectedRevision, atUtc);
+        if (!checkedLink.IsSuccess) return checkedLink.Error!;
+        if (checkedLink.Value!.StartPatchRequestedAtUtc is null)
+            return OperationError.Conflict("WMS не переключала этот РО 1С.");
+        checkedLink.Value.RecordReturnPatchIntent(atUtc);
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult ConfirmReturnPatch(Guid shippingOrderId,
+        long expectedRevision, DateTimeOffset atUtc)
+    {
+        var checkedLink = ReturnLink(shippingOrderId, expectedRevision, atUtc);
+        if (!checkedLink.IsSuccess) return checkedLink.Error!;
+        if (checkedLink.Value!.ReturnPatchRequestedAtUtc is null)
+            return OperationError.Conflict("Возврат статуса РО 1С ещё не запрошен.");
+        checkedLink.Value.ConfirmReturnPatch(atUtc);
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult RecordReturnFailure(Guid shippingOrderId,
+        long expectedRevision, DateTimeOffset atUtc, string error)
+    {
+        var checkedLink = ReturnLink(shippingOrderId, expectedRevision, atUtc);
+        if (!checkedLink.IsSuccess) return checkedLink.Error!;
+        if (string.IsNullOrWhiteSpace(error) || error.Length > 2000)
+            return OperationError.Invalid("Укажите причину ошибки возврата РО 1С.");
+        checkedLink.Value!.RecordReturnError(atUtc, error.Trim());
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
     public OperationResult ReleaseCancelledSource(Guid shippingOrderId,
-        string userId, DateTimeOffset releasedAtUtc)
+        string userId, long expectedRevision, DateTimeOffset releasedAtUtc)
+    {
+        var checkedLink = ReturnLink(shippingOrderId,
+            expectedRevision, releasedAtUtc);
+        if (!checkedLink.IsSuccess) return checkedLink.Error!;
+        if (!ValidUser(userId))
+            return OperationError.Invalid("Исполнитель освобождения РО 1С не определён.");
+        if (checkedLink.Value!.StartConfirmedAtUtc is not null
+            && checkedLink.Value.ReturnPatchConfirmedAtUtc is null)
+            return OperationError.Conflict("Возврат статуса РО 1С ещё не подтверждён.");
+        checkedLink.Value.ConfirmReturnPost(releasedAtUtc);
+        checkedLink.Value.ReleaseAfterCancellation(userId, releasedAtUtc);
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    private OperationResult<PickingAssemblySourceLink> ReturnLink(
+        Guid shippingOrderId, long expectedRevision, DateTimeOffset atUtc)
     {
         if (Status != PickingAssemblyStatus.CancellationPending)
             return OperationError.Conflict("Сборка не ожидает возврата статусов 1С.");
+        if (OperationalRevision != expectedRevision)
+            return OperationError.Conflict("Сборка изменилась. Обновите возврат РО 1С.");
         var link = ActiveLink(shippingOrderId);
         if (link is null)
             return OperationError.NotFound("РО 1С не ожидает завершения отмены.");
-        if (!ValidUser(userId) || releasedAtUtc == default
-            || releasedAtUtc < CreatedAtUtc)
-            return OperationError.Invalid("Исполнитель или время освобождения недопустимы.");
-        link.ReleaseAfterCancellation(userId, releasedAtUtc);
-        OperationalRevision++;
-        return OperationResult.Success();
+        if (atUtc == default || atUtc < CreatedAtUtc
+            || link.LastReturnAttemptAtUtc is DateTimeOffset previous
+                && atUtc < previous)
+            return OperationError.Invalid("Время возврата РО 1С недопустимо.");
+        return link;
     }
 
     public OperationResult CompleteCancellation(DateTimeOffset completedAtUtc,

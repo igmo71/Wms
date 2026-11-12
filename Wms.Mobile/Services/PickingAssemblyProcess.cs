@@ -11,6 +11,7 @@ public sealed class PickingAssemblyProcess(
     public bool HasPendingCommand => _pending is not null;
     public string? PendingLabel => _pending?.Label;
     public MobilePickingStartResponse? LastStartResult { get; private set; }
+    public MobilePickingCloseResponse? LastCloseResult { get; private set; }
 
     public Task<MobilePickingAssemblyResponse> CreateAsync(Guid warehouseId, string barcode) =>
         Begin("Создать сборку", warehouseId, async id =>
@@ -97,8 +98,11 @@ public sealed class PickingAssemblyProcess(
     public Task<MobilePickingAssemblyResponse> CloseAsync(
         Guid assemblyId, Guid warehouseId, long revision) =>
         Begin("Закрыть и отгрузить", warehouseId, async id =>
-            (await client.CloseAsync(assemblyId,
-                new(id, warehouseId, revision))).AssemblyId);
+        {
+            LastCloseResult = await client.CloseAsync(assemblyId,
+                new(id, warehouseId, revision));
+            return LastCloseResult.AssemblyId;
+        });
 
     public Task<MobilePickingAssemblyResponse> OrderReplenishmentAsync(
         Guid assemblyId, Guid warehouseId, long revision,
@@ -117,6 +121,7 @@ public sealed class PickingAssemblyProcess(
         if (_pending is not null)
             throw new InvalidOperationException("Сначала повторите незавершённую команду.");
         LastStartResult = null;
+        LastCloseResult = null;
         _pending = new PendingCommand(Guid.NewGuid(), label, warehouseId, execute);
         return RetryAsync();
     }

@@ -132,10 +132,10 @@ public sealed class MobilePickingClient
         GetAsync<MobilePickingClosureCheckResponse>(
             $"{Route}/{assemblyId:D}/closure-check?warehouseId={warehouseId:D}", ct);
 
-    public Task<MobilePickingCommandIdResponse> CloseAsync(
+    public Task<MobilePickingCloseResponse> CloseAsync(
         Guid assemblyId, MobilePickingCloseRequest request,
         CancellationToken ct = default) =>
-        PostAsync<MobilePickingCloseRequest, MobilePickingCommandIdResponse>(
+        PostAsync<MobilePickingCloseRequest, MobilePickingCloseResponse>(
             $"{Route}/{assemblyId:D}/close", request, ct);
 
     private async Task<TResponse> GetAsync<TResponse>(string route, CancellationToken ct)

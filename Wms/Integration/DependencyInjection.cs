@@ -5,7 +5,6 @@ using System.Net.Mime;
 using System.Text;
 using Wms.Integration.OneS;
 using Wms.Integration.OneS.Services;
-using Wms.Application.ShippingOrders;
 
 namespace Wms.Integration;
 
@@ -34,8 +33,6 @@ public static class DependencyInjection
         services.AddScoped<Catalog_СтруктураПредприятия_Service>();
         services.AddScoped<Catalog_ФизическиеЛица_Service>();
         services.AddScoped<Catalog_УпаковкиЕдиницыИзмерения_Service>();
-        services.AddScoped<IShippingOrderSource, Document_РасходныйОрдерНаТовары_InboundService>();
-        services.AddScoped<IShippingOrderExecutionSink, Document_РасходныйОрдерНаТовары_OutboundService>();
         services.AddScoped<InformationRegister_ШтрихкодыНоменклатуры_Service>();
 
         return services;

@@ -207,6 +207,17 @@ public sealed class PickingAssemblySafetyTests(SqlDatabase database)
 
         public Task<OperationResult> PostAsync(Guid sourceId, CancellationToken ct) =>
             Task.FromResult(OperationResult.Success());
+
+        public Task<OperationResult> SetPreparedAsync(Guid sourceId,
+            CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<OperationResult> ApplyTargetAsync(ShippingExchangeTarget target,
+            string planSourceSnapshotJson, ShippingSourceSnapshot current,
+            CancellationToken ct) => throw new NotSupportedException();
+
+        public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
+            string planSourceSnapshotJson, ShippingSourceSnapshot current) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoOpSourceStore : IShippingSourceStore

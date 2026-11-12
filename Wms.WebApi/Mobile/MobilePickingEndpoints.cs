@@ -56,7 +56,7 @@ internal static class MobilePickingEndpoints
         group.MapGet("/{assemblyId:guid}/closure-check", CheckClosureAsync)
             .WithMobileResponses<MobilePickingClosureCheckResponse>();
         group.MapPost("/{assemblyId:guid}/close", CloseAsync)
-            .WithMobileResponses<MobilePickingCommandIdResponse>();
+            .WithMobileResponses<MobilePickingCloseResponse>();
         return endpoints;
     }
 
@@ -448,7 +448,7 @@ internal static class MobilePickingEndpoints
     private static async Task<IResult> CloseAsync(
         Guid assemblyId, MobilePickingCloseRequest request,
         ClaimsPrincipal principal, IPickingAssemblyStore assemblies,
-        ClosePickingAssembly close, CancellationToken ct)
+        CloseAndShipPickingAssembly close, CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return TypedResults.Unauthorized();
@@ -459,13 +459,12 @@ internal static class MobilePickingEndpoints
         var result = await close.ExecuteAsync(new ClosePickingAssemblyRequest(
             request.ClientRequestId, assemblyId, request.ExpectedRevision,
             userId), ct);
-        if (result.IsSuccess)
-            return CommandId(result);
-        var assembly = await assemblies.ReadAssemblyAsync(assemblyId, ct);
-        if (assembly?.Status == PickingAssemblyStatus.Closed)
-            return MobileEndpointResults.CommandProblem(OperationError.Conflict(
-                "Сборка уже закрыта. Повтор обмена с 1С станет доступен после подключения интеграции."));
-        return MobileEndpointResults.CommandProblem(result.Error!);
+        return result.IsSuccess
+            ? TypedResults.Ok(new MobilePickingCloseResponse(result.Value!.PickingAssemblyId,
+                result.Value.AllConfirmed, result.Value.Documents.Select(x =>
+                    new MobilePickingExchangeDocumentResponse(x.ShippingOrderId,
+                        (MobileShippingExchangeStage)x.Stage, x.Error)).ToArray()))
+            : MobileEndpointResults.CommandProblem(result.Error!);
     }
 
     private static async Task<OperationResult> CheckWarehouseAsync(
@@ -500,7 +499,12 @@ internal static class MobilePickingEndpoints
         item.CreatedAtUtc, item.StartedAtUtc, item.HasWarning,
         item.Sources.Select(x => new MobilePickingListSourceResponse(
             x.SourceRefKey, x.Number, x.StartConfirmed,
-            x.StartError, x.SourceCheckError)).ToArray());
+            x.StartError, x.SourceCheckError)
+            {
+                ExchangeStage = x.ExchangeStage is { } stage
+                    ? (MobileShippingExchangeStage)stage : null,
+                ExchangeError = x.ExchangeError
+            }).ToArray());
 
     private static MobilePickingAssemblyResponse MapAssembly(PickingAssemblyView view) => new(
         view.Id, view.Number, view.WarehouseId,
@@ -512,7 +516,12 @@ internal static class MobilePickingEndpoints
             x.SourceRefKey, x.Number, x.Status.ToString(),
             x.Posted, x.DeletionMark, x.LastCheckedAtUtc, x.LastCheckError,
             x.StartConfirmedAtUtc, x.LastStartAttemptAtUtc, x.LastStartError,
-            x.PlanSourceSnapshotJson, x.CurrentSourceJson)).ToArray(),
+            x.PlanSourceSnapshotJson, x.CurrentSourceJson)
+            {
+                ExchangeStage = x.ExchangeStage is { } stage
+                    ? (MobileShippingExchangeStage)stage : null,
+                ExchangeError = x.ExchangeError
+            }).ToArray(),
         view.PlanLines.Select(x => new MobilePickingPlanLineResponse(
             x.SourceRefKey, x.SkuId, x.SkuCode, x.SkuName,
             x.Quantity)).ToArray());

@@ -14,7 +14,6 @@ public static class MobileApiRoutes
     public const string InventoryCounts = Base + "/inventory-counts";
     public const string ReceivingOrders = Base + "/receiving-orders";
     public const string LicensePlateNumberPutaway = Base + "/lpn-putaway";
-    public const string ShippingOrders = Base + "/shipping-orders";
     public const string PickingAssemblies = Base + "/picking-assemblies";
     public const string ReplenishmentTasks = Base + "/replenishment-tasks";
     public const string StockAvailability = Base + "/stock-availability";

@@ -10,9 +10,21 @@ public enum MobilePickingAssemblyStatus
     Cancelled = 5
 }
 
+public enum MobileShippingExchangeStage
+{
+    PendingPatch = 0,
+    PatchConfirmed = 1,
+    PostConfirmed = 2,
+    NeedsReview = 3
+}
+
 public sealed record MobilePickingListSourceResponse(
     Guid SourceRefKey, string? Number, bool StartConfirmed,
-    string? StartError, string? SourceCheckError);
+    string? StartError, string? SourceCheckError)
+{
+    public MobileShippingExchangeStage? ExchangeStage { get; init; }
+    public string? ExchangeError { get; init; }
+}
 
 public sealed record MobilePickingAssemblyListResponse(
     Guid Id, string Number, Guid WarehouseId, MobilePickingAssemblyStatus Status,
@@ -26,7 +38,11 @@ public sealed record MobilePickingSourceResponse(
     bool Posted, bool DeletionMark, DateTimeOffset? LastCheckedAtUtc,
     string? LastCheckError, DateTimeOffset? StartConfirmedAtUtc,
     DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError,
-    string PlanSourceSnapshotJson, string? CurrentSourceJson);
+    string PlanSourceSnapshotJson, string? CurrentSourceJson)
+{
+    public MobileShippingExchangeStage? ExchangeStage { get; init; }
+    public string? ExchangeError { get; init; }
+}
 
 public sealed record MobilePickingPlanLineResponse(
     Guid SourceRefKey, Guid SkuId, string? SkuCode, string? SkuName,
@@ -56,6 +72,12 @@ public sealed record MobilePickingStartResponse(
     IReadOnlyList<MobilePickingSourceStartResponse> Sources);
 
 public sealed record MobilePickingCommandIdResponse(Guid AssemblyId);
+
+public sealed record MobilePickingExchangeDocumentResponse(
+    Guid SourceRefKey, MobileShippingExchangeStage Stage, string? Error);
+
+public sealed record MobilePickingCloseResponse(Guid AssemblyId,
+    bool AllConfirmed, IReadOnlyList<MobilePickingExchangeDocumentResponse> Documents);
 
 public sealed record MobilePickingResolveSourceRequest(string Barcode);
 public sealed record MobilePickingCreateRequest(

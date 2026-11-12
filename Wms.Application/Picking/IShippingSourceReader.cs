@@ -11,6 +11,9 @@ public interface IShippingSourceReader
 public interface IShippingStoredSnapshotParser
 {
     OperationResult<ShippingSourceSnapshot> Parse(Guid refKey, string storedDocumentJson);
+    OperationResult<bool> UnchangedApartFromStatusAndPosting(
+        Guid refKey, string originalDocumentJson,
+        ShippingSourceSnapshot current);
 }
 
 public sealed record ShippingSourceSnapshot(

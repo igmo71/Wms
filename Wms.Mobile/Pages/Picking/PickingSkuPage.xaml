@@ -51,6 +51,21 @@
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
+                    <Label Text="Обмен с 1С по документам" FontAttributes="Bold" FontSize="16" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ExchangeRows, Source={x:Reference Page}}"
+                                         Spacing="4">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="local:PickingExchangeRow">
+                                <Border Padding="8" Stroke="#D4D4D4">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Number}" FontAttributes="Bold" />
+                                        <Label Text="{Binding Stage}" />
+                                        <Label Text="{Binding Error}" TextColor="Red" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>

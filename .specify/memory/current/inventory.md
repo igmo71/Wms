@@ -5,8 +5,9 @@
 A warehouse contains pickable storage (`Storage`, displayed as `Комплектация`),
 reserve (`Reserve`, displayed as `Хранение`), transit, receiving, and shipping
 zone types. New receiving putaway can post into either Storage or Reserve.
-Older picking, transfer, and count flows still use their former Storage-only
-rules and are not ready for reserve stock.
+The replacement picking workflow can use Storage and eligible one-SKU Reserve
+cells. Older transfer and count flows still use their former Storage-only rules
+and are not ready for reserve stock.
 
 Locations form an arbitrary-depth physical tree within one warehouse. A folder
 may have no functional zone; an operational location belongs to one active zone
@@ -92,9 +93,7 @@ for that quantity or releases a mistaken block, preserving the report and
 decision. A direct Reserve pick first holds the whole one-SKU cell; each
 confirmed date group must be taken in full. The
 hold can be released after a confirming scan only when no positive fact remains
-from that cell. Replacement Mobile screens use these operations; the main
-home-screen button still opens the legacy picking and shipping flow until the
-final workflow switch.
+from that cell. The Mobile «Отбор» button opens the replacement picking screens.
 
 The replacement replenishment proposal calculator uses the remaining assembly
 demand, suggested picking steps, shared stock availability and existing tasks.
@@ -278,5 +277,6 @@ Posting and eligibility-changing topology or lock updates advance
 balance concurrency tokens plus named database constraints. Only recognized
 inventory concurrency failures become business conflicts.
 
-The current boundaries of picking, shipping, transfers, and inventory counts
-are in [other warehouse workflows](other-workflows.md).
+Transfer and inventory-count boundaries are in
+[other warehouse workflows](other-workflows.md). The outbound stock rules are
+described above; the 1C exchange rules are in [integration](integration.md).
