@@ -115,8 +115,12 @@ The replacement close command performs the fresh check before opening its
 stock transaction, then verifies the same source JSON and assembly revision
 inside that transaction. It stores an immutable per-document target decision:
 the approved WMS plan, allocated SKU quantities, intended `Shipped` status and
-reviewed source JSON. The Integration target builder turns that decision and
-the saved original source rows into a concrete 1C PATCH body. It fills each
+reviewed source JSON. Before posting any stock movement, closure asks the
+Integration target builder to construct every document's PATCH rows from the
+saved source and reviewed state. Missing or insufficient order-reference rows,
+or any other locally unbuildable target, blocks the entire closure without
+posting stock or saving an exchange target. The builder turns that decision
+and the saved original source rows into a concrete 1C PATCH body. It fills each
 SKU's original lines in order within their original quantities; an approved
 increase can use reviewed source quantities. Unshipped plan remains in
 `НеОтгружать` rows. Zero allocation keeps applicable rows as `НеОтгружать`
@@ -144,8 +148,10 @@ application command closes open warehouse work once, then attempts each
 unconfirmed 1C document independently. Its response receipt distinguishes
 replay of a lost answer from a new retry ID after a known failure. The same
 Mobile and Web close action retries only unconfirmed documents after warehouse
-closure; the operator's active list retains the assembly until every document
-is confirmed. Per-document stages and errors remain visible in its detail.
+closure. Any Operator can retry the exchange regardless of who closed the
+assembly; the original closing user remains recorded in the closure and audit.
+The active list retains the assembly until every document is confirmed.
+Per-document stages and errors remain visible in its detail.
 For a new discrepancy, the Manager approval
 command requires the exact fresh source JSON that was reviewed, records a
 reason, and advances only that document's decision revision; the warehouse

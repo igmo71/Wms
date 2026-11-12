@@ -21,7 +21,8 @@ public sealed class PickingAssemblyQueryStore(
         var assemblies = await db.PickingAssemblies.AsNoTracking()
             .Where(x => warehouseId == null || x.WarehouseId == warehouseId)
             .Where(x => userId == null || x.Status != PickingAssemblyStatus.Cancelled
-                && (x.CreatedBy == userId || x.ResponsibleUserId == userId))
+                && (x.CreatedBy == userId || x.ResponsibleUserId == userId
+                    || x.Status == PickingAssemblyStatus.Closed))
             .Include(x => x.SourceLinks).ThenInclude(x => x.ShippingOrder)
             .OrderByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id)
             .AsSplitQuery().ToArrayAsync(ct);

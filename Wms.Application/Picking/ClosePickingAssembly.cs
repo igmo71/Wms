@@ -20,6 +20,7 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
     IPickingAssemblyStore assemblies, CheckPickingClosure checker,
     AllocatePickingFact allocator, PostInventoryMovement.Handler posting,
     IReplenishmentStore replenishments,
+    IShippingSourceWriter shippingWriter,
     WarehousePermission permission, TimeProvider clock)
 {
     private const string CommandType = "picking.assembly.close";
@@ -112,6 +113,38 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                 if (allocation.RequiresManagerDecision.Count > 0)
                     return OperationError.Conflict("Не распределён недобор общего SKU.");
                 var now = clock.GetUtcNow();
+                var closed = assembly.Close(request.UserId,
+                    request.ExpectedRevision, now);
+                if (!closed.IsSuccess) return closed.Error!;
+                var targets = new List<ShippingExchangeTarget>();
+                foreach (var source in review.Sources)
+                {
+                    var targetJson = JsonSerializer.Serialize(new
+                    {
+                        Version = 1, Status = ShippingOrderStatus.Shipped.ToString(),
+                        ApprovedPlan = assembly.PlanLines.Where(x =>
+                            x.ShippingOrderId == source.ShippingOrderId)
+                            .Select(x => new { SkuId = x.StockKeepingUnitId,
+                                x.Quantity }).ToArray(),
+                        Allocation = allocation.Allocations.Where(x =>
+                            x.ShippingOrderId == source.ShippingOrderId)
+                            .Select(x => new { SkuId = x.StockKeepingUnitId,
+                                x.Quantity }).ToArray()
+                    });
+                    var target = ShippingExchangeTarget.Create(assembly.Id,
+                        source.ShippingOrderId, assembly.OperationalRevision,
+                        source.CurrentSourceJson!, targetJson);
+                    if (!target.IsSuccess) return target.Error!;
+                    var link = assembly.ActiveSources.Single(x =>
+                        x.ShippingOrderId == source.ShippingOrderId);
+                    var buildable = shippingWriter.ValidateTarget(target.Value!,
+                        link.PlanSourceSnapshotJson);
+                    if (!buildable.IsSuccess)
+                        return OperationError.Conflict(
+                            $"РО 1С {source.Number ?? source.ShippingOrderId.ToString()}: "
+                            + buildable.Error!.Message);
+                    targets.Add(target.Value!);
+                }
                 var cancelledReplenishments = 0;
                 foreach (var task in await replenishments.LoadForAssemblyAsync(
                     session, assembly.Id, token))
@@ -144,9 +177,6 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                 }
                 await assemblies.ReleasePickingClosureHoldsAsync(session,
                     assembly.Id, token);
-                var closed = assembly.Close(request.UserId,
-                    request.ExpectedRevision, now);
-                if (!closed.IsSuccess) return closed.Error!;
                 var reviewedJson = JsonSerializer.Serialize(new
                 {
                     Sources = review.Sources.Select(x => new
@@ -161,28 +191,8 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                 session.Stage(closure.Value!);
                 foreach (var line in allocation.Allocations)
                     session.Stage(line);
-                foreach (var source in review.Sources)
-                {
-                    // This neutral, immutable decision is converted to 1C row
-                    // JSON by ShippingTargetBuilder in the exchange stage.
-                    var targetJson = JsonSerializer.Serialize(new
-                    {
-                        Version = 1, Status = ShippingOrderStatus.Shipped.ToString(),
-                        ApprovedPlan = assembly.PlanLines.Where(x =>
-                            x.ShippingOrderId == source.ShippingOrderId)
-                            .Select(x => new { SkuId = x.StockKeepingUnitId,
-                                x.Quantity }).ToArray(),
-                        Allocation = allocation.Allocations.Where(x =>
-                            x.ShippingOrderId == source.ShippingOrderId)
-                            .Select(x => new { SkuId = x.StockKeepingUnitId,
-                                x.Quantity }).ToArray()
-                    });
-                    var target = ShippingExchangeTarget.Create(assembly.Id,
-                        source.ShippingOrderId, assembly.OperationalRevision,
-                        source.CurrentSourceJson!, targetJson);
-                    if (!target.IsSuccess) return target.Error!;
-                    session.Stage(target.Value!);
-                }
+                foreach (var target in targets)
+                    session.Stage(target);
                 var audit = WarehouseAuditEvent.Create("picking.assembly.closed",
                     now, request.UserId, null, null, null, null, null,
                     JsonSerializer.Serialize(new { Revision = request.ExpectedRevision,

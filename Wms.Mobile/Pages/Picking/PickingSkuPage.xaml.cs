@@ -182,9 +182,11 @@ public partial class PickingSkuPage : ContentPage
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || _assembly is null || !IsOwner
+        if (_busy || _process.HasPendingCommand || _assembly is null
             || _assembly.Status is not (MobilePickingAssemblyStatus.InProgress
-                or MobilePickingAssemblyStatus.Closed)) return;
+                or MobilePickingAssemblyStatus.Closed)
+            || _assembly.Status == MobilePickingAssemblyStatus.InProgress && !IsOwner)
+            return;
         SetBusy(true);
         try
         {
@@ -301,7 +303,7 @@ public partial class PickingSkuPage : ContentPage
         ReplenishmentsButton.Text = _replenishmentsReady ? "Подпитки ✓" : "Подпитки";
         CloseButton.IsVisible = RouteButton.IsVisible
             || _assembly is { Status: MobilePickingAssemblyStatus.Closed }
-                && IsOwner && _assembly.Sources.Any(x =>
+                && _assembly.Sources.Any(x =>
                     x.ExchangeStage != MobileShippingExchangeStage.PostConfirmed);
         CloseButton.Text = _assembly?.Status == MobilePickingAssemblyStatus.Closed
             ? "Закрыть и отгрузить · повторить обмен" : "Закрыть и отгрузить";

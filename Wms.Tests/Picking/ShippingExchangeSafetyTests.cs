@@ -208,7 +208,8 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
         var close = new ClosePickingAssembly(executor, assemblyStore, checker,
             new AllocatePickingFact(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
-            new ReplenishmentStore(database), permission, TimeProvider.System);
+            new ReplenishmentStore(database), transport, permission,
+            TimeProvider.System);
         var exchangeStore = new ShippingExchangeStore(database);
         var exchange = new ExchangeShippingDocument(exchangeStore, transport,
             transport, executor, permission, TimeProvider.System);
@@ -305,6 +306,9 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
         public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
             string planSourceSnapshotJson, ShippingSourceSnapshot current) =>
             current.RawDocumentJson == target.TargetDocumentJson;
+
+        public OperationResult ValidateTarget(ShippingExchangeTarget target,
+            string planSourceSnapshotJson) => OperationResult.Success();
 
         public async Task<OperationResult> ApplyTargetAsync(
             ShippingExchangeTarget target, string planSourceSnapshotJson,

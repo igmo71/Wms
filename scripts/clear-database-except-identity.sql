@@ -1,7 +1,7 @@
 /*
     Очистка прикладных данных WMS для текущей схемы базы данных.
     Включает справочники и топологию склада.
-    Учитывает источники и циклы приемки, LPN, движения, журнал аудита,
+    Учитывает источники и циклы приемки, сборки, подпитку, LPN, движения, журнал аудита,
     квитанции команд и запись разовой загрузки топологии и начальных остатков.
     Запускать при остановленных WebApp, WebApi и обработчиках интеграции.
 
@@ -23,10 +23,25 @@ SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    -- Аудит ссылается на команды, приемки, LPN, источники, номенклатуру
+    -- Аудит ссылается на команды, приемки, сборки, LPN, источники, номенклатуру
     -- и запись разовой загрузки. Полная очистка удаляет также их историю.
     DELETE FROM [dbo].[WarehouseAuditEvents];
     DELETE FROM [dbo].[CommandReceipts];
+
+    -- Операции Отбора и Подпитки ссылаются друг на друга, на документы 1С,
+    -- ячейки и движения. Записи с FK на движения удаляются до движений.
+    DELETE FROM [dbo].[ReplenishmentTransfers];
+    DELETE FROM [dbo].[StockShortages];
+    DELETE FROM [dbo].[PickingReservations];
+    DELETE FROM [dbo].[ReplenishmentSourceCycles];
+    DELETE FROM [dbo].[ReplenishmentTasks];
+    DELETE FROM [dbo].[PickingEntries];
+    DELETE FROM [dbo].[PickingClosures];
+    DELETE FROM [dbo].[PickingAllocations];
+    DELETE FROM [dbo].[ShippingExchangeTargets];
+    DELETE FROM [dbo].[PickingAssemblyPlanLines];
+    DELETE FROM [dbo].[PickingAssemblySourceLinks];
+    DELETE FROM [dbo].[PickingAssemblies];
 
     -- История размещения ссылается на LPN, его строки и складские движения.
     DELETE FROM [dbo].[LicensePlateNumberPutaways];

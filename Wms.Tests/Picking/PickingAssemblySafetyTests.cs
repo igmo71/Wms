@@ -218,6 +218,9 @@ public sealed class PickingAssemblySafetyTests(SqlDatabase database)
         public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
             string planSourceSnapshotJson, ShippingSourceSnapshot current) =>
             throw new NotSupportedException();
+
+        public OperationResult ValidateTarget(ShippingExchangeTarget target,
+            string planSourceSnapshotJson) => throw new NotSupportedException();
     }
 
     private sealed class NoOpSourceStore : IShippingSourceStore

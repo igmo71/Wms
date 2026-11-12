@@ -72,11 +72,11 @@ login, and destination cell address; filters can be combined.
 ## Web picking assemblies
 
 The Manager «Сборки WMS» page lists picking assemblies across warehouses;
-Operator sees only assigned closed assemblies awaiting 1C exchange and can
-retry that exchange. The detail page keeps the WMS plan per 1C document,
-physical WMS fact by SKU and cell, current imported 1C lines, posted allocation,
-and action history separate. A fresh «Сверить с 1С» action retrieves each
-document before a decision and shows hard blocks and issues requiring Manager
+Operator sees all closed assemblies awaiting 1C exchange and can retry that
+exchange regardless of who closed them. The detail page keeps the WMS plan per
+1C document, physical WMS fact by SKU and cell, current imported 1C lines,
+posted allocation, and action history separate. A fresh «Сверить с 1С» action
+retrieves each document before a decision and shows hard blocks and issues requiring Manager
 review. A Manager may change one document's WMS plan with a reason and the
 reviewed source snapshot, explicitly distribute a partial shared SKU across
 documents, and close the assembly with a recorded reason. The close action
@@ -114,8 +114,8 @@ a client request ID and the expected assembly revision. A closed assembly
 accepts a replay of its original close request without posting stock again;
 the same close action with a new request ID retries unconfirmed 1C documents.
 The response and refreshed card show the result for each document. Closed
-assemblies awaiting exchange remain in the Operator work list until all
-documents are confirmed. The replacement TSD screens
+assemblies awaiting exchange remain in every Operator's work list for their
+selected warehouse until all documents are confirmed. The replacement TSD screens
 show plan and confirmed fact per SKU with white, yellow and green progress,
 and preserve the unit next to the plan quantity. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm

@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
@@ -7,6 +8,7 @@ using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
+using Wms.Integration.OneS;
 using Wms.Tests.Infrastructure;
 using static Wms.Tests.Infrastructure.TestSupport;
 
@@ -80,6 +82,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
             checker, new AllocatePickingFact(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
             new ReplenishmentStore(database),
+            new ShippingSourceWriter(new HttpClient()),
             permission, TimeProvider.System);
         var request = new ClosePickingAssemblyRequest(Guid.NewGuid(), assembly.Id,
             assembly.OperationalRevision, UserId);
@@ -180,6 +183,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
             new AllocatePickingFact(),
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
             new ReplenishmentStore(database),
+            new ShippingSourceWriter(new HttpClient()),
             permission, TimeProvider.System);
         var takeOver = new TakeOverPickingAssembly(executor, store, permission,
             TimeProvider.System);
@@ -221,9 +225,100 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
             x.PickingAssemblyId == assembly.Id).ToArrayAsync());
     }
 
+    [Fact]
+    public async Task Missing_basis_rows_block_closure_before_stock_posting()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Unbuildable exchange" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Picked SKU" };
+        var zone = Zone(warehouse.Id, "STOCK", ZoneType.Storage);
+        var location = Location(warehouse.Id, zone, 1);
+        var sourceId = Guid.NewGuid();
+        var sourceSnapshot = Source(sourceId, warehouse.Id, sku.Id,
+            Guid.NewGuid(), includeBasis: false);
+        var source = Value(ShippingOrder.Create(SourceImport(sourceSnapshot,
+            ShippingOrderStatus.Prepared), DateTimeOffset.UtcNow));
+        Success(source.ApplyCurrentSource(SourceImport(sourceSnapshot,
+            ShippingOrderStatus.ReadyForPicking), DateTimeOffset.UtcNow));
+        Success(source.RecordSourceCheck(sourceSnapshot.RawDocumentJson, null,
+            DateTimeOffset.UtcNow));
+        var assembly = PickingAssembly(warehouse.Id, UserId);
+        Value(assembly.AttachSource(sourceId, sourceSnapshot.RawDocumentJson,
+            new Dictionary<Guid, decimal> { [sku.Id] = 10 }, UserId,
+            DateTimeOffset.UtcNow));
+        var startedAt = DateTimeOffset.UtcNow;
+        var leaseId = Guid.NewGuid();
+        Success(assembly.FreezeForStart(UserId, startedAt));
+        Success(assembly.ClaimStart(leaseId, startedAt, startedAt.AddMinutes(10)));
+        Success(assembly.RecordSourceStartResult(leaseId, sourceId, startedAt, null));
+        Success(assembly.CompleteStart(leaseId, startedAt));
+        var entry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
+            location.Id, sku.Id, null, 10, UserId, DateTimeOffset.UtcNow));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, source, assembly,
+                entry, Balance(warehouse.Id, location.Id, sku.Id, 10));
+            seed.Add(Value(PickingReservation.Create(entry.Id, assembly.Id,
+                warehouse.Id, location.Id, sku.Id, null, 10, UserId,
+                DateTimeOffset.UtcNow)));
+            await seed.SaveChangesAsync();
+        }
+        var store = new PickingAssemblyStore(database);
+        var permission = new WarehousePermission(new OperatorPermission());
+        var checker = new CheckPickingClosure(store,
+            new SynchronizeShippingSource(new FixedReader(sourceSnapshot),
+                new ShippingSourceStore(database), TimeProvider.System),
+            new FixedParser(sourceSnapshot), new AllocatePickingFact(),
+            permission, TimeProvider.System);
+        var close = new ClosePickingAssembly(
+            new CommandExecutor(new CommandExecutionStore(database)), store,
+            checker, new AllocatePickingFact(),
+            new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            new ReplenishmentStore(database),
+            new ShippingSourceWriter(new HttpClient()),
+            permission, TimeProvider.System);
+        var request = new ClosePickingAssemblyRequest(Guid.NewGuid(), assembly.Id,
+            assembly.OperationalRevision, UserId);
+
+        Error(await close.ExecuteAsync(request), OperationErrorType.Conflict);
+        await using var verify = database.CreateDbContext();
+        Assert.Empty(await verify.InventoryMovements.Where(x =>
+            x.RecorderId == assembly.Id).ToArrayAsync());
+        Assert.False(await verify.PickingClosures.AnyAsync(x =>
+            x.PickingAssemblyId == assembly.Id));
+        Assert.False(await verify.ShippingExchangeTargets.AnyAsync(x =>
+            x.PickingAssemblyId == assembly.Id));
+        Assert.False(await verify.CommandReceipts.AnyAsync(x =>
+            x.RequestId == request.RequestId));
+        Assert.Equal(PickingAssemblyStatus.InProgress,
+            (await verify.PickingAssemblies.SingleAsync(x => x.Id == assembly.Id)).Status);
+        Assert.Equal(10, (await verify.InventoryBalances.SingleAsync(x =>
+            x.StorageLocationId == location.Id)).Quantity);
+    }
+
     private static ShippingSourceSnapshot Source(Guid sourceId, Guid warehouseId,
-        Guid skuId, Guid receiverId) => new(
-            RefKey: sourceId, RawDocumentJson: "{\"version\":1}", Posted: true,
+        Guid skuId, Guid receiverId, bool includeBasis = true)
+    {
+        var item = new JsonObject
+        {
+            ["LineNumber"] = 1, ["Номенклатура_Key"] = skuId.ToString(),
+            ["Количество"] = 10, ["КоличествоУпаковок"] = 10,
+            ["Действие"] = "Отгрузить", ["ЭтоУпаковочныйЛист"] = false,
+            ["ЭтоСлужебнаяСтрокаПустогоУпаковочногоЛиста"] = 0
+        };
+        var basis = new JsonObject
+        {
+            ["LineNumber"] = 1, ["Номенклатура_Key"] = skuId.ToString(),
+            ["Количество"] = 10, ["Распоряжение"] = Guid.NewGuid().ToString()
+        };
+        var raw = new JsonObject
+        {
+            ["Ref_Key"] = sourceId.ToString(),
+            ["ОтгружаемыеТовары"] = new JsonArray(item.DeepClone()),
+            ["ТоварыПоРаспоряжениям"] = includeBasis
+                ? new JsonArray(basis.DeepClone()) : new JsonArray()
+        }.ToJsonString();
+        return new ShippingSourceSnapshot(
+            RefKey: sourceId, RawDocumentJson: raw, Posted: true,
             DeletionMark: false, Number: "РО 1С", Date: DateTime.UtcNow,
             WarehouseId: warehouseId, Comment: null, RawStatus: null,
             Status: ShippingOrderStatus.ReadyForPicking, RawWarehouseOperation: null,
@@ -233,8 +328,11 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
             Queue: ShippingOrderQueue.Unknown, PlannedShippingDate: null,
             DeliveryDirectionId: null,
             Items: [new ShippingSourceItem(1, skuId, "10", 10, "10", 10,
-                null, ShippingOrderAction.PickUp, false, false, "{}")],
-            BasisItems: []);
+                null, ShippingOrderAction.PickUp, false, false, item.ToJsonString())],
+            BasisItems: includeBasis
+                ? [new ShippingSourceBasisItem(1, skuId, "10", 10,
+                    null, null, basis.ToJsonString())] : []);
+    }
 
     private static ShippingOrderImportSnapshot SourceImport(
         ShippingSourceSnapshot source, ShippingOrderStatus status) => new(

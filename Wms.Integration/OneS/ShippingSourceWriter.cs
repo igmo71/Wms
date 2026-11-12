@@ -9,6 +9,14 @@ namespace Wms.Integration.OneS;
 
 public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourceWriter
 {
+    public OperationResult ValidateTarget(ShippingExchangeTarget target,
+        string planSourceSnapshotJson)
+    {
+        var built = new ShippingTargetBuilder().Build(target,
+            planSourceSnapshotJson);
+        return built.IsSuccess ? OperationResult.Success() : built.Error!;
+    }
+
     public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
         string planSourceSnapshotJson, ShippingSourceSnapshot current)
     {

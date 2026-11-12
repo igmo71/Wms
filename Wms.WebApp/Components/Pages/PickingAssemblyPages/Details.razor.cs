@@ -77,7 +77,6 @@ public partial class Details
         _assembly = await Assemblies.GetAsync(Id, CancellationToken.None);
         if (!_isManager && _assembly is not null
             && (_assembly.Status != PickingAssemblyStatus.Closed
-                || _assembly.ResponsibleUserId != _userId
                 || _assembly.Sources.All(x =>
                     x.ExchangeStage == ShippingExchangeStage.PostConfirmed)))
         {

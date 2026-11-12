@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Wms.Application.Picking;
@@ -15,7 +14,6 @@ public partial class Index
     private string? _error;
     private bool _busy;
     private bool _isManager;
-    private string? _userId;
 
     private IEnumerable<PickingAssemblyListItem> Filtered =>
         string.IsNullOrWhiteSpace(_filter) ? _items : _items.Where(x =>
@@ -26,7 +24,6 @@ public partial class Index
     {
         var principal = (await Authentication.GetAuthenticationStateAsync()).User;
         _isManager = principal.IsInRole("Manager");
-        _userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         await ReloadAsync();
     }
 
@@ -38,8 +35,7 @@ public partial class Index
         {
             var items = await Assemblies.ListForManagerAsync(CancellationToken.None);
             _items = _isManager ? items : items.Where(x =>
-                x.ResponsibleUserId == _userId
-                && x.Status == PickingAssemblyStatus.Closed
+                x.Status == PickingAssemblyStatus.Closed
                 && x.Sources.Any(s =>
                     s.ExchangeStage != ShippingExchangeStage.PostConfirmed)).ToArray();
         }
