@@ -137,7 +137,9 @@ routes and the client serve the replacement Mobile screens. The picking SKU
 screen opens a replenishment list with white proposals and ordered tasks,
 yellow started tasks and green tasks whose full quantity has posted, including
 when the source pallet still awaits return. Partial posted quantity is visible;
-the SKU screen marks replenishments ready only when all active tasks have
+cancelled orders remain visible in gray with the reason that the assembly no
+longer needs that SKU replenished. The SKU screen marks replenishments ready
+only when all active tasks have
 posted and no proposal or deficit remains. The home screen opens the
 replenisher's warehouse queue in shipping priority order. Its task card shows
 the held source, actual dated stock groups for the requested SKU and other SKU

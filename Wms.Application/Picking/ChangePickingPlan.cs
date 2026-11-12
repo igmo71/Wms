@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
+using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Domain;
 
@@ -15,8 +16,8 @@ public sealed record ChangePickingPlanRequest(Guid RequestId, Guid PickingAssemb
     string ReviewedSourceJson, string Reason, string UserId);
 
 public sealed class ChangePickingPlan(CommandExecutor executor,
-    IPickingAssemblyStore assemblies, WarehousePermission permission,
-    TimeProvider clock)
+    IPickingAssemblyStore assemblies, IReplenishmentStore replenishments,
+    WarehousePermission permission, TimeProvider clock)
 {
     private const string CommandType = "picking.plan.change";
 
@@ -44,8 +45,9 @@ public sealed class ChangePickingPlan(CommandExecutor executor,
             {
                 var access = await permission.RequireManagerAsync(request.UserId, token);
                 if (!access.IsSuccess) return access.Error!;
-                var assembly = await assemblies.LoadAssemblyAsync(session,
-                    request.PickingAssemblyId, token);
+                var work = await assemblies.LoadWorkAsync(session,
+                    request.PickingAssemblyId, null, token);
+                var assembly = work.Assembly;
                 if (assembly is null)
                     return OperationError.NotFound("Сборка WMS не найдена.");
                 if (!assembly.ActiveSources.Any(x => x.ShippingOrderId == request.ShippingOrderId))
@@ -66,6 +68,11 @@ public sealed class ChangePickingPlan(CommandExecutor executor,
                     request.PlanBySku, request.ExpectedRevision);
                 if (!changed.IsSuccess) return changed.Error!;
                 var now = clock.GetUtcNow();
+                var cancelled = await CancelUnneededReplenishments.ExecuteAsync(
+                    replenishments, session, assembly, work.Entries,
+                    before.Keys.Union(request.PlanBySku.Keys).ToArray(),
+                    request.UserId, now, CommandType, request.RequestId, token);
+                if (!cancelled.IsSuccess) return cancelled.Error!;
                 var reviewedHash = Convert.ToHexString(SHA256.HashData(
                     Encoding.UTF8.GetBytes(request.ReviewedSourceJson)));
                 var audits = new List<WarehouseAuditEvent>();
@@ -98,6 +105,7 @@ public sealed class ChangePickingPlan(CommandExecutor executor,
                     if (!lineAudit.IsSuccess) return lineAudit.Error!;
                     audits.Add(lineAudit.Value!);
                 }
+                audits.AddRange(cancelled.Value!);
                 return new CommandExecutionResult(assembly.Id, audits);
             }, ct);
     }

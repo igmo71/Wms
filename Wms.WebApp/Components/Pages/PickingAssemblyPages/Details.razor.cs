@@ -387,6 +387,7 @@ public partial class Details
         "picking.shortage.reported" => "Сообщено о недостаче",
         "inventory.shortage.resolved" => "Недостача разобрана",
         "replenishment.transfer.corrected" => "Подпитка скорректирована",
+        "replenishment.cancelled.unneeded" => "Невостребованная Подпитка отменена",
         "picking.assembly.cancellation-requested" => "Запрошена отмена сборки",
         _ => eventType
     };

@@ -108,6 +108,54 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
             x.OwnerId == startedFirst.TaskId));
     }
 
+    [Fact]
+    public async Task Pick_that_closes_demand_cancels_only_an_unstarted_replenishment()
+    {
+        var executor = new CommandExecutor(new CommandExecutionStore(database));
+        var assemblies = new PickingAssemblyStore(database);
+        var replenishments = new ReplenishmentStore(database);
+        var stock = new StockAvailabilityStore(database);
+        var pick = new ConfirmPick(executor, assemblies, stock, stock,
+            replenishments, Permission(), TimeProvider.System);
+        var start = Commands().Start;
+
+        var cancelledFirst = await SeedOrderedWithPickingStockAsync();
+        var request = new ConfirmPickRequest(Guid.NewGuid(),
+            cancelledFirst.AssemblyId, cancelledFirst.AssemblyRevision,
+            cancelledFirst.DestinationCode, cancelledFirst.SkuId,
+            cancelledFirst.ExpirationDate, 4, Worker);
+        Value(await pick.ExecuteAsync(request));
+        Value(await pick.ExecuteAsync(request));
+        Error(await start.ExecuteAsync(new(Guid.NewGuid(), cancelledFirst.TaskId,
+            cancelledFirst.FirstCode, Worker)), OperationErrorType.Conflict);
+
+        var startedFirst = await SeedOrderedWithPickingStockAsync();
+        Value(await start.ExecuteAsync(new(Guid.NewGuid(), startedFirst.TaskId,
+            startedFirst.FirstCode, Worker)));
+        Value(await pick.ExecuteAsync(new(Guid.NewGuid(), startedFirst.AssemblyId,
+            startedFirst.AssemblyRevision, startedFirst.DestinationCode,
+            startedFirst.SkuId, startedFirst.ExpirationDate, 4, Worker)));
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(ReplenishmentTaskStatus.Cancelled,
+            (await verify.ReplenishmentTasks.SingleAsync(x =>
+                x.Id == cancelledFirst.TaskId)).Status);
+        Assert.Equal(ReplenishmentTaskStatus.InProgress,
+            (await verify.ReplenishmentTasks.SingleAsync(x =>
+                x.Id == startedFirst.TaskId)).Status);
+        Assert.False(await verify.StorageLocationLocks.AnyAsync(x =>
+            x.OwnerId == cancelledFirst.TaskId));
+        Assert.True(await verify.StorageLocationLocks.AnyAsync(x =>
+            x.OwnerId == startedFirst.TaskId));
+        Assert.Equal(1, await verify.PickingEntries.CountAsync(x =>
+            x.PickingAssemblyId == cancelledFirst.AssemblyId));
+        Assert.Empty(await verify.InventoryMovements.Where(x =>
+            x.RecorderId == cancelledFirst.AssemblyId).ToArrayAsync());
+        Assert.Equal(1, await verify.WarehouseAuditEvents.CountAsync(x =>
+            x.PickingAssemblyId == cancelledFirst.AssemblyId
+            && x.EventType == "replenishment.cancelled.unneeded"));
+    }
+
     private (StartReplenishmentSource Start,
         ConfirmReplenishmentTransfer Transfer,
         ReportReplenishmentShortage Shortage,
@@ -157,6 +205,17 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
         return new Seed(warehouse.Id, assembly.Id, assembly.OperationalRevision,
             task.Id, sku.Id, first.Id, first.Code, second.Code,
             destination.Id, destination.Code, date);
+    }
+
+    private async Task<Seed> SeedOrderedWithPickingStockAsync()
+    {
+        var seed = await SeedOrderedAsync(4, 0, 4);
+        await using var db = database.CreateDbContext();
+        db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), seed.WarehouseId,
+            seed.DestinationId, seed.SkuId, 4, DateTimeOffset.UtcNow,
+            seed.ExpirationDate)));
+        await db.SaveChangesAsync();
+        return seed;
     }
 
     private sealed record Seed(Guid WarehouseId, Guid AssemblyId,

@@ -3,6 +3,7 @@ using System.Globalization;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -16,7 +17,8 @@ public sealed record ConfirmPickRequest(Guid RequestId, Guid PickingAssemblyId,
 
 public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore assemblies,
     IStockAvailabilityStore stock, IStockReservationStore reservations,
-    WarehousePermission permission, TimeProvider clock)
+    IReplenishmentStore replenishments, WarehousePermission permission,
+    TimeProvider clock)
 {
     private const string CommandType = "picking.pick.confirm";
 
@@ -83,6 +85,12 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                     reservation.Value!, token);
                 if (!reserved.IsSuccess) return reserved.Error!;
                 session.Stage(entry.Value!);
+                var cancelled = await CancelUnneededReplenishments.ExecuteAsync(
+                    replenishments, session, assembly,
+                    state.Entries.Append(entry.Value!).ToArray(),
+                    [request.StockKeepingUnitId], request.UserId, now,
+                    CommandType, request.RequestId, token);
+                if (!cancelled.IsSuccess) return cancelled.Error!;
                 var audit = WarehouseAuditEvent.Create("picking.pick.confirmed",
                     now, request.UserId, null, null, null,
                     request.StockKeepingUnitId, null, null,
@@ -91,7 +99,8 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                     commandUserId: request.UserId, commandType: CommandType,
                     requestId: request.RequestId, pickingAssemblyId: assembly.Id);
                 if (!audit.IsSuccess) return audit.Error!;
-                return new CommandExecutionResult(entry.Value!.Id, [audit.Value!]);
+                return new CommandExecutionResult(entry.Value!.Id,
+                    [audit.Value!, .. cancelled.Value!]);
             }, ct);
     }
 }

@@ -109,6 +109,13 @@ The command rechecks the route, stock, source, destination and existing tasks
 in one transaction, then saves the task, assembly revision, audit and command
 receipt together. Repeating its request ID returns the same task. No stock
 movement or physical source hold occurs when the task is ordered.
+
+When a confirmed pick or Manager plan change reduces an assembly's remaining
+demand for a SKU to zero, the same command cancels its ordered replenishment
+tasks for that SKU. A task whose source has already been scanned continues at
+its original ordered quantity. Cancelled tasks remain in the assembly's history;
+if demand later rises, a new task must be ordered explicitly.
+
 The replenisher's active-task query lists ordered and in-progress tasks for
 one warehouse. It reads the current queue of every linked 1C document on each
 request and uses the highest priority in a multi-document assembly: live queue,

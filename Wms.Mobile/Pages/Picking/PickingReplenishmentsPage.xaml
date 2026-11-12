@@ -38,7 +38,8 @@
                                     <VerticalStackLayout Spacing="3">
                                         <Label Text="{Binding SkuName}" FontAttributes="Bold" />
                                         <Label Text="{Binding ProgressText}" FontSize="13" />
-                                        <Label Text="{Binding AddressText}" FontSize="12" />
+                                        <Label Text="{Binding AddressText}" FontSize="12"
+                                               IsVisible="{Binding HasAddress}" />
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>

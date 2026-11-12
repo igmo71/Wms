@@ -56,6 +56,7 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
         var assemblyStore = new PickingAssemblyStore(database);
         var stock = new StockAvailabilityStore(database);
         var pick = new ConfirmPick(executor, assemblyStore, stock, stock,
+            new ReplenishmentStore(database),
             permission, TimeProvider.System);
         var report = new ReportPickingShortage(executor, assemblyStore, stock,
             stock, stock, permission, TimeProvider.System);

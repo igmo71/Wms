@@ -65,9 +65,7 @@ public partial class PickingReplenishmentsPage : ContentPage
                     $"{(group.ExpirationDate is DateOnly date ? date.ToString("dd.MM.yyyy") : "без срока")}: "
                     + group.Quantity.ToString("0.###", CultureInfo.CurrentCulture)))))
                 .ToArray();
-            TaskRows = list.Tasks.Where(x =>
-                    x.Status != MobileReplenishmentTaskStatus.Cancelled)
-                .Select(x => new PickingReplenishmentTaskRow(
+            TaskRows = list.Tasks.Select(x => new PickingReplenishmentTaskRow(
                     names.GetValueOrDefault(x.SkuId) ?? x.SkuId.ToString(),
                     x.OrderedQuantity, x.TransferredQuantity, x.Status,
                     x.RecommendedSourceCode, x.RecommendedDestinationCode))
@@ -81,8 +79,10 @@ public partial class PickingReplenishmentsPage : ContentPage
                     list.Deficits.Select(x =>
                         $"{names.GetValueOrDefault(x.SkuId) ?? x.SkuId.ToString()} — "
                         + x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)));
-            ReadyLabel.Text = TaskRows.Count > 0
-                && TaskRows.All(x => x.IsTransferred)
+            var activeTasks = TaskRows.Where(x =>
+                x.Status != MobileReplenishmentTaskStatus.Cancelled).ToArray();
+            ReadyLabel.Text = activeTasks.Length > 0
+                && activeTasks.All(x => x.IsTransferred)
                 && ProposalRows.Count == 0 && list.Deficits.Count == 0
                     ? "Все заказанные Подпитки проведены ✓"
                     : "Предложения и заказы обновляются при открытии и потягивании вниз.";
@@ -164,10 +164,14 @@ public sealed record PickingReplenishmentTaskRow(
     string? RecommendedSourceCode, string? RecommendedDestinationCode)
 {
     public bool IsTransferred => TransferredQuantity == OrderedQuantity;
-    public Color BackgroundColor => IsTransferred ? Color.FromArgb("#DDF2DD")
+    public bool HasAddress => Status != MobileReplenishmentTaskStatus.Cancelled;
+    public Color BackgroundColor => Status == MobileReplenishmentTaskStatus.Cancelled
+        ? Color.FromArgb("#F0F0F0") : IsTransferred ? Color.FromArgb("#DDF2DD")
         : Status == MobileReplenishmentTaskStatus.InProgress
             ? Color.FromArgb("#FFF1C2") : Colors.White;
-    public string ProgressText => $"{TransferredQuantity.ToString("0.###", CultureInfo.CurrentCulture)}"
+    public string ProgressText => Status == MobileReplenishmentTaskStatus.Cancelled
+        ? $"Заказ {OrderedQuantity.ToString("0.###", CultureInfo.CurrentCulture)} отменён: потребность по SKU закрыта."
+        : $"{TransferredQuantity.ToString("0.###", CultureInfo.CurrentCulture)}"
         + $" из {OrderedQuantity.ToString("0.###", CultureInfo.CurrentCulture)}"
         + (IsTransferred ? " · проведено" : Status == MobileReplenishmentTaskStatus.InProgress
             ? " · выполняется" : " · заказано");
