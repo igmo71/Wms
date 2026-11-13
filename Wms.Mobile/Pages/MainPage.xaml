@@ -64,7 +64,7 @@
                 Clicked="OnPickingClicked"
                 FontSize="16"
                 HeightRequest="52"
-                Text="Отбор" />
+                Text="Отбор и Отгрузка" />
 
             <Button
                 Clicked="OnReplenishmentsClicked"

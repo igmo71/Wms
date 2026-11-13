@@ -79,14 +79,19 @@
                     IsVisible="False" Clicked="OnTakeOverClicked" />
             <Button x:Name="StartButton" Text="Начать Отбор"
                     IsVisible="False" Clicked="OnStartClicked" />
-            <Button x:Name="SourcesButton" Text="Документы 1С"
-                    Clicked="OnSourcesClicked" />
-            <Button x:Name="RouteButton" Text="Маршрут" Clicked="OnRouteClicked"
-                    IsVisible="False" />
-            <Button x:Name="ReplenishmentsButton" Text="Подпитки"
-                    Clicked="OnReplenishmentsClicked" IsVisible="False" />
             <Button x:Name="CloseButton" Text="Закрыть и отгрузить"
                     Clicked="OnCloseClicked" IsVisible="False" />
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+                <Button Text="SKU" FontSize="12" Padding="2,8" IsEnabled="False"
+                        FontAttributes="Bold" SemanticProperties.Description="Текущий раздел: SKU" />
+                <Button x:Name="RouteButton" Grid.Column="1" Text="Маршрут"
+                        FontSize="12" Padding="2,8" Clicked="OnRouteClicked" />
+                <Button x:Name="ReplenishmentsButton" Grid.Column="2" Text="Подпитки"
+                        FontSize="12" Padding="2,8" Clicked="OnReplenishmentsClicked" />
+                <Button x:Name="SourcesButton" Grid.Column="3" Text="📄 1С"
+                        FontSize="12" Padding="2,8" Clicked="OnSourcesClicked"
+                        SemanticProperties.Description="Документы 1С" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

@@ -161,9 +161,10 @@ public sealed class PickingAssemblyQueryStore(
         var skus = skuIds.Select(skuId =>
             {
                 knownSkus.TryGetValue(skuId, out var sku);
+                var unit = sku?.BaseUnitOfMeasure;
                 return new PickingWorkSkuView(skuId, sku?.Code, sku?.Name,
-                    sku?.BaseUnitOfMeasure?.Abbreviation
-                        ?? sku?.BaseUnitOfMeasure?.Name,
+                    string.IsNullOrWhiteSpace(unit?.Description)
+                        ? unit?.Name : unit?.Description,
                     sku?.TracksExpirationDate ?? false,
                     planned.GetValueOrDefault(skuId), picked.GetValueOrDefault(skuId));
             }).OrderBy(x => x.Name).ThenBy(x => x.Code).ThenBy(x => x.SkuId)

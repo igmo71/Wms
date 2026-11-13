@@ -106,7 +106,7 @@ public partial class PickingSkuPage : ContentPage
                 : "Складской факт проведён · обмен с 1С ожидается",
             _ => "Сборка отменяется или отменена"
         };
-        OwnerLabel.Text = $"Ответственный: {assembly.ResponsibleDisplayName}";
+        OwnerLabel.Text = assembly.ResponsibleDisplayName;
         SkuRows = _work?.Skus.Select(x => new PickingSkuPlanRow(
             x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
             x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)).ToArray()
@@ -166,18 +166,14 @@ public partial class PickingSkuPage : ContentPage
     {
         if (_busy || _process.HasPendingCommand || _assembly is null
             || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
-        var page = _services.GetRequiredService<PickingRoutePage>();
-        page.Show(_assembly, _process);
-        await Navigation.PushAsync(page);
+        await SwitchSectionAsync(PickingSection.Route);
     }
 
     private async void OnReplenishmentsClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null
             || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
-        var page = _services.GetRequiredService<PickingReplenishmentsPage>();
-        page.Show(_assembly, _process);
-        await Navigation.PushAsync(page);
+        await SwitchSectionAsync(PickingSection.Replenishments);
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
@@ -222,10 +218,19 @@ public partial class PickingSkuPage : ContentPage
     private async void OnSourcesClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null) return;
-        var page = _services.GetRequiredService<PickingSourcesPage>();
-        page.Show(_assembly, _process);
-        await Navigation.PushAsync(page);
-        Navigation.RemovePage(this);
+        await SwitchSectionAsync(PickingSection.Sources);
+    }
+
+    private async Task SwitchSectionAsync(PickingSection section)
+    {
+        if (_assembly is null) return;
+        SetBusy(true);
+        try
+        {
+            await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                _process, section);
+        }
+        finally { SetBusy(false); }
     }
 
     private async void OnStartClicked(object? sender, EventArgs e)
@@ -295,13 +300,12 @@ public partial class PickingSkuPage : ContentPage
             or MobilePickingAssemblyStatus.InProgress } && !IsOwner;
         TakeOverButton.IsEnabled = !_busy && !pending;
         SourcesButton.IsEnabled = !_busy && !pending;
-        RouteButton.IsVisible = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
+        var canWork = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
             && IsOwner;
-        RouteButton.IsEnabled = !_busy && !pending;
-        ReplenishmentsButton.IsVisible = RouteButton.IsVisible;
-        ReplenishmentsButton.IsEnabled = !_busy && !pending;
+        RouteButton.IsEnabled = !_busy && !pending && canWork;
+        ReplenishmentsButton.IsEnabled = !_busy && !pending && canWork;
         ReplenishmentsButton.Text = _replenishmentsReady ? "Подпитки ✓" : "Подпитки";
-        CloseButton.IsVisible = RouteButton.IsVisible
+        CloseButton.IsVisible = canWork
             || _assembly is { Status: MobilePickingAssemblyStatus.Closed }
                 && _assembly.Sources.Any(x =>
                     x.ExchangeStage != MobileShippingExchangeStage.PostConfirmed);

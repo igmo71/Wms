@@ -8,16 +8,21 @@ public partial class PickingReplenishmentsPage : ContentPage
 {
     private readonly MobilePickingClient _picking;
     private readonly MobileReplenishmentClient _replenishments;
+    private readonly MobileWarehouseSelection _selection;
+    private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
     private bool _busy;
 
     public PickingReplenishmentsPage(MobilePickingClient picking,
-        MobileReplenishmentClient replenishments, PickingAssemblyProcess process)
+        MobileReplenishmentClient replenishments, MobileWarehouseSelection selection,
+        PickingAssemblyProcess process, IServiceProvider services)
     {
         InitializeComponent();
         _picking = picking;
         _replenishments = replenishments;
+        _selection = selection;
+        _services = services;
         _process = process;
         BindingContext = this;
     }
@@ -110,6 +115,30 @@ public partial class PickingReplenishmentsPage : ContentPage
         await RunOrderAsync(_process.RetryAsync, retry: true);
     }
 
+    private async void OnSkuClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Sku);
+
+    private async void OnRouteClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Route);
+
+    private async void OnSourcesClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Sources);
+
+    private async Task SwitchSectionAsync(PickingSection section)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null) return;
+        if (section == PickingSection.Route
+            && (_assembly.Status != MobilePickingAssemblyStatus.InProgress
+                || _assembly.ResponsibleUserId != _selection.CurrentUserId)) return;
+        SetBusy(true);
+        try
+        {
+            await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                _process, section);
+        }
+        finally { SetBusy(false); }
+    }
+
     private async Task RunOrderAsync(
         Func<Task<MobilePickingAssemblyResponse>> action, bool retry = false)
     {
@@ -138,6 +167,12 @@ public partial class PickingReplenishmentsPage : ContentPage
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
         if (RetryButton.IsVisible)
             RetryButton.Text = $"Повторить: {_process.PendingLabel}";
+        var canNavigate = !busy && !_process.HasPendingCommand && _assembly is not null;
+        SkuButton.IsEnabled = canNavigate;
+        SourcesButton.IsEnabled = canNavigate;
+        RouteButton.IsEnabled = canNavigate
+            && _assembly?.Status == MobilePickingAssemblyStatus.InProgress
+            && _assembly.ResponsibleUserId == _selection.CurrentUserId;
         NavigationPage.SetHasBackButton(this, !busy && !_process.HasPendingCommand);
     }
 

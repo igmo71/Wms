@@ -130,7 +130,7 @@ internal static class MobilePickingEndpoints
                 OperationError.Conflict("Нужен проведённый РО 1С в статусе Подготовлен."));
         return TypedResults.Ok(new MobilePickingSourceResolutionResponse(
             null, new MobilePickingFreeSourceResponse(
-                source.RefKey, source.Number, warehouseId, source.Status.ToString())));
+                source.RefKey, source.Number, warehouseId, source.Status.GetDisplayName())));
     }
 
     private static async Task<IResult> CreateAsync(
@@ -513,7 +513,7 @@ internal static class MobilePickingEndpoints
         view.CreatedAtUtc, view.FirstStartAttemptAtUtc, view.StartedAtUtc,
         view.ClosedAtUtc,
         view.Sources.Select(x => new MobilePickingSourceResponse(
-            x.SourceRefKey, x.Number, x.Status.ToString(),
+            x.SourceRefKey, x.Number, x.Status.GetDisplayName(),
             x.Posted, x.DeletionMark, x.LastCheckedAtUtc, x.LastCheckError,
             x.StartConfirmedAtUtc, x.LastStartAttemptAtUtc, x.LastStartError,
             x.PlanSourceSnapshotJson, x.CurrentSourceJson)

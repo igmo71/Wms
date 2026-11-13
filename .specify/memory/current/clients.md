@@ -114,8 +114,9 @@ started replenishment and 1C status restoration.
 
 ## Mobile picking API
 
-The Mobile home «Отбор» button opens the replacement assembly queue. The Web
-navigation links to the replacement «Отбор» list for Operator and Manager.
+The Mobile home «Отбор и Отгрузка» button opens the replacement assembly queue.
+The Web «Отгрузка» navigation opens its source documents and WMS orders for
+Operator and Manager.
 
 The replacement Mobile V1 picking API exposes the assembly work list with
 per-SKU plan and confirmed fact, original-cell fact entries, a recalculated
@@ -129,7 +130,15 @@ The response and refreshed card show the result for each document. Closed
 assemblies awaiting exchange remain in every Operator's work list for their
 selected warehouse until all documents are confirmed. The replacement TSD screens
 show plan and confirmed fact per SKU with white, yellow and green progress,
-and preserve the unit next to the plan quantity. The route is a recommendation;
+and preserve the unit next to the plan quantity. Picking uses the SKU base unit
+`Description`, falling back to `Name`; the Mobile API exposes Russian display
+names for 1C shipping document statuses. Its SKU, route, replenishment and 1C
+document sections share a compact bottom navigation row. Section changes replace
+the current section in the stack, while pending commands block navigation;
+unavailable work sections remain disabled. The first route card has a stronger
+border and gray background. Unavailable demand refers to replenishment or a
+Manager decision, and a wrong-cell message identifies stocked SKU by name rather
+than a GUID. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm
 the offered quantity explicitly. The fact card refreshes the next route step
 in place. A shortage is reported separately, with the found quantity retained.

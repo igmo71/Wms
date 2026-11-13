@@ -174,6 +174,7 @@ public sealed class PickingAssemblyStore(IDbContextFactory<ApplicationDbContext>
         bool forCommand, CancellationToken ct)
     {
         var assemblies = db.PickingAssemblies.Include(x => x.PlanLines)
+            .ThenInclude(x => x.StockKeepingUnit)
             .Include(x => x.SourceLinks);
         var assembly = forCommand
             ? await assemblies.SingleOrDefaultAsync(x => x.Id == assemblyId, ct)

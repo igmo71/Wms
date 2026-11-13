@@ -60,11 +60,14 @@ internal static class PickingSourceRules
             return OperationError.Conflict($"Ячейка {scannedCode} не подходит для Отбора.");
         if (!state.CellSkus.Any(x => x.Id == skuId))
         {
+            var selected = assembly.PlanLines.FirstOrDefault(x =>
+                x.StockKeepingUnitId == skuId)?.StockKeepingUnit;
+            var selectedName = selected?.Name ?? selected?.Code ?? "выбранный SKU";
             var actual = state.CellSkus.Count == 0 ? "ячейка пуста"
                 : string.Join(", ", state.CellSkus.Select(x =>
-                    $"{x.Code ?? x.Id.ToString()} {x.Name}"));
+                    x.Name ?? x.Code ?? "SKU без наименования"));
             return OperationError.Conflict(
-                $"В ячейке {scannedCode} нет выбранного SKU {skuId}; числится: {actual}.");
+                $"В ячейке {scannedCode} нет SKU «{selectedName}»; числится: {actual}.");
         }
         var planned = assembly.PlanLines.Where(x => x.StockKeepingUnitId == skuId)
             .Sum(x => x.Quantity);

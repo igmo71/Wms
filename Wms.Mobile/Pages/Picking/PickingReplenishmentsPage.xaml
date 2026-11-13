@@ -55,6 +55,18 @@
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить заказ"
                     IsVisible="False" Clicked="OnRetryClicked" />
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+                <Button x:Name="SkuButton" Text="SKU" FontSize="12"
+                        Padding="2,8" Clicked="OnSkuClicked" />
+                <Button x:Name="RouteButton" Grid.Column="1" Text="Маршрут"
+                        FontSize="12" Padding="2,8" Clicked="OnRouteClicked" />
+                <Button Grid.Column="2" Text="Подпитки" FontSize="12" Padding="2,8"
+                        IsEnabled="False" FontAttributes="Bold"
+                        SemanticProperties.Description="Текущий раздел: Подпитки" />
+                <Button x:Name="SourcesButton" Grid.Column="3" Text="📄 1С"
+                        FontSize="12" Padding="2,8" Clicked="OnSourcesClicked"
+                        SemanticProperties.Description="Документы 1С" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

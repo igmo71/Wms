@@ -17,7 +17,14 @@
                                          Spacing="5">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:PickingRouteRow">
-                                <Border Padding="10" Stroke="#D4D4D4">
+                                <Border Padding="10" Stroke="{AppThemeBinding Light=#D4D4D4, Dark=#5B5B5B}">
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
+                                            <Setter Property="StrokeThickness" Value="3" />
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F0F0F0, Dark=#353535}" />
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light=#707070, Dark=#A0A0A0}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer Tapped="OnStepTapped"
                                                               CommandParameter="{Binding .}" />
@@ -52,6 +59,18 @@
                     Clicked="OnRetryClicked" IsVisible="False" />
             <Button x:Name="CloseButton" Text="Закрыть и отгрузить"
                     Clicked="OnCloseClicked" />
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+                <Button x:Name="SkuButton" Text="SKU" FontSize="12"
+                        Padding="2,8" Clicked="OnSkuClicked" />
+                <Button Grid.Column="1" Text="Маршрут" FontSize="12" Padding="2,8"
+                        IsEnabled="False" FontAttributes="Bold"
+                        SemanticProperties.Description="Текущий раздел: Маршрут" />
+                <Button x:Name="ReplenishmentsButton" Grid.Column="2" Text="Подпитки"
+                        FontSize="12" Padding="2,8" Clicked="OnReplenishmentsClicked" />
+                <Button x:Name="SourcesButton" Grid.Column="3" Text="📄 1С"
+                        FontSize="12" Padding="2,8" Clicked="OnSourcesClicked"
+                        SemanticProperties.Description="Документы 1С" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

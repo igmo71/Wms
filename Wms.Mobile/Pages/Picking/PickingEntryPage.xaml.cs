@@ -378,7 +378,7 @@ public partial class PickingEntryPage : ContentPage
                     _skuId = gap.SkuId;
                     _sku = await _client.SkuAsync(_assembly.Id,
                         _assembly.WarehouseId, _skuId);
-                    ErrorLabel.Text = "Оставшийся товар недоступен. Нужна Подпитка или разбор.";
+                    ErrorLabel.Text = "Оставшийся товар недоступен. Ожидается Подпитка или решение руководителя.";
                 }
                 else
                     ErrorLabel.Text = "Доступные шаги закончились. Проверьте закрытие сборки.";

@@ -93,7 +93,7 @@ public partial class PickingAssemblyPage : ContentPage
             var items = await _client.ListAsync(warehouse.Id);
             AssemblyRows = items.Select(x => new PickingAssemblyQueueRow(
                 x.Id, x.Number,
-                $"{StatusText(x.Status)} · РО 1С: {x.Sources.Count} · Ответственный: {x.ResponsibleDisplayName}",
+                $"{StatusText(x.Status)} · РО 1С: {x.Sources.Count} · {x.ResponsibleDisplayName}",
                 x.HasWarning ? "Требуется внимание к документам 1С" : null)).ToArray();
             OnPropertyChanged(nameof(AssemblyRows));
             ErrorLabel.Text = string.Empty;

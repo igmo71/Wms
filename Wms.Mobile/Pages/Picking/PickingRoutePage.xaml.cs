@@ -8,16 +8,19 @@ namespace Wms.Mobile;
 public partial class PickingRoutePage : ContentPage
 {
     private readonly MobilePickingClient _client;
+    private readonly MobileWarehouseSelection _selection;
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
     private bool _busy;
 
     public PickingRoutePage(MobilePickingClient client,
-        PickingAssemblyProcess process, IServiceProvider services)
+        MobileWarehouseSelection selection, PickingAssemblyProcess process,
+        IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
+        _selection = selection;
         _process = process;
         _services = services;
         BindingContext = this;
@@ -61,7 +64,7 @@ public partial class PickingRoutePage : ContentPage
             {
                 var (name, unit) = names.GetValueOrDefault(x.SkuId);
                 return new PickingRouteRow(x.SkuId, x.LocationCode,
-                    x.DirectPalletPick,
+                    x.DirectPalletPick, index == 0,
                     $"{index + 1}. {x.LocationCode} · {name ?? x.SkuId.ToString()}",
                     $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} {unit ?? "—"}"
                     + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : "")
@@ -69,7 +72,7 @@ public partial class PickingRoutePage : ContentPage
             }).ToArray();
             Gaps = route.Gaps.Select(x => new PickingRouteGapRow(
                 $"{names.GetValueOrDefault(x.SkuId).Item1 ?? x.SkuId.ToString()}: "
-                + $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} — нужна Подпитка или разбор"
+                + $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} — ожидается Подпитка или решение руководителя"
             )).ToArray();
             OnPropertyChanged(nameof(Steps));
             OnPropertyChanged(nameof(Gaps));
@@ -89,6 +92,30 @@ public partial class PickingRoutePage : ContentPage
         page.ShowPick(_assembly, _process, row.SkuId,
             row.LocationCode, row.DirectPalletPick);
         await Navigation.PushAsync(page);
+    }
+
+    private async void OnSkuClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Sku);
+
+    private async void OnReplenishmentsClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Replenishments);
+
+    private async void OnSourcesClicked(object? sender, EventArgs e) =>
+        await SwitchSectionAsync(PickingSection.Sources);
+
+    private async Task SwitchSectionAsync(PickingSection section)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null) return;
+        if (section == PickingSection.Replenishments
+            && (_assembly.Status != MobilePickingAssemblyStatus.InProgress
+                || _assembly.ResponsibleUserId != _selection.CurrentUserId)) return;
+        SetBusy(true);
+        try
+        {
+            await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                _process, section);
+        }
+        finally { SetBusy(false); }
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
@@ -128,7 +155,8 @@ public partial class PickingRoutePage : ContentPage
         try
         {
             _assembly = await execute();
-            await Navigation.PopAsync();
+            await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                _process, PickingSection.Sku);
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException)
@@ -145,7 +173,13 @@ public partial class PickingRoutePage : ContentPage
         _busy = busy;
         ProgressIndicator.IsVisible = busy;
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
-        CloseButton.IsEnabled = !busy && !_process.HasPendingCommand;
+        var canNavigate = !busy && !_process.HasPendingCommand && _assembly is not null;
+        SkuButton.IsEnabled = canNavigate;
+        SourcesButton.IsEnabled = canNavigate;
+        ReplenishmentsButton.IsEnabled = canNavigate
+            && _assembly?.Status == MobilePickingAssemblyStatus.InProgress
+            && _assembly.ResponsibleUserId == _selection.CurrentUserId;
+        CloseButton.IsEnabled = canNavigate;
         NavigationPage.SetHasBackButton(this, !busy && !_process.HasPendingCommand);
     }
 
@@ -158,6 +192,6 @@ public partial class PickingRoutePage : ContentPage
 }
 
 public sealed record PickingRouteRow(Guid SkuId, string LocationCode,
-    bool DirectPalletPick, string Heading, string Detail);
+    bool DirectPalletPick, bool IsCurrent, string Heading, string Detail);
 
 public sealed record PickingRouteGapRow(string Text);
