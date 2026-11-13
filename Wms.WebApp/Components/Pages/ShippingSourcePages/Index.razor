@@ -1,0 +1,126 @@
+@page "/shipping-sources"
+@attribute [Authorize(Roles = "Operator,Manager")]
+@using Wms.Application.Picking
+@using Wms.Common
+
+<PageTitle>Документы 1С для отгрузки</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Документы 1С для отгрузки</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
+    </MudStack>
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+    <MudGrid>
+        <MudItem xs="12" lg="7">
+            <MudPaper Class="pa-4">
+                <MudTextField T="string" @bind-Value="_filter" Immediate="true"
+                              Label="Поиск по номеру документа 1С" Class="mb-3" />
+                @if (_busy)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else
+                {
+                    <MudTable T="ShippingSourceListItem" Items="Filtered" Dense="true" Hover="true"
+                              Elevation="0" RowsPerPage="15" OnRowClick="OnSourceRowClick"
+                              RowClass="cursor-pointer" RowStyleFunc="SourceRowStyle">
+                        <HeaderContent>
+                            <MudTh>Документ 1С</MudTh><MudTh>Получатель / склад</MudTh>
+                            <MudTh>Состояние</MudTh><MudTh>Сверка</MudTh><MudTh>Ордер WMS</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Документ 1С">
+                                <MudText>@(context.Number ?? context.Id.ToString())</MudText>
+                                <MudText Typo="Typo.caption">@context.Date.ToString("dd.MM.yyyy")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Получатель / склад">
+                                <MudText>@(context.ReceiverName ?? "—")</MudText>
+                                <MudText Typo="Typo.caption">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Состояние">
+                                <MudText>@context.Status.GetDisplayName()</MudText>
+                                @if (!context.Posted || context.DeletionMark)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Warning">@(context.DeletionMark ? "Помечен удалённым" : "Не проведён")</MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Сверка">
+                                @if (context.LastCheckError is not null)
+                                {
+                                    <MudText Color="Color.Error">Ошибка</MudText>
+                                }
+                                else
+                                {
+                                    <MudText>@(context.LastCheckedAtUtc is null ? "Не сверялся" : "Успешно")</MudText>
+                                }
+                                <MudText Typo="Typo.caption">@(context.LastCheckedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Ордер WMS">
+                                @if (context.AssemblyId is Guid assemblyId
+                                    && _accessibleAssemblyIds.Contains(assemblyId))
+                                {
+                                    <span @onclick:stopPropagation="true">
+                                        <MudLink Href="@($"picking-assemblies/{assemblyId}")">@(context.AssemblyNumber ?? "Открыть ордер")</MudLink>
+                                    </span>
+                                }
+                                else if (context.AssemblyId is not null)
+                                {
+                                    <MudText>@(context.AssemblyNumber ?? "Связан")</MudText>
+                                }
+                                else
+                                {
+                                    <MudText>Свободен</MudText>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>Документы не найдены.</NoRecordsContent>
+                        <PagerContent><MudTablePager /></PagerContent>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" lg="5">
+            <MudPaper Class="pa-4">
+                @if (ActiveSource is { } source)
+                {
+                    <MudText Typo="Typo.h6">РО 1С @(source.Number ?? source.Id.ToString())</MudText>
+                    <MudText Typo="Typo.caption">Состав по последней сохранённой синхронизации.</MudText>
+                    @if (source.LastCheckError is not null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mt-2">@source.LastCheckError</MudAlert>
+                    }
+                    @if (source.Lines.Count == 0)
+                    {
+                        <MudText Class="mt-3">Строк SKU нет.</MudText>
+                    }
+                    else
+                    {
+                        <MudTable T="ShippingSourceLineView" Items="source.Lines" Dense="true"
+                                  Elevation="0" RowsPerPage="15" Class="mt-3">
+                            <HeaderContent><MudTh>№</MudTh><MudTh>SKU</MudTh><MudTh>Количество 1С</MudTh></HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="№">@context.LineNumber</MudTd>
+                                <MudTd DataLabel="SKU">
+                                    @(context.SkuName ?? context.SkuCode ?? context.SkuId.ToString())
+                                    <SkuInfoButton WarehouseId="source.WarehouseId" SkuId="context.SkuId"
+                                                   SkuName="@(context.SkuName ?? context.SkuCode)" />
+                                </MudTd>
+                                <MudTd DataLabel="Количество 1С">@context.Quantity.ToString("0.###")</MudTd>
+                            </RowTemplate>
+                            <PagerContent><MudTablePager /></PagerContent>
+                        </MudTable>
+                    }
+                }
+                else
+                {
+                    <MudText>Выберите документ, чтобы увидеть его состав.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>

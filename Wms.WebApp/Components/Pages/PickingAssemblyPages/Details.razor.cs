@@ -413,7 +413,22 @@ public partial class Details
                 row?.Quantity ?? 0,
                 _assembly.Sources.First(x => x.SourceRefKey == sourceId).CurrentSourceJson is null
                     ? null : current.GetValueOrDefault(id),
-                allocated.TryGetValue(id, out var quantity) ? quantity : null))
+                allocated.TryGetValue(id, out var quantity) ? quantity
+                    : _assembly.Status == PickingAssemblyStatus.Closed ? 0 : null))
             .OrderBy(x => x.Name).ToArray();
     }
+
+    private string WorkRowStyle(PickingWorkSkuView row, int _) =>
+        _assembly?.Status is PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing
+            ? ""
+            : row.PlannedQuantity == row.ConfirmedQuantity
+                ? "background-color: var(--mud-palette-success-hover);"
+                : "background-color: var(--mud-palette-warning-hover);";
+
+    private string SourceComparisonStyle(SourceComparisonRow row, int _) =>
+        _assembly?.Status != PickingAssemblyStatus.Closed || row.Allocated is null
+            ? ""
+            : row.Plan == row.Allocated
+                ? "background-color: var(--mud-palette-success-hover);"
+                : "background-color: var(--mud-palette-warning-hover);";
 }

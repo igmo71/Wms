@@ -71,7 +71,19 @@ login, and destination cell address; filters can be combined.
 
 ## Web picking assemblies
 
-The Manager «Сборки WMS» page lists picking assemblies across warehouses;
+The Web «Отгрузка» group contains «Документы 1С» and «Ордера WMS» for Operator
+and Manager. The first page searches imported shipping orders by 1C number and
+shows their stored source lines, status, warehouse, receiver, latest check and
+active WMS assembly link when that assembly is accessible to the user. The
+assembly detail links back to each source document. The source page reads the
+last saved WMS projection, not live 1C;
+an unsuccessful check leaves the saved lines visible with its error. The second
+page is the existing picking assembly list and detail, without a Web creation
+action. Its aggregate SKU plan/fact rows are neutral before picking starts,
+green when equal after it starts, and yellow when different. A linked 1C
+document's plan versus allocated fact is colored only after assembly closure.
+
+The Manager «Ордера WMS» page lists picking assemblies across warehouses;
 Operator sees all closed assemblies awaiting 1C exchange and can retry that
 exchange regardless of who closed them. The detail page keeps the WMS plan per
 1C document, physical WMS fact by SKU and cell, current imported 1C lines,

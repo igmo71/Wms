@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
         services.AddScoped<SynchronizeReceivingSource>();
         services.AddScoped<IShippingSourceStore, ShippingSourceStore>();
+        services.AddScoped<IShippingSourceQueryStore, ShippingSourceQueryStore>();
         services.AddScoped<SynchronizeShippingSource>();
         services.AddScoped<IPickingAssemblyStore, PickingAssemblyStore>();
         services.AddScoped<IPickingAssemblyQueryStore, PickingAssemblyQueryStore>();

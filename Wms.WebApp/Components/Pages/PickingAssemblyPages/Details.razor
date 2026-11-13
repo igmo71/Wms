@@ -2,9 +2,10 @@
 @attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Application.Picking
 @using Wms.Application.Replenishment
+@using Wms.Common
 @using Wms.Domain.Enums
 
-<PageTitle>Сборка WMS @(_assembly?.Number)</PageTitle>
+<PageTitle>Ордер WMS @(_assembly?.Number)</PageTitle>
 
 @if (_busy && _assembly is null)
 {
@@ -22,7 +23,7 @@ else
 {
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-            <MudText Typo="Typo.h5">Сборка @_assembly.Number</MudText>
+            <MudText Typo="Typo.h5">Ордер WMS @_assembly.Number</MudText>
             <MudSpacer />
             <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
             @if (_pendingCloseRequest is not null)
@@ -60,7 +61,8 @@ else
 
         <MudPaper Class="pa-4">
             <MudText Typo="Typo.h6">План и факт WMS</MudText>
-            <MudTable T="PickingWorkSkuView" Items="_work?.Skus ?? []" Dense="true" Elevation="0">
+            <MudTable T="PickingWorkSkuView" Items="_work?.Skus ?? []" Dense="true"
+                      Elevation="0" RowStyleFunc="WorkRowStyle">
                 <HeaderContent><MudTh>SKU</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Ед.</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd>@(context.Name ?? context.Code ?? context.SkuId.ToString())</MudTd>
@@ -90,14 +92,14 @@ else
             var checkedSource = _check?.Sources.FirstOrDefault(x => x.ShippingOrderId == source.SourceRefKey);
             <MudPaper Class="pa-4">
                 <MudStack Row="true" AlignItems="AlignItems.Center">
-                    <MudText Typo="Typo.h6">РО 1С @(source.Number ?? source.SourceRefKey.ToString())</MudText>
+                    <MudText Typo="Typo.h6"><MudLink Href="@($"shipping-sources?document={source.SourceRefKey}")">РО 1С @(source.Number ?? source.SourceRefKey.ToString())</MudLink></MudText>
                     <MudSpacer />
                     @if (_isManager && _assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null && checkedSource?.CurrentSourceJson is not null)
                     {
                         <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="() => OpenPlanAsync(source.SourceRefKey)">Изменить план</MudButton>
                     }
                 </MudStack>
-                <MudText Typo="Typo.body2">Статус: @source.Status · Проведён: @(source.Posted ? "да" : "нет") · Удалён: @(source.DeletionMark ? "да" : "нет")</MudText>
+                <MudText Typo="Typo.body2">Статус: @source.Status.GetDisplayName() · Проведён: @(source.Posted ? "да" : "нет") · Удалён: @(source.DeletionMark ? "да" : "нет")</MudText>
                 <MudText Typo="Typo.body2">Склад: @(source.WarehouseName ?? source.WarehouseId?.ToString() ?? "—") · Получатель: @(source.ReceiverName ?? source.ReceiverId?.ToString() ?? "—") · Очередь: @source.Queue · Дата отгрузки: @(source.PlannedShippingDate?.ToString("dd.MM.yyyy") ?? "—")</MudText>
                 <MudText Typo="Typo.body2">Сверка: @(source.LastCheckedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "не выполнена")</MudText>
                 @if (_assembly.Status == PickingAssemblyStatus.Closed)
@@ -114,7 +116,7 @@ else
                         <MudButton Variant="Variant.Outlined" Disabled="@(_busy || _pendingExchangeApproval is not null)" OnClick="() => ReviewExchangeAsync(source.SourceRefKey)">Прочитать текущий РО 1С</MudButton>
                         @if (_reviewedExchangeSources.TryGetValue(source.SourceRefKey, out var reviewed))
                         {
-                            <MudText Typo="Typo.body2">Текущая 1С: @reviewed.Status · Проведён: @reviewed.Posted · Удалён: @reviewed.DeletionMark · Получатель: @reviewed.ReceiverId · Склад: @reviewed.WarehouseId</MudText>
+                            <MudText Typo="Typo.body2">Текущая 1С: @reviewed.Status.GetDisplayName() · Проведён: @reviewed.Posted · Удалён: @reviewed.DeletionMark · Получатель: @reviewed.ReceiverId · Склад: @reviewed.WarehouseId</MudText>
                             @foreach (var line in reviewed.Items)
                             {
                                 <MudText Typo="Typo.caption">Строка @line.LineNumber · SKU @line.StockKeepingUnitId · @line.RawQuantity · @line.Action</MudText>
@@ -137,7 +139,8 @@ else
                 @if (source.LastCheckError is not null) { <MudAlert Severity="Severity.Warning">@source.LastCheckError</MudAlert> }
                 @if (checkedSource?.BlockingError is not null) { <MudAlert Severity="Severity.Error">@checkedSource.BlockingError</MudAlert> }
                 @if (checkedSource?.ReceiverChanged == true) { <MudAlert Severity="Severity.Warning">Получатель изменился после начала отбора. Проверьте физическое разделение товара.</MudAlert> }
-                <MudTable T="SourceComparisonRow" Items="SourceRows(source.SourceRefKey)" Dense="true" Elevation="0">
+                <MudTable T="SourceComparisonRow" Items="SourceRows(source.SourceRefKey)" Dense="true"
+                          Elevation="0" RowStyleFunc="SourceComparisonStyle">
                     <HeaderContent><MudTh>SKU</MudTh><MudTh>План WMS</MudTh><MudTh>Текущая 1С</MudTh><MudTh>Распределено</MudTh></HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.Name</MudTd>
