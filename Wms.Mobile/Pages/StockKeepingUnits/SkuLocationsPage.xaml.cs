@@ -56,7 +56,7 @@ public partial class SkuLocationsPage : ContentPage
                 || response.Locations is null)
                 throw new HttpRequestException("Сервер вернул остатки другого SKU или склада.");
             Locations = response.Locations.Select(x => new SkuLocationRow(
-                x.LocationCode,
+                string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName,
                 x.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Срок не указан",
                 $"Доступно {x.AvailableQuantity.ToString("0.###", CultureInfo.CurrentCulture)}",
                 x.AccountingQuantity == x.AvailableQuantity ? string.Empty
@@ -71,5 +71,5 @@ public partial class SkuLocationsPage : ContentPage
     }
 }
 
-public sealed record SkuLocationRow(string LocationCode, string ExpirationText,
+public sealed record SkuLocationRow(string LocationAddress, string ExpirationText,
     string AvailableText, string AccountingText, bool HasDifferentAccounting);

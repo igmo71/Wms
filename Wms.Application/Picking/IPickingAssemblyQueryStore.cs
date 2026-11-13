@@ -84,7 +84,10 @@ public sealed record PickingWorkSkuView(Guid SkuId, string? Code,
 public sealed record PickingWorkEntryView(Guid Id, Guid StorageLocationId,
     string LocationCode, Guid SkuId, DateOnly? ExpirationDate,
     decimal Quantity, string ConfirmedBy, DateTimeOffset ConfirmedAtUtc,
-    bool FromReserve);
+    bool FromReserve)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record PickingWorkView(Guid Id, Guid WarehouseId,
     PickingAssemblyStatus Status, long Revision, string ResponsibleUserId,

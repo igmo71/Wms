@@ -20,7 +20,7 @@
                             <DataTemplate x:DataType="local:SkuLocationRow">
                                 <Border Padding="9" Stroke="#D4D4D4">
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                                        <Label Text="{Binding LocationCode}" FontAttributes="Bold" />
+                                        <Label Text="{Binding LocationAddress}" FontSize="20" FontAttributes="Bold" />
                                         <Label Grid.Row="1" Text="{Binding ExpirationText}" FontSize="12" />
                                         <VerticalStackLayout Grid.Column="1" Grid.RowSpan="2" Spacing="2">
                                             <Label Text="{Binding AvailableText}" FontAttributes="Bold"

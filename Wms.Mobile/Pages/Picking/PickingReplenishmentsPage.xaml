@@ -20,7 +20,7 @@
                                 <Border Padding="9" Stroke="#D4D4D4" BackgroundColor="White">
                                     <VerticalStackLayout Spacing="3">
                                         <Label Text="{Binding SkuName}" FontAttributes="Bold" />
-                                        <Label Text="{Binding DetailText}" FontSize="12" />
+                                        <Label Text="{Binding DetailText}" FontSize="18" FontAttributes="Bold" />
                                         <Label Text="{Binding GroupsText}" FontSize="12" />
                                         <Button Text="Заказать" CommandParameter="{Binding .}"
                                                 Clicked="OnOrderClicked" />
@@ -38,7 +38,7 @@
                                     <VerticalStackLayout Spacing="3">
                                         <Label Text="{Binding SkuName}" FontAttributes="Bold" />
                                         <Label Text="{Binding ProgressText}" FontSize="13" />
-                                        <Label Text="{Binding AddressText}" FontSize="12"
+                                        <Label Text="{Binding AddressText}" FontSize="18" FontAttributes="Bold"
                                                IsVisible="{Binding HasAddress}" />
                                     </VerticalStackLayout>
                                 </Border>

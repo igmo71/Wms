@@ -72,8 +72,11 @@ public partial class ReplenishmentQueuePage : ContentPage
             TaskRows = tasks.Select(x => new ReplenishmentQueueRow(x.Id,
                 $"Сборка {x.AssemblyNumber} · {x.SkuName ?? x.SkuCode ?? x.SkuId.ToString()}",
                 x.PriorityQueue, x.OrderedQuantity, x.TransferredQuantity,
-                x.Status, x.AssignedTo, x.RecommendedSourceCode,
-                x.RecommendedDestinationCode)).ToArray();
+                x.Status, x.AssignedTo,
+                string.IsNullOrWhiteSpace(x.RecommendedSourceName)
+                    ? x.RecommendedSourceCode : x.RecommendedSourceName,
+                string.IsNullOrWhiteSpace(x.RecommendedDestinationName)
+                    ? x.RecommendedDestinationCode : x.RecommendedDestinationName)).ToArray();
             OnPropertyChanged(nameof(TaskRows));
             EmptyLabel.IsVisible = TaskRows.Count == 0;
             ErrorLabel.Text = string.Empty;

@@ -30,6 +30,7 @@
                                                               CommandParameter="{Binding .}" />
                                     </Border.GestureRecognizers>
                                     <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Address}" FontSize="23" FontAttributes="Bold" />
                                         <Label Text="{Binding Heading}" FontAttributes="Bold" />
                                         <Label Text="{Binding Detail}" FontSize="13" />
                                     </VerticalStackLayout>
@@ -39,15 +40,6 @@
                     </VerticalStackLayout>
                     <Label x:Name="EmptyLabel" Text="Доступных шагов нет."
                            IsVisible="False" />
-                    <Label Text="Недоступное количество" FontAttributes="Bold" FontSize="16" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Gaps, Source={x:Reference Page}}"
-                                         Spacing="4">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:PickingRouteGapRow">
-                                <Label Text="{Binding Text}" TextColor="DarkOrange" />
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>

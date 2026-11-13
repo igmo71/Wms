@@ -123,7 +123,7 @@ public partial class PickingEntryPage : ContentPage
         {
             Title = "Отбор › Возврат";
             RemainingLabel.Text = $"Вернуть из факта: {entry.Quantity:0.###} {unit}";
-            RecommendationLabel.Text = $"Исходная ячейка: {entry.LocationCode}";
+            RecommendationLabel.Text = $"Исходная ячейка: {(string.IsNullOrWhiteSpace(entry.LocationName) ? entry.LocationCode : entry.LocationName)}";
             ExpiryLabel.Text = entry.ExpirationDate is DateOnly date
                 ? $"Срок: {date:dd.MM.yyyy}" : "Срок не указан";
             StockLabel.Text = _returnLocationChecked
@@ -149,13 +149,15 @@ public partial class PickingEntryPage : ContentPage
                     .FirstOrDefault()?.LocationCode;
             var allPicked = _work?.Skus.All(x =>
                 x.ConfirmedQuantity >= x.PlannedQuantity) == true;
+            var recommendedName = _sku?.Locations.FirstOrDefault(x =>
+                x.LocationCode == _recommendedCode)?.LocationName;
             RecommendationLabel.Text = _recommendedCode is null
                 ? allPicked ? "Все SKU набраны. Проверьте закрытие сборки."
                     : "Доступной ячейки нет. Ожидается Подпитка или решение руководителя."
-                : $"Рекомендуемая ячейка: {_recommendedCode}"
+                : $"Рекомендуемая ячейка: {(string.IsNullOrWhiteSpace(recommendedName) ? _recommendedCode : recommendedName)}"
                     + (_directPalletPick ? " · снять весь поддон" : "");
             StockLabel.Text = _source is null ? "Сканируйте ячейку."
-                : $"Ячейка {_source.LocationCode}: учёт {_source.AccountingQuantity:0.###}, "
+                : $"Ячейка {(string.IsNullOrWhiteSpace(_source.LocationName) ? _source.LocationCode : _source.LocationName)}: учёт {_source.AccountingQuantity:0.###}, "
                     + $"доступно {_source.AvailableQuantity:0.###}, "
                     + $"резерв {_source.ReservedQuantity:0.###}, "
                     + $"спорное {_source.BlockedQuantity:0.###}";
@@ -238,7 +240,7 @@ public partial class PickingEntryPage : ContentPage
                 return;
             }
             if (!await DisplayAlertAsync("Возврат в ячейку",
-                $"Подтверждаете, что {quantity:0.###} находится в исходной ячейке {entry.LocationCode}?",
+                $"Подтверждаете, что {quantity:0.###} находится в исходной ячейке {(string.IsNullOrWhiteSpace(entry.LocationName) ? entry.LocationCode : entry.LocationName)}?",
                 "Подтвердить", "Отмена")) return;
             await RunActionAsync(PendingAction.Return,
                 () => _process.ReducePickAsync(_assembly.Id,

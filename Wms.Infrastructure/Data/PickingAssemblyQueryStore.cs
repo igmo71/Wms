@@ -147,7 +147,8 @@ public sealed class PickingAssemblyQueryStore(
                 (entry, location) => new PickingWorkEntryView(entry.Id,
                     entry.StorageLocationId, location.Code, entry.StockKeepingUnitId,
                     entry.ExpirationDate, entry.Quantity, entry.ConfirmedBy,
-                    entry.ConfirmedAtUtc, location.Zone!.Type == ZoneType.Reserve))
+                    entry.ConfirmedAtUtc, location.Zone!.Type == ZoneType.Reserve)
+                { LocationName = location.Name })
             .ToArrayAsync(ct);
         var picked = entries.GroupBy(x => x.SkuId)
             .ToDictionary(x => x.Key, x => x.Sum(row => row.Quantity));
@@ -251,7 +252,7 @@ public sealed class PickingAssemblyQueryStore(
             x.Zone?.Type ?? ZoneType.Receiving,
             !x.IsFolder && !x.DeletionMark && x.Zone is { DeletionMark: false }
                 && x.Warehouse is { DeletionMark: false },
-            counts.GetValueOrDefault(x.Id))).ToArray();
+            counts.GetValueOrDefault(x.Id)) { Name = x.Name }).ToArray();
     }
 
     private static string DisplayName(string? displayName, string? userName, string id) =>

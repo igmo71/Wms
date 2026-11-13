@@ -262,7 +262,8 @@ internal static class MobilePickingEndpoints
                 x.Group.StorageLocationId, x.LocationCode,
                 x.Group.ExpirationDate, x.AccountingQuantity,
                 x.AvailableForNewPick(assemblyId), x.ReservedQuantity,
-                x.BlockedQuantity, x.Hold is not null)).ToArray()));
+                x.BlockedQuantity, x.Hold is not null)
+            { LocationName = x.LocationName }).ToArray()));
     }
 
     private static async Task<IResult> GetWorkAsync(
@@ -290,7 +291,8 @@ internal static class MobilePickingEndpoints
             work.Entries.Select(x => new MobilePickingWorkEntryResponse(x.Id,
                 x.StorageLocationId, x.LocationCode, x.SkuId,
                 x.ExpirationDate, x.Quantity, x.ConfirmedBy,
-                x.ConfirmedAtUtc, x.FromReserve)).ToArray()));
+                x.ConfirmedAtUtc, x.FromReserve)
+            { LocationName = x.LocationName }).ToArray()));
     }
 
     private static async Task<IResult> GetRouteAsync(
@@ -312,7 +314,8 @@ internal static class MobilePickingEndpoints
         return TypedResults.Ok(new MobilePickingRouteResponse(route.Revision,
             route.Steps.Select(x => new MobilePickingRouteStepResponse(
                 x.StorageLocationId, x.LocationCode, x.StockKeepingUnitId,
-                x.ExpirationDate, x.Quantity, x.DirectPalletPick)).ToArray(),
+                x.ExpirationDate, x.Quantity, x.DirectPalletPick)
+            { LocationName = x.LocationName }).ToArray(),
             route.Gaps.Select(x => new MobilePickingRouteGapResponse(
                 x.StockKeepingUnitId, x.ExpirationDate, x.Quantity)).ToArray()));
     }
@@ -339,7 +342,8 @@ internal static class MobilePickingEndpoints
             source.StockKeepingUnitId, source.ExpirationDate,
             source.AccountingQuantity, source.AvailableQuantity,
             source.SuggestedQuantity, source.ReservedQuantity,
-            source.BlockedQuantity, source.RequiresVisualExpiryCheck));
+            source.BlockedQuantity, source.RequiresVisualExpiryCheck)
+        { LocationName = source.LocationName });
     }
 
     private static async Task<IResult> HoldPalletAsync(

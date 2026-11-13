@@ -35,12 +35,18 @@ public sealed record ReplenishmentTransferView(
 public sealed record ReplenishmentTaskTransferView(
     Guid Id, Guid DestinationLocationId, string DestinationCode,
     DateOnly? ExpirationDate, decimal Quantity, decimal EffectiveQuantity,
-    DateTimeOffset ConfirmedAtUtc);
+    DateTimeOffset ConfirmedAtUtc)
+{
+    public string? DestinationName { get; init; }
+}
 
 public sealed record ReplenishmentTaskCycleView(
     Guid Id, Guid SourceLocationId, string SourceCode,
     DateTimeOffset StartedAtUtc, DateTimeOffset? CompletedAtUtc,
-    bool? SourceWasEmpty, IReadOnlyList<ReplenishmentTaskTransferView> Transfers);
+    bool? SourceWasEmpty, IReadOnlyList<ReplenishmentTaskTransferView> Transfers)
+{
+    public string? SourceName { get; init; }
+}
 
 public sealed record ReplenishmentSourceStockView(
     Guid SkuId, string? SkuName, DateOnly? ExpirationDate,
@@ -57,7 +63,11 @@ public sealed record ReplenishmentTaskDetail(
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
     Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode,
     IReadOnlyList<ReplenishmentTaskCycleView> Cycles,
-    IReadOnlyList<ReplenishmentSourceStockView> ActiveSourceStock);
+    IReadOnlyList<ReplenishmentSourceStockView> ActiveSourceStock)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public sealed record ReplenishmentQueueEntry(
     Guid Id, Guid PickingAssemblyId, string AssemblyNumber,
@@ -67,7 +77,11 @@ public sealed record ReplenishmentQueueEntry(
     DateTimeOffset OrderedAtUtc, Guid? RecommendedSourceLocationId,
     string? RecommendedSourceCode, Guid? RecommendedDestinationLocationId,
     string? RecommendedDestinationCode,
-    IReadOnlyList<ShippingOrderQueue> SourceQueues);
+    IReadOnlyList<ShippingOrderQueue> SourceQueues)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public interface IReplenishmentStore
 {

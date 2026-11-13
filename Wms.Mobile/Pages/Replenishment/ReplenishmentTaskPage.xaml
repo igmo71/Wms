@@ -12,7 +12,7 @@
                     <Label x:Name="SkuLabel" FontSize="21" FontAttributes="Bold" />
                     <Label x:Name="ProgressLabel" FontSize="15" />
                     <Label x:Name="StatusLabel" FontSize="13" />
-                    <Label x:Name="RecommendationLabel" FontSize="13" />
+                    <Label x:Name="RecommendationLabel" FontSize="19" FontAttributes="Bold" />
                     <Button x:Name="CameraButton" Text="Сканировать ячейку"
                             IsVisible="False" Clicked="OnCameraClicked" />
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
@@ -26,7 +26,7 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout x:Name="ActivePanel" Spacing="6" IsVisible="False">
-                        <Label x:Name="ActiveSourceLabel" FontAttributes="Bold" />
+                        <Label x:Name="ActiveSourceLabel" FontSize="20" FontAttributes="Bold" />
                         <Label x:Name="ReturnRequiredLabel" TextColor="DarkOrange" />
                         <Label Text="Остаток в исходной ячейке (другие SKU — для сведения)"
                                FontSize="12" />

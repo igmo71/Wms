@@ -23,6 +23,7 @@ public sealed record StockAvailability(
     decimal BlockedQuantity,
     StockHoldView? Hold)
 {
+    public string? LocationName { get; init; }
     public decimal ReservedQuantity => Reservations.Sum(x => x.Quantity);
 
     public decimal AvailableQuantity => AvailableForNewPick(null);

@@ -99,18 +99,18 @@ public partial class ReplenishmentTaskPage : ContentPage
         ProgressLabel.Text = $"Проведено {_task.TransferredQuantity:0.###} из "
             + $"{_task.OrderedQuantity:0.###}; осталось {Remaining:0.###}";
         StatusLabel.Text = cycle is not null
-            ? $"Поддон снят: {cycle.SourceCode}. Требуется возврат или подтверждение пустой ячейки."
+            ? $"Поддон снят: {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}. Требуется возврат или подтверждение пустой ячейки."
             : _task.Status == MobileReplenishmentTaskStatus.Completed
                 ? "Задание завершено" : Remaining == 0
                     ? "Все количество проведено" : "Ожидается скан источника";
-        RecommendationLabel.Text = $"Источник: {_task.RecommendedSourceCode ?? "нет доступного источника"}"
-            + $" · Назначение: {_task.RecommendedDestinationCode ?? "выбрать по скану"}";
+        RecommendationLabel.Text = $"Источник: {(string.IsNullOrWhiteSpace(_task.RecommendedSourceName) ? _task.RecommendedSourceCode ?? "нет доступного источника" : _task.RecommendedSourceName)}"
+            + $" · Назначение: {(string.IsNullOrWhiteSpace(_task.RecommendedDestinationName) ? _task.RecommendedDestinationCode ?? "выбрать по скану" : _task.RecommendedDestinationName)}";
         StartPanel.IsVisible = cycle is null && Remaining > 0 && CanOperate;
         ActivePanel.IsVisible = cycle is not null;
         StartButton.IsEnabled = !_busy && !_process.HasPendingCommand && CanOperate;
         if (cycle is not null)
         {
-            ActiveSourceLabel.Text = $"Фактический источник: {cycle.SourceCode}";
+            ActiveSourceLabel.Text = $"Фактический источник: {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}";
             ReturnRequiredLabel.Text = "Исходная ячейка удерживается до повторного скана.";
             var selectedGroup = SelectedGroup;
             var groups = _task.ActiveSourceStock
@@ -131,7 +131,8 @@ public partial class ReplenishmentTaskPage : ContentPage
                 QuantityEntry.Text = Math.Min(Remaining, group.Available)
                     .ToString("0.###", CultureInfo.CurrentCulture);
             if (string.IsNullOrWhiteSpace(DestinationEntry.Text))
-                DestinationEntry.Placeholder = _task.RecommendedDestinationCode is { } destination
+                DestinationEntry.Placeholder = (string.IsNullOrWhiteSpace(_task.RecommendedDestinationName)
+                    ? _task.RecommendedDestinationCode : _task.RecommendedDestinationName) is { } destination
                     ? $"Сканируйте назначение, рекомендовано {destination}"
                     : "Сканируйте ячейку Комплектации";
             TransferButton.IsEnabled = !_busy && !_process.HasPendingCommand
@@ -150,7 +151,9 @@ public partial class ReplenishmentTaskPage : ContentPage
             _scanTarget = ScanTarget.Source;
         }
         TransferRows = _task.Cycles.SelectMany(x => x.Transfers.Select(t =>
-            new ReplenishmentTransferRow(x.SourceCode, t.DestinationCode,
+            new ReplenishmentTransferRow(
+                string.IsNullOrWhiteSpace(x.SourceName) ? x.SourceCode : x.SourceName,
+                string.IsNullOrWhiteSpace(t.DestinationName) ? t.DestinationCode : t.DestinationName,
                 t.ExpirationDate, t.EffectiveQuantity))).ToArray();
         OnPropertyChanged(nameof(TransferRows));
     }
@@ -228,7 +231,7 @@ public partial class ReplenishmentTaskPage : ContentPage
         }
         var destination = DestinationEntry.Text.Trim();
         if (!await DisplayAlertAsync("Провести Подпитку",
-            $"Перенести {quantity:0.###} из {cycle.SourceCode} в {destination}?",
+            $"Перенести {quantity:0.###} из {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)} в {destination}?",
             "Провести", "Отмена")) return;
         await RunCommandAsync(() => _process.TransferAsync(_taskId, _warehouseId,
             cycle.Id, destination, _task.SkuId, group.ExpirationDate, quantity));
@@ -248,7 +251,7 @@ public partial class ReplenishmentTaskPage : ContentPage
             return;
         }
         if (!await DisplayAlertAsync("Недостача",
-            $"В {cycle.SourceCode} ожидалось {expected:0.###}, найдено {found:0.###}. Зафиксировать расхождение?",
+            $"В {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)} ожидалось {expected:0.###}, найдено {found:0.###}. Зафиксировать расхождение?",
             "Зафиксировать", "Отмена")) return;
         await RunCommandAsync(() => _process.ReportShortageAsync(_taskId,
             _warehouseId, cycle.Id, _task.SkuId, group.ExpirationDate,
@@ -268,7 +271,7 @@ public partial class ReplenishmentTaskPage : ContentPage
         var code = ReturnEntry.Text.Trim();
         if (code != cycle.SourceCode)
         {
-            ErrorLabel.Text = $"Повторно сканируйте исходную ячейку {cycle.SourceCode}.";
+            ErrorLabel.Text = $"Повторно сканируйте исходную ячейку {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}.";
             return;
         }
         if (!await DisplayAlertAsync(empty ? "Ячейка пуста" : "Вернуть поддон",

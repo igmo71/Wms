@@ -27,7 +27,6 @@ public partial class PickingRoutePage : ContentPage
     }
 
     public IReadOnlyList<PickingRouteRow> Steps { get; private set; } = [];
-    public IReadOnlyList<PickingRouteGapRow> Gaps { get; private set; } = [];
 
     public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
     {
@@ -65,17 +64,13 @@ public partial class PickingRoutePage : ContentPage
                 var (name, unit) = names.GetValueOrDefault(x.SkuId);
                 return new PickingRouteRow(x.SkuId, x.LocationCode,
                     x.DirectPalletPick, index == 0,
-                    $"{index + 1}. {x.LocationCode} · {name ?? x.SkuId.ToString()}",
+                    $"{index + 1}. {name ?? x.SkuId.ToString()}",
                     $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} {unit ?? "—"}"
                     + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : "")
-                    + (x.DirectPalletPick ? " · снять весь поддон" : ""));
+                    + (x.DirectPalletPick ? " · снять весь поддон" : ""))
+                { Address = string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName };
             }).ToArray();
-            Gaps = route.Gaps.Select(x => new PickingRouteGapRow(
-                $"{names.GetValueOrDefault(x.SkuId).Item1 ?? x.SkuId.ToString()}: "
-                + $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} — ожидается Подпитка или решение руководителя"
-            )).ToArray();
             OnPropertyChanged(nameof(Steps));
-            OnPropertyChanged(nameof(Gaps));
             EmptyLabel.IsVisible = Steps.Count == 0;
             ErrorLabel.Text = string.Empty;
         }
@@ -192,6 +187,7 @@ public partial class PickingRoutePage : ContentPage
 }
 
 public sealed record PickingRouteRow(Guid SkuId, string LocationCode,
-    bool DirectPalletPick, bool IsCurrent, string Heading, string Detail);
-
-public sealed record PickingRouteGapRow(string Text);
+    bool DirectPalletPick, bool IsCurrent, string Heading, string Detail)
+{
+    public string Address { get; init; } = LocationCode;
+}

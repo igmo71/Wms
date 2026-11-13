@@ -14,7 +14,11 @@ public sealed record MobileReplenishmentProposalGroupResponse(
 public sealed record MobileReplenishmentProposalResponse(
     Guid SkuId, Guid SourceLocationId, string SourceCode,
     Guid? DestinationLocationId, string? DestinationCode,
-    decimal Quantity, IReadOnlyList<MobileReplenishmentProposalGroupResponse> Groups);
+    decimal Quantity, IReadOnlyList<MobileReplenishmentProposalGroupResponse> Groups)
+{
+    public string? SourceName { get; init; }
+    public string? DestinationName { get; init; }
+}
 
 public sealed record MobileReplenishmentDeficitResponse(Guid SkuId, decimal Quantity);
 
@@ -22,7 +26,11 @@ public sealed record MobilePickingReplenishmentTaskResponse(
     Guid Id, Guid SkuId, decimal OrderedQuantity, decimal TransferredQuantity,
     MobileReplenishmentTaskStatus Status,
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
-    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode);
+    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public sealed record MobilePickingReplenishmentsResponse(
     Guid PickingAssemblyId, long Revision,
@@ -37,17 +45,27 @@ public sealed record MobileReplenishmentQueueItemResponse(
     MobileReplenishmentTaskStatus Status, string? AssignedTo,
     DateTimeOffset OrderedAtUtc, string PriorityQueue,
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
-    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode);
+    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public sealed record MobileReplenishmentTransferResponse(
     Guid Id, Guid DestinationLocationId, string DestinationCode,
     DateOnly? ExpirationDate, decimal OriginalQuantity,
-    decimal EffectiveQuantity, DateTimeOffset ConfirmedAtUtc);
+    decimal EffectiveQuantity, DateTimeOffset ConfirmedAtUtc)
+{
+    public string? DestinationName { get; init; }
+}
 
 public sealed record MobileReplenishmentSourceCycleResponse(
     Guid Id, Guid SourceLocationId, string SourceCode,
     DateTimeOffset StartedAtUtc, DateTimeOffset? CompletedAtUtc,
-    bool? SourceWasEmpty, IReadOnlyList<MobileReplenishmentTransferResponse> Transfers);
+    bool? SourceWasEmpty, IReadOnlyList<MobileReplenishmentTransferResponse> Transfers)
+{
+    public string? SourceName { get; init; }
+}
 
 public sealed record MobileReplenishmentSourceStockResponse(
     Guid SkuId, string? SkuName, DateOnly? ExpirationDate,
@@ -64,7 +82,11 @@ public sealed record MobileReplenishmentTaskResponse(
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
     Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode,
     IReadOnlyList<MobileReplenishmentSourceCycleResponse> Cycles,
-    IReadOnlyList<MobileReplenishmentSourceStockResponse> ActiveSourceStock);
+    IReadOnlyList<MobileReplenishmentSourceStockResponse> ActiveSourceStock)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public sealed record MobileReplenishmentResourceIdResponse(Guid Id);
 

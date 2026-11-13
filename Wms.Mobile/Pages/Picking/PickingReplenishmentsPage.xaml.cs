@@ -65,7 +65,9 @@ public partial class PickingReplenishmentsPage : ContentPage
             ProposalRows = list.Proposals.Select(x => new PickingReplenishmentProposalRow(
                 x.SkuId, names.GetValueOrDefault(x.SkuId) ?? x.SkuId.ToString(),
                 x.SourceLocationId, x.DestinationLocationId, x.Quantity,
-                list.Revision, x.SourceCode, x.DestinationCode,
+                list.Revision,
+                string.IsNullOrWhiteSpace(x.SourceName) ? x.SourceCode : x.SourceName,
+                string.IsNullOrWhiteSpace(x.DestinationName) ? x.DestinationCode : x.DestinationName,
                 string.Join(", ", x.Groups.Select(group =>
                     $"{(group.ExpirationDate is DateOnly date ? date.ToString("dd.MM.yyyy") : "без срока")}: "
                     + group.Quantity.ToString("0.###", CultureInfo.CurrentCulture)))))
@@ -73,7 +75,10 @@ public partial class PickingReplenishmentsPage : ContentPage
             TaskRows = list.Tasks.Select(x => new PickingReplenishmentTaskRow(
                     names.GetValueOrDefault(x.SkuId) ?? x.SkuId.ToString(),
                     x.OrderedQuantity, x.TransferredQuantity, x.Status,
-                    x.RecommendedSourceCode, x.RecommendedDestinationCode))
+                    string.IsNullOrWhiteSpace(x.RecommendedSourceName)
+                        ? x.RecommendedSourceCode : x.RecommendedSourceName,
+                    string.IsNullOrWhiteSpace(x.RecommendedDestinationName)
+                        ? x.RecommendedDestinationCode : x.RecommendedDestinationName))
                 .ToArray();
             OnPropertyChanged(nameof(ProposalRows));
             OnPropertyChanged(nameof(TaskRows));
@@ -187,9 +192,9 @@ public partial class PickingReplenishmentsPage : ContentPage
 public sealed record PickingReplenishmentProposalRow(
     Guid SkuId, string SkuName, Guid SourceLocationId,
     Guid? DestinationLocationId, decimal Quantity, long Revision,
-    string SourceCode, string? DestinationCode, string GroupsText)
+    string SourceAddress, string? DestinationAddress, string GroupsText)
 {
-    public string DetailText => $"{SourceCode} → {DestinationCode ?? "выбрать при переносе"} · "
+    public string DetailText => $"{SourceAddress} → {DestinationAddress ?? "выбрать при переносе"} · "
         + Quantity.ToString("0.###", CultureInfo.CurrentCulture);
 }
 

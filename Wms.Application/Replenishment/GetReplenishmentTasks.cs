@@ -14,6 +14,8 @@ public sealed record ReplenishmentTaskListItem(
     Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode)
 {
     public decimal RemainingQuantity => OrderedQuantity - TransferredQuantity;
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
 }
 
 public sealed class GetReplenishmentTasks(
@@ -35,7 +37,11 @@ public sealed class GetReplenishmentTasks(
                 x.OrderedAtUtc, x.SourceQueues.OrderBy(Rank).FirstOrDefault(),
                 x.RecommendedSourceLocationId, x.RecommendedSourceCode,
                 x.RecommendedDestinationLocationId,
-                x.RecommendedDestinationCode))
+                x.RecommendedDestinationCode)
+            {
+                RecommendedSourceName = x.RecommendedSourceName,
+                RecommendedDestinationName = x.RecommendedDestinationName
+            })
             .OrderBy(x => Rank(x.PriorityQueue))
             .ThenBy(x => x.OrderedAtUtc)
             .ThenBy(x => x.Id)

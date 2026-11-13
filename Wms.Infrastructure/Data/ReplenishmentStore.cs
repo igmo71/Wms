@@ -175,9 +175,12 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
             .Concat(new[] { task.RecommendedSourceStorageLocationId,
                 task.RecommendedDestinationStorageLocationId }
                 .OfType<Guid>()).Distinct().ToArray();
-        var codes = await db.StorageLocations.AsNoTracking()
+        var addresses = await db.StorageLocations.AsNoTracking()
             .Where(x => locationIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, x => x.Code, ct);
+            .Select(x => new { x.Id, x.Code, x.Name })
+            .ToDictionaryAsync(x => x.Id, ct);
+        var codes = addresses.ToDictionary(x => x.Key, x => x.Value.Code);
+        var names = addresses.ToDictionary(x => x.Key, x => x.Value.Name);
         var active = cycles.SingleOrDefault(x => x.CompletedAtUtc is null);
         InventoryBalance[] balances = active is null ? [] : await db.InventoryBalances.AsNoTracking()
             .Where(x => x.WarehouseId == task.WarehouseId
@@ -216,7 +219,11 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                         transfer.ExpirationDate, transfer.Quantity,
                         EffectiveQuantity(task, transfer, cycle,
                             correctionLookup[transfer.Id]),
-                        transfer.ConfirmedAtUtc)).ToArray())).ToArray(),
+                        transfer.ConfirmedAtUtc)
+                    { DestinationName = names.GetValueOrDefault(transfer.DestinationStorageLocationId) })
+                    .ToArray())
+                { SourceName = names.GetValueOrDefault(cycle.SourceStorageLocationId) })
+                .ToArray(),
             balances.Select(balance => new ReplenishmentSourceStockView(
                 balance.StockKeepingUnitId,
                 skus.GetValueOrDefault(balance.StockKeepingUnitId),
@@ -226,7 +233,13 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                     .Sum(x => x.BlockedQuantity)))
                 .OrderBy(x => x.SkuId != task.StockKeepingUnitId)
                 .ThenBy(x => x.ExpirationDate is null)
-                .ThenBy(x => x.ExpirationDate).ToArray());
+                .ThenBy(x => x.ExpirationDate).ToArray())
+        {
+            RecommendedSourceName = task.RecommendedSourceStorageLocationId is Guid sourceNameId
+                ? names.GetValueOrDefault(sourceNameId) : null,
+            RecommendedDestinationName = task.RecommendedDestinationStorageLocationId is Guid destinationNameId
+                ? names.GetValueOrDefault(destinationNameId) : null
+        };
     }
 
     private static decimal EffectiveQuantity(ReplenishmentTask task,
@@ -359,9 +372,12 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
             .Where(x => skuIds.Contains(x.Id))
             .Select(x => new { x.Id, x.Code, x.Name })
             .ToDictionaryAsync(x => x.Id, ct);
-        var codes = await db.StorageLocations.AsNoTracking()
+        var addresses = await db.StorageLocations.AsNoTracking()
             .Where(x => locationIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, x => x.Code, ct);
+            .Select(x => new { x.Id, x.Code, x.Name })
+            .ToDictionaryAsync(x => x.Id, ct);
+        var codes = addresses.ToDictionary(x => x.Key, x => x.Value.Code);
+        var names = addresses.ToDictionary(x => x.Key, x => x.Value.Name);
         var currentQueues = await (
             from link in db.PickingAssemblySourceLinks.AsNoTracking()
             join source in db.ShippingOrders.AsNoTracking()
@@ -387,7 +403,13 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 task.RecommendedDestinationStorageLocationId,
                 task.RecommendedDestinationStorageLocationId is Guid destinationId
                     ? codes.GetValueOrDefault(destinationId) : null,
-                queues[task.PickingAssemblyId].ToArray());
+                queues[task.PickingAssemblyId].ToArray())
+            {
+                RecommendedSourceName = task.RecommendedSourceStorageLocationId is Guid sourceNameId
+                    ? names.GetValueOrDefault(sourceNameId) : null,
+                RecommendedDestinationName = task.RecommendedDestinationStorageLocationId is Guid destinationNameId
+                    ? names.GetValueOrDefault(destinationNameId) : null
+            };
         }).ToArray();
     }
 
@@ -451,7 +473,7 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 && x.Warehouse is { DeletionMark: false },
             x.ActiveLock is not null, x.AllowsMultipleSkus,
             currentByLocation[x.Id].ToHashSet(),
-            historyByLocation[x.Id].ToHashSet())).ToArray();
+            historyByLocation[x.Id].ToHashSet()) { Name = x.Name }).ToArray();
         var tasks = await db.ReplenishmentTasks.AsNoTracking()
             .Where(x => x.WarehouseId == warehouseId
                 && (x.Status == ReplenishmentTaskStatus.Ordered

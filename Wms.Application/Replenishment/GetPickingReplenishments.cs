@@ -8,13 +8,21 @@ namespace Wms.Application.Replenishment;
 public sealed record PickingReplenishmentProposalView(
     Guid StockKeepingUnitId, Guid SourceLocationId, string SourceCode,
     Guid? DestinationLocationId, string? DestinationCode,
-    decimal Quantity, IReadOnlyList<ReplenishmentProposalGroup> Groups);
+    decimal Quantity, IReadOnlyList<ReplenishmentProposalGroup> Groups)
+{
+    public string? SourceName { get; init; }
+    public string? DestinationName { get; init; }
+}
 
 public sealed record PickingReplenishmentTaskView(
     Guid Id, Guid StockKeepingUnitId, decimal OrderedQuantity,
     decimal TransferredQuantity, ReplenishmentTaskStatus Status,
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
-    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode);
+    Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode)
+{
+    public string? RecommendedSourceName { get; init; }
+    public string? RecommendedDestinationName { get; init; }
+}
 
 public sealed record PickingReplenishmentsView(
     Guid PickingAssemblyId, Guid WarehouseId, long Revision,
@@ -65,7 +73,12 @@ public sealed class GetPickingReplenishments(
                 x.DestinationLocationId is Guid destinationId
                     && locations.TryGetValue(destinationId, out var destination)
                     ? destination.Code : null,
-                x.Quantity, x.Groups)).ToArray(),
+                x.Quantity, x.Groups)
+            {
+                SourceName = locations[x.SourceLocationId].Name,
+                DestinationName = x.DestinationLocationId is Guid destinationNameId
+                    ? locations.GetValueOrDefault(destinationNameId)?.Name : null
+            }).ToArray(),
             proposals.Value.Deficits,
             tasks.Select(x => new PickingReplenishmentTaskView(x.Id,
                 x.StockKeepingUnitId, x.OrderedQuantity, x.TransferredQuantity,
@@ -76,6 +89,12 @@ public sealed class GetPickingReplenishments(
                 x.RecommendedDestinationStorageLocationId,
                 x.RecommendedDestinationStorageLocationId is Guid targetId
                     && locations.TryGetValue(targetId, out var target)
-                    ? target.Code : null)).ToArray());
+                    ? target.Code : null)
+            {
+                RecommendedSourceName = x.RecommendedSourceStorageLocationId is Guid sourceNameId
+                    ? locations.GetValueOrDefault(sourceNameId)?.Name : null,
+                RecommendedDestinationName = x.RecommendedDestinationStorageLocationId is Guid targetNameId
+                    ? locations.GetValueOrDefault(targetNameId)?.Name : null
+            }).ToArray());
     }
 }

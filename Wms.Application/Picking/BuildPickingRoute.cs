@@ -5,7 +5,10 @@ using Wms.Domain.Enums;
 namespace Wms.Application.Picking;
 
 public sealed record PickingRouteLocation(
-    Guid Id, string Code, ZoneType ZoneType, bool IsActive, int DistinctSkuCount);
+    Guid Id, string Code, ZoneType ZoneType, bool IsActive, int DistinctSkuCount)
+{
+    public string? Name { get; init; }
+}
 
 public sealed record PickingRouteRequest(
     Guid PickingAssemblyId, Guid WarehouseId, DateOnly Today,
@@ -16,7 +19,10 @@ public sealed record PickingRouteRequest(
 
 public sealed record PickingRouteStep(Guid StorageLocationId, string LocationCode,
     Guid StockKeepingUnitId, DateOnly? ExpirationDate, decimal Quantity,
-    bool DirectPalletPick);
+    bool DirectPalletPick)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record PickingRouteGap(Guid StockKeepingUnitId,
     DateOnly? ExpirationDate, decimal Quantity);
@@ -99,7 +105,8 @@ public sealed class BuildPickingRoute
                     bucket.Remaining -= group.AccountingQuantity;
                     palletSteps.Add(new PickingRouteStep(group.Group.StorageLocationId,
                         locations[group.Group.StorageLocationId].Code, skuId,
-                        group.Group.ExpirationDate, group.AccountingQuantity, true));
+                        group.Group.ExpirationDate, group.AccountingQuantity, true)
+                    { LocationName = locations[group.Group.StorageLocationId].Name });
                 }
                 reserveCells = reserveCells.Where(x =>
                     x[0].Group.StorageLocationId != pallet[0].Group.StorageLocationId).ToArray();
@@ -130,7 +137,8 @@ public sealed class BuildPickingRoute
                         chosen.AvailableForNewPick(request.PickingAssemblyId));
                     storageSteps.Add(new PickingRouteStep(chosen.Group.StorageLocationId,
                         locations[chosen.Group.StorageLocationId].Code, skuId,
-                        bucket.Date, quantity, false));
+                        bucket.Date, quantity, false)
+                    { LocationName = locations[chosen.Group.StorageLocationId].Name });
                     bucket.Remaining -= quantity;
                     candidates = candidates.Where(x => x != chosen).ToArray();
                 }

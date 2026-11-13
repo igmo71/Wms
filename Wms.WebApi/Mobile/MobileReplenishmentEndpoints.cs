@@ -58,7 +58,8 @@ internal static class MobileReplenishmentEndpoints
                 x.StockKeepingUnitId, x.SourceLocationId, x.SourceCode,
                 x.DestinationLocationId, x.DestinationCode, x.Quantity,
                 x.Groups.Select(group => new MobileReplenishmentProposalGroupResponse(
-                    group.ExpirationDate, group.Quantity)).ToArray())).ToArray(),
+                    group.ExpirationDate, group.Quantity)).ToArray())
+            { SourceName = x.SourceName, DestinationName = x.DestinationName }).ToArray(),
             view.Deficits.Select(x => new MobileReplenishmentDeficitResponse(
                 x.StockKeepingUnitId, x.Quantity)).ToArray(),
             view.Tasks.Select(x => new MobilePickingReplenishmentTaskResponse(
@@ -66,7 +67,9 @@ internal static class MobileReplenishmentEndpoints
                 x.TransferredQuantity, (MobileReplenishmentTaskStatus)x.Status,
                 x.RecommendedSourceLocationId, x.RecommendedSourceCode,
                 x.RecommendedDestinationLocationId,
-                x.RecommendedDestinationCode)).ToArray()));
+                x.RecommendedDestinationCode)
+            { RecommendedSourceName = x.RecommendedSourceName,
+                RecommendedDestinationName = x.RecommendedDestinationName }).ToArray()));
     }
 
     private static async Task<IResult> OrderAsync(
@@ -103,7 +106,9 @@ internal static class MobileReplenishmentEndpoints
                     x.OrderedAtUtc, x.PriorityQueue.ToString(),
                     x.RecommendedSourceLocationId, x.RecommendedSourceCode,
                     x.RecommendedDestinationLocationId,
-                    x.RecommendedDestinationCode)).ToArray())
+                    x.RecommendedDestinationCode)
+                { RecommendedSourceName = x.RecommendedSourceName,
+                    RecommendedDestinationName = x.RecommendedDestinationName }).ToArray())
             : MobileEndpointResults.CommandProblem(result.Error!);
     }
 
@@ -136,10 +141,14 @@ internal static class MobileReplenishmentEndpoints
                     transfer.Id, transfer.DestinationLocationId,
                     transfer.DestinationCode, transfer.ExpirationDate,
                     transfer.Quantity, transfer.EffectiveQuantity,
-                    transfer.ConfirmedAtUtc)).ToArray())).ToArray(),
+                    transfer.ConfirmedAtUtc)
+                    { DestinationName = transfer.DestinationName }).ToArray())
+                { SourceName = cycle.SourceName }).ToArray(),
             detail.ActiveSourceStock.Select(x => new MobileReplenishmentSourceStockResponse(
                 x.SkuId, x.SkuName, x.ExpirationDate,
-                x.AccountingQuantity, x.BlockedQuantity)).ToArray()));
+                x.AccountingQuantity, x.BlockedQuantity)).ToArray())
+        { RecommendedSourceName = detail.RecommendedSourceName,
+            RecommendedDestinationName = detail.RecommendedDestinationName });
     }
 
     private static async Task<IResult> StartSourceAsync(

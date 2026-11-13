@@ -9,7 +9,10 @@ namespace Wms.Application.Picking;
 public sealed record PickingSourceView(Guid PickingAssemblyId, Guid StorageLocationId,
     string LocationCode, Guid StockKeepingUnitId, DateOnly? ExpirationDate,
     decimal AccountingQuantity, decimal AvailableQuantity, decimal SuggestedQuantity,
-    decimal ReservedQuantity, decimal BlockedQuantity, bool RequiresVisualExpiryCheck);
+    decimal ReservedQuantity, decimal BlockedQuantity, bool RequiresVisualExpiryCheck)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed class GetPickingSource(
     IPickingAssemblyStore assemblies, IStockAvailabilityStore stock,
@@ -108,6 +111,7 @@ internal static class PickingSourceRules
             group.Group.ExpirationDate, group.AccountingQuantity, free,
             Math.Min(remaining, free), group.ReservedQuantity,
             group.BlockedQuantity, group.Group.ExpirationDate is null
-                && state.CellSkus.Single(x => x.Id == skuId).TracksExpirationDate);
+                && state.CellSkus.Single(x => x.Id == skuId).TracksExpirationDate)
+        { LocationName = location.Name };
     }
 }

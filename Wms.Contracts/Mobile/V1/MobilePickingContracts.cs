@@ -100,7 +100,10 @@ public sealed record MobilePickingWorkEntryResponse(
     Guid Id, Guid StorageLocationId, string LocationCode,
     Guid SkuId, DateOnly? ExpirationDate, decimal Quantity,
     string ConfirmedBy, DateTimeOffset ConfirmedAtUtc,
-    bool FromReserve);
+    bool FromReserve)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record MobilePickingWorkResponse(
     Guid Id, MobilePickingAssemblyStatus Status, long Revision,
@@ -110,7 +113,10 @@ public sealed record MobilePickingWorkResponse(
 
 public sealed record MobilePickingRouteStepResponse(
     Guid StorageLocationId, string LocationCode, Guid SkuId,
-    DateOnly? ExpirationDate, decimal Quantity, bool DirectPalletPick);
+    DateOnly? ExpirationDate, decimal Quantity, bool DirectPalletPick)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record MobilePickingRouteGapResponse(
     Guid SkuId, DateOnly? ExpirationDate, decimal Quantity);
@@ -122,7 +128,10 @@ public sealed record MobilePickingRouteResponse(
 public sealed record MobilePickingAvailabilityResponse(
     Guid StorageLocationId, string LocationCode, DateOnly? ExpirationDate,
     decimal AccountingQuantity, decimal AvailableQuantity,
-    decimal ReservedQuantity, decimal BlockedQuantity, bool Held);
+    decimal ReservedQuantity, decimal BlockedQuantity, bool Held)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record MobilePickingSkuResponse(
     Guid SkuId, decimal PlannedQuantity, decimal ConfirmedQuantity,
@@ -139,7 +148,10 @@ public sealed record MobilePickingScannedSourceResponse(
     DateOnly? ExpirationDate, decimal AccountingQuantity,
     decimal AvailableQuantity, decimal SuggestedQuantity,
     decimal ReservedQuantity, decimal BlockedQuantity,
-    bool RequiresVisualExpiryCheck);
+    bool RequiresVisualExpiryCheck)
+{
+    public string? LocationName { get; init; }
+}
 
 public sealed record MobilePickingHoldPalletRequest(
     Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,

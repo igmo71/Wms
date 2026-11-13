@@ -16,7 +16,7 @@
                             SemanticProperties.Description="Остатки SKU по ячейкам" />
                 </Grid>
                 <Label x:Name="RemainingLabel" />
-                <Label x:Name="RecommendationLabel" FontSize="13" />
+                <Label x:Name="RecommendationLabel" FontSize="19" FontAttributes="Bold" />
                 <local:OperationalCameraScannerView x:Name="CameraScannerView" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                     <Entry x:Name="LocationEntry" Placeholder="Сканируйте ячейку"

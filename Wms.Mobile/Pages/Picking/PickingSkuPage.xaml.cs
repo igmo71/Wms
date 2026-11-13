@@ -16,6 +16,7 @@ public partial class PickingSkuPage : ContentPage
     private MobilePickingWorkResponse? _work;
     private bool _busy;
     private bool _replenishmentsReady;
+    private IReadOnlyDictionary<Guid, decimal> _unavailableBySku = new Dictionary<Guid, decimal>();
 
     public PickingSkuPage(MobilePickingClient client,
         MobileReplenishmentClient replenishments,
@@ -63,10 +64,21 @@ public partial class PickingSkuPage : ContentPage
             var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
             _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
             _replenishmentsReady = false;
+            _unavailableBySku = new Dictionary<Guid, decimal>();
             string? replenishmentError = null;
+            string? routeError = null;
             if (assembly.Status == MobilePickingAssemblyStatus.InProgress
                 && assembly.ResponsibleUserId == _selection.CurrentUserId)
             {
+                try
+                {
+                    var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
+                    _unavailableBySku = route.Gaps.GroupBy(x => x.SkuId)
+                        .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
+                }
+                catch (MobileApiException exception) { routeError = exception.Message; }
+                catch (HttpRequestException)
+                { routeError = "Не удалось обновить доступность SKU."; }
                 try
                 {
                     var list = await _replenishments.AssemblyAsync(assembly.Id,
@@ -84,7 +96,8 @@ public partial class PickingSkuPage : ContentPage
             }
             Apply(assembly);
             if (!_process.HasPendingCommand)
-                ErrorLabel.Text = replenishmentError ?? string.Empty;
+                ErrorLabel.Text = string.Join("\n", new[] { routeError, replenishmentError }
+                    .Where(x => !string.IsNullOrWhiteSpace(x)));
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить сборку."; }
@@ -109,7 +122,8 @@ public partial class PickingSkuPage : ContentPage
         OwnerLabel.Text = assembly.ResponsibleDisplayName;
         SkuRows = _work?.Skus.Select(x => new PickingSkuPlanRow(
             x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
-            x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)).ToArray()
+            x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)
+            { UnavailableQuantity = _unavailableBySku.GetValueOrDefault(x.SkuId) }).ToArray()
             ?? assembly.PlanLines.GroupBy(x => x.SkuId)
                 .Select(group => new PickingSkuPlanRow(group.Key,
                     group.First().SkuName ?? group.First().SkuCode ?? group.Key.ToString(),
@@ -119,7 +133,7 @@ public partial class PickingSkuPage : ContentPage
         OnPropertyChanged(nameof(SkuRows));
         EntryRows = _work?.Entries.Select(x => new PickingEntryListRow(x.Id,
             $"{SkuRows.FirstOrDefault(sku => sku.SkuId == x.SkuId)?.Name ?? x.SkuId.ToString()} · "
-            + $"{x.LocationCode} · {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}"
+            + $"{(string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName)} · {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}"
             + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : string.Empty),
             assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
             .ToArray() ?? [];
@@ -147,6 +161,17 @@ public partial class PickingSkuPage : ContentPage
         if (row is null || row.PlannedQuantity <= row.ConfirmedQuantity) return;
         var page = _services.GetRequiredService<PickingEntryPage>();
         page.ShowPick(_assembly, _process, skuId, null, false);
+        await Navigation.PushAsync(page);
+    }
+
+    private async void OnSkuInfoClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || _assembly is null
+            || sender is not Button { CommandParameter: Guid skuId }) return;
+        var row = SkuRows.FirstOrDefault(x => x.SkuId == skuId);
+        if (row is null) return;
+        var page = _services.GetRequiredService<SkuLocationsPage>();
+        page.Show(_assembly.WarehouseId, skuId, row.Name, row.Unit);
         await Navigation.PushAsync(page);
     }
 
@@ -266,6 +291,7 @@ public partial class PickingSkuPage : ContentPage
         {
             var assembly = await action();
             _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            _unavailableBySku = new Dictionary<Guid, decimal>();
             Apply(assembly);
             if (_process.LastStartResult is { Status: MobilePickingAssemblyStatus.Preparing } start)
                 ErrorLabel.Text = string.Join("\n", start.Sources
@@ -333,6 +359,9 @@ public partial class PickingSkuPage : ContentPage
 public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
     decimal PlannedQuantity, decimal ConfirmedQuantity, string? Unit)
 {
+    public decimal UnavailableQuantity { get; init; }
+    public bool HasUnavailable => UnavailableQuantity > 0;
+    public string UnavailableText => $"Недоступно {UnavailableQuantity:0.###} {Unit ?? "—"} · ожидается Подпитка или решение руководителя";
     public string PlanText => $"План {PlannedQuantity:0.###} {Unit ?? "—"}";
     public string FactText => $"Факт {ConfirmedQuantity:0.###}";
     public Color BackgroundColor => ConfirmedQuantity == PlannedQuantity

@@ -34,6 +34,7 @@ internal static class MobileStockAvailabilityEndpoints
                 .ThenBy(x => x.Group.ExpirationDate)
                 .Select(x => new MobileSkuLocationResponse(x.LocationCode,
                     x.Group.ExpirationDate, x.AvailableQuantity,
-                    x.AccountingQuantity)).ToArray()));
+                    x.AccountingQuantity)
+                { LocationName = x.LocationName }).ToArray()));
     }
 }

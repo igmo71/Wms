@@ -9,7 +9,10 @@ namespace Wms.Application.Replenishment;
 public sealed record ReplenishmentLocation(
     Guid Id, string Code, ZoneType ZoneType, bool IsActive, bool IsHeld,
     bool AllowsMultipleSkus, IReadOnlySet<Guid> CurrentSkuIds,
-    IReadOnlySet<Guid> HistoricalSkuIds);
+    IReadOnlySet<Guid> HistoricalSkuIds)
+{
+    public string? Name { get; init; }
+}
 
 public sealed record ReplenishmentProposalRequest(
     Guid PickingAssemblyId, Guid WarehouseId, DateOnly Today,

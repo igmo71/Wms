@@ -138,13 +138,18 @@ the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
 border and gray background. Unavailable demand refers to replenishment or a
 Manager decision, and a wrong-cell message identifies stocked SKU by name rather
-than a GUID. The route is a recommendation;
+than a GUID. The picking SKU card shows each SKU's unavailable route quantity
+and opens stock by cell through its info button. The route no longer repeats
+unavailable quantities after its steps. Visible cell addresses use
+`StorageLocation.Name`, falling back to `Code`; scanning and validation continue
+to use `Code`. Addresses are larger on picking and replenishment work screens,
+including the shared stock-by-cell view. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm
 the offered quantity explicitly. The fact card refreshes the next route step
 in place. A shortage is reported separately, with the found quantity retained.
 Returning a confirmed fact requires scanning its original cell and confirming
-the physical return. The route shows unavailable demand while other SKU remain
-selectable. A fresh closure check prevents the TSD Operator from overriding
+the physical return. Other SKU remain selectable when one is unavailable.
+A fresh closure check prevents the TSD Operator from overriding
 plan or source discrepancies.
 
 Mobile V1 also exposes Operator-only replenishment proposals and existing tasks

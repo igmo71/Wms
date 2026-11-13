@@ -216,7 +216,8 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
                 && x.ExpirationDate == key.ExpirationDate).Sum(x => x.BlockedQuantity);
             return new StockAvailability(key, locations[key.StorageLocationId].Code,
                 balance?.Quantity ?? 0, reserved, blocked,
-                held is null ? null : new StockHoldView(held.OwnerType, held.OwnerId, held.Reason, held.LockedBy));
+                held is null ? null : new StockHoldView(held.OwnerType, held.OwnerId, held.Reason, held.LockedBy))
+            { LocationName = locations[key.StorageLocationId].Name };
         }).OrderBy(x => x.LocationCode, StringComparer.Ordinal)
             .ThenBy(x => x.Group.ExpirationDate is null).ThenBy(x => x.Group.ExpirationDate).ToArray();
     }
