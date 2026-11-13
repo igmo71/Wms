@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Wms.Application.Picking;
@@ -35,7 +34,8 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
         var uri = DocumentUri(sourceId) + "?$format=json";
         using var request = new HttpRequestMessage(HttpMethod.Patch, uri)
         {
-            Content = JsonContent.Create(new { Статус = "КОтбору" })
+            Content = new StringContent("{\"Статус\":\"КОтбору\"}",
+                Encoding.UTF8, "application/json")
         };
         return await SendAsync(request, expectedStatus: "КОтбору", ct);
     }
@@ -46,7 +46,8 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
         var uri = DocumentUri(sourceId) + "?$format=json";
         using var request = new HttpRequestMessage(HttpMethod.Patch, uri)
         {
-            Content = JsonContent.Create(new { Статус = "Подготовлен" })
+            Content = new StringContent("{\"Статус\":\"Подготовлен\"}",
+                Encoding.UTF8, "application/json")
         };
         return await SendAsync(request, expectedStatus: "Подготовлен", ct);
     }
@@ -96,10 +97,12 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
             using var json = JsonDocument.Parse(body);
             if (json.RootElement.ValueKind != JsonValueKind.Object
                 || !json.RootElement.TryGetProperty("Статус", out var status)
-                || status.ValueKind != JsonValueKind.String
-                || status.GetString() != expectedStatus)
+                || status.ValueKind != JsonValueKind.String)
+                return OperationError.Failure("Ответ 1С на PATCH не содержит статус расходного документа.");
+            var actualStatus = status.GetString();
+            if (actualStatus != expectedStatus)
                 return OperationError.Conflict(
-                    $"1С не подтвердила переход расходного документа в статус {expectedStatus}.");
+                    $"1С ответила на PATCH статусом «{actualStatus}», ожидался «{expectedStatus}». Проверьте правила изменения статуса в 1С.");
             return OperationResult.Success();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

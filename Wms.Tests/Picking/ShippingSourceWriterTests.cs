@@ -13,6 +13,23 @@ public sealed class ShippingSourceWriterTests
     private static readonly Guid SkuId = Guid.NewGuid();
 
     [Fact]
+    public async Task Status_patch_sends_literal_cyrillic_field_name()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"Статус\":\"КОтбору\"}")
+        });
+        using var client = Client(handler);
+
+        Success(await new ShippingSourceWriter(client)
+            .SetReadyForPickingAsync(OrderId, CancellationToken.None));
+
+        var call = Assert.Single(handler.Calls);
+        Assert.Equal(HttpMethod.Patch, call.Method);
+        Assert.Equal("{\"Статус\":\"КОтбору\"}", call.Body);
+    }
+
+    [Fact]
     public async Task Matching_target_skips_patch_but_unposted_document_still_posts()
     {
         var original = Source();
