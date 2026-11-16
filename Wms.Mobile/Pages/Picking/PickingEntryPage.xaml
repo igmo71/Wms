@@ -28,14 +28,12 @@
                 <Label x:Name="ExpiryLabel" FontSize="13" />
                 <Entry x:Name="QuantityEntry" Keyboard="Numeric" FontSize="22"
                        Placeholder="Количество" />
-                <Label Text="Проверьте количество и нажмите подтверждение."
+                <Label Text="Если найдено меньше предложенного, укажите весь фактический остаток этого SKU и срока в ячейке, включая ноль."
                        FontSize="12" />
                 <Button x:Name="HoldPalletButton" Text="Снять весь поддон"
                         Clicked="OnHoldPalletClicked" IsVisible="False" />
                 <Button x:Name="ConfirmButton" Text="Подтвердить Отбор"
                         Clicked="OnConfirmClicked" IsEnabled="False" />
-                <Button x:Name="ShortageButton" Text="Сообщить о недостаче"
-                        Clicked="OnShortageClicked" IsVisible="False" />
                 <Button x:Name="ReturnPalletButton" Text="Вернуть поддон в исходную ячейку"
                         Clicked="OnReturnPalletClicked" IsVisible="False" />
             </VerticalStackLayout>

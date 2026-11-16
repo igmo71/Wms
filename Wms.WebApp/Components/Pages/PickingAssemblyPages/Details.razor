@@ -61,6 +61,15 @@ else
 
         <MudPaper Class="pa-4">
             <MudText Typo="Typo.h6">План и факт WMS</MudText>
+            @if (_assembly.Status == PickingAssemblyStatus.InProgress
+                && _work?.Skus.Any(x => x.ConfirmedQuantity < x.PlannedQuantity) == true)
+            {
+                <MudAlert Severity="Severity.Warning" Class="my-2">
+                    Факт ниже плана. Решение по недостаче исправляет остаток ячейки, но не утверждает отгрузку меньшего количества.
+                    Можно добрать товар. Для закрытия с текущим фактом нажмите «Сверить с 1С», при необходимости распределите общий SKU по документам,
+                    укажите причину решения и закройте сборку ниже.
+                </MudAlert>
+            }
             <MudTable T="PickingWorkSkuView" Items="_work?.Skus ?? []" Dense="true"
                       Elevation="0" RowStyleFunc="WorkRowStyle">
                 <HeaderContent><MudTh>SKU</MudTh><MudTh>План</MudTh><MudTh>Факт</MudTh><MudTh>Ед.</MudTh></HeaderContent>
@@ -249,7 +258,7 @@ else
                 @if (_assembly.Status == PickingAssemblyStatus.InProgress && _pendingCloseRequest is null && _pendingCancelRequest is null)
                 {
                     <MudTextField T="string" @bind-Value="_closeReason" Label="Причина решения руководителя" Lines="2" Class="mt-3" />
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_busy || !_check.CanManagerClose)" OnClick="CloseAsync">Закрыть и отгрузить</MudButton>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_busy || !_check.CanManagerClose)" OnClick="CloseAsync">@(_check.FactMatchesPlan ? "Закрыть и отгрузить" : "Закрыть с текущим фактом и отгрузить")</MudButton>
                 }
             </MudPaper>
         }

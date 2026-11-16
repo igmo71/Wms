@@ -227,6 +227,11 @@ public partial class PickingSkuPage : ContentPage
                 ErrorLabel.Text = string.Join("\n", check.HardBlocks.Concat(check.ManagerIssues));
                 if (string.IsNullOrWhiteSpace(ErrorLabel.Text))
                     ErrorLabel.Text = "Сборка требует решения руководителя склада.";
+                await DisplayAlertAsync(check.HardBlocks.Count > 0
+                        ? "Закрытие пока невозможно" : "Требуется решение руководителя",
+                    ErrorLabel.Text + (check.ManagerIssues.Count > 0
+                        ? "\n\nСверьте сборку с 1С и примите решение в веб-приложении." : ""),
+                    "Понятно");
                 return;
             }
             if (!await DisplayAlertAsync("Закрыть и отгрузить",
@@ -361,7 +366,7 @@ public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
 {
     public decimal UnavailableQuantity { get; init; }
     public bool HasUnavailable => UnavailableQuantity > 0;
-    public string UnavailableText => $"Недоступно {UnavailableQuantity:0.###} {Unit ?? "—"} · ожидается Подпитка или решение руководителя";
+    public string UnavailableText => $"Не хватает для сборки {UnavailableQuantity:0.###} {Unit ?? "—"} · ожидается Подпитка или решение руководителя";
     public string PlanText => $"План {PlannedQuantity:0.###} {Unit ?? "—"}";
     public string FactText => $"Факт {ConfirmedQuantity:0.###}";
     public Color BackgroundColor => ConfirmedQuantity == PlannedQuantity

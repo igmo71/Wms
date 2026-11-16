@@ -13,7 +13,7 @@ public sealed record ReportPickingShortageRequest(
     Guid RequestId, Guid PickingAssemblyId, long ExpectedRevision,
     string ScannedLocationCode, Guid StockKeepingUnitId, DateOnly? ExpirationDate,
     decimal ExpectedQuantity, decimal FoundQuantity, string UserId,
-    Guid? ExistingPickingEntryId = null, string? Comment = null);
+    string? Comment = null);
 
 public sealed class ReportPickingShortage(CommandExecutor executor,
     IPickingAssemblyStore assemblies, IStockAvailabilityStore stock,
@@ -31,7 +31,6 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
             || !WarehouseQuantity.IsPositive(request.ExpectedQuantity)
             || !WarehouseQuantity.IsNonNegative(request.FoundQuantity)
             || request.FoundQuantity >= request.ExpectedQuantity
-            || request.ExistingPickingEntryId == Guid.Empty
             || request.Comment?.Trim().Length > StockShortage.MaximumCommentLength
             || string.IsNullOrWhiteSpace(request.UserId))
             return Task.FromResult<OperationResult<Guid>>(
@@ -48,7 +47,6 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
             request.ExpirationDate?.ToString("yyyy-MM-dd") ?? "",
             request.ExpectedQuantity.ToString(CultureInfo.InvariantCulture),
             request.FoundQuantity.ToString(CultureInfo.InvariantCulture),
-            request.ExistingPickingEntryId?.ToString("N") ?? "",
             request.Comment?.Trim() ?? ""
         }));
         return executor.ExecuteAsync(CommandType, request.RequestId, hash, request.UserId,
@@ -75,26 +73,14 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                     && (state.Location.ActiveLock?.OwnerType != StorageLocationLockOwnerType.PickingAssembly
                         || state.Location.ActiveLock.OwnerId != assembly.Id))
                     return OperationError.Conflict("Перед сообщением о недостаче на поддоне удержите ячейку.");
-                var missing = request.ExpectedQuantity - request.FoundQuantity;
-                if (missing > source.SuggestedQuantity)
-                    return OperationError.Conflict("Спорное количество превышает свободный остаток или потребность.");
-
-                var existing = request.ExistingPickingEntryId is Guid entryId
-                    ? state.Entries.SingleOrDefault(x => x.Id == entryId) : null;
-                if (request.ExistingPickingEntryId is not null
-                    && (existing is null || existing.Quantity <= 0
-                        || existing.WarehouseId != assembly.WarehouseId
-                        || existing.StorageLocationId != source.StorageLocationId
-                        || existing.StockKeepingUnitId != request.StockKeepingUnitId
-                        || existing.ExpirationDate != request.ExpirationDate
-                        || existing.Quantity != request.FoundQuantity))
-                    return OperationError.Conflict("Ранее подтверждённый факт не совпадает с найденным количеством.");
-                if (existing is null && request.FoundQuantity > source.SuggestedQuantity - missing)
-                    return OperationError.Conflict("Найденное количество превышает свободный остаток или план.");
+                if (request.ExpectedQuantity != source.AvailableQuantity
+                    || request.FoundQuantity >= source.SuggestedQuantity)
+                    return OperationError.Conflict(
+                        "Остаток или потребность изменились. Повторно сканируйте ячейку перед подтверждением недостачи.");
 
                 var now = clock.GetUtcNow();
                 PickingEntry? newEntry = null;
-                if (existing is null && request.FoundQuantity > 0)
+                if (request.FoundQuantity > 0)
                 {
                     var created = PickingEntry.Create(assembly.Id, assembly.WarehouseId,
                         source.StorageLocationId, request.StockKeepingUnitId,
@@ -125,7 +111,7 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                     JsonSerializer.Serialize(new { ShortageId = shortage.Value!.Id,
                         source.StorageLocationId, request.ExpirationDate,
                         request.ExpectedQuantity, request.FoundQuantity,
-                        PickingEntryId = existing?.Id ?? newEntry?.Id,
+                        PickingEntryId = newEntry?.Id,
                         Comment = request.Comment?.Trim() }),
                     commandUserId: request.UserId, commandType: CommandType,
                     requestId: request.RequestId, pickingAssemblyId: assembly.Id);

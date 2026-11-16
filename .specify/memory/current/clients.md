@@ -108,7 +108,10 @@ expiration group, expected and found quantities, current held fact, blocked
 quantity and resolution. Its decision dialog explains the stock effect:
 confirming a shortage posts a correction for the blocked quantity; rejecting
 the report releases the block without a stock movement. Both require a reason
-and preserve the command ID for an uncertain reply. The cancellation action
+and preserve the command ID for an uncertain reply. Resolving the cell shortage
+does not change the assembly plan or approve shipping fewer units. When fact
+is below plan, the Web card directs the Manager to recheck 1C, allocate a shared
+SKU if needed, and close with a reason or wait for further picking. The cancellation action
 requires a reason and zero remaining picked fact; the server also checks
 reservations and returned pallets. An accepted cancellation may wait for
 started replenishment and 1C status restoration.
@@ -147,7 +150,14 @@ to use `Code`. Addresses are larger on picking and replenishment work screens,
 including the shared stock-by-cell view. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm
 the offered quantity explicitly. The fact card refreshes the next route step
-in place. A shortage is reported separately, with the found quantity retained.
+in place. Its one confirmation button records a full offered pick normally.
+A smaller entered quantity, including zero, opens a shortage confirmation:
+the entered amount is the entire remaining physical quantity of that SKU and
+expiration group in the scanned cell. The prompt shows the offered pick, free
+accounting quantity, found amount and amount to block. Confirmation reserves
+the found fact and reports the shortage in one replay-safe command; cancelling
+changes nothing. The former separate picking-shortage button is removed.
+When closure needs a Manager, the TSD shows the reasons in a visible dialog.
 Returning a confirmed fact requires scanning its original cell and confirming
 the physical return. Other SKU remain selectable when one is unavailable.
 A fresh closure check prevents the TSD Operator from overriding

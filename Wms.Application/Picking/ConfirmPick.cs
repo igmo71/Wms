@@ -62,6 +62,8 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                 var source = checkedSource.Value!;
                 if (request.Quantity > source.SuggestedQuantity)
                     return OperationError.Conflict("Количество превышает оставшуюся потребность или доступный остаток.");
+                if (request.Quantity < source.SuggestedQuantity)
+                    return OperationError.Conflict("Для меньшего количества подтвердите недостачу в ячейке.");
                 if (state.Location!.Zone!.Type == ZoneType.Reserve)
                 {
                     var hold = state.Location.ActiveLock;

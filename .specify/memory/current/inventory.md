@@ -86,11 +86,16 @@ check only for a SKU that tracks expiration; the fact retains null. Confirming
 a pick reserves its exact group and records editable fact without moving stock.
 Reducing a fact requires a scan of its original cell and confirmation that the
 released quantity is physically there; the matching reservation is reduced
-in the same command. Reporting a physical shortage is a separate command:
-the found quantity is reserved once, while the disputed free quantity is
-blocked by a dated shortage record. A Manager either posts a stock correction
-for that quantity or releases a mistaken block, preserving the report and
-decision. A direct Reserve pick first holds the whole one-SKU cell; each
+in the same command. A normal pick confirms the full quantity currently offered
+for the scanned SKU, cell and expiration group. When the operator finds less,
+including zero, the found quantity means the entire remaining physical stock
+of that group in the cell. The shortage command checks the scanned free
+accounting quantity, reserves the found positive fact once, and blocks all
+other free accounting quantity of that group in the same transaction. The
+disputed group therefore does not return as a route step. A Manager either
+posts a stock correction for the blocked quantity or releases a mistaken block,
+preserving the report and decision. This stock decision does not approve a
+shipping plan/fact discrepancy. A direct Reserve pick first holds the whole one-SKU cell; each
 confirmed date group must be taken in full. The
 hold can be released after a confirming scan only when no positive fact remains
 from that cell. The Mobile «Отбор» button opens the replacement picking screens.

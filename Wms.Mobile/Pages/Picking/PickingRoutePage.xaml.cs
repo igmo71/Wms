@@ -125,6 +125,11 @@ public partial class PickingRoutePage : ContentPage
                 ErrorLabel.Text = string.Join("\n", check.HardBlocks.Concat(check.ManagerIssues));
                 if (string.IsNullOrWhiteSpace(ErrorLabel.Text))
                     ErrorLabel.Text = "Сборка требует решения руководителя склада.";
+                await DisplayAlertAsync(check.HardBlocks.Count > 0
+                        ? "Закрытие пока невозможно" : "Требуется решение руководителя",
+                    ErrorLabel.Text + (check.ManagerIssues.Count > 0
+                        ? "\n\nСверьте сборку с 1С и примите решение в веб-приложении." : ""),
+                    "Понятно");
                 return;
             }
             if (!await DisplayAlertAsync("Закрыть и отгрузить",

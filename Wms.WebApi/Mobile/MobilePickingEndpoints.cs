@@ -427,7 +427,7 @@ internal static class MobilePickingEndpoints
             request.ClientRequestId, assemblyId, request.ExpectedRevision,
             request.ScannedLocationCode, request.SkuId, request.ExpirationDate,
             request.ExpectedQuantity, request.FoundQuantity, userId,
-            request.ExistingPickingEntryId, request.Comment), ct));
+            request.Comment), ct));
     }
 
     private static async Task<IResult> CheckClosureAsync(

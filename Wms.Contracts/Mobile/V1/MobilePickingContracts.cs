@@ -175,7 +175,7 @@ public sealed record MobilePickingShortageRequest(
     Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
     string ScannedLocationCode, Guid SkuId, DateOnly? ExpirationDate,
     decimal ExpectedQuantity, decimal FoundQuantity,
-    Guid? ExistingPickingEntryId = null, string? Comment = null);
+    string? Comment = null);
 
 public sealed record MobilePickingClosureCheckResponse(
     long Revision, bool FactMatchesPlan, bool CanOperatorClose,

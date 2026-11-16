@@ -132,7 +132,6 @@ public partial class PickingEntryPage : ContentPage
             ConfirmButton.Text = "Подтвердить возврат";
             ConfirmButton.IsEnabled = !_busy && _returnLocationChecked
                 && !_needsPalletReturn;
-            ShortageButton.IsVisible = false;
             HoldPalletButton.IsVisible = false;
             ReturnPalletButton.IsVisible = _needsPalletReturn;
         }
@@ -169,7 +168,6 @@ public partial class PickingEntryPage : ContentPage
             ConfirmButton.Text = "Подтвердить Отбор";
             ConfirmButton.IsEnabled = !_busy && _source is not null
                 && (!_directPalletPick || _palletHeld);
-            ShortageButton.IsVisible = _source is not null;
             HoldPalletButton.IsVisible = _source is not null
                 && _directPalletPick && !_palletHeld;
             ReturnPalletButton.IsVisible = _directPalletPick && _palletHeld
@@ -231,7 +229,7 @@ public partial class PickingEntryPage : ContentPage
     private async void OnConfirmClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null) return;
-        if (!TryQuantity(out var quantity)) return;
+        if (!TryQuantity(out var quantity, allowZero: _returnEntry is null)) return;
         if (_returnEntry is { } entry)
         {
             if (!_returnLocationChecked || quantity > entry.Quantity)
@@ -259,31 +257,29 @@ public partial class PickingEntryPage : ContentPage
                 ErrorLabel.Text = "Сначала снимите весь поддон и подтвердите удержание.";
                 return;
             }
-            await RunActionAsync(PendingAction.Pick,
-                () => _process.ConfirmPickAsync(_assembly.Id,
-                    _assembly.WarehouseId, _assembly.Revision,
-                    source.LocationCode, _skuId, source.ExpirationDate, quantity));
+            if (quantity < source.SuggestedQuantity)
+            {
+                var address = string.IsNullOrWhiteSpace(source.LocationName)
+                    ? source.LocationCode : source.LocationName;
+                var missing = source.AvailableQuantity - quantity;
+                var unit = _work?.Skus.FirstOrDefault(x => x.SkuId == _skuId)?.Unit ?? "ед.";
+                if (!await DisplayAlertAsync("Недостача в ячейке",
+                    $"В ячейке {address} предложено отобрать {source.SuggestedQuantity:0.###} {unit}. "
+                    + $"Свободно по учёту {source.AvailableQuantity:0.###} {unit}; фактически в ячейке {quantity:0.###} {unit}. "
+                    + $"Отобрать найденное и заблокировать недостачу {missing:0.###} {unit} до решения руководителя?",
+                    "Подтвердить недостачу", "Отмена")) return;
+                await RunActionAsync(PendingAction.Shortage,
+                    () => _process.ReportShortageAsync(_assembly.Id,
+                        _assembly.WarehouseId, _assembly.Revision,
+                        source.LocationCode, _skuId, source.ExpirationDate,
+                        source.AvailableQuantity, quantity, null));
+            }
+            else
+                await RunActionAsync(PendingAction.Pick,
+                    () => _process.ConfirmPickAsync(_assembly.Id,
+                        _assembly.WarehouseId, _assembly.Revision,
+                        source.LocationCode, _skuId, source.ExpirationDate, quantity));
         }
-    }
-
-    private async void OnShortageClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _process.HasPendingCommand || _assembly is null
-            || _source is not { } source) return;
-        if (!TryQuantity(out var found, allowZero: true)
-            || found >= source.SuggestedQuantity)
-        {
-            ErrorLabel.Text = "Для недостачи укажите найденное количество меньше предложенного.";
-            return;
-        }
-        if (!await DisplayAlertAsync("Недостача",
-            $"Ожидалось {source.SuggestedQuantity:0.###}, найдено {found:0.###}. Сообщить руководителю?",
-            "Сообщить", "Отмена")) return;
-        await RunActionAsync(PendingAction.Shortage,
-            () => _process.ReportShortageAsync(_assembly.Id,
-                _assembly.WarehouseId, _assembly.Revision,
-                source.LocationCode, _skuId, source.ExpirationDate,
-                source.SuggestedQuantity, found, null));
     }
 
     private async void OnHoldPalletClicked(object? sender, EventArgs e)

@@ -35,7 +35,7 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
             DateTimeOffset.UtcNow));
         var assembly = PickingAssembly(warehouse.Id, Worker);
         Value(assembly.AttachSource(sourceId, "{\"version\":1}",
-            new Dictionary<Guid, decimal> { [sku.Id] = 10 }, Worker,
+            new Dictionary<Guid, decimal> { [sku.Id] = 3 }, Worker,
             DateTimeOffset.UtcNow));
         var startedAt = DateTimeOffset.UtcNow;
         var leaseId = Guid.NewGuid();
@@ -47,7 +47,7 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
         await using (var seed = database.CreateDbContext())
         {
             seed.AddRange(warehouse, sku, zone, location, source, assembly,
-                Balance(warehouse.Id, location.Id, sku.Id, 10));
+                Balance(warehouse.Id, location.Id, sku.Id, 5));
             await seed.SaveChangesAsync();
         }
 
@@ -72,7 +72,7 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
             Guid.NewGuid(), assembly.Id, assembly.OperationalRevision, NewWorker)));
         Error(await pick.ExecuteAsync(new ConfirmPickRequest(Guid.NewGuid(),
             assembly.Id, assembly.OperationalRevision, location.Code,
-            sku.Id, null, 6, Worker)), OperationErrorType.Conflict);
+            sku.Id, null, 2, Worker)), OperationErrorType.Conflict);
         await using (var afterConflict = database.CreateDbContext())
         {
             Assert.False(await afterConflict.PickingEntries.AnyAsync(x =>
@@ -83,35 +83,57 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
         var afterTakeOver = (await assemblyStore.ReadAssemblyAsync(assembly.Id,
             CancellationToken.None))!;
 
-        var entryId = Value(await pick.ExecuteAsync(new ConfirmPickRequest(
+        Error(await pick.ExecuteAsync(new ConfirmPickRequest(
             Guid.NewGuid(), assembly.Id, afterTakeOver.OperationalRevision,
-            location.Code, sku.Id, null, 6, NewWorker)));
-        Assert.Equal(4m, (await stock.ReadSkuAsync(warehouse.Id, sku.Id,
-            CancellationToken.None)).Single().AvailableQuantity);
-        var afterPick = (await assemblyStore.ReadAssemblyAsync(assembly.Id,
-            CancellationToken.None))!;
-        var shortageId = Value(await report.ExecuteAsync(
-            new ReportPickingShortageRequest(Guid.NewGuid(), assembly.Id,
-                afterPick.OperationalRevision, location.Code, sku.Id,
-                null, 4, 0, NewWorker)));
+            location.Code, sku.Id, null, 2, NewWorker)),
+            OperationErrorType.Conflict);
+        Error(await report.ExecuteAsync(new ReportPickingShortageRequest(
+            Guid.NewGuid(), assembly.Id, afterTakeOver.OperationalRevision,
+            location.Code, sku.Id, null, 3, 2, NewWorker)),
+            OperationErrorType.Conflict);
+        var shortageRequest = new ReportPickingShortageRequest(Guid.NewGuid(),
+            assembly.Id, afterTakeOver.OperationalRevision, location.Code,
+            sku.Id, null, 5, 2, NewWorker);
+        var shortageId = Value(await report.ExecuteAsync(shortageRequest));
+        Assert.Equal(shortageId, Value(await report.ExecuteAsync(shortageRequest)));
+        Guid entryId;
+        await using (var afterReport = database.CreateDbContext())
+        {
+            entryId = (await afterReport.PickingEntries.SingleAsync(x =>
+                x.PickingAssemblyId == assembly.Id)).Id;
+            Assert.Equal(2m, (await afterReport.PickingReservations.SingleAsync(x =>
+                x.PickingEntryId == entryId)).Quantity);
+            Assert.Equal(3m, (await afterReport.StockShortages.SingleAsync(x =>
+                x.Id == shortageId)).BlockedQuantity);
+        }
+        var afterReportStock = await stock.ReadSkuAsync(warehouse.Id, sku.Id,
+            CancellationToken.None);
+        Assert.Equal(0m, afterReportStock.Single().AvailableQuantity);
+        var route = Value(new BuildPickingRoute().Execute(new PickingRouteRequest(
+            assembly.Id, warehouse.Id, DateOnly.FromDateTime(DateTime.Today),
+            new Dictionary<Guid, decimal> { [sku.Id] = 1 }, afterReportStock,
+            [new PickingRouteLocation(location.Id, location.Code,
+                ZoneType.Storage, true, 1)])));
+        Assert.Empty(route.Steps);
+        Assert.Equal(1m, route.Gaps.Single().Quantity);
         Value(await resolve.ExecuteAsync(new ResolveStockShortageRequest(
             Guid.NewGuid(), shortageId, true, "Недостача проверена", "manager")));
 
         var beforeReturn = (await stock.ReadSkuAsync(warehouse.Id, sku.Id,
             CancellationToken.None)).Single();
-        Assert.Equal(6m, beforeReturn.AccountingQuantity);
-        Assert.Equal(6m, beforeReturn.ReservedQuantity);
+        Assert.Equal(2m, beforeReturn.AccountingQuantity);
+        Assert.Equal(2m, beforeReturn.ReservedQuantity);
         Assert.Equal(0m, beforeReturn.AvailableQuantity);
         var afterShortage = (await assemblyStore.ReadAssemblyAsync(assembly.Id,
             CancellationToken.None))!;
         var returnRequest = new ReducePickRequest(Guid.NewGuid(), assembly.Id,
             entryId, afterShortage.OperationalRevision, location.Code,
-            6, true, NewWorker);
+            2, true, NewWorker);
         Assert.Equal(entryId, Value(await reduce.ExecuteAsync(returnRequest)));
         Assert.Equal(entryId, Value(await reduce.ExecuteAsync(returnRequest)));
 
         await using var final = database.CreateDbContext();
-        Assert.Equal(6m, (await final.InventoryBalances.SingleAsync(x =>
+        Assert.Equal(2m, (await final.InventoryBalances.SingleAsync(x =>
             x.StorageLocationId == location.Id)).Quantity);
         Assert.Equal(0m, (await final.PickingEntries.SingleAsync(x =>
             x.Id == entryId)).Quantity);
@@ -121,6 +143,19 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
             x.RecorderId == shortageId));
         Assert.Equal(1, await final.CommandReceipts.CountAsync(x =>
             x.RequestId == returnRequest.RequestId));
+
+        var afterReturn = (await assemblyStore.ReadAssemblyAsync(assembly.Id,
+            CancellationToken.None))!;
+        var zeroRequest = new ReportPickingShortageRequest(Guid.NewGuid(),
+            assembly.Id, afterReturn.OperationalRevision, location.Code,
+            sku.Id, null, 2, 0, NewWorker);
+        var zeroShortageId = Value(await report.ExecuteAsync(zeroRequest));
+        Assert.Equal(zeroShortageId, Value(await report.ExecuteAsync(zeroRequest)));
+        await using var afterZero = database.CreateDbContext();
+        Assert.False(await afterZero.PickingEntries.AnyAsync(x =>
+            x.PickingAssemblyId == assembly.Id && x.Quantity > 0));
+        Assert.Equal(2m, (await afterZero.StockShortages.SingleAsync(x =>
+            x.Id == zeroShortageId)).BlockedQuantity);
     }
 
     private static ShippingOrderImportSnapshot SourceImport(Guid sourceId,
