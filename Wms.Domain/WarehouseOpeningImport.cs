@@ -66,9 +66,8 @@ public sealed class WarehouseOpeningImport
     {
         if (Status != WarehouseOpeningImportStatus.TopologyImported)
             return OperationError.Conflict("Начальные остатки уже загружены для этого склада.");
-        if (!ValidSha256(sourceSha256)
-            || !string.Equals(SourceSha256, sourceSha256, StringComparison.OrdinalIgnoreCase))
-            return OperationError.Conflict("Файл остатков отличается от файла топологии.");
+        if (!ValidSha256(sourceSha256))
+            return OperationError.Invalid("Хеш файла начальных остатков некорректен.");
         if (declaredSnapshotAt == default || importedAtUtc == default
             || !ValidSummary(stockSummary) || !ValidUserId(userId))
             return OperationError.Invalid("Данные загрузки начальных остатков неполны или некорректны.");

@@ -20,6 +20,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
 {
     private const string Actor = "opening-admin";
     private static readonly byte[] Workbook = [1, 3, 5, 7];
+    private static readonly byte[] StockWorkbook = [2, 4, 6, 8];
     private static readonly DateTimeOffset SnapshotAt =
         new(2026, 11, 2, 12, 0, 0, TimeSpan.FromHours(3));
     private static readonly string[] ReviewedAddresses =
@@ -52,19 +53,19 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
 
         var wrongUnit = new FixedReader([rows[0] with { UnitOfMeasure = "кг" }]);
         var wrongUnitPlan = await new PreviewOpeningStock(wrongUnit, new OpeningImportStore(database))
-            .BuildPlanAsync(warehouse.Id, Workbook, SnapshotAt);
+            .BuildPlanAsync(warehouse.Id, StockWorkbook, SnapshotAt);
         Assert.False(wrongUnitPlan.CanConfirm);
         Assert.Contains(wrongUnitPlan.Issues, x => x.BlocksConfirmation
             && x.Message == "Единица выгрузки не совпадает с базовой единицей SKU.");
 
         var plan = await new PreviewOpeningStock(reader, new OpeningImportStore(database))
-            .BuildPlanAsync(warehouse.Id, Workbook, SnapshotAt);
+            .BuildPlanAsync(warehouse.Id, StockWorkbook, SnapshotAt);
         Assert.True(plan.CanConfirm, string.Join("; ", plan.Issues
             .Where(x => x.BlocksConfirmation).Select(x => x.Message)));
         Assert.Equal(8, plan.Counts.ReviewedMixedCells);
         Assert.Equal(0, plan.Counts.UnreviewedMixedCells);
         var command = new ConfirmOpeningStockCommand(Guid.NewGuid(), warehouse.Id,
-            Workbook, SnapshotAt, plan.Signature, Actor);
+            "stock.xlsx", StockWorkbook, SnapshotAt, plan.Signature, Actor);
         var confirm = Confirm(reader, database);
         var importId = Value(await confirm.ExecuteAsync(command));
         Assert.Equal(importId, Value(await confirm.ExecuteAsync(command)));
@@ -134,6 +135,8 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
             Assert.Equal(WarehouseOpeningImportStatus.StockImported, import.Status);
             Assert.Equal(SnapshotAt, import.DeclaredSnapshotAt);
             Assert.Contains(ReviewedAddresses[0], import.StockSummary);
+            Assert.Contains("stock.xlsx", import.StockSummary);
+            Assert.Contains(Convert.ToHexString(SHA256.HashData(StockWorkbook)), import.StockSummary);
             Assert.Equal(1, await verify.CommandReceipts.CountAsync(x => x.RequestId == command.RequestId));
         }
 
@@ -151,7 +154,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
         var changedWorkbook = await confirm.ExecuteAsync(command with
         {
             RequestId = Guid.NewGuid(), UserId = "another-admin",
-            Workbook = new byte[] { 2, 4, 6, 8 }
+            Workbook = new byte[] { 9, 8, 7, 6 }
         });
         Error(changedWorkbook, OperationErrorType.Conflict);
         await using (var verifyReplay = database.CreateDbContext())
@@ -206,7 +209,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
             .BuildPlanAsync(warehouse.Id, Workbook, SnapshotAt);
         Assert.True(plan.CanConfirm);
         var command = new ConfirmOpeningStockCommand(Guid.NewGuid(), warehouse.Id,
-            Workbook, SnapshotAt, plan.Signature, Actor);
+            "opening.xlsx", Workbook, SnapshotAt, plan.Signature, Actor);
         var failing = Confirm(reader, database.WithInterceptor(new BreakOpeningStockAuditReference()));
         await Assert.ThrowsAsync<DbUpdateException>(() => failing.ExecuteAsync(command));
 
@@ -238,7 +241,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
 
         var permission = new ConcurrentAdministrator();
         var firstCommand = new ConfirmOpeningStockCommand(Guid.NewGuid(), warehouse.Id,
-            Workbook, SnapshotAt, plan.Signature, "first-admin");
+            "opening.xlsx", Workbook, SnapshotAt, plan.Signature, "first-admin");
         var secondCommand = firstCommand with
         {
             RequestId = Guid.NewGuid(), UserId = "second-admin"

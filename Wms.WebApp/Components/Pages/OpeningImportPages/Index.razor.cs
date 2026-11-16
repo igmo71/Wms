@@ -328,7 +328,8 @@ public partial class Index
 
     private async Task ConfirmStockAsync()
     {
-        if (_warehouse is null || StockConfirmDisabled || _workbook is null || _stockPlan is null)
+        if (_warehouse is null || StockConfirmDisabled || _workbook is null
+            || _sourceName is null || _stockPlan is null)
             return;
         _busy = true;
         _error = null;
@@ -342,7 +343,7 @@ public partial class Index
                 return;
             }
             var result = await StockConfirmService.ExecuteAsync(new ConfirmOpeningStockCommand(
-                _requestId, _warehouse.Id, _workbook, _snapshotAt,
+                _requestId, _warehouse.Id, _sourceName, _workbook, _snapshotAt,
                 _stockPlan.Signature, userId));
             if (result.IsSuccess)
             {

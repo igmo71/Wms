@@ -615,7 +615,7 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Maintenance_cleanup_preserves_import_and_catalog_receipts_until_full_clear()
+    public async Task Maintenance_cleanup_resets_opening_stock_but_retains_topology_and_catalog_receipts()
     {
         var isolated = new SqlDatabase();
         await isolated.InitializeAsync();
@@ -685,12 +685,20 @@ public sealed class ReceivingSafetyTests(SqlDatabase database)
                         "scripts/clear-wms-operational-data.sql")));
             await using (var retained = isolated.CreateDbContext())
             {
-                Assert.Equal(commandTypes.OrderBy(x => x).ToArray(),
+                Assert.Equal(commandTypes.Where(x => x != "warehouse.opening.stock.import")
+                        .OrderBy(x => x).ToArray(),
                     await retained.CommandReceipts.Select(x => x.CommandType)
                         .OrderBy(x => x).ToArrayAsync());
-                Assert.Equal(4, await retained.WarehouseAuditEvents.CountAsync());
-                Assert.Equal(WarehouseOpeningImportStatus.StockImported,
-                    (await retained.WarehouseOpeningImports.SingleAsync()).Status);
+                Assert.Equal(3, await retained.WarehouseAuditEvents.CountAsync());
+                var retainedImport = await retained.WarehouseOpeningImports.SingleAsync();
+                Assert.Equal(WarehouseOpeningImportStatus.TopologyImported, retainedImport.Status);
+                Assert.Equal("opening.xlsx", retainedImport.SourceName);
+                Assert.Equal(sourceHash.ToLowerInvariant(), retainedImport.SourceSha256);
+                Assert.Null(retainedImport.DeclaredSnapshotAt);
+                Assert.Null(retainedImport.StockImportedAtUtc);
+                Assert.Null(retainedImport.StockImportedBy);
+                Assert.Null(retainedImport.StockSummary);
+                Assert.Equal(2, retainedImport.Revision);
                 Assert.Equal(1, await retained.StockKeepingUnits.CountAsync());
             }
 

@@ -8,8 +8,9 @@
 
     Сохраняются Identity (dbo.AspNet*), dbo.__EFMigrationsHistory,
     все справочники, штрихкоды, склады, зоны, места хранения, ручные блокировки,
-    запись разовой загрузки топологии и остатков, а также аудит и квитанции
-    этой загрузки и изменений справочника SKU.
+    запись загрузки топологии, ее аудит и квитанции, а также историю изменений
+    справочника SKU. Этап начальных остатков возвращается в ожидание загрузки.
+    Флаги SKU, включенные при прежней загрузке остатков, остаются в справочнике.
     Учитывает состав LPN, историю размещения, участников приемки,
     резервы и недостачи Отбора и Подпитки.
     Последовательность LicensePlateNumberSequence не сбрасывается: старые коды
@@ -24,24 +25,22 @@ SET XACT_ABORT ON;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    -- Сохраняем только аудит разовой загрузки и изменений справочника SKU.
+    -- Сохраняем только аудит топологии и изменений справочника SKU.
     -- Остальной аудит может ссылаться на удаляемые сборки, приемки и команды.
     DELETE FROM [dbo].[WarehouseAuditEvents]
     WHERE [CommandType] IS NULL OR [CommandType] NOT IN (
         'sku.expiration-tracking.set',
         'sku.barcode.remove-local',
-        'warehouse.opening.topology.import',
-        'warehouse.opening.stock.import'
+        'warehouse.opening.topology.import'
     );
 
-    -- Квитанции сохраненных изменений и разовой загрузки нужны для безопасного
+    -- Квитанции сохраненных изменений и топологии нужны для безопасного
     -- повтора команд. Их аудит остается выше и ссылается на квитанции по FK.
     DELETE FROM [dbo].[CommandReceipts]
     WHERE [CommandType] NOT IN (
         'sku.expiration-tracking.set',
         'sku.barcode.remove-local',
-        'warehouse.opening.topology.import',
-        'warehouse.opening.stock.import'
+        'warehouse.opening.topology.import'
     );
 
     -- Связанные с движениями записи удаляются до самих движений.
@@ -91,8 +90,16 @@ BEGIN TRY
     DELETE FROM [dbo].[ReceivingSourceDocuments];
     DELETE FROM [dbo].[ShippingOrders];
 
-    -- WarehouseOpeningImports, его протокол и топология остаются. Этот скрипт
-    -- удаляет и начальные остатки; повторную загрузку без полной очистки не выполнять.
+    -- Протокол топологии остается; протокол остатков больше не должен описывать
+    -- удаленные движения. Повторная загрузка возможна после полного сброса работы.
+    UPDATE [dbo].[WarehouseOpeningImports]
+    SET [Status] = 1,
+        [DeclaredSnapshotAt] = NULL,
+        [StockImportedAtUtc] = NULL,
+        [StockImportedBy] = NULL,
+        [StockSummary] = NULL,
+        [Revision] = [Revision] + 1
+    WHERE [Status] = 2;
 
     COMMIT TRANSACTION;
 END TRY

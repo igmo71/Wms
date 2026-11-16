@@ -10,6 +10,7 @@ namespace Wms.Application.OpeningImports;
 public sealed record ConfirmOpeningStockCommand(
     Guid RequestId,
     Guid WarehouseId,
+    string SourceName,
     ReadOnlyMemory<byte> Workbook,
     DateTimeOffset DeclaredSnapshotAt,
     string PreviewSignature,
@@ -29,6 +30,8 @@ public sealed class ConfirmOpeningStock(
         ConfirmOpeningStockCommand command, CancellationToken ct = default)
     {
         if (command is null || command.WarehouseId == Guid.Empty
+            || string.IsNullOrWhiteSpace(command.SourceName)
+            || command.SourceName.Trim().Length > WarehouseOpeningImport.MaximumSourceNameLength
             || command.Workbook.IsEmpty || command.DeclaredSnapshotAt == default
             || command.PreviewSignature is not { Length: 64 }
             || !command.PreviewSignature.All(Uri.IsHexDigit))
@@ -36,10 +39,11 @@ public sealed class ConfirmOpeningStock(
                 OperationError.Invalid("Для загрузки нужны склад, файл, время снимка и подтверждённый предпросмотр."));
 
         var sourceHash = Convert.ToHexString(SHA256.HashData(command.Workbook.Span));
+        var sourceName = command.SourceName.Trim();
         var previewSignature = command.PreviewSignature.ToUpperInvariant();
         var requestHash = CommandExecutor.ComputeHash(JsonSerializer.Serialize(new
         {
-            command.WarehouseId, SourceSha256 = sourceHash,
+            command.WarehouseId, SourceName = sourceName, SourceSha256 = sourceHash,
             command.DeclaredSnapshotAt, PreviewSignature = previewSignature
         }));
 
@@ -66,10 +70,6 @@ public sealed class ConfirmOpeningStock(
                     || snapshotImport.Status != state.Import.Status)
                     return OperationError.Conflict(
                         "Сначала загрузите топологию склада или обновите предпросмотр.");
-                if (!string.Equals(state.Import.SourceSha256, sourceHash,
-                    StringComparison.OrdinalIgnoreCase))
-                    return OperationError.Conflict(
-                        "Файл остатков отличается от загруженной топологии. Новая репетиция требует очистки базы.");
                 if (state.Import.Status != WarehouseOpeningImportStatus.TopologyImported)
                     return OperationError.Conflict(
                         "Начальные остатки этого склада уже загружены. Проверьте сохранённый протокол; новая репетиция требует очистки базы.");
@@ -111,7 +111,7 @@ public sealed class ConfirmOpeningStock(
                         "Состав согласованных смешанных ячеек изменился.");
                 var summary = JsonSerializer.Serialize(new
                 {
-                    plan.SourceSha256, plan.DeclaredSnapshotAt,
+                    SourceName = sourceName, plan.SourceSha256, plan.DeclaredSnapshotAt,
                     plan.Counts.SourceRows, plan.Counts.AcceptedRows,
                     plan.Counts.CorrectedRows, plan.Counts.ExcludedRows,
                     plan.Counts.NonzeroRows, plan.Counts.ZeroRows,

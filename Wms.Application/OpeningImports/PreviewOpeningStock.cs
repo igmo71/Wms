@@ -133,9 +133,6 @@ public static class OpeningStockPlanBuilder
         {
             if (state.Import.Status != WarehouseOpeningImportStatus.TopologyImported)
                 issues.Add(new(null, null, "Начальные остатки уже загружены для этого склада.", true));
-            if (!string.Equals(state.Import.SourceSha256, sourceSha256,
-                    StringComparison.OrdinalIgnoreCase))
-                issues.Add(new(null, null, "Файл остатков отличается от файла топологии.", true));
         }
         if (state.HasOperationalStock)
             issues.Add(new(null, null,

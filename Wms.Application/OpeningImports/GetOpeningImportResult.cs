@@ -30,7 +30,8 @@ public sealed record OpeningStockResult(
     int NonzeroRows, int ZeroRows, int NegativeRows,
     int MissingRequiredDates, int PastDates, decimal SignedQuantity,
     IReadOnlyList<string> ReviewedMixedAddresses,
-    int Movements, int Balances, int ExpirationFlagsEnabled);
+    int Movements, int Balances, int ExpirationFlagsEnabled,
+    string? SourceName = null, string? SourceSha256 = null);
 
 public sealed record OpeningImportResult(
     Guid Id, Guid WarehouseId, string SourceName, string SourceSha256,

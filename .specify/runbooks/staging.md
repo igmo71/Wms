@@ -75,11 +75,13 @@ migration compatibility separately before changing a non-disposable database.
 
 ### Cutover rehearsal database
 
-Use a separate disposable database for each warehouse-cutover rehearsal. The
-opening import allows one topology stage and one stock snapshot per warehouse;
-a changed workbook or a new request cannot replace either stage. Keep the XLSX,
-snapshot time, source SHA-256 and saved import protocol with the rehearsal
-results. Inspect the protocol on the Administrator «Переход со старой WMS» page
+Use an isolated disposable database for warehouse-cutover rehearsals. The
+opening import allows one topology stage and one stock snapshot per warehouse
+between operational-data resets. A new request cannot replace a confirmed stock
+snapshot until the operational-data cleanup resets that stage. Keep both XLSX
+files when they differ, the snapshot time, each source SHA-256 and the saved
+import protocol with the rehearsal results. Inspect the protocol on the
+Administrator «Переход со старой WMS» page
 before accepting the rehearsal.
 Before catalog synchronization, check the effective `ONEC_BASEADDRESS` for
 that WebApp against the 1C UT database corresponding to the export. The
@@ -89,22 +91,26 @@ may contain SKU GUIDs absent from that copy. A rehearsal that reads a different
 operations cannot affect shared dev/test work.
 
 For another rehearsal, stop that environment's WebApp, WebApi and integration
-workers. Restore a clean disposable database, or run
-`scripts/clear-database-except-identity.sql` against the intended disposable
-database, then resynchronize the 1C SKU and unit catalogs before loading stock.
+workers. To retain topology and catalogs, run
+`scripts/clear-wms-operational-data.sql` against the intended disposable database.
+It removes operational work, balances, movements, stock-import audit and command
+receipts, then returns the opening-import status to topology-only. Local SKU flags,
+including expiration tracking enabled by the prior stock import, remain; review
+them when the next export differs. To rebuild topology as well, restore a clean
+disposable database or run `scripts/clear-database-except-identity.sql`, then
+resynchronize the 1C SKU and unit catalogs before loading stock.
 The full-clear script also removes opening-import records, audit, movements,
 balances, topology and catalogs, while preserving Identity and migration history.
 Recreate the target warehouse and its access settings before the next import.
-`scripts/clear-wms-operational-data.sql` keeps topology, the opening-import
-record, its audit and command receipts, and catalog-change history. It removes
-balances and movements, so the saved import summary no longer describes current
-stock and the warehouse cannot use the script for another cutover rehearsal.
+The operational cleanup keeps the topology import record, its audit and command
+receipts, and catalog-change history. It clears the former stock summary so the
+saved protocol describes the current stage.
 Database cleanup is an environment operation, never a cutover-page action.
 
 At the final transition, complete or separately resolve open work in the old
 WMS, stop its warehouse operations, and export the complete workbook. Preview
 and confirm topology in the new WMS; synchronize SKU and unit catalogs; preview
-and confirm stock from the same unchanged workbook with its recorded Moscow-time
+and confirm stock from the same or a later workbook with its recorded Moscow-time
 snapshot. Inspect the saved protocol and balances, then resume warehouse work
 only in the new WMS. The export does not migrate unfinished orders, LPNs or
 transfers. The detailed checks are in the

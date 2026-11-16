@@ -29,9 +29,7 @@ public sealed class PostOpeningStock(IOpeningInventoryPostingStore store)
             || confirmationState.Snapshot.HasOperationalWork
             || import is null || import.Id != importId
             || import.WarehouseId != plan.WarehouseId
-            || import.Status != WarehouseOpeningImportStatus.TopologyImported
-            || !string.Equals(import.SourceSha256,
-                plan.SourceSha256, StringComparison.OrdinalIgnoreCase))
+            || import.Status != WarehouseOpeningImportStatus.TopologyImported)
             return OperationError.Conflict("Состояние склада не соответствует проверенному снимку.");
 
         var rows = plan.Rows

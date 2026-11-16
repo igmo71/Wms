@@ -9,7 +9,7 @@
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4 mb-6">
     <MudText Typo="Typo.h5" Class="mb-2">Переход со старой WMS</MudText>
-    <MudText Class="mb-4">Загрузите топологию и начальные остатки из одной выгрузки XLSX. Каждый этап подтверждается отдельно.</MudText>
+    <MudText Class="mb-4">Загрузите топологию и начальные остатки отдельными этапами. Для остатков можно выбрать другую выгрузку XLSX с адресами загруженной топологии.</MudText>
     <MudPaper Class="pa-3 mb-4" Elevation="1">
         <MudAutocomplete T="Warehouse" Value="_warehouse" ValueChanged="OnWarehouseChangedAsync"
                          SearchFunc="SearchWarehousesAsync" ToStringFunc="x => x?.Name ?? string.Empty"
@@ -26,7 +26,7 @@
                 && _savedResult?.Stock is null)
             {
                 <MudText Typo="Typo.h6">@(_savedResult is null ? "1. Топология" : "2. Начальные остатки")</MudText>
-                <MudText>Выберите выгрузку топологии и остатков 1С в формате XLSX.</MudText>
+                <MudText>Выберите выгрузку 1С в формате XLSX для текущего этапа.</MudText>
                 <InputFile OnChange="UploadAsync" accept=".xlsx" disabled="@(_busy || _loadingSavedResult)" />
                 @if (_savedResult is null)
                 {
@@ -34,7 +34,7 @@
                 }
                 else
                 {
-                    <MudText Typo="Typo.caption">Для остатков выберите ту же неизменённую выгрузку. После обновления страницы файл нужно выбрать повторно.</MudText>
+                    <MudText Typo="Typo.caption">Для остатков можно выбрать другую выгрузку. Адреса должны соответствовать загруженной топологии. После обновления страницы файл нужно выбрать повторно.</MudText>
                 }
                 @if (_sourceName is not null)
                 {
@@ -76,7 +76,7 @@
                     <MudButton Variant="Variant.Outlined" Disabled="@_loadingSavedResult" OnClick="LoadSavedResultAsync">Обновить</MudButton>
                 </MudStack>
                 <MudText><b>Статус:</b> @ImportStatusName(saved.Status)</MudText>
-                <MudText><b>Источник:</b> @saved.SourceName · SHA-256: <code>@saved.SourceSha256</code></MudText>
+                <MudText><b>Источник топологии:</b> @saved.SourceName · SHA-256: <code>@saved.SourceSha256</code></MudText>
                 <MudText><b>Топология:</b> @MoscowTime(saved.TopologyImportedAtUtc) МСК · @saved.TopologyImportedBy</MudText>
                 <MudText>Строк: @saved.TopologyCounts.SourceRows; принято: @saved.TopologyCounts.AcceptedRows; исправлено: @saved.TopologyCounts.CorrectedRows; исключено: @saved.TopologyCounts.ExcludedRows; ячеек: @saved.TopologyCounts.DistinctCells (пустых: @saved.TopologyCounts.EmptyCells).</MudText>
                 @if (ZeroPrefixExclusions.Count > 0)
@@ -119,6 +119,7 @@
                 {
                     <MudDivider />
                     <MudText Typo="Typo.subtitle2">Начальные остатки</MudText>
+                    <MudText><b>Источник остатков:</b> @(stock.SourceName ?? "имя не сохранено") · SHA-256: <code>@stock.SourceSha256</code></MudText>
                     <MudText><b>Момент выгрузки:</b> @MoscowTime(saved.DeclaredSnapshotAt) МСК</MudText>
                     <MudText><b>Подтверждено:</b> @MoscowTime(saved.StockImportedAtUtc) МСК · @saved.StockImportedBy</MudText>
                     <MudText>Строк: @stock.SourceRows; принято: @stock.AcceptedRows; исправлено: @stock.CorrectedRows; исключено: @stock.ExcludedRows; ненулевых: @stock.NonzeroRows; движений: @stock.Movements; остатков: @stock.Balances.</MudText>

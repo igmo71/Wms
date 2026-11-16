@@ -181,15 +181,18 @@ source-completion command finishes the pending assembly cancellation.
 ## Opening stock cutover
 
 The Administrator confirms opening stock separately from topology on the Web
-cutover page, using the same XLSX file after SKU catalog synchronization. The
-preview requires the topology-stage source SHA-256, a declared snapshot time,
-active target cells with matching functional purposes, known SKU GUIDs, and
+cutover page, using a separately selected XLSX file after SKU catalog
+synchronization. The stock file may differ from the topology file. The preview
+requires a previously imported topology, a declared snapshot time, active
+target cells with matching functional purposes, known SKU GUIDs, and
 matching canonical units. It blocks operational stock or work, unresolved mixed
 cells, unsupported quantities, and changed warehouse state. Missing SKUs and
 cells are not created during stock confirmation. Only one opening snapshot can
-be confirmed per warehouse. An exact retry with the original command key returns
-the recorded result; a new request for the same or another workbook conflicts.
-Another rehearsal starts with a cleaned database.
+be confirmed per warehouse between operational-data resets. An exact retry with
+the original command key returns the recorded result; a new request for the same
+or another workbook conflicts while that snapshot exists. The operational-data
+cleanup resets the stock stage and its command receipts while preserving topology;
+the next snapshot is previewed and confirmed against the retained cells.
 
 Accepted source rows with nonzero quantities produce one posted movement of
 positive magnitude and one signed turnover per row. A positive source quantity
@@ -199,9 +202,9 @@ expiration date, so repeated source rows share one balance while retaining
 separate movements and turnovers. A supplied past date remains as supplied;
 an absent required date remains unknown. An accepted source `Да` enables the
 SKU's local expiration requirement without disabling any existing requirement.
-Accepted zero rows make no movement. The import status, declared time, source
-summary, stock effects, SKU flags, audit and command receipt commit together;
-failed confirmation leaves the topology-only stage intact.
+Accepted zero rows make no movement. The import status, declared time, stock
+file name and hash, source summary, stock effects, SKU flags, audit and command
+receipt commit together; failed confirmation leaves the topology-only stage intact.
 
 Exactly these reviewed cells permit several SKUs: `1C09A1`, `1G09A1`,
 `1K09A1`, `1M09A1`, `1O09A1`, `1Q09A1`, `1U11A1`, `2O01A1`, `2O02A1`,
