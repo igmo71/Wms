@@ -85,8 +85,7 @@ internal static class MobileReplenishmentEndpoints
             return MobileEndpointResults.CommandProblem(warehouse.Error!);
         return ResourceId(await order.ExecuteAsync(new OrderReplenishmentRequest(
             request.ClientRequestId, assemblyId, request.ExpectedRevision,
-            request.SkuId, request.SourceLocationId,
-            request.ExpectedDestinationLocationId, request.Quantity, userId), ct));
+            request.SkuId, userId), ct));
     }
 
     private static async Task<IResult> ListAsync(

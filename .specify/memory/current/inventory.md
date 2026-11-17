@@ -109,11 +109,13 @@ quantity in the recommendation; a physically held cell is unavailable. A
 Storage destination with the SKU is preferred, followed by an empty cell with
 history for that SKU. This read-only calculation creates no replenishment task;
 ordering and physical scans require their own checks. An Operator responsible
-for an active assembly can explicitly order one currently offered proposal.
-The command rechecks the route, stock, source, destination and existing tasks
-in one transaction, then saves the task, assembly revision, audit and command
-receipt together. Repeating its request ID returns the same task. No stock
-movement or physical source hold occurs when the task is ordered.
+for an active assembly can explicitly order all currently offered proposals
+for one SKU in a single command. The command rechecks the route, stock,
+sources, destinations and existing tasks in one transaction, then saves all
+tasks, one assembly revision, their audit events and one command receipt
+together. Repeating its request ID returns the same assembly without creating
+more tasks. No stock movement or physical source hold occurs when the tasks
+are ordered.
 
 When a confirmed pick or Manager plan change reduces an assembly's remaining
 demand for a SKU to zero, the same command cancels its ordered replenishment

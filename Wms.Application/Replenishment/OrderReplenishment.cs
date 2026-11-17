@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
@@ -11,8 +10,7 @@ namespace Wms.Application.Replenishment;
 
 public sealed record OrderReplenishmentRequest(
     Guid RequestId, Guid PickingAssemblyId, long ExpectedRevision,
-    Guid StockKeepingUnitId, Guid SourceLocationId,
-    Guid? ExpectedDestinationLocationId, decimal Quantity, string UserId);
+    Guid StockKeepingUnitId, string UserId);
 
 public sealed class OrderReplenishment(
     CommandExecutor executor, IPickingAssemblyStore assemblies,
@@ -27,18 +25,14 @@ public sealed class OrderReplenishment(
     {
         if (request is null || request.RequestId == Guid.Empty
             || request.PickingAssemblyId == Guid.Empty || request.ExpectedRevision < 0
-            || request.StockKeepingUnitId == Guid.Empty || request.SourceLocationId == Guid.Empty
-            || request.ExpectedDestinationLocationId == Guid.Empty
-            || !WarehouseQuantity.IsPositive(request.Quantity)
+            || request.StockKeepingUnitId == Guid.Empty
             || string.IsNullOrWhiteSpace(request.UserId) || request.UserId.Length > 36)
             return Task.FromResult<OperationResult<Guid>>(
-                OperationError.Invalid("Укажите сборку, предложение Подпитки и сотрудника."));
+                OperationError.Invalid("Укажите сборку, SKU и сотрудника."));
 
         var hash = CommandExecutor.ComputeHash(
             $"{request.PickingAssemblyId:N}:{request.ExpectedRevision}:" +
-            $"{request.StockKeepingUnitId:N}:{request.SourceLocationId:N}:" +
-            $"{request.ExpectedDestinationLocationId:N}:" +
-            request.Quantity.ToString(CultureInfo.InvariantCulture));
+            $"{request.StockKeepingUnitId:N}");
         return executor.ExecuteAsync(CommandType, request.RequestId, hash,
             request.UserId, async (session, token) =>
             {
@@ -80,36 +74,38 @@ public sealed class OrderReplenishment(
                     route.Value!.Steps, availability, state.Locations,
                     state.ActiveTasks));
                 if (!calculated.IsSuccess) return calculated.Error!;
-                var proposal = calculated.Value!.Proposals.SingleOrDefault(x =>
-                    x.StockKeepingUnitId == request.StockKeepingUnitId
-                    && x.SourceLocationId == request.SourceLocationId
-                    && x.DestinationLocationId == request.ExpectedDestinationLocationId
-                    && x.Quantity == request.Quantity);
-                if (proposal is null)
+                var proposals = calculated.Value!.Proposals.Where(x =>
+                    x.StockKeepingUnitId == request.StockKeepingUnitId).ToArray();
+                if (proposals.Length == 0)
                     return OperationError.Conflict(
-                        "Предложение Подпитки изменилось. Обновите список перед заказом.");
+                        "Предложений Подпитки больше нет. Обновите SKU перед заказом.");
 
                 var changed = assembly.RecordReplenishmentOrder(request.UserId,
                     request.ExpectedRevision);
                 if (!changed.IsSuccess) return changed.Error!;
                 var now = clock.GetUtcNow();
-                var task = ReplenishmentTask.Order(Guid.NewGuid(), assembly.Id,
-                    assembly.WarehouseId, request.StockKeepingUnitId,
-                    proposal.Quantity, proposal.SourceLocationId,
-                    proposal.DestinationLocationId, request.UserId, now);
-                if (!task.IsSuccess) return task.Error!;
-                session.Stage(task.Value!);
-                var audit = WarehouseAuditEvent.Create("replenishment.ordered", now,
-                    request.UserId, null, null, null, request.StockKeepingUnitId,
-                    null, null,
-                    JsonSerializer.Serialize(new { TaskId = task.Value!.Id,
-                        SourceLocationId = proposal.SourceLocationId,
-                        DestinationLocationId = proposal.DestinationLocationId,
-                        proposal.Quantity, Revision = assembly.OperationalRevision }),
-                    commandUserId: request.UserId, commandType: CommandType,
-                    requestId: request.RequestId, pickingAssemblyId: assembly.Id);
-                if (!audit.IsSuccess) return audit.Error!;
-                return new CommandExecutionResult(task.Value!.Id, [audit.Value!]);
+                var audits = new List<WarehouseAuditEvent>(proposals.Length);
+                foreach (var proposal in proposals)
+                {
+                    var task = ReplenishmentTask.Order(Guid.NewGuid(), assembly.Id,
+                        assembly.WarehouseId, request.StockKeepingUnitId,
+                        proposal.Quantity, proposal.SourceLocationId,
+                        proposal.DestinationLocationId, request.UserId, now);
+                    if (!task.IsSuccess) return task.Error!;
+                    session.Stage(task.Value!);
+                    var audit = WarehouseAuditEvent.Create("replenishment.ordered", now,
+                        request.UserId, null, null, null, request.StockKeepingUnitId,
+                        null, null,
+                        JsonSerializer.Serialize(new { TaskId = task.Value!.Id,
+                            SourceLocationId = proposal.SourceLocationId,
+                            DestinationLocationId = proposal.DestinationLocationId,
+                            proposal.Quantity, Revision = assembly.OperationalRevision }),
+                        commandUserId: request.UserId, commandType: CommandType,
+                        requestId: request.RequestId, pickingAssemblyId: assembly.Id);
+                    if (!audit.IsSuccess) return audit.Error!;
+                    audits.Add(audit.Value!);
+                }
+                return new CommandExecutionResult(assembly.Id, audits);
             }, ct);
     }
 }

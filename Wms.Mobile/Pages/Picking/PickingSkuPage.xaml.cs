@@ -15,8 +15,8 @@ public partial class PickingSkuPage : ContentPage
     private MobilePickingAssemblyResponse? _assembly;
     private MobilePickingWorkResponse? _work;
     private bool _busy;
-    private bool _replenishmentsReady;
-    private IReadOnlyDictionary<Guid, decimal> _unavailableBySku = new Dictionary<Guid, decimal>();
+    private IReadOnlyDictionary<Guid, decimal>? _availableBySku;
+    private MobilePickingReplenishmentsResponse? _replenishmentList;
 
     public PickingSkuPage(MobilePickingClient client,
         MobileReplenishmentClient replenishments,
@@ -40,6 +40,9 @@ public partial class PickingSkuPage : ContentPage
     public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
     {
         _process = process;
+        _work = null;
+        _availableBySku = null;
+        _replenishmentList = null;
         Apply(assembly);
     }
 
@@ -63,8 +66,8 @@ public partial class PickingSkuPage : ContentPage
         {
             var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
             _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
-            _replenishmentsReady = false;
-            _unavailableBySku = new Dictionary<Guid, decimal>();
+            _availableBySku = null;
+            _replenishmentList = null;
             string? replenishmentError = null;
             string? routeError = null;
             if (assembly.Status == MobilePickingAssemblyStatus.InProgress
@@ -73,8 +76,10 @@ public partial class PickingSkuPage : ContentPage
                 try
                 {
                     var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
-                    _unavailableBySku = route.Gaps.GroupBy(x => x.SkuId)
-                        .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
+                    if (route.Revision == _work.Revision)
+                        _availableBySku = route.Steps.GroupBy(x => x.SkuId)
+                            .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
+                    else routeError = "Сборка изменилась. Обновите доступность SKU.";
                 }
                 catch (MobileApiException exception) { routeError = exception.Message; }
                 catch (HttpRequestException)
@@ -83,11 +88,8 @@ public partial class PickingSkuPage : ContentPage
                 {
                     var list = await _replenishments.AssemblyAsync(assembly.Id,
                         assembly.WarehouseId);
-                    var active = list.Tasks.Where(x =>
-                        x.Status != MobileReplenishmentTaskStatus.Cancelled).ToArray();
-                    _replenishmentsReady = active.Length > 0
-                        && active.All(x => x.TransferredQuantity == x.OrderedQuantity)
-                        && list.Proposals.Count == 0 && list.Deficits.Count == 0;
+                    if (list.Revision == _work.Revision) _replenishmentList = list;
+                    else replenishmentError = "Сборка изменилась. Обновите подпитку.";
                 }
                 catch (MobileApiException exception)
                 { replenishmentError = exception.Message; }
@@ -123,7 +125,16 @@ public partial class PickingSkuPage : ContentPage
         SkuRows = _work?.Skus.Select(x => new PickingSkuPlanRow(
             x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
             x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)
-            { UnavailableQuantity = _unavailableBySku.GetValueOrDefault(x.SkuId) }).ToArray()
+            {
+                AvailableQuantity = _availableBySku?.GetValueOrDefault(x.SkuId),
+                ReplenishmentState = ReplenishmentStateFor(x.SkuId,
+                    x.PlannedQuantity - x.ConfirmedQuantity,
+                    _availableBySku?.GetValueOrDefault(x.SkuId)),
+                HasExistingReplenishment = _replenishmentList?.Tasks.Any(task =>
+                    task.SkuId == x.SkuId && task.Status is
+                        (MobileReplenishmentTaskStatus.Ordered
+                            or MobileReplenishmentTaskStatus.InProgress)) == true
+            }).ToArray()
             ?? assembly.PlanLines.GroupBy(x => x.SkuId)
                 .Select(group => new PickingSkuPlanRow(group.Key,
                     group.First().SkuName ?? group.First().SkuCode ?? group.Key.ToString(),
@@ -150,6 +161,30 @@ public partial class PickingSkuPage : ContentPage
                 }, x.ExchangeError)).ToArray() : [];
         OnPropertyChanged(nameof(ExchangeRows));
         UpdateActions();
+    }
+
+    private PickingReplenishmentState ReplenishmentStateFor(Guid skuId,
+        decimal remaining, decimal? available)
+    {
+        if (remaining <= 0 || _assembly?.Status != MobilePickingAssemblyStatus.InProgress
+            || !IsOwner || available is null || _replenishmentList is null)
+            return PickingReplenishmentState.Hidden;
+        if (available >= remaining)
+            return _replenishmentList.Tasks.Any(x => x.SkuId == skuId
+                && x.Status != MobileReplenishmentTaskStatus.Cancelled)
+                ? PickingReplenishmentState.Ready
+                : PickingReplenishmentState.Hidden;
+        if (_replenishmentList.Proposals.Any(x => x.SkuId == skuId))
+            return PickingReplenishmentState.CanOrder;
+        if (_replenishmentList.Tasks.Any(x => x.SkuId == skuId
+            && x.Status == MobileReplenishmentTaskStatus.InProgress
+            && x.TransferredQuantity < x.OrderedQuantity))
+            return PickingReplenishmentState.InProgress;
+        if (_replenishmentList.Tasks.Any(x => x.SkuId == skuId
+            && x.Status == MobileReplenishmentTaskStatus.Ordered
+            && x.TransferredQuantity < x.OrderedQuantity))
+            return PickingReplenishmentState.Ordered;
+        return PickingReplenishmentState.Unavailable;
     }
 
     private async void OnSkuTapped(object? sender, TappedEventArgs e)
@@ -194,11 +229,22 @@ public partial class PickingSkuPage : ContentPage
         await SwitchSectionAsync(PickingSection.Route);
     }
 
-    private async void OnReplenishmentsClicked(object? sender, EventArgs e)
+    private async void OnReplenishmentClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null
-            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
-        await SwitchSectionAsync(PickingSection.Replenishments);
+            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner
+            || sender is not Button { CommandParameter: Guid skuId }) return;
+        var row = SkuRows.FirstOrDefault(x => x.SkuId == skuId);
+        if (row is null) return;
+        if (row.ReplenishmentState == PickingReplenishmentState.CanOrder)
+        {
+            if (_replenishmentList is null) return;
+            await RunCommandAsync(() => _process.OrderReplenishmentAsync(
+                _assembly.Id, _assembly.WarehouseId, _replenishmentList.Revision,
+                skuId));
+        }
+        else if (row.ReplenishmentState != PickingReplenishmentState.Hidden)
+            await DisplayAlertAsync("Подпитка", row.ReplenishmentHint, "Понятно");
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
@@ -292,12 +338,16 @@ public partial class PickingSkuPage : ContentPage
         if (_busy || _process.HasPendingCommand && !retry) return;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
+        var refreshWork = false;
         try
         {
             var assembly = await action();
             _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
-            _unavailableBySku = new Dictionary<Guid, decimal>();
+            _availableBySku = null;
+            _replenishmentList = null;
             Apply(assembly);
+            refreshWork = assembly.Status == MobilePickingAssemblyStatus.InProgress
+                && IsOwner;
             if (_process.LastStartResult is { Status: MobilePickingAssemblyStatus.Preparing } start)
                 ErrorLabel.Text = string.Join("\n", start.Sources
                     .Where(x => x.Error is not null).Select(x => x.Error));
@@ -314,6 +364,7 @@ public partial class PickingSkuPage : ContentPage
                 : "Действие выполнено, но экран не обновился. Потяните вниз.";
         }
         finally { SetBusy(false); }
+        if (refreshWork) await RefreshAsync();
     }
 
     private void UpdateActions()
@@ -334,8 +385,6 @@ public partial class PickingSkuPage : ContentPage
         var canWork = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
             && IsOwner;
         RouteButton.IsEnabled = !_busy && !pending && canWork;
-        ReplenishmentsButton.IsEnabled = !_busy && !pending && canWork;
-        ReplenishmentsButton.Text = _replenishmentsReady ? "Подпитки ✓" : "Подпитки";
         CloseButton.IsVisible = canWork
             || _assembly is { Status: MobilePickingAssemblyStatus.Closed }
                 && _assembly.Sources.Any(x =>
@@ -364,14 +413,41 @@ public partial class PickingSkuPage : ContentPage
 public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
     decimal PlannedQuantity, decimal ConfirmedQuantity, string? Unit)
 {
-    public decimal UnavailableQuantity { get; init; }
-    public bool HasUnavailable => UnavailableQuantity > 0;
-    public string UnavailableText => $"Не хватает для сборки {UnavailableQuantity:0.###} {Unit ?? "—"} · ожидается Подпитка или решение руководителя";
+    public decimal? AvailableQuantity { get; init; }
+    public PickingReplenishmentState ReplenishmentState { get; init; }
+    public bool HasExistingReplenishment { get; init; }
+    public bool HasReplenishmentIcon => ReplenishmentState != PickingReplenishmentState.Hidden;
+    public bool ShowUnavailableSlash => ReplenishmentState == PickingReplenishmentState.Unavailable;
+    public string ReplenishmentHint => ReplenishmentState switch
+    {
+        PickingReplenishmentState.CanOrder => HasExistingReplenishment
+            ? "Заказать ещё" : "Заказать подпитку",
+        PickingReplenishmentState.Ordered => "Подпитка заказана",
+        PickingReplenishmentState.InProgress => "Подпитка выполняется",
+        PickingReplenishmentState.Ready => "Готово: можно отобрать оставшийся план",
+        PickingReplenishmentState.Unavailable => "Сейчас подпитать нельзя",
+        _ => string.Empty
+    };
+    public Color ReplenishmentColor => ReplenishmentState switch
+    {
+        PickingReplenishmentState.CanOrder => Color.FromArgb("#1976D2"),
+        PickingReplenishmentState.Ordered => Color.FromArgb("#E9B949"),
+        PickingReplenishmentState.InProgress => Color.FromArgb("#E87924"),
+        PickingReplenishmentState.Ready => Color.FromArgb("#358A4B"),
+        _ => Color.FromArgb("#9E9E9E")
+    };
     public string PlanText => $"План {PlannedQuantity:0.###} {Unit ?? "—"}";
+    public string AvailableText => AvailableQuantity is decimal quantity
+        ? $"Доступно {quantity:0.###}" : "Доступно —";
     public string FactText => $"Факт {ConfirmedQuantity:0.###}";
     public Color BackgroundColor => ConfirmedQuantity == PlannedQuantity
         ? Color.FromArgb("#E4F5E7")
         : ConfirmedQuantity > 0 ? Color.FromArgb("#FFF1CF") : Colors.White;
+}
+
+public enum PickingReplenishmentState
+{
+    Hidden, CanOrder, Ordered, InProgress, Ready, Unavailable
 }
 
 public sealed record PickingEntryListRow(Guid Id, string Text, bool CanReturn);

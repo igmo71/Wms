@@ -253,13 +253,6 @@ public partial class PickingSourcesPage : ContentPage
         await SwitchSectionAsync(PickingSection.Route);
     }
 
-    private async void OnReplenishmentsClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _process.HasPendingCommand || _assembly is null
-            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner) return;
-        await SwitchSectionAsync(PickingSection.Replenishments);
-    }
-
     private async Task SwitchSectionAsync(PickingSection section)
     {
         if (_assembly is null) return;
@@ -296,7 +289,6 @@ public partial class PickingSourcesPage : ContentPage
         var canWork = _assembly is { Status: MobilePickingAssemblyStatus.InProgress }
             && IsOwner;
         RouteButton.IsEnabled = !_busy && !pending && canWork;
-        ReplenishmentsButton.IsEnabled = !_busy && !pending && canWork;
         NavigationPage.SetHasBackButton(this, !_busy && !pending);
     }
 

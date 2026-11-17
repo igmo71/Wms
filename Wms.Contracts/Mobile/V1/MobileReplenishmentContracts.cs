@@ -92,8 +92,7 @@ public sealed record MobileReplenishmentResourceIdResponse(Guid Id);
 
 public sealed record MobileReplenishmentOrderRequest(
     Guid ClientRequestId, Guid WarehouseId, long ExpectedRevision,
-    Guid SkuId, Guid SourceLocationId,
-    Guid? ExpectedDestinationLocationId, decimal Quantity);
+    Guid SkuId);
 
 public sealed record MobileReplenishmentStartSourceRequest(
     Guid ClientRequestId, Guid WarehouseId, string SourceLocationCode);

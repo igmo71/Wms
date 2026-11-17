@@ -4,7 +4,7 @@ using Wms.Mobile.Services;
 
 namespace Wms.Mobile;
 
-internal enum PickingSection { Sku, Route, Replenishments, Sources }
+internal enum PickingSection { Sku, Route, Sources }
 
 internal static class PickingSectionNavigation
 {
@@ -16,7 +16,6 @@ internal static class PickingSectionNavigation
         {
             PickingSection.Sku => services.GetRequiredService<PickingSkuPage>(),
             PickingSection.Route => services.GetRequiredService<PickingRoutePage>(),
-            PickingSection.Replenishments => services.GetRequiredService<PickingReplenishmentsPage>(),
             PickingSection.Sources => services.GetRequiredService<PickingSourcesPage>(),
             _ => throw new ArgumentOutOfRangeException(nameof(section))
         };
@@ -24,8 +23,6 @@ internal static class PickingSectionNavigation
         {
             case PickingSkuPage sku: sku.Show(assembly, process); break;
             case PickingRoutePage route: route.Show(assembly, process); break;
-            case PickingReplenishmentsPage replenishments:
-                replenishments.Show(assembly, process); break;
             case PickingSourcesPage sources: sources.Show(assembly, process); break;
         }
         await current.Navigation.PushAsync(page);

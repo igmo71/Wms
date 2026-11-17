@@ -34,8 +34,8 @@ Each SKU quantity group shows its base unit once, with an unknown unit shown
 explicitly. Quantity inputs retain their existing validation and compact
 editing behavior. Counts of lines and pallets are integers, and weight is a
 separate kg measure. Order progress does not total quantities across SKUs;
-TSD receiving shows progress by line count. TSD picking shows plan and
-confirmed fact per SKU.
+TSD receiving shows progress by line count. TSD picking shows plan, currently
+pickable quantity and confirmed fact per SKU.
 
 LPN tracks receiving provenance and initial putaway, not stored inventory.
 

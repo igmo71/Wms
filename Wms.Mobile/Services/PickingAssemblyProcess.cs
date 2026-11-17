@@ -106,12 +106,11 @@ public sealed class PickingAssemblyProcess(
 
     public Task<MobilePickingAssemblyResponse> OrderReplenishmentAsync(
         Guid assemblyId, Guid warehouseId, long revision,
-        Guid skuId, Guid sourceId, Guid? destinationId, decimal quantity) =>
+        Guid skuId) =>
         Begin("Заказать Подпитку", warehouseId, async id =>
         {
             await replenishments.OrderAsync(assemblyId,
-                new(id, warehouseId, revision, skuId, sourceId,
-                    destinationId, quantity));
+                new(id, warehouseId, revision, skuId));
             return assemblyId;
         });
 

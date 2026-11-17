@@ -54,14 +54,12 @@
                     IsVisible="False" Clicked="OnTakeOverClicked" />
             <Button x:Name="StartButton" Text="Начать Отбор"
                     IsVisible="False" Clicked="OnStartClicked" />
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
                 <Button x:Name="SkuButton" Text="SKU" FontSize="12"
                         Padding="2,8" Clicked="OnSkuClicked" />
                 <Button x:Name="RouteButton" Grid.Column="1" Text="Маршрут"
                         FontSize="12" Padding="2,8" Clicked="OnRouteClicked" />
-                <Button x:Name="ReplenishmentsButton" Grid.Column="2" Text="Подпитки"
-                        FontSize="12" Padding="2,8" Clicked="OnReplenishmentsClicked" />
-                <Button Grid.Column="3" Text="📄 1С" FontSize="12" Padding="2,8"
+                <Button Grid.Column="2" Text="📄 1С" FontSize="12" Padding="2,8"
                         IsEnabled="False" FontAttributes="Bold"
                         SemanticProperties.Description="Текущий раздел: Документы 1С" />
             </Grid>

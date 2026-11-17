@@ -56,7 +56,6 @@ public static class MauiProgram
         builder.Services.AddTransient<PickingSkuPage>();
         builder.Services.AddTransient<PickingRoutePage>();
         builder.Services.AddTransient<PickingEntryPage>();
-        builder.Services.AddTransient<PickingReplenishmentsPage>();
         builder.Services.AddTransient<ReplenishmentQueuePage>();
         builder.Services.AddTransient<ReplenishmentTaskPage>();
         builder.Services.AddTransient<ReplenishmentTaskProcess>();

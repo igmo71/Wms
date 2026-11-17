@@ -32,6 +32,9 @@
                                     <VerticalStackLayout Spacing="2">
                                         <Label Text="{Binding Address}" FontSize="23" FontAttributes="Bold" />
                                         <Label Text="{Binding Heading}" FontAttributes="Bold" />
+                                        <Label Text="{Binding Quantities}" FontSize="13"
+                                               LineBreakMode="WordWrap" />
+                                        <Label Text="{Binding StepQuantity}" FontAttributes="Bold" />
                                         <Label Text="{Binding Detail}" FontSize="13" />
                                     </VerticalStackLayout>
                                 </Border>
@@ -51,15 +54,13 @@
                     Clicked="OnRetryClicked" IsVisible="False" />
             <Button x:Name="CloseButton" Text="Закрыть и отгрузить"
                     Clicked="OnCloseClicked" />
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="4">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
                 <Button x:Name="SkuButton" Text="SKU" FontSize="12"
                         Padding="2,8" Clicked="OnSkuClicked" />
                 <Button Grid.Column="1" Text="Маршрут" FontSize="12" Padding="2,8"
                         IsEnabled="False" FontAttributes="Bold"
                         SemanticProperties.Description="Текущий раздел: Маршрут" />
-                <Button x:Name="ReplenishmentsButton" Grid.Column="2" Text="Подпитки"
-                        FontSize="12" Padding="2,8" Clicked="OnReplenishmentsClicked" />
-                <Button x:Name="SourcesButton" Grid.Column="3" Text="📄 1С"
+                <Button x:Name="SourcesButton" Grid.Column="2" Text="📄 1С"
                         FontSize="12" Padding="2,8" Clicked="OnSourcesClicked"
                         SemanticProperties.Description="Документы 1С" />
             </Grid>

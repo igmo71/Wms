@@ -17,6 +17,63 @@ namespace Wms.Tests.Replenishment;
 public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Sku_order_creates_all_source_tasks_once_in_one_commit()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "SKU replenishment order" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Ordered SKU" };
+        var reserve = Zone(warehouse.Id, "RES", ZoneType.Reserve);
+        var storage = Zone(warehouse.Id, "CMP", ZoneType.Storage);
+        var first = Location(warehouse.Id, reserve, 1);
+        var second = Location(warehouse.Id, reserve, 2);
+        var destination = Location(warehouse.Id, storage, 1);
+        var (assembly, source) = ActiveAssembly(warehouse.Id, sku.Id, 7);
+        var revision = assembly.OperationalRevision;
+        var expires = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, reserve, storage, first, second,
+                destination, assembly, source,
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    first.Id, sku.Id, 4, DateTimeOffset.UtcNow, expires)),
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    second.Id, sku.Id, 5, DateTimeOffset.UtcNow, expires)),
+                Value(StockShortage.Report(Guid.NewGuid(), warehouse.Id,
+                    first.Id, sku.Id, expires, StockShortageOrigin.Replenishment,
+                    Guid.NewGuid(), 4, 3, null, Worker, DateTimeOffset.UtcNow)),
+                Value(StockShortage.Report(Guid.NewGuid(), warehouse.Id,
+                    second.Id, sku.Id, expires, StockShortageOrigin.Replenishment,
+                    Guid.NewGuid(), 5, 4, null, Worker, DateTimeOffset.UtcNow)));
+            await seed.SaveChangesAsync();
+        }
+
+        var stock = new StockAvailabilityStore(database);
+        var order = new OrderReplenishment(
+            new CommandExecutor(new CommandExecutionStore(database)),
+            new PickingAssemblyStore(database), new ReplenishmentStore(database),
+            stock, new BuildPickingRoute(), new BuildReplenishmentProposals(),
+            Permission(), TimeProvider.System);
+        var request = new OrderReplenishmentRequest(Guid.NewGuid(), assembly.Id,
+            revision, sku.Id, Worker);
+        Assert.Equal(assembly.Id, Value(await order.ExecuteAsync(request)));
+        Assert.Equal(assembly.Id, Value(await order.ExecuteAsync(request)));
+        Error(await order.ExecuteAsync(request with { RequestId = Guid.NewGuid() }),
+            OperationErrorType.Conflict);
+
+        await using var verify = database.CreateDbContext();
+        var tasks = await verify.ReplenishmentTasks.Where(x =>
+            x.PickingAssemblyId == assembly.Id).ToArrayAsync();
+        Assert.Equal(2, tasks.Length);
+        Assert.Equal(new[] { 3m, 4m }, tasks.Select(x => x.OrderedQuantity)
+            .OrderBy(x => x).ToArray());
+        Assert.Equal(2, await verify.WarehouseAuditEvents.CountAsync(x =>
+            x.PickingAssemblyId == assembly.Id && x.EventType == "replenishment.ordered"));
+        Assert.Equal(1, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "replenishment.order" && x.RequestId == request.RequestId));
+        Assert.Equal(revision + 1, (await verify.PickingAssemblies.SingleAsync(x =>
+            x.Id == assembly.Id)).OperationalRevision);
+    }
+
+    [Fact]
     public async Task Shortage_block_survives_empty_source_and_second_source_finishes_after_assembly_close()
     {
         var seed = await SeedOrderedAsync(8, 4, 10);

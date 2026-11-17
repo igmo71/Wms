@@ -133,18 +133,30 @@ the same close action with a new request ID retries unconfirmed 1C documents.
 The response and refreshed card show the result for each document. Closed
 assemblies awaiting exchange remain in every Operator's work list for their
 selected warehouse until all documents are confirmed. The replacement TSD screens
-show plan and confirmed fact per SKU with white, yellow and green progress,
+show plan, currently pickable quantity and confirmed fact per SKU with white,
+yellow and green progress,
 and preserve the unit next to the plan quantity. Picking uses the SKU base unit
 `Description`, falling back to `Name`; the Mobile API exposes Russian display
-names for 1C shipping document statuses. Its SKU, route, replenishment and 1C
-document sections share a compact bottom navigation row. Section changes replace
+names for 1C shipping document statuses. Its SKU, route and 1C document
+sections share a compact bottom navigation row. Section changes replace
 the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
-border and gray background. Unavailable demand refers to replenishment or a
-Manager decision, and a wrong-cell message identifies stocked SKU by name rather
-than a GUID. The picking SKU card shows each SKU's unavailable route quantity
-and opens stock by cell through its info button. The route no longer repeats
-unavailable quantities after its steps. Visible cell addresses use
+border and gray background. The SKU and route cards both show plan, currently
+pickable route quantity and confirmed fact per SKU; a route card also shows the
+quantity for its own cell. Unknown availability is shown as a dash, not zero.
+The SKU card opens stock by cell through its info button. A replenishment icon
+on that card uses blue for an available order action, yellow for ordered,
+orange for in progress, and green only when currently pickable quantity covers
+the whole remaining SKU plan and this SKU has a non-cancelled replenishment
+task. The icon is absent when the SKU was already fully pickable without
+replenishment. Where shown, it sits beside the available quantity. New
+proposals during an existing
+replenishment allow another order. A gray icon with a crossed arrow means no further
+replenishment is currently available; tapping it shows a short explanation.
+The icon is hidden when the SKU plan is already confirmed. The picking worker
+does not see a separate replenishment section or individual task details.
+Unavailable demand may require a Manager decision, and a wrong-cell message
+identifies stocked SKU by name rather than a GUID. Visible cell addresses use
 `StorageLocation.Name`, falling back to `Code`; scanning and validation continue
 to use `Code`. Addresses are larger on picking and replenishment work screens,
 including the shared stock-by-cell view. The route is a recommendation;
@@ -171,14 +183,9 @@ dated transfers, shortage reports and return or empty-cell confirmation use
 separate commands. Each mutation carries a client request ID; callers retain
 the exact request for an explicit retry after an uncertain response. These
 routes and the client serve the replacement Mobile screens. The picking SKU
-screen opens a replenishment list with white proposals and ordered tasks,
-yellow started tasks and green tasks whose full quantity has posted, including
-when the source pallet still awaits return. Partial posted quantity is visible;
-cancelled orders remain visible in gray with the reason that the assembly no
-longer needs that SKU replenished. The SKU screen marks replenishments ready
-only when all active tasks have
-posted and no proposal or deficit remains. The home screen opens the
-replenisher's warehouse queue in shipping priority order. Its task card shows
+screen orders all current proposals for one SKU in one replay-safe command.
+The home screen opens the replenisher's warehouse queue in shipping priority
+order. Its task card shows
 the held source, actual dated stock groups for the requested SKU and other SKU
 for information, posted transfers and the pending pallet return. A worker
 scans the source, destination and source again at completion, explicitly

@@ -8,19 +8,17 @@ namespace Wms.Mobile;
 public partial class PickingRoutePage : ContentPage
 {
     private readonly MobilePickingClient _client;
-    private readonly MobileWarehouseSelection _selection;
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
     private bool _busy;
 
     public PickingRoutePage(MobilePickingClient client,
-        MobileWarehouseSelection selection, PickingAssemblyProcess process,
+        PickingAssemblyProcess process,
         IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
-        _selection = selection;
         _process = process;
         _services = services;
         BindingContext = this;
@@ -57,16 +55,31 @@ public partial class PickingRoutePage : ContentPage
             var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
             _assembly = assembly;
             var work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
-            var names = work.Skus.ToDictionary(x => x.SkuId,
-                x => (x.Name ?? x.Code ?? x.SkuId.ToString(), x.Unit));
+            if (route.Revision != work.Revision)
+            {
+                Steps = [];
+                OnPropertyChanged(nameof(Steps));
+                EmptyLabel.IsVisible = true;
+                ErrorLabel.Text = "Сборка изменилась. Обновите маршрут.";
+                return;
+            }
+            var skus = work.Skus.ToDictionary(x => x.SkuId);
+            var available = route.Steps.GroupBy(x => x.SkuId)
+                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
             Steps = route.Steps.Select((x, index) =>
             {
-                var (name, unit) = names.GetValueOrDefault(x.SkuId);
+                var sku = skus.GetValueOrDefault(x.SkuId);
+                var name = sku?.Name ?? sku?.Code ?? x.SkuId.ToString();
+                var plan = sku is null ? "—" : sku.PlannedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
+                var fact = sku is null ? "—" : sku.ConfirmedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
                 return new PickingRouteRow(x.SkuId, x.LocationCode,
                     x.DirectPalletPick, index == 0,
-                    $"{index + 1}. {name ?? x.SkuId.ToString()}",
-                    $"{x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)} {unit ?? "—"}"
-                    + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : "")
+                    $"{index + 1}. {name}",
+                    $"План {plan} {sku?.Unit ?? "—"} · "
+                    + $"Доступно {available[x.SkuId]:0.###} · "
+                    + $"Факт {fact}",
+                    $"В этой ячейке: {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}",
+                    (x.ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : "")
                     + (x.DirectPalletPick ? " · снять весь поддон" : ""))
                 { Address = string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName };
             }).ToArray();
@@ -92,18 +105,12 @@ public partial class PickingRoutePage : ContentPage
     private async void OnSkuClicked(object? sender, EventArgs e) =>
         await SwitchSectionAsync(PickingSection.Sku);
 
-    private async void OnReplenishmentsClicked(object? sender, EventArgs e) =>
-        await SwitchSectionAsync(PickingSection.Replenishments);
-
     private async void OnSourcesClicked(object? sender, EventArgs e) =>
         await SwitchSectionAsync(PickingSection.Sources);
 
     private async Task SwitchSectionAsync(PickingSection section)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null) return;
-        if (section == PickingSection.Replenishments
-            && (_assembly.Status != MobilePickingAssemblyStatus.InProgress
-                || _assembly.ResponsibleUserId != _selection.CurrentUserId)) return;
         SetBusy(true);
         try
         {
@@ -176,9 +183,6 @@ public partial class PickingRoutePage : ContentPage
         var canNavigate = !busy && !_process.HasPendingCommand && _assembly is not null;
         SkuButton.IsEnabled = canNavigate;
         SourcesButton.IsEnabled = canNavigate;
-        ReplenishmentsButton.IsEnabled = canNavigate
-            && _assembly?.Status == MobilePickingAssemblyStatus.InProgress
-            && _assembly.ResponsibleUserId == _selection.CurrentUserId;
         CloseButton.IsEnabled = canNavigate;
         NavigationPage.SetHasBackButton(this, !busy && !_process.HasPendingCommand);
     }
@@ -192,7 +196,8 @@ public partial class PickingRoutePage : ContentPage
 }
 
 public sealed record PickingRouteRow(Guid SkuId, string LocationCode,
-    bool DirectPalletPick, bool IsCurrent, string Heading, string Detail)
+    bool DirectPalletPick, bool IsCurrent, string Heading,
+    string Quantities, string StepQuantity, string Detail)
 {
     public string Address { get; init; } = LocationCode;
 }
