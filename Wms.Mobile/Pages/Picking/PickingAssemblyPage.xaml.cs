@@ -216,7 +216,8 @@ public partial class PickingAssemblyPage : ContentPage
     {
         Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
-        ProgressIndicator.IsVisible = busy;
+        ProgressIndicator.IsRunning = busy && !QueueRefreshView.IsRefreshing;
+        ProgressIndicator.IsVisible = ProgressIndicator.IsRunning;
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
         CreateButton.IsEnabled = !busy && !_process.HasPendingCommand && Warehouse is not null;
         WarehousePicker.IsEnabled = !busy && !_process.HasPendingCommand;

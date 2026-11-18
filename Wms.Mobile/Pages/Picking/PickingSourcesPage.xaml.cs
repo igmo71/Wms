@@ -104,13 +104,14 @@ public partial class PickingSourcesPage : ContentPage
     private void Apply(MobilePickingAssemblyResponse? assembly)
     {
         _assembly = assembly;
-        NumberLabel.Text = assembly is null ? "Новая сборка" : $"Сборка {assembly.Number}";
+        PickingTitle.Set(HeaderTitleLabel, "Отбор", assembly?.Number);
+        Title = assembly is null ? "Отбор" : $"Отбор · {assembly.Number}";
         StatusLabel.Text = assembly is null ? "Документы 1С ещё не добавлены."
             : assembly.Status switch
             {
                 MobilePickingAssemblyStatus.Draft => "Черновик",
-                MobilePickingAssemblyStatus.Preparing => "Ожидается перевод РО 1С в КОтбору",
-                MobilePickingAssemblyStatus.InProgress => "Отбор в работе",
+                MobilePickingAssemblyStatus.Preparing => "Запрос в 1С КОтбору",
+                MobilePickingAssemblyStatus.InProgress => "В работе",
                 MobilePickingAssemblyStatus.Closed => "Сборка закрыта",
                 _ => "Сборка отменяется или отменена"
             };
@@ -296,7 +297,8 @@ public partial class PickingSourcesPage : ContentPage
     {
         Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
-        ProgressIndicator.IsVisible = busy;
+        ProgressIndicator.IsRunning = busy && !SourcesRefreshView.IsRefreshing;
+        ProgressIndicator.IsVisible = ProgressIndicator.IsRunning;
         UpdateActions();
         if (busy) CameraScannerView.Stop();
     }

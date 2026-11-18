@@ -3,74 +3,112 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:Wms.Mobile"
-             Title="Отбор › SKU">
+             Title="Отбор">
+    <Shell.TitleView>
+        <Label x:Name="HeaderTitleLabel" MaxLines="1"
+               WidthRequest="240" HeightRequest="40" HorizontalOptions="Start"
+               LineBreakMode="TailTruncation" VerticalTextAlignment="Center" />
+    </Shell.TitleView>
+    <ContentPage.Resources>
+        <Style x:Key="SkuCardAction" TargetType="Button">
+            <Setter Property="WidthRequest" Value="36" />
+            <Setter Property="HeightRequest" Value="36" />
+            <Setter Property="MinimumWidthRequest" Value="36" />
+            <Setter Property="MinimumHeightRequest" Value="36" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BackgroundColor" Value="#E5E7EB" />
+        </Style>
+    </ContentPage.Resources>
     <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
         <VerticalStackLayout Spacing="3">
-            <Label x:Name="NumberLabel" FontSize="21" FontAttributes="Bold" />
-            <Label x:Name="StatusLabel" FontSize="13" />
-            <Label x:Name="OwnerLabel" FontSize="13" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <Label x:Name="StatusLabel" FontSize="13" MaxLines="1"
+                       MaximumWidthRequest="160"
+                       LineBreakMode="TailTruncation" />
+                <Label x:Name="OwnerLabel" Grid.Column="1" FontSize="13"
+                       MaxLines="1" LineBreakMode="TailTruncation"
+                       HorizontalTextAlignment="End" />
+            </Grid>
         </VerticalStackLayout>
         <RefreshView x:Name="SkuRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="7">
-                    <Label Text="SKU сборки" FontAttributes="Bold" FontSize="17" />
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding SkuRows, Source={x:Reference Page}}"
                                          Spacing="5">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:PickingSkuPlanRow">
                                 <Border Padding="9" Stroke="#D4D4D4"
                                         BackgroundColor="{Binding BackgroundColor}">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Tapped="OnSkuTapped"
-                                            CommandParameter="{Binding SkuId}" />
-                                    </Border.GestureRecognizers>
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                    <VerticalStackLayout Spacing="5">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnSkuTapped"
+                                                                      CommandParameter="{Binding SkuId}" />
+                                            </Grid.GestureRecognizers>
                                             <Label Text="{Binding Name}" FontAttributes="Bold"
-                                                   LineBreakMode="WordWrap" />
-                                            <Button Grid.Column="1" Text="ⓘ" FontSize="17" WidthRequest="34"
-                                                    BackgroundColor="Transparent" CommandParameter="{Binding SkuId}"
-                                                    Clicked="OnSkuInfoClicked"
-                                                    SemanticProperties.Description="Остатки SKU по ячейкам" />
+                                                   TextColor="#202124" LineBreakMode="WordWrap" />
+                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                <Label Text="{Binding PlanText}" TextColor="#202124"
+                                                       HorizontalTextAlignment="End" />
+                                                <Label Text="{Binding AvailableText}" TextColor="#202124"
+                                                       HorizontalTextAlignment="End" />
+                                                <Label Text="{Binding FactText}" TextColor="#202124"
+                                                       FontFamily="OpenSansSemibold"
+                                                       HorizontalTextAlignment="End" />
+                                            </VerticalStackLayout>
                                         </Grid>
-                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                            <Label Text="{Binding PlanText}" HorizontalTextAlignment="End" />
-                                            <HorizontalStackLayout HorizontalOptions="End" Spacing="3">
-                                                <Label Text="{Binding AvailableText}"
-                                                       VerticalTextAlignment="Center" />
-                                                <Grid IsVisible="{Binding HasReplenishmentIcon}"
-                                                      VerticalOptions="Center">
-                                                    <Button Text="📦↓" FontSize="13" WidthRequest="40"
-                                                            HeightRequest="36" Padding="0"
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                            <HorizontalStackLayout Spacing="4" VerticalOptions="Start">
+                                                <Button Style="{StaticResource SkuCardAction}"
+                                                        ImageSource="material_info.png"
+                                                        CommandParameter="{Binding SkuId}"
+                                                        Clicked="OnSkuInfoClicked"
+                                                        ToolTipProperties.Text="Остатки SKU по ячейкам"
+                                                        SemanticProperties.Description="Остатки SKU по ячейкам" />
+                                                <Grid IsVisible="{Binding HasReplenishmentIcon}">
+                                                    <Button Style="{StaticResource SkuCardAction}"
+                                                            ImageSource="material_move_to_inbox.png"
                                                             BackgroundColor="{Binding ReplenishmentColor}"
                                                             CommandParameter="{Binding SkuId}"
                                                             Clicked="OnReplenishmentClicked"
+                                                            ToolTipProperties.Text="{Binding ReplenishmentHint}"
                                                             SemanticProperties.Description="{Binding ReplenishmentHint}" />
-                                                    <Label Text="╱" FontSize="24" TextColor="#404040"
+                                                    <Label Text="╱" FontSize="24" TextColor="#111111"
                                                            HorizontalOptions="Center" VerticalOptions="Center"
                                                            InputTransparent="True"
                                                            IsVisible="{Binding ShowUnavailableSlash}" />
                                                 </Grid>
                                             </HorizontalStackLayout>
-                                            <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
-                                                   HorizontalTextAlignment="End" />
-                                        </VerticalStackLayout>
-                                    </Grid>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="4"
+                                                                 BindableLayout.ItemsSource="{Binding Entries}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:PickingEntryListRow">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto"
+                                                              ColumnSpacing="5">
+                                                            <Label Text="{Binding Address}" FontSize="16"
+                                                                   TextColor="#202124" VerticalTextAlignment="Center"
+                                                                   LineBreakMode="WordWrap" />
+                                                            <Label Grid.Column="1" Text="{Binding QuantityText}"
+                                                                   TextColor="#202124" FontSize="16"
+                                                                   FontFamily="OpenSansSemibold"
+                                                                   VerticalTextAlignment="Center" />
+                                                            <Button Grid.Column="2" Style="{StaticResource SkuCardAction}"
+                                                                    ImageSource="material_undo.png"
+                                                                    IsVisible="{Binding CanReturn}"
+                                                                    CommandParameter="{Binding Id}" Clicked="OnReturnClicked"
+                                                                    ToolTipProperties.Text="Вернуть в исходную ячейку"
+                                                                    SemanticProperties.Description="{Binding ReturnDescription}" />
+                                                            <Label Grid.Row="1" Grid.ColumnSpan="3"
+                                                                   Text="{Binding ExpirationText}" FontSize="12"
+                                                                   TextColor="#505050" IsVisible="{Binding HasExpiration}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </VerticalStackLayout>
                                 </Border>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
-                    <Label Text="Подтверждённый факт" FontAttributes="Bold" FontSize="16" />
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding EntryRows, Source={x:Reference Page}}"
-                                         Spacing="4">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="local:PickingEntryListRow">
-                                <Grid ColumnDefinitions="*,Auto" Padding="7" ColumnSpacing="8">
-                                    <Label Text="{Binding Text}" VerticalTextAlignment="Center" />
-                                    <Button Grid.Column="1" Text="Вернуть" FontSize="12"
-                                            IsVisible="{Binding CanReturn}"
-                                            CommandParameter="{Binding Id}" Clicked="OnReturnClicked" />
-                                </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
@@ -93,8 +131,8 @@
             </ScrollView>
         </RefreshView>
         <VerticalStackLayout Grid.Row="2" Spacing="5">
-            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
-                     HeightRequest="3" IsVisible="False" />
+            <ActivityIndicator x:Name="ProgressIndicator" HeightRequest="28"
+                               IsRunning="False" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду"
                     IsVisible="False" Clicked="OnRetryClicked" />

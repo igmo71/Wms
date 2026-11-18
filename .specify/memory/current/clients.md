@@ -32,7 +32,7 @@ Its cell editor and detail view show the multiple-SKU permission for both
 Комплектация and Хранение cells.
 
 Operator SKU cards and lists in the replacement receiving, putaway and picking
-workflows provide a small «i» action, except the picking SKU selection list.
+workflows provide a small «i» action.
 The read-only detail shows the SKU's locations and expiration groups in the
 selected warehouse. Available quantity is primary; accounting quantity is
 shown separately only when it differs because of reservations, shortage blocks
@@ -144,12 +144,37 @@ unavailable work sections remain disabled. The first route card has a stronger
 border and gray background. The SKU and route cards both show plan, currently
 pickable route quantity and confirmed fact per SKU; a route card also shows the
 quantity for its own cell. Unknown availability is shown as a dash, not zero.
-The SKU card opens stock by cell through its info button. A replenishment icon
+The route card shows its address prominently with that cell's quantity on the
+same line, SKU name on the left and plan,
+available and fact in a right-aligned column. The quantity to take in that
+cell is separate from the SKU totals. Date and pallet details take a line
+only when present. Scanning a cell on the current route
+opens the first matching step's fact page with the cell automatically checked;
+quantity and any whole-pallet action still require confirmation. An unmatched
+scan stays on the route with an explanation. The route supports the device
+scanner and camera. The picking SKU, route and 1C sections share the short
+«Отбор · номер» navigation title; the active bottom button identifies the
+section. The title uses a left-aligned, bounded MAUI Shell.TitleView to keep
+the whole heading visible. The SKU, route and 1C pages label an active assembly
+«В работе» and one awaiting the 1C transition «Запрос в 1С КОтбору».
+Status and responsible worker share one line on all three pages, where
+applicable. The worker receives the remaining width after a bounded status
+label. The SKU section omits its redundant heading. Picking
+sections and the assembly queue use animated operation indicators, while
+swipe refresh retains the native RefreshView spinner.
+The SKU card opens stock by cell through its info button. Its compact action row
+places information and replenishment on the left and confirmed facts on the right.
+Each fact retains its original cell address, quantity, expiration date when known,
+and a return icon for the current owner of an active assembly. Facts from different
+cells or expiration groups stay separate without repeating the SKU name in a
+second list. Tapping the name/quantity block opens picking; action buttons and fact
+rows do not open it. The card uses 36-by-36 action buttons with 24-by-24 symbols.
+A replenishment icon
 on that card uses blue for an available order action, yellow for ordered,
 orange for in progress, and green only when currently pickable quantity covers
 the whole remaining SKU plan and this SKU has a non-cancelled replenishment
 task. The icon is absent when the SKU was already fully pickable without
-replenishment. Where shown, it sits beside the available quantity. New
+replenishment. Where shown, it sits beside the information action. New
 proposals during an existing
 replenishment allow another order. A gray icon with a crossed arrow means no further
 replenishment is currently available; tapping it shows a short explanation.
@@ -161,8 +186,24 @@ identifies stocked SKU by name rather than a GUID. Visible cell addresses use
 to use `Code`. Addresses are larger on picking and replenishment work screens,
 including the shared stock-by-cell view. The route is a recommendation;
 the worker may open an SKU directly, scan a different allowed cell, and confirm
-the offered quantity explicitly. The fact card refreshes the next route step
-in place. Its one confirmation button records a full offered pick normally.
+the offered quantity explicitly. The fact and return pages show a compact SKU
+card with plan, confirmed fact and remaining or return quantity, with the unit
+beside the plan. The recommended or original cell has a separate large address;
+after a pick scan, the actual cell address appears above its stock and expiry.
+The fact and return pages show plan, fact and remaining or return quantity in
+three compact rows beside the SKU, with small captions and ordinary sized SKU
+and quantity values. Cell addresses remain 22 point. The assembly number is shown in smaller
+type beside the page title, truncated visually if needed. Cell input is scan-only
+(device scanner or camera); there is no manual address field or check button.
+An animated MAUI ActivityIndicator shows loading and command execution.
+Confirmation and pallet actions stay below the scrolling content. The shortage
+hint appears only for a scanned pick, not a return. Inputs and actions are
+disabled while a command is running or awaiting an explicit retry.
+Opened from the route, the fact card refreshes the next route step in place.
+Opened from SKU, it returns to that SKU list after each successful pick or
+shortage confirmation, even if the SKU is not complete. An uncertain response
+keeps the page open; a successful explicit retry follows the same navigation.
+Holding a pallet does not leave the page. Its one confirmation button records a full offered pick normally.
 A smaller entered quantity, including zero, opens a shortage confirmation:
 the entered amount is the entire remaining physical quantity of that SKU and
 expiration group in the scanned cell. The prompt shows the offered pick, free

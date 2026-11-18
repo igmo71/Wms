@@ -39,8 +39,8 @@
             </ScrollView>
         </RefreshView>
         <VerticalStackLayout Grid.Row="1" Spacing="5">
-            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
-                     HeightRequest="3" IsVisible="False" />
+            <ActivityIndicator x:Name="ProgressIndicator" HeightRequest="28"
+                               IsRunning="False" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить создание сборки"
                     IsVisible="False" Clicked="OnRetryClicked" />

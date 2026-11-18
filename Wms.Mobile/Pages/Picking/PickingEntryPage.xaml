@@ -5,45 +5,81 @@
              xmlns:local="clr-namespace:Wms.Mobile"
              Title="Отбор › Факт"
              HideSoftInputOnTapped="True">
+    <Shell.TitleView>
+        <Label x:Name="HeaderTitleLabel" MaxLines="1"
+               WidthRequest="240" HeightRequest="40" HorizontalOptions="Start"
+               LineBreakMode="TailTruncation" VerticalTextAlignment="Center" />
+    </Shell.TitleView>
     <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
         <ScrollView>
             <VerticalStackLayout Spacing="8">
-                <Label x:Name="NumberLabel" FontSize="20" FontAttributes="Bold" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
-                    <Label x:Name="SkuLabel" FontSize="18" FontAttributes="Bold" />
-                    <Button Grid.Column="1" Text="ⓘ" FontSize="17" WidthRequest="34"
-                            BackgroundColor="Transparent" Clicked="OnInfoClicked"
-                            SemanticProperties.Description="Остатки SKU по ячейкам" />
-                </Grid>
-                <Label x:Name="RemainingLabel" />
-                <Label x:Name="RecommendationLabel" FontSize="19" FontAttributes="Bold" />
+                <Border x:Name="SkuCard" Padding="9" Stroke="#D4D4D4" BackgroundColor="White">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                        <Label x:Name="SkuLabel" FontSize="14" FontAttributes="Bold"
+                               TextColor="#202124" LineBreakMode="WordWrap" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="3" HorizontalOptions="End">
+                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="5" HorizontalOptions="End">
+                                <Label Text="План" FontSize="12" TextColor="#505050" />
+                                <Label x:Name="PlanLabel" Grid.Column="1" FontSize="14"
+                                       FontFamily="OpenSansSemibold" TextColor="#202124"
+                                       MaxLines="1" LineBreakMode="NoWrap" HorizontalTextAlignment="End" />
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="5" HorizontalOptions="End">
+                                <Label Text="Факт" FontSize="12" TextColor="#505050" />
+                                <Label x:Name="FactLabel" Grid.Column="1" FontSize="14"
+                                       FontFamily="OpenSansSemibold" TextColor="#202124"
+                                       MaxLines="1" LineBreakMode="NoWrap" HorizontalTextAlignment="End" />
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="5" HorizontalOptions="End">
+                                <Label x:Name="RemainingCaptionLabel" Text="Осталось" FontSize="12"
+                                       TextColor="#505050" />
+                                <Label x:Name="RemainingLabel" Grid.Column="1" FontSize="14"
+                                       FontFamily="OpenSansSemibold" TextColor="#202124"
+                                       MaxLines="1" LineBreakMode="NoWrap" HorizontalTextAlignment="End" />
+                            </Grid>
+                        </VerticalStackLayout>
+                        <Button x:Name="InfoButton" Grid.Row="1" ImageSource="material_info.png"
+                                WidthRequest="36" HeightRequest="36" MinimumWidthRequest="36"
+                                MinimumHeightRequest="36" Padding="6" CornerRadius="6"
+                                HorizontalOptions="Start" BackgroundColor="#E5E7EB" Clicked="OnInfoClicked"
+                                ToolTipProperties.Text="Остатки SKU по ячейкам"
+                                SemanticProperties.Description="Остатки SKU по ячейкам" />
+                    </Grid>
+                </Border>
+                <Border Padding="9" Stroke="#D4D4D4">
+                    <VerticalStackLayout Spacing="3">
+                        <Label x:Name="RecommendationCaptionLabel" FontSize="12" />
+                        <Label x:Name="RecommendationLabel" FontSize="22" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Border>
                 <local:OperationalCameraScannerView x:Name="CameraScannerView" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                    <Entry x:Name="LocationEntry" Placeholder="Сканируйте ячейку"
-                           ReturnType="Done" Completed="OnLocationCompleted" />
-                    <Button Grid.Column="1" Text="Проверить"
-                            Clicked="OnCheckLocationClicked" />
-                </Grid>
-                <Label x:Name="StockLabel" FontSize="13" />
+                <Label x:Name="SourceCaptionLabel" Text="Считанная ячейка" FontSize="12" IsVisible="False" />
+                <Label x:Name="SourceAddressLabel" FontSize="22" FontAttributes="Bold" IsVisible="False" />
+                <HorizontalStackLayout x:Name="AvailableBlock" Spacing="8" IsVisible="False">
+                    <Label Text="Доступно" FontSize="12" VerticalTextAlignment="Center" />
+                    <Label x:Name="AvailableLabel" FontSize="14" FontFamily="OpenSansSemibold" />
+                </HorizontalStackLayout>
+                <Label x:Name="StockLabel" FontSize="12" />
                 <Label x:Name="ExpiryLabel" FontSize="13" />
+                <Label x:Name="QuantityCaptionLabel" Text="Количество к отбору" FontSize="12" />
                 <Entry x:Name="QuantityEntry" Keyboard="Numeric" FontSize="22"
                        Placeholder="Количество" />
-                <Label Text="Если найдено меньше предложенного, укажите весь фактический остаток этого SKU и срока в ячейке, включая ноль."
+                <Label x:Name="ShortageHintLabel" Text="Если найдено меньше предложенного, укажите весь фактический остаток этого SKU и срока в ячейке, включая ноль."
                        FontSize="12" />
-                <Button x:Name="HoldPalletButton" Text="Снять весь поддон"
-                        Clicked="OnHoldPalletClicked" IsVisible="False" />
-                <Button x:Name="ConfirmButton" Text="Подтвердить Отбор"
-                        Clicked="OnConfirmClicked" IsEnabled="False" />
-                <Button x:Name="ReturnPalletButton" Text="Вернуть поддон в исходную ячейку"
-                        Clicked="OnReturnPalletClicked" IsVisible="False" />
             </VerticalStackLayout>
         </ScrollView>
         <VerticalStackLayout Grid.Row="1" Spacing="5">
-            <BoxView x:Name="ProgressIndicator" Color="{StaticResource Primary}"
-                     HeightRequest="3" IsVisible="False" />
+            <ActivityIndicator x:Name="ProgressIndicator" HeightRequest="28"
+                               IsRunning="False" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />
             <Button x:Name="RetryButton" Text="Повторить команду"
                     Clicked="OnRetryClicked" IsVisible="False" />
+            <Button x:Name="HoldPalletButton" Text="Снять весь поддон"
+                    Clicked="OnHoldPalletClicked" IsVisible="False" />
+            <Button x:Name="ConfirmButton" Text="Подтвердить Отбор"
+                    Clicked="OnConfirmClicked" IsEnabled="False" />
+            <Button x:Name="ReturnPalletButton" Text="Вернуть поддон в исходную ячейку"
+                    Clicked="OnReturnPalletClicked" IsVisible="False" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

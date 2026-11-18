@@ -33,7 +33,6 @@ public partial class PickingSkuPage : ContentPage
     }
 
     public IReadOnlyList<PickingSkuPlanRow> SkuRows { get; private set; } = [];
-    public IReadOnlyList<PickingEntryListRow> EntryRows { get; private set; } = [];
     public IReadOnlyList<PickingExchangeRow> ExchangeRows { get; private set; } = [];
     private bool IsOwner => _assembly?.ResponsibleUserId == _selection.CurrentUserId;
 
@@ -109,12 +108,13 @@ public partial class PickingSkuPage : ContentPage
     private void Apply(MobilePickingAssemblyResponse assembly)
     {
         _assembly = assembly;
-        NumberLabel.Text = $"Сборка {assembly.Number}";
+        PickingTitle.Set(HeaderTitleLabel, "Отбор", assembly.Number);
+        Title = $"Отбор · {assembly.Number}";
         StatusLabel.Text = assembly.Status switch
         {
             MobilePickingAssemblyStatus.Draft => "Черновик",
-            MobilePickingAssemblyStatus.Preparing => "Ожидается перевод РО 1С в КОтбору",
-            MobilePickingAssemblyStatus.InProgress => "Отбор в работе",
+            MobilePickingAssemblyStatus.Preparing => "Запрос в 1С КОтбору",
+            MobilePickingAssemblyStatus.InProgress => "В работе",
             MobilePickingAssemblyStatus.Closed => assembly.Sources.All(x =>
                 x.ExchangeStage == MobileShippingExchangeStage.PostConfirmed)
                 ? "Сборка закрыта · обмен с 1С подтверждён"
@@ -122,10 +122,17 @@ public partial class PickingSkuPage : ContentPage
             _ => "Сборка отменяется или отменена"
         };
         OwnerLabel.Text = assembly.ResponsibleDisplayName;
+        var entriesBySku = _work?.Entries.ToLookup(x => x.SkuId);
         SkuRows = _work?.Skus.Select(x => new PickingSkuPlanRow(
             x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
             x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)
             {
+                Entries = entriesBySku?[x.SkuId].Select(entry => new PickingEntryListRow(
+                    entry.Id,
+                    string.IsNullOrWhiteSpace(entry.LocationName) ? entry.LocationCode : entry.LocationName,
+                    entry.Quantity, entry.ExpirationDate,
+                    assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
+                    .ToArray() ?? [],
                 AvailableQuantity = _availableBySku?.GetValueOrDefault(x.SkuId),
                 ReplenishmentState = ReplenishmentStateFor(x.SkuId,
                     x.PlannedQuantity - x.ConfirmedQuantity,
@@ -142,13 +149,6 @@ public partial class PickingSkuPage : ContentPage
                 .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(x => x.SkuId).ToArray();
         OnPropertyChanged(nameof(SkuRows));
-        EntryRows = _work?.Entries.Select(x => new PickingEntryListRow(x.Id,
-            $"{SkuRows.FirstOrDefault(sku => sku.SkuId == x.SkuId)?.Name ?? x.SkuId.ToString()} · "
-            + $"{(string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName)} · {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}"
-            + (x.ExpirationDate is DateOnly date ? $" · до {date:dd.MM.yyyy}" : string.Empty),
-            assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
-            .ToArray() ?? [];
-        OnPropertyChanged(nameof(EntryRows));
         ExchangeRows = assembly.Status == MobilePickingAssemblyStatus.Closed
             ? assembly.Sources.Select(x => new PickingExchangeRow(
                 x.Number ?? x.SourceRefKey.ToString(),
@@ -195,7 +195,7 @@ public partial class PickingSkuPage : ContentPage
         var row = SkuRows.FirstOrDefault(x => x.SkuId == skuId);
         if (row is null || row.PlannedQuantity <= row.ConfirmedQuantity) return;
         var page = _services.GetRequiredService<PickingEntryPage>();
-        page.ShowPick(_assembly, _process, skuId, null, false);
+        page.ShowPick(_assembly, _process, skuId, null, false, PickingEntryOrigin.Sku);
         await Navigation.PushAsync(page);
     }
 
@@ -398,7 +398,8 @@ public partial class PickingSkuPage : ContentPage
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        ProgressIndicator.IsVisible = busy;
+        ProgressIndicator.IsRunning = busy && !SkuRefreshView.IsRefreshing;
+        ProgressIndicator.IsVisible = ProgressIndicator.IsRunning;
         UpdateActions();
     }
 
@@ -413,6 +414,7 @@ public partial class PickingSkuPage : ContentPage
 public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
     decimal PlannedQuantity, decimal ConfirmedQuantity, string? Unit)
 {
+    public IReadOnlyList<PickingEntryListRow> Entries { get; init; } = [];
     public decimal? AvailableQuantity { get; init; }
     public PickingReplenishmentState ReplenishmentState { get; init; }
     public bool HasExistingReplenishment { get; init; }
@@ -450,6 +452,14 @@ public enum PickingReplenishmentState
     Hidden, CanOrder, Ordered, InProgress, Ready, Unavailable
 }
 
-public sealed record PickingEntryListRow(Guid Id, string Text, bool CanReturn);
+public sealed record PickingEntryListRow(Guid Id, string Address, decimal Quantity,
+    DateOnly? ExpirationDate, bool CanReturn)
+{
+    public string QuantityText => Quantity.ToString("0.###", CultureInfo.CurrentCulture);
+    public bool HasExpiration => ExpirationDate is not null;
+    public string ExpirationText => ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : string.Empty;
+    public string ReturnDescription => $"Вернуть {QuantityText} в ячейку {Address}"
+        + (HasExpiration ? $", срок {ExpirationText}" : string.Empty);
+}
 
 public sealed record PickingExchangeRow(string Number, string Stage, string? Error);

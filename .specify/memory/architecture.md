@@ -347,6 +347,10 @@ programming failures remain exceptions and are handled at the outer boundary.
 
 MAUI pages are grouped by operator workflow. Scanner adapters, feature HTTP
 clients, session handling, and platform helpers remain technical components.
+Picking SKU card actions, including the fact and return pages, use bundled Material Symbols Outlined SVG assets under
+`Wms.Mobile/Resources/Images/material_*.svg`, converted by MAUI at build time.
+Asset comments retain upstream provenance and local modifications; the Apache 2.0
+license is packaged in `Resources/Raw/material-symbols-license.txt`.
 Feature clients and Mobile V1 contract source files are grouped by business
 feature over one authenticated transport.
 The Mobile V1 location contract preserves the existing numeric zone-context

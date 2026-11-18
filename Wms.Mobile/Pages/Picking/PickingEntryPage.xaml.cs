@@ -19,6 +19,9 @@ public partial class PickingEntryPage : ContentPage
     private MobilePickingWorkEntryResponse? _returnEntry;
     private Guid _skuId;
     private string? _recommendedCode;
+    private string? _scannedLocationCode;
+    private string? _initialScanCode;
+    private PickingEntryOrigin _origin;
     private bool _directPalletPick;
     private bool _palletHeld;
     private bool _returnLocationChecked;
@@ -42,25 +45,31 @@ public partial class PickingEntryPage : ContentPage
 
     public void ShowPick(MobilePickingAssemblyResponse assembly,
         PickingAssemblyProcess process, Guid skuId,
-        string? recommendedCode, bool directPalletPick)
+        string? recommendedCode, bool directPalletPick, PickingEntryOrigin origin,
+        string? initialScanCode = null)
     {
         _assembly = assembly;
         _process = process;
         _skuId = skuId;
         _recommendedCode = recommendedCode;
         _directPalletPick = directPalletPick;
+        _origin = origin;
+        _initialScanCode = initialScanCode;
+        _palletHeld = false;
+        _sku = null;
+        _work = null;
         _returnEntry = null;
         _source = null;
         _returnLocationChecked = false;
         _needsPalletReturn = false;
-        LocationEntry.Text = string.Empty;
+        _scannedLocationCode = null;
         QuantityEntry.Text = string.Empty;
     }
 
     public void ShowReturn(MobilePickingAssemblyResponse assembly,
         PickingAssemblyProcess process, MobilePickingWorkEntryResponse entry)
     {
-        ShowPick(assembly, process, entry.SkuId, entry.LocationCode, false);
+        ShowPick(assembly, process, entry.SkuId, entry.LocationCode, false, PickingEntryOrigin.Sku);
         _returnEntry = entry;
         QuantityEntry.Text = entry.Quantity.ToString("0.###", CultureInfo.CurrentCulture);
     }
@@ -71,6 +80,11 @@ public partial class PickingEntryPage : ContentPage
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         await RefreshAsync();
+        if (_visible && _sku is not null && _initialScanCode is { } code)
+        {
+            _initialScanCode = null;
+            await CheckLocationAsync(code);
+        }
         await UpdateCameraAsync();
     }
 
@@ -104,7 +118,7 @@ public partial class PickingEntryPage : ContentPage
 
     private async void OnInfoClicked(object? sender, EventArgs e)
     {
-        if (_assembly is null || _skuId == Guid.Empty || _process.HasPendingCommand)
+        if (_busy || _assembly is null || _skuId == Guid.Empty || _process.HasPendingCommand)
             return;
         var page = _services.GetRequiredService<SkuLocationsPage>();
         page.Show(_assembly.WarehouseId, _skuId, SkuLabel.Text,
@@ -115,30 +129,61 @@ public partial class PickingEntryPage : ContentPage
     private void Apply()
     {
         if (_assembly is null) return;
-        NumberLabel.Text = $"Сборка {_assembly.Number}";
         var sku = _work?.Skus.FirstOrDefault(x => x.SkuId == _skuId);
         SkuLabel.Text = sku?.Name ?? sku?.Code ?? _skuId.ToString();
         var unit = sku?.Unit ?? "—";
+        PlanLabel.Text = sku is null ? $"— {unit}" : $"{sku.PlannedQuantity:0.###} {unit}";
+        FactLabel.Text = sku is null ? "—" : $"{sku.ConfirmedQuantity:0.###}";
+        SkuCard.BackgroundColor = sku is null ? Colors.White
+            : sku.ConfirmedQuantity == sku.PlannedQuantity ? Color.FromArgb("#E4F5E7")
+            : sku.ConfirmedQuantity > 0 ? Color.FromArgb("#FFF1CF") : Colors.White;
+        var canInteract = !_busy && !_process.HasPendingCommand;
+        InfoButton.IsEnabled = canInteract;
+        QuantityEntry.IsEnabled = canInteract && !_needsPalletReturn
+            && (_returnEntry is not null || _source is not null);
+        HoldPalletButton.IsEnabled = canInteract;
+        ReturnPalletButton.IsEnabled = canInteract;
+        ShortageHintLabel.IsVisible = _returnEntry is null && _source is not null;
+        QuantityCaptionLabel.Text = _returnEntry is null ? "Количество к отбору" : "Количество к возврату";
+        SourceAddressLabel.IsVisible = _returnEntry is null && _source is not null;
+        SourceCaptionLabel.IsVisible = SourceAddressLabel.IsVisible;
+        AvailableBlock.IsVisible = SourceAddressLabel.IsVisible;
+        AvailableLabel.Text = _source is null ? "—" : $"{_source.AvailableQuantity:0.###}";
+        SourceAddressLabel.Text = _source is null ? string.Empty
+            : string.IsNullOrWhiteSpace(_source.LocationName) ? _source.LocationCode : _source.LocationName;
         if (_returnEntry is { } entry)
         {
+            SourceCaptionLabel.Text = "Считанный код ячейки";
+            SourceCaptionLabel.IsVisible = _scannedLocationCode is not null;
+            SourceAddressLabel.IsVisible = SourceCaptionLabel.IsVisible;
+            SourceAddressLabel.Text = _scannedLocationCode;
             Title = "Отбор › Возврат";
-            RemainingLabel.Text = $"Вернуть из факта: {entry.Quantity:0.###} {unit}";
-            RecommendationLabel.Text = $"Исходная ячейка: {(string.IsNullOrWhiteSpace(entry.LocationName) ? entry.LocationCode : entry.LocationName)}";
+            PickingTitle.Set(HeaderTitleLabel, Title, _assembly.Number);
+            Title = $"Отбор › Возврат · {_assembly.Number}";
+            RemainingCaptionLabel.Text = "К возврату";
+            RemainingLabel.Text = $"{entry.Quantity:0.###}";
+            RecommendationCaptionLabel.Text = "Исходная ячейка";
+            RecommendationLabel.Text = string.IsNullOrWhiteSpace(entry.LocationName) ? entry.LocationCode : entry.LocationName;
             ExpiryLabel.Text = entry.ExpirationDate is DateOnly date
                 ? $"Срок: {date:dd.MM.yyyy}" : "Срок не указан";
             StockLabel.Text = _returnLocationChecked
                 ? "Подтвердите, что возвращаемый товар находится в исходной ячейке."
                 : "Сканируйте исходную ячейку для возврата.";
             ConfirmButton.Text = "Подтвердить возврат";
-            ConfirmButton.IsEnabled = !_busy && _returnLocationChecked
+            ConfirmButton.IsEnabled = canInteract && _returnLocationChecked
                 && !_needsPalletReturn;
             HoldPalletButton.IsVisible = false;
             ReturnPalletButton.IsVisible = _needsPalletReturn;
         }
         else
         {
+            SourceCaptionLabel.Text = "Считанная ячейка";
             Title = "Отбор › Факт";
-            RemainingLabel.Text = $"Осталось: {_sku?.RemainingQuantity ?? 0:0.###} {unit}";
+            PickingTitle.Set(HeaderTitleLabel, Title, _assembly.Number);
+            Title = $"Отбор › Факт · {_assembly.Number}";
+            RemainingCaptionLabel.Text = "Осталось";
+            RemainingLabel.Text = sku is null ? "—"
+                : $"{Math.Max(0, sku.PlannedQuantity - sku.ConfirmedQuantity):0.###}";
             if (_recommendedCode is null)
                 _recommendedCode = _sku?.Locations
                     .Where(x => x.AvailableQuantity > 0)
@@ -150,15 +195,16 @@ public partial class PickingEntryPage : ContentPage
                 x.ConfirmedQuantity >= x.PlannedQuantity) == true;
             var recommendedName = _sku?.Locations.FirstOrDefault(x =>
                 x.LocationCode == _recommendedCode)?.LocationName;
+            RecommendationCaptionLabel.Text = _recommendedCode is null ? "Следующий шаг" : "Рекомендуемая ячейка";
             RecommendationLabel.Text = _recommendedCode is null
                 ? allPicked ? "Все SKU набраны. Проверьте закрытие сборки."
                     : "Доступной ячейки нет. Ожидается Подпитка или решение руководителя."
-                : $"Рекомендуемая ячейка: {(string.IsNullOrWhiteSpace(recommendedName) ? _recommendedCode : recommendedName)}"
-                    + (_directPalletPick ? " · снять весь поддон" : "");
+                : (string.IsNullOrWhiteSpace(recommendedName) ? _recommendedCode : recommendedName);
+            RecommendationLabel.FontSize = _recommendedCode is null ? 13 : 22;
+            if (_directPalletPick && _recommendedCode is not null)
+                RecommendationCaptionLabel.Text += " · снять весь поддон";
             StockLabel.Text = _source is null ? "Сканируйте ячейку."
-                : $"Ячейка {(string.IsNullOrWhiteSpace(_source.LocationName) ? _source.LocationCode : _source.LocationName)}: учёт {_source.AccountingQuantity:0.###}, "
-                    + $"доступно {_source.AvailableQuantity:0.###}, "
-                    + $"резерв {_source.ReservedQuantity:0.###}, "
+                : $"Учёт {_source.AccountingQuantity:0.###}, резерв {_source.ReservedQuantity:0.###}, "
                     + $"спорное {_source.BlockedQuantity:0.###}";
             ExpiryLabel.Text = _source?.ExpirationDate is DateOnly expiry
                 ? $"Срок: {expiry:dd.MM.yyyy}"
@@ -166,7 +212,7 @@ public partial class PickingEntryPage : ContentPage
                     ? "Срок не указан: проверьте его визуально до подтверждения."
                     : _source is null ? string.Empty : "Срок не указан";
             ConfirmButton.Text = "Подтвердить Отбор";
-            ConfirmButton.IsEnabled = !_busy && _source is not null
+            ConfirmButton.IsEnabled = canInteract && _source is not null
                 && (!_directPalletPick || _palletHeld);
             HoldPalletButton.IsVisible = _source is not null
                 && _directPalletPick && !_palletHeld;
@@ -186,18 +232,12 @@ public partial class PickingEntryPage : ContentPage
         });
     }
 
-    private async void OnLocationCompleted(object? sender, EventArgs e) =>
-        await CheckLocationAsync(LocationEntry.Text);
-
-    private async void OnCheckLocationClicked(object? sender, EventArgs e) =>
-        await CheckLocationAsync(LocationEntry.Text);
-
     private async Task CheckLocationAsync(string? code)
     {
         if (!_visible || _busy || _process.HasPendingCommand || _assembly is null
             || string.IsNullOrWhiteSpace(code)) return;
         Interlocked.Increment(ref _scanGeneration);
-        LocationEntry.Text = code.Trim();
+        _scannedLocationCode = code.Trim();
         ErrorLabel.Text = string.Empty;
         if (_returnEntry is not null)
         {
@@ -206,6 +246,8 @@ public partial class PickingEntryPage : ContentPage
             return;
         }
         SetBusy(true);
+        _source = null;
+        QuantityEntry.Text = string.Empty;
         try
         {
             _source = await _client.ScanSourceAsync(_assembly.Id,
@@ -243,7 +285,7 @@ public partial class PickingEntryPage : ContentPage
             await RunActionAsync(PendingAction.Return,
                 () => _process.ReducePickAsync(_assembly.Id,
                     _assembly.WarehouseId, entry.Id, _assembly.Revision,
-                    LocationEntry.Text ?? "", quantity, null));
+                    _scannedLocationCode ?? "", quantity, null));
         }
         else if (_source is { } source)
         {
@@ -294,12 +336,12 @@ public partial class PickingEntryPage : ContentPage
     private async void OnReturnPalletClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null
-            || string.IsNullOrWhiteSpace(LocationEntry.Text)
+            || string.IsNullOrWhiteSpace(_scannedLocationCode)
             || _returnEntry is not null && !_returnLocationChecked) return;
         await RunActionAsync(PendingAction.PalletReturn,
             () => _process.ReturnPalletAsync(_assembly.Id,
                 _assembly.WarehouseId, _assembly.Revision,
-                LocationEntry.Text ?? ""));
+                _scannedLocationCode ?? ""));
     }
 
     private bool TryQuantity(out decimal quantity, bool allowZero = false)
@@ -346,6 +388,12 @@ public partial class PickingEntryPage : ContentPage
     private async Task AfterActionAsync(PendingAction action)
     {
         if (_assembly is null) return;
+        if (_origin == PickingEntryOrigin.Sku
+            && action is (PendingAction.Pick or PendingAction.Shortage))
+        {
+            await Navigation.PopAsync();
+            return;
+        }
         _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
         if (action == PendingAction.Hold)
         {
@@ -358,7 +406,7 @@ public partial class PickingEntryPage : ContentPage
             var route = await _client.RouteAsync(_assembly.Id, _assembly.WarehouseId);
             _source = null;
             _palletHeld = false;
-            LocationEntry.Text = string.Empty;
+            _scannedLocationCode = null;
             QuantityEntry.Text = string.Empty;
             if (route.Steps.FirstOrDefault() is { } next)
             {
@@ -402,9 +450,9 @@ public partial class PickingEntryPage : ContentPage
 
     private async Task CheckLocationAfterHoldAsync()
     {
-        if (_assembly is null || string.IsNullOrWhiteSpace(LocationEntry.Text)) return;
+        if (_assembly is null || string.IsNullOrWhiteSpace(_scannedLocationCode)) return;
         _source = await _client.ScanSourceAsync(_assembly.Id,
-            new(_assembly.WarehouseId, _skuId, LocationEntry.Text));
+            new(_assembly.WarehouseId, _skuId, _scannedLocationCode));
         Apply();
     }
 
@@ -427,6 +475,7 @@ public partial class PickingEntryPage : ContentPage
         _busy = busy;
         Interlocked.Increment(ref _scanGeneration);
         ProgressIndicator.IsVisible = busy;
+        ProgressIndicator.IsRunning = busy;
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
         NavigationPage.SetHasBackButton(this, !busy && !_process.HasPendingCommand);
         if (busy) CameraScannerView.Stop();
@@ -442,3 +491,5 @@ public partial class PickingEntryPage : ContentPage
 
     private enum PendingAction { Pick, Return, Hold, PalletReturn, Shortage }
 }
+
+public enum PickingEntryOrigin { Sku, Route }

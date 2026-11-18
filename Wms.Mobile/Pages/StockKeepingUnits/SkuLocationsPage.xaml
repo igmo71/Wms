@@ -8,7 +8,6 @@
         <VerticalStackLayout Spacing="4">
             <Label x:Name="SkuNameLabel" FontAttributes="Bold" FontSize="19" LineBreakMode="WordWrap" />
             <Label x:Name="UnitLabel" FontSize="12" />
-            <Label Text="Доступно для новой работы по ячейкам и срокам годности" FontSize="12" />
         </VerticalStackLayout>
         <RefreshView x:Name="LocationsRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
