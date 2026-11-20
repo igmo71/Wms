@@ -30,7 +30,7 @@ public sealed class ShippingSourceWriterTests
     }
 
     [Fact]
-    public async Task Matching_target_skips_patch_but_unposted_document_still_posts()
+    public async Task Matching_target_with_older_line_numbers_skips_patch_and_still_posts()
     {
         var original = Source();
         var target = Target(original);
@@ -39,6 +39,7 @@ public sealed class ShippingSourceWriterTests
         var patch = JsonNode.Parse(built.PatchJson)!.AsObject();
         foreach (var (name, value) in patch)
             currentJson[name] = value?.DeepClone();
+        currentJson["ТоварыПоРаспоряжениям"]![0]!["LineNumber"] = 3;
         currentJson["Posted"] = false;
         var current = Value(new ShippingStoredSnapshotParser()
             .Parse(OrderId, currentJson.ToJsonString()));

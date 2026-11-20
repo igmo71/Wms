@@ -26,6 +26,8 @@ public sealed class ShippingTargetBuilderTests
             .EnumerateArray().ToArray();
         Assert.Equal(3, items.Length);
         Assert.Equal(new[] { 3m, 5m, 2m }, items.Select(Quantity));
+        Assert.Equal(new[] { "1", "2", "3" },
+            items.Select(x => x.GetProperty("LineNumber").GetString()));
         Assert.Equal(new[] { "Отгрузить", "Отгрузить", "НеОтгружать" },
             items.Select(x => x.GetProperty("Действие").GetString()));
         Assert.Equal(SecondSeries.ToString(),
@@ -35,9 +37,55 @@ public sealed class ShippingTargetBuilderTests
         var basis = json.RootElement.GetProperty("ТоварыПоРаспоряжениям")
             .EnumerateArray().ToArray();
         Assert.Equal(new[] { 3m, 5m }, basis.Select(Quantity));
+        Assert.Equal(new[] { "1", "2" },
+            basis.Select(x => x.GetProperty("LineNumber").GetString()));
         Assert.Equal(new[] { FirstBasis.ToString(), SecondBasis.ToString() },
             basis.Select(x => x.GetProperty("Распоряжение").GetString()));
         Assert.Equal("Отгружен", json.RootElement.GetProperty("Статус").GetString());
+    }
+
+    [Fact]
+    public void Partial_pick_numbers_both_patch_tables_in_source_order_without_gaps()
+    {
+        var unpickedSku = Guid.NewGuid();
+        var fullyPickedSku = Guid.NewGuid();
+        var source = new JsonObject
+        {
+            ["Ref_Key"] = OrderId.ToString(),
+            ["ОтгружаемыеТовары"] = new JsonArray(
+                ShippingLine(1, 5, Guid.Empty, unpickedSku),
+                ShippingLine(2, 10, Guid.Empty),
+                ShippingLine(3, 12, Guid.Empty, fullyPickedSku)),
+            ["ТоварыПоРаспоряжениям"] = new JsonArray(
+                BasisLine(1, 5, FirstBasis, unpickedSku),
+                BasisLine(2, 10, SecondBasis),
+                BasisLine(3, 12, FirstBasis, fullyPickedSku))
+        }.ToJsonString();
+        var target = Value(ShippingExchangeTarget.Create(Guid.NewGuid(), OrderId, 1,
+            source, JsonSerializer.Serialize(new
+            {
+                Version = 1, Status = "Shipped",
+                ApprovedPlan = new[] { new { SkuId = unpickedSku, Quantity = 5m },
+                    new { SkuId, Quantity = 10m }, new { SkuId = fullyPickedSku, Quantity = 12m } },
+                Allocation = new[] { new { SkuId = fullyPickedSku, Quantity = 12m },
+                    new { SkuId, Quantity = 6m } }
+            })));
+
+        var patch = Value(new ShippingTargetBuilder().Build(target, source));
+        using var json = JsonDocument.Parse(patch.PatchJson);
+        var items = json.RootElement.GetProperty("ОтгружаемыеТовары").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "1", "2", "3", "4" },
+            items.Select(x => x.GetProperty("LineNumber").GetString()));
+        Assert.Equal(new[] { 5m, 6m, 12m, 4m }, items.Select(Quantity));
+        Assert.Equal(new[] { "НеОтгружать", "Отгрузить", "Отгрузить", "НеОтгружать" },
+            items.Select(x => x.GetProperty("Действие").GetString()));
+
+        var basis = json.RootElement.GetProperty("ТоварыПоРаспоряжениям").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "1", "2" },
+            basis.Select(x => x.GetProperty("LineNumber").GetString()));
+        Assert.Equal(new[] { 6m, 12m }, basis.Select(Quantity));
+        Assert.Equal(new[] { SecondBasis.ToString(), FirstBasis.ToString() },
+            basis.Select(x => x.GetProperty("Распоряжение").GetString()));
     }
 
     [Fact]
@@ -116,10 +164,10 @@ public sealed class ShippingTargetBuilderTests
     }
 
     private static JsonObject ShippingLine(int number, decimal quantity,
-        Guid series) => new()
+        Guid series, Guid? skuId = null) => new()
     {
         ["LineNumber"] = number,
-        ["Номенклатура_Key"] = SkuId.ToString(),
+        ["Номенклатура_Key"] = (skuId ?? SkuId).ToString(),
         ["Количество"] = quantity,
         ["КоличествоУпаковок"] = quantity,
         ["Действие"] = "Отгрузить",
@@ -130,10 +178,10 @@ public sealed class ShippingTargetBuilderTests
     };
 
     private static JsonObject BasisLine(int number, decimal quantity,
-        Guid basis) => new()
+        Guid basis, Guid? skuId = null) => new()
     {
         ["LineNumber"] = number,
-        ["Номенклатура_Key"] = SkuId.ToString(),
+        ["Номенклатура_Key"] = (skuId ?? SkuId).ToString(),
         ["Количество"] = quantity,
         ["Распоряжение"] = basis.ToString(),
         ["Распоряжение_Type"] = "StandardODATA.Document_Распоряжение",

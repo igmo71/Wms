@@ -37,7 +37,8 @@ The read-only detail shows the SKU's locations and expiration groups in the
 selected warehouse. Available quantity is primary; accounting quantity is
 shown separately only when it differs because of reservations, shortage blocks
 or a whole-cell hold. The unit is shown once, or marked unknown. The Web
-receiving plan and LPN rows use the same view.
+receiving plan and LPN rows use the same view. In Web shipping, «План - Факт»
+and the selected 1C shipping document's SKU table open it from their first column.
 Mobile reads it through an Operator-only endpoint; Web uses the shared
 application availability query with the same role check.
 
@@ -72,8 +73,8 @@ login, and destination cell address; filters can be combined.
 
 ## Web picking assemblies
 
-The Web «Отгрузка» group contains «Документы 1С» and «Ордера WMS» for Operator
-and Manager. The first page searches imported shipping orders by 1C number and
+The Web «Отгрузка» group contains «Документы 1С» and «Расходные ордера WMS»
+for Operator and Manager. The first page searches imported shipping orders by 1C number and
 shows their stored source lines, status, warehouse, receiver, latest check and
 active WMS assembly link when that assembly is accessible to the user. The
 assembly detail links back to each source document. The source page reads the
@@ -84,27 +85,42 @@ action. Its aggregate SKU plan/fact rows are neutral before picking starts,
 green when equal after it starts, and yellow when different. A linked 1C
 document's plan versus allocated fact is colored only after assembly closure.
 
-The Manager «Ордера WMS» page lists picking assemblies across warehouses;
+The Manager «Расходные ордера WMS» page lists picking assemblies across warehouses;
 Operator sees all closed assemblies awaiting 1C exchange and can retry that
-exchange regardless of who closed them. The detail page keeps the WMS plan per
-1C document, physical WMS fact by SKU and cell, current imported 1C lines,
-posted allocation, and action history separate. A fresh «Сверить с 1С» action
-retrieves each document before a decision and shows hard blocks and issues requiring Manager
-review. A Manager may change one document's WMS plan with a reason and the
-reviewed source snapshot, explicitly distribute a partial shared SKU across
-documents, and close the assembly with a recorded reason. The close action
-checks 1C again and retains the same request ID if its response is uncertain.
+exchange regardless of who closed them. The detail header shows the WMS order
+number, creation date, status and responsible user. «План - Факт» expands each
+picked SKU to its individual cell, expiration date, quantity and picker name
+records. One «Документы 1С» panel lists linked documents with their status,
+receiver, queue display name, planned shipping date and latest check. Each
+document expands to its SKU comparison, which shows «План WMS», «План 1С»
+from the latest saved source and either the proposed or posted allocation. A SKU row can expand
+when it combines multiple imported 1C lines from that document. A pending
+manual allocation is identified in the comparison.
+
+For a Manager, the header offers «Сверить с 1С» and «Закрыть и отгрузить».
+«Обновить» reloads saved WMS data and resets the current closure review. It
+also clears the unsubmitted allocation when there is no close request to retry.
+A fresh check retrieves each document, shows blockers and review issues near
+the actions and offers «Распределить недобор» when a shared SKU needs a split.
+The card prompts for the next step, and closing becomes available after the
+check allows it and the Manager enters a reason. During picking, the Manager
+sees «Изменить план» in each expanded document row. The action refreshes 1C
+before opening the editor. Saving requires a reason and the reviewed source
+snapshot. The close action checks 1C again and retains the same request ID
+if its response is uncertain.
 After warehouse closure, the same action retries exchange for unconfirmed
 1C documents and shows their individual stages and errors. For a new source
 discrepancy, the Manager reads and reviews the fresh 1C document, records a
 reason, and then retries the exchange without changing the warehouse fact.
 Physical picking quantities remain editable only through the TSD workflow.
-The same page shows posted replenishment steps with their original and current
-effective quantities. A Manager can enter the actual transferred quantity and
-reason; the dialog keeps its command ID for an uncertain response. The separate
+«Подпитки» lists the assembly's ordered, in-progress, completed and cancelled
+tasks with their ordered and transferred quantities. Each task with posted steps
+expands to their original and current effective quantities. A Manager can enter
+the actual transferred quantity and reason. The dialog keeps its command ID for
+an uncertain response. The separate
 correction movement and task progress are described in [inventory](inventory.md).
-The same Manager detail page lists picking shortage reports with the cell,
-expiration group, expected and found quantities, current held fact, blocked
+The same Manager detail page lists picking shortage reports with separate SKU
+and cell columns, expiration group, expected and found quantities, current held fact, blocked
 quantity and resolution. Its decision dialog explains the stock effect:
 confirming a shortage posts a correction for the blocked quantity; rejecting
 the report releases the block without a stock movement. Both require a reason

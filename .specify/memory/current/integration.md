@@ -132,9 +132,15 @@ increase can use reviewed source quantities. Unshipped plan remains in
 and empties the basis table. Deleted original lines can be restored from the
 saved source with their original requisites and order references. The builder
 copies only writable row fields into PATCH. The stock commit does not call 1C.
+Both tabular sections are sent in source-line order with consecutive
+`LineNumber` values starting at one, encoded as JSON strings. Added split
+rows follow the original rows. Read-back matching compares row data in
+line-number order and accepts older numbering with gaps.
 Each document target tracks its own PATCH and POST confirmations, last attempt
 time, error and decision revision. A failed PATCH or POST keeps its current
-stage for retry; successful PATCH alone does not confirm the exchange. A new
+stage for retry. The writer also logs rejected HTTP responses with the document
+Ref_Key, method, status code and bounded error text. Successful PATCH alone
+does not confirm the exchange. A new
 source discrepancy requires review. An approved fresh source increments that
 document's decision revision and resets PATCH progress while preserving the
 closed WMS target and stock fact. Only confirmed POST completes the target.

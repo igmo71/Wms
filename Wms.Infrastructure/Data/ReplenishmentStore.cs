@@ -112,35 +112,37 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
             EffectiveQuantity(task, transfer, cycle, corrections), corrections.Length);
     }
 
-    public async Task<IReadOnlyList<ReplenishmentTransferView>> ReadTransfersAsync(
+    public async Task<IReadOnlyList<ReplenishmentTaskSummary>> ReadAssemblyTaskSummariesAsync(
         Guid assemblyId, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var tasks = await db.ReplenishmentTasks.AsNoTracking()
             .Include(x => x.SourceCycles).ThenInclude(x => x.Transfers)
-            .Where(x => x.PickingAssemblyId == assemblyId).ToArrayAsync(ct);
+            .Where(x => x.PickingAssemblyId == assemblyId)
+            .OrderByDescending(x => x.OrderedAtUtc).ThenBy(x => x.Id).ToArrayAsync(ct);
+        if (tasks.Length == 0) return [];
         var steps = tasks.SelectMany(task => task.SourceCycles.SelectMany(cycle =>
             cycle.Transfers.Select(transfer => new { task, cycle, transfer })))
             .ToArray();
-        if (steps.Length == 0) return [];
         var transferIds = steps.Select(x => x.transfer.Id).ToArray();
         var locationIds = steps.SelectMany(x => new[]
             { x.cycle.SourceStorageLocationId, x.transfer.DestinationStorageLocationId })
             .Distinct().ToArray();
         var skuIds = tasks.Select(x => x.StockKeepingUnitId).Distinct().ToArray();
-        var corrections = await db.InventoryMovements.AsNoTracking()
+        InventoryMovement[] corrections = steps.Length == 0 ? [] : await db.InventoryMovements.AsNoTracking()
             .Where(x => x.RecorderType == RecorderType.StockCorrection
                 && x.RecorderId != null && transferIds.Contains(x.RecorderId.Value)
                 && x.PostedAtUtc != null)
             .ToArrayAsync(ct);
-        var locations = await db.StorageLocations.AsNoTracking()
+        var locations = locationIds.Length == 0 ? new Dictionary<Guid, string>()
+            : await db.StorageLocations.AsNoTracking()
             .Where(x => locationIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.Code, ct);
         var skus = await db.StockKeepingUnits.AsNoTracking()
             .Where(x => skuIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.Name ?? x.Code, ct);
         var byTransfer = corrections.ToLookup(x => x.RecorderId);
-        return steps.OrderByDescending(x => x.transfer.ConfirmedAtUtc)
+        var transfers = steps.OrderByDescending(x => x.transfer.ConfirmedAtUtc)
             .ThenBy(x => x.transfer.Id)
             .Select(x => new ReplenishmentTransferView(x.transfer.Id,
                 x.task.Id, x.task.StockKeepingUnitId,
@@ -152,7 +154,11 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 x.transfer.ExpirationDate, x.transfer.Quantity,
                 EffectiveQuantity(x.task, x.transfer, x.cycle,
                     byTransfer[x.transfer.Id]),
-                x.transfer.ConfirmedAtUtc)).ToArray();
+                x.transfer.ConfirmedAtUtc)).ToLookup(x => x.TaskId);
+        return tasks.Select(task => new ReplenishmentTaskSummary(task.Id,
+            task.StockKeepingUnitId, skus.GetValueOrDefault(task.StockKeepingUnitId),
+            task.Status, task.OrderedQuantity, task.TransferredQuantity,
+            task.OrderedAtUtc, transfers[task.Id].ToArray())).ToArray();
     }
 
     public async Task<ReplenishmentTaskDetail?> ReadTaskAsync(

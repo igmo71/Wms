@@ -1,12 +1,14 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Wms.Application.Picking;
 using Wms.Common;
 using Wms.Domain;
 
 namespace Wms.Integration.OneS;
 
-public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourceWriter
+public sealed class ShippingSourceWriter(HttpClient httpClient,
+    ILogger<ShippingSourceWriter>? logger = null) : IShippingSourceWriter
 {
     public OperationResult ValidateTarget(ShippingExchangeTarget target,
         string planSourceSnapshotJson)
@@ -37,7 +39,7 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
             Content = new StringContent("{\"Статус\":\"КОтбору\"}",
                 Encoding.UTF8, "application/json")
         };
-        return await SendAsync(request, expectedStatus: "КОтбору", ct);
+        return await SendAsync(request, sourceId, expectedStatus: "КОтбору", ct);
     }
 
     public async Task<OperationResult> SetPreparedAsync(Guid sourceId,
@@ -49,7 +51,7 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
             Content = new StringContent("{\"Статус\":\"Подготовлен\"}",
                 Encoding.UTF8, "application/json")
         };
-        return await SendAsync(request, expectedStatus: "Подготовлен", ct);
+        return await SendAsync(request, sourceId, expectedStatus: "Подготовлен", ct);
     }
 
     public async Task<OperationResult> ApplyTargetAsync(ShippingExchangeTarget target,
@@ -71,26 +73,32 @@ public sealed class ShippingSourceWriter(HttpClient httpClient) : IShippingSourc
             Content = new StringContent(built.Value!.PatchJson,
                 Encoding.UTF8, "application/json")
         };
-        return await SendAsync(request, expectedStatus: null, ct);
+        return await SendAsync(request, target.ShippingOrderId, expectedStatus: null, ct);
     }
 
     public async Task<OperationResult> PostAsync(Guid sourceId, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post,
             DocumentUri(sourceId) + "/Post?$format=json");
-        return await SendAsync(request, expectedStatus: null, ct);
+        return await SendAsync(request, sourceId, expectedStatus: null, ct);
     }
 
     private async Task<OperationResult> SendAsync(HttpRequestMessage request,
-        string? expectedStatus, CancellationToken ct)
+        Guid sourceId, string? expectedStatus, CancellationToken ct)
     {
         try
         {
             using var response = await httpClient.SendAsync(request, ct);
             var body = await response.Content.ReadAsStringAsync(ct);
             if (!response.IsSuccessStatusCode)
+            {
+                var error = ErrorText(body);
+                var statusCode = (int)response.StatusCode;
+                logger?.LogWarning("1С отклонила {Method} для РО {ShippingOrderId}: HTTP {StatusCode}. {OneCError}",
+                    request.Method.Method, sourceId, statusCode, error);
                 return OperationError.Failure(
-                    $"1С отклонила {request.Method}: HTTP {(int)response.StatusCode}. {ErrorText(body)}");
+                    $"1С отклонила {request.Method}: HTTP {statusCode}. {error}");
+            }
             if (expectedStatus is null)
                 return OperationResult.Success();
 

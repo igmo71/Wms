@@ -32,11 +32,9 @@ public sealed record PickingAssemblySourceView(
     DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError,
     string PlanSourceSnapshotJson, string? CurrentSourceJson)
 {
-    public Guid? WarehouseId { get; init; }
-    public string? WarehouseName { get; init; }
     public Guid? ReceiverId { get; init; }
     public string? ReceiverName { get; init; }
-    public string? Queue { get; init; }
+    public ShippingOrderQueue? Queue { get; init; }
     public DateTime? PlannedShippingDate { get; init; }
     public IReadOnlyList<PickingSourceLineView> CurrentLines { get; init; } = [];
     public ShippingExchangeStage? ExchangeStage { get; init; }

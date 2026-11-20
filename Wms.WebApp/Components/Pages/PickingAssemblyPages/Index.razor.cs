@@ -48,9 +48,9 @@ public partial class Index
         PickingAssemblyStatus.Draft => "Черновик",
         PickingAssemblyStatus.Preparing => "Подготовка 1С",
         PickingAssemblyStatus.InProgress => "Отбор",
-        PickingAssemblyStatus.Closed => "Закрыта",
+        PickingAssemblyStatus.Closed => "Закрыт",
         PickingAssemblyStatus.CancellationPending => "Отмена ожидается",
-        PickingAssemblyStatus.Cancelled => "Отменена",
+        PickingAssemblyStatus.Cancelled => "Отменён",
         _ => status.ToString()
     };
 }

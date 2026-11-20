@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using Wms.Application.Picking;
 using Wms.Application.Replenishment;
+using Wms.Application.Users;
 using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.PickingAssemblyPages;
@@ -20,6 +21,7 @@ public partial class Details
     [Inject] private IReplenishmentStore Replenishments { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
+    [Inject] private ApplicationUserQueryService UserNames { get; set; } = null!;
 
     private PickingAssemblyView? _assembly;
     private PickingWorkView? _work;
@@ -27,7 +29,8 @@ public partial class Details
     private IReadOnlyList<PickingAuditView> _audit = [];
     private IReadOnlyList<PickingAllocationView> _postedAllocations = [];
     private IReadOnlyList<PickingShortageView> _shortages = [];
-    private IReadOnlyList<ReplenishmentTransferView> _replenishmentTransfers = [];
+    private IReadOnlyList<ReplenishmentTaskSummary> _replenishmentTasks = [];
+    private IReadOnlyDictionary<string, string> _pickerNames = new Dictionary<string, string>();
     private IReadOnlyCollection<PickingAllocationInput>? _manualAllocations;
     private ClosePickingAssemblyRequest? _pendingCloseRequest;
     private CancelPickingAssemblyRequest? _pendingCancelRequest;
@@ -35,6 +38,10 @@ public partial class Details
     private readonly Dictionary<Guid, ShippingSourceSnapshot> _reviewedExchangeSources = [];
     private readonly Dictionary<Guid, string> _exchangeReasons = [];
     private readonly Dictionary<Guid, string> _exchangeAttemptErrors = [];
+    private readonly HashSet<Guid> _expandedSkuIds = [];
+    private readonly HashSet<Guid> _expandedSourceIds = [];
+    private readonly HashSet<(Guid SourceId, Guid SkuId)> _expandedSourceSkuIds = [];
+    private readonly HashSet<Guid> _expandedReplenishmentIds = [];
     private string? _userId;
     private bool _isManager;
     private string? _closeReason;
@@ -43,8 +50,9 @@ public partial class Details
     private string? _message;
     private bool _busy;
 
-    private sealed record SourceComparisonRow(string Name, decimal Plan,
-        decimal? Current, decimal? Allocated);
+    private sealed record SourceComparisonRow(Guid SkuId, string Name, decimal Plan,
+        decimal? Current, decimal? Allocated, bool RequiresAllocation,
+        IReadOnlyList<PickingSourceLineView> CurrentLines);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -58,6 +66,11 @@ public partial class Details
         _pendingExchangeApproval = null;
         _reviewedExchangeSources.Clear();
         _exchangeAttemptErrors.Clear();
+        _expandedSkuIds.Clear();
+        _expandedSourceIds.Clear();
+        _expandedSourceSkuIds.Clear();
+        _expandedReplenishmentIds.Clear();
+        _closeReason = null;
         await ReloadAsync();
     }
 
@@ -65,6 +78,7 @@ public partial class Details
     {
         _busy = true;
         _error = null;
+        _message = null;
         _check = null;
         if (_pendingCloseRequest is null) _manualAllocations = null;
         try { await ReloadViewsAsync(); }
@@ -84,11 +98,12 @@ public partial class Details
             _error = "Эта сборка недоступна для повтора обмена.";
         }
         _work = _assembly is null ? null : await Assemblies.GetWorkAsync(Id, CancellationToken.None);
+        _pickerNames = await UserNames.GetUserNamesAsync(_work?.Entries.Select(x => x.ConfirmedBy) ?? []);
         _audit = _assembly is null ? [] : await Assemblies.GetAuditAsync(Id, CancellationToken.None);
         _postedAllocations = _assembly is null ? [] : await Assemblies.GetPostedAllocationsAsync(Id, CancellationToken.None);
         _shortages = _assembly is null ? [] : await Assemblies.GetShortagesAsync(Id, CancellationToken.None);
-        _replenishmentTransfers = _assembly is null ? []
-            : await Replenishments.ReadTransfersAsync(Id, CancellationToken.None);
+        _replenishmentTasks = _assembly is null ? []
+            : await Replenishments.ReadAssemblyTaskSummariesAsync(Id, CancellationToken.None);
     }
 
     private async Task CheckAsync()
@@ -369,6 +384,25 @@ public partial class Details
         _work?.Skus.FirstOrDefault(x => x.SkuId == skuId) is { } sku
             ? sku.Name ?? sku.Code ?? skuId.ToString() : skuId.ToString();
 
+    private string PickerName(string userId) =>
+        _pickerNames.TryGetValue(userId, out var name) && name != userId
+            ? name : "Пользователь не найден";
+
+    private static void ToggleDetails<T>(HashSet<T> expandedRows, T id) where T : notnull
+    {
+        if (!expandedRows.Add(id))
+            expandedRows.Remove(id);
+    }
+
+    private static string ReplenishmentStatusText(ReplenishmentTaskStatus status) => status switch
+    {
+        ReplenishmentTaskStatus.Ordered => "Заказана",
+        ReplenishmentTaskStatus.InProgress => "В работе",
+        ReplenishmentTaskStatus.Completed => "Завершена",
+        ReplenishmentTaskStatus.Cancelled => "Отменена",
+        _ => "Неизвестен"
+    };
+
     private static string ExchangeText(ShippingExchangeStage? stage) => stage switch
     {
         ShippingExchangeStage.PostConfirmed => "Подтверждён",
@@ -392,29 +426,34 @@ public partial class Details
         _ => eventType
     };
 
-    private IReadOnlyList<SourceComparisonRow> SourceRows(Guid sourceId)
+    private IReadOnlyList<SourceComparisonRow> SourceRows(PickingAssemblySourceView source)
     {
         if (_assembly is null) return [];
-        var plan = _assembly.PlanLines.Where(x => x.SourceRefKey == sourceId)
+        var plan = _assembly.PlanLines.Where(x => x.SourceRefKey == source.SourceRefKey)
             .ToDictionary(x => x.SkuId);
-        var current = _assembly.Sources.First(x => x.SourceRefKey == sourceId)
-            .CurrentLines.GroupBy(x => x.SkuId)
-            .ToDictionary(x => x.Key, x => x.Sum(line => line.Quantity));
-        var allocationPreview = _check?.Allocation?.Allocations;
+        var current = source.CurrentLines.ToLookup(x => x.SkuId);
+        var allocationPreview = _check?.Allocation;
         var allocated = allocationPreview is null
-            ? _postedAllocations.Where(x => x.ShippingOrderId == sourceId)
+            ? _postedAllocations.Where(x => x.ShippingOrderId == source.SourceRefKey)
                 .ToDictionary(x => x.SkuId, x => x.Quantity)
-            : allocationPreview.Where(x => x.ShippingOrderId == sourceId)
+            : allocationPreview.Allocations.Where(x => x.ShippingOrderId == source.SourceRefKey)
                 .ToDictionary(x => x.StockKeepingUnitId, x => x.Quantity);
-        return plan.Keys.Union(current.Keys).Union(allocated.Keys)
-            .Select(id => new SourceComparisonRow(
-                plan.TryGetValue(id, out var row)
-                    ? row.SkuName ?? row.SkuCode ?? id.ToString() : SkuName(id),
-                row?.Quantity ?? 0,
-                _assembly.Sources.First(x => x.SourceRefKey == sourceId).CurrentSourceJson is null
-                    ? null : current.GetValueOrDefault(id),
-                allocated.TryGetValue(id, out var quantity) ? quantity
-                    : _assembly.Status == PickingAssemblyStatus.Closed ? 0 : null))
+        return plan.Keys.Union(current.Select(x => x.Key)).Union(allocated.Keys)
+            .Select(id =>
+            {
+                var row = plan.GetValueOrDefault(id);
+                var lines = current[id].ToArray();
+                var firstLine = lines.FirstOrDefault();
+                return new SourceComparisonRow(
+                    id,
+                    row?.SkuName ?? firstLine?.SkuName ?? row?.SkuCode ?? firstLine?.SkuCode ?? SkuName(id),
+                    row?.Quantity ?? 0,
+                    source.CurrentSourceJson is null ? null : lines.Sum(x => x.Quantity),
+                    allocated.TryGetValue(id, out var quantity) ? quantity
+                        : _assembly.Status == PickingAssemblyStatus.Closed ? 0 : null,
+                    row is not null && allocationPreview?.RequiresManagerDecision.Contains(id) == true,
+                    lines);
+            })
             .OrderBy(x => x.Name).ToArray();
     }
 

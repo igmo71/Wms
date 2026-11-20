@@ -33,6 +33,12 @@ public sealed record ReplenishmentTransferView(
     DateOnly? ExpirationDate, decimal OriginalQuantity,
     decimal EffectiveQuantity, DateTimeOffset ConfirmedAtUtc);
 
+public sealed record ReplenishmentTaskSummary(
+    Guid Id, Guid StockKeepingUnitId, string? SkuName,
+    ReplenishmentTaskStatus Status, decimal OrderedQuantity,
+    decimal TransferredQuantity, DateTimeOffset OrderedAtUtc,
+    IReadOnlyList<ReplenishmentTransferView> Transfers);
+
 public sealed record ReplenishmentTaskTransferView(
     Guid Id, Guid DestinationLocationId, string DestinationCode,
     DateOnly? ExpirationDate, decimal Quantity, decimal EffectiveQuantity,
@@ -112,7 +118,7 @@ public interface IReplenishmentStore
     Task<ReplenishmentTransferCorrectionState?> LoadTransferCorrectionAsync(
         ICommandExecutionContext session, Guid transferId, CancellationToken ct);
 
-    Task<IReadOnlyList<ReplenishmentTransferView>> ReadTransfersAsync(
+    Task<IReadOnlyList<ReplenishmentTaskSummary>> ReadAssemblyTaskSummariesAsync(
         Guid assemblyId, CancellationToken ct);
 
     Task<ReplenishmentTaskDetail?> ReadTaskAsync(Guid taskId, CancellationToken ct);

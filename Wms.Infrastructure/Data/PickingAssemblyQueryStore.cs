@@ -132,6 +132,21 @@ public sealed class PickingAssemblyQueryStore(
             .Where(x => x.Id == assembly.WarehouseId)
             .Select(x => x.Name).SingleOrDefaultAsync(ct);
         var sourceIds = assembly.ActiveSources.Select(x => x.ShippingOrderId).ToArray();
+        var receiverNames = await db.ShippingOrders.AsNoTracking()
+            .Where(x => sourceIds.Contains(x.Id))
+            .Select(source => new
+            {
+                source.Id,
+                ReceiverName = source.ReceiverType == PartyType.Partner
+                    ? db.Partners.Where(x => x.Id == source.ReceiverId).Select(x => x.Name).FirstOrDefault()
+                    : source.ReceiverType == PartyType.Individual
+                        ? db.Individuals.Where(x => x.Id == source.ReceiverId).Select(x => x.Name).FirstOrDefault()
+                        : source.ReceiverType == PartyType.OrganizationalUnit
+                            ? db.OrganizationalUnits.Where(x => x.Id == source.ReceiverId).Select(x => x.Name).FirstOrDefault()
+                            : source.ReceiverType == PartyType.Warehouse
+                                ? db.Warehouses.Where(x => x.Id == source.ReceiverId).Select(x => x.Name).FirstOrDefault()
+                                : null
+            }).ToDictionaryAsync(x => x.Id, x => x.ReceiverName, ct);
         var targets = await db.ShippingExchangeTargets.AsNoTracking()
             .Where(x => x.PickingAssemblyId == assemblyId)
             .ToDictionaryAsync(x => x.ShippingOrderId, ct);
@@ -161,11 +176,9 @@ public sealed class PickingAssemblyQueryStore(
                     link.LastStartError, link.PlanSourceSnapshotJson,
                     source?.CurrentSourceJson)
                 {
-                    WarehouseId = source?.WarehouseId,
-                    WarehouseName = warehouseName,
                     ReceiverId = source?.ReceiverId,
-                    ReceiverName = source?.Receiver?.Name,
-                    Queue = source?.Queue.ToString(),
+                    ReceiverName = receiverNames.GetValueOrDefault(link.ShippingOrderId),
+                    Queue = source?.Queue,
                     PlannedShippingDate = source?.PlannedShippingDate,
                     ExchangeStage = targets.GetValueOrDefault(link.ShippingOrderId)?.Stage,
                     ExchangeError = targets.GetValueOrDefault(link.ShippingOrderId)?.LastError,

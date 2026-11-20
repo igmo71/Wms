@@ -84,20 +84,18 @@ public sealed class ShippingTargetBuilder
         using var json = JsonDocument.Parse(patch.PatchJson);
         var document = json.RootElement;
         return RowsMatch(document.GetProperty("ОтгружаемыеТовары"),
-                current.Items.Select(x => x.RawLineJson), ShippingFields)
+                current.Items.OrderBy(x => x.LineNumber).Select(x => x.RawLineJson), ShippingFields)
             && RowsMatch(document.GetProperty("ТоварыПоРаспоряжениям"),
-                current.BasisItems.Select(x => x.RawLineJson), BasisFields);
+                current.BasisItems.OrderBy(x => x.LineNumber).Select(x => x.RawLineJson), BasisFields);
     }
 
     private static bool RowsMatch(JsonElement expected,
         IEnumerable<string> currentRows, string[] fields)
     {
         var left = expected.EnumerateArray()
-            .Select(x => Normalize(CopyFields(x.GetRawText(), fields)))
-            .OrderBy(x => x["LineNumber"]!.GetValue<int>()).ToArray();
+            .Select(x => Normalize(CopyFields(x.GetRawText(), fields))).ToArray();
         var right = currentRows
-            .Select(x => Normalize(CopyFields(x, fields)))
-            .OrderBy(x => x["LineNumber"]!.GetValue<int>()).ToArray();
+            .Select(x => Normalize(CopyFields(x, fields))).ToArray();
         return left.Length == right.Length
             && left.Zip(right).All(pair =>
                 JsonNode.DeepEquals(pair.First, pair.Second));
@@ -105,15 +103,13 @@ public sealed class ShippingTargetBuilder
 
     private static JsonObject Normalize(JsonObject line)
     {
+        // Once rows are ordered, their original numbers can have gaps from older retries.
+        line.Remove("LineNumber");
         foreach (var field in new[] { "Количество", "КоличествоУпаковок" })
             if (line[field] is JsonNode value
                 && decimal.TryParse(value.ToString(), NumberStyles.Float,
                     CultureInfo.InvariantCulture, out var quantity))
                 line[field] = quantity;
-        if (line["LineNumber"] is JsonNode number
-            && int.TryParse(number.ToString(), NumberStyles.Integer,
-                CultureInfo.InvariantCulture, out var lineNumber))
-            line["LineNumber"] = lineNumber;
         return line;
     }
 
@@ -122,14 +118,14 @@ public sealed class ShippingTargetBuilder
         IReadOnlyDictionary<Guid, decimal> approved,
         IReadOnlyDictionary<Guid, decimal> allocated)
     {
-        var result = new JsonArray();
+        var result = new List<(int LineNumber, JsonObject Row)>();
         var used = new HashSet<int>();
         var next = original.Items.Concat(reviewed.Items)
             .Select(x => x.LineNumber).DefaultIfEmpty().Max() + 1;
         foreach (var line in reviewed.Items.Where(x => !x.IsRegular)
             .OrderBy(x => x.LineNumber))
         {
-            result.Add(CopyFields(line.RawLineJson, ShippingFields));
+            result.Add((line.LineNumber, CopyFields(line.RawLineJson, ShippingFields)));
             used.Add(line.LineNumber);
         }
 
@@ -158,12 +154,12 @@ public sealed class ShippingTargetBuilder
                 var shipped = Math.Min(shipRemaining, plan);
                 shipRemaining -= shipped;
                 var firstNumber = Reserve(template.LineNumber, used, ref next);
-                result.Add(ShippingLine(template.RawJson, firstNumber,
+                result.Add((firstNumber, ShippingLine(template.RawJson,
                     shipped > 0 ? shipped : plan,
-                    shipped > 0 ? "Отгрузить" : "НеОтгружать"));
+                    shipped > 0 ? "Отгрузить" : "НеОтгружать")));
                 if (shipped > 0 && plan > shipped)
-                    result.Add(ShippingLine(template.RawJson,
-                        Reserve(0, used, ref next), plan - shipped, "НеОтгружать"));
+                    result.Add((Reserve(0, used, ref next),
+                        ShippingLine(template.RawJson, plan - shipped, "НеОтгружать")));
             }
             if (planRemaining != 0 || shipRemaining != 0)
                 return OperationError.Conflict(
@@ -171,14 +167,14 @@ public sealed class ShippingTargetBuilder
         }
         if (approved.Any(x => x.Value > 0 && !templates.Any(y => y.SkuId == x.Key)))
             return OperationError.Conflict("Для SKU утверждённого плана нет сохранённой строки РО 1С.");
-        return result;
+        return NumberForPatch(result);
     }
 
     private static OperationResult<JsonArray> BuildBasisItems(
         ShippingSourceSnapshot original, ShippingSourceSnapshot reviewed,
         IReadOnlyDictionary<Guid, decimal> allocated)
     {
-        var result = new JsonArray();
+        var result = new List<(int LineNumber, JsonObject Row)>();
         var used = new HashSet<int>();
         var next = original.BasisItems.Concat(reviewed.BasisItems)
             .Select(x => x.LineNumber).DefaultIfEmpty().Max() + 1;
@@ -197,9 +193,8 @@ public sealed class ShippingTargetBuilder
                 var taken = Math.Min(remaining, capacity);
                 if (taken <= 0) continue;
                 var item = CopyFields(line.RawJson, BasisFields);
-                item["LineNumber"] = Reserve(line.LineNumber, used, ref next);
                 item["Количество"] = taken;
-                result.Add(item);
+                result.Add((Reserve(line.LineNumber, used, ref next), item));
                 remaining -= taken;
                 if (remaining == 0) break;
             }
@@ -207,7 +202,7 @@ public sealed class ShippingTargetBuilder
                 return OperationError.Conflict(
                     "Распределённый факт РО 1С нельзя связать с сохранёнными распоряжениями.");
         }
-        return result;
+        return NumberForPatch(result);
     }
 
     private static IReadOnlyList<LineTemplate> MergeItems(
@@ -250,15 +245,24 @@ public sealed class ShippingTargetBuilder
         return result;
     }
 
-    private static JsonObject ShippingLine(string rawJson, int number,
-        decimal quantity, string action)
+    private static JsonObject ShippingLine(string rawJson, decimal quantity, string action)
     {
         var line = CopyFields(rawJson, ShippingFields);
-        line["LineNumber"] = number;
         line["Количество"] = quantity;
         line["КоличествоУпаковок"] = quantity;
         line["Действие"] = action;
         return line;
+    }
+
+    private static JsonArray NumberForPatch(List<(int LineNumber, JsonObject Row)> rows)
+    {
+        var result = new JsonArray();
+        foreach (var (_, row) in rows.OrderBy(x => x.LineNumber))
+        {
+            row["LineNumber"] = (result.Count + 1).ToString(CultureInfo.InvariantCulture);
+            result.Add(row);
+        }
+        return result;
     }
 
     private static JsonObject CopyFields(string rawJson, IEnumerable<string> fields)

@@ -2,11 +2,11 @@
 @attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Application.Picking
 
-<PageTitle>Ордера WMS для отгрузки</PageTitle>
+<PageTitle>Расходные ордера WMS</PageTitle>
 
 <MudStack Spacing="3">
     <MudStack Row="true" AlignItems="AlignItems.Center">
-        <MudText Typo="Typo.h5">Ордера WMS для отгрузки</MudText>
+        <MudText Typo="Typo.h5">Расходные ордера WMS</MudText>
         <MudSpacer />
         <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="ReloadAsync">Обновить</MudButton>
     </MudStack>
@@ -16,7 +16,7 @@
     }
     <MudPaper Class="pa-4">
         <MudTextField T="string" @bind-Value="_filter" Immediate="true"
-                      Label="Номер сборки или РО 1С" Class="mb-3" />
+                      Label="Номер ордера WMS или РО 1С" Class="mb-3" />
         @if (_busy)
         {
             <MudProgressLinear Indeterminate="true" />
@@ -26,20 +26,20 @@
             <MudTable T="PickingAssemblyListItem" Items="Filtered" Dense="true" Hover="true"
                       RowsPerPage="15" Elevation="0">
                 <HeaderContent>
-                    <MudTh>Ордер WMS</MudTh><MudTh>Склад</MudTh><MudTh>Состояние</MudTh>
-                    <MudTh>Ответственный</MudTh><MudTh>РО 1С</MudTh><MudTh>Создана</MudTh>
+                    <MudTh>Ордер WMS</MudTh><MudTh>Склад</MudTh><MudTh>Статус</MudTh>
+                    <MudTh>Ответственный</MudTh><MudTh>РО 1С</MudTh><MudTh>Создан</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Ордер WMS"><MudLink Href="@($"picking-assemblies/{context.Id}")">@context.Number</MudLink></MudTd>
                     <MudTd DataLabel="Склад">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudTd>
-                    <MudTd DataLabel="Состояние">@StatusText(context.Status)
+                    <MudTd DataLabel="Статус">@StatusText(context.Status)
                         @if (context.HasWarning) { <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" /> }
                     </MudTd>
                     <MudTd DataLabel="Ответственный">@context.ResponsibleDisplayName</MudTd>
                     <MudTd DataLabel="РО 1С">@string.Join(", ", context.Sources.Select(x => x.Number ?? x.SourceRefKey.ToString()))</MudTd>
-                    <MudTd DataLabel="Создана">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Создан">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
                 </RowTemplate>
-                <NoRecordsContent>Сборок нет.</NoRecordsContent>
+                <NoRecordsContent>Расходные ордера не найдены.</NoRecordsContent>
                 <PagerContent><MudTablePager /></PagerContent>
             </MudTable>
         }
