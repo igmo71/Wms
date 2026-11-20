@@ -24,7 +24,7 @@ public sealed class GetPickingWork(
 
 public sealed record PickingRouteView(long Revision,
     IReadOnlyList<PickingRouteStep> Steps,
-    IReadOnlyList<PickingRouteGap> Gaps);
+    IReadOnlyList<PickingRouteGap> Gaps, PickingWorkView Work);
 
 public sealed class GetPickingRoute(
     GetPickingWork workQuery, IPickingAssemblyQueryStore assemblies,
@@ -44,16 +44,15 @@ public sealed class GetPickingRoute(
         var remaining = work.Skus.Where(x => x.PlannedQuantity > x.ConfirmedQuantity)
             .ToDictionary(x => x.SkuId,
                 x => x.PlannedQuantity - x.ConfirmedQuantity);
-        var availability = new List<StockAvailability>();
-        foreach (var skuId in remaining.Keys)
-            availability.AddRange(await stock.ReadSkuAsync(work.WarehouseId, skuId, ct));
+        var availability = await stock.ReadSkusAsync(work.WarehouseId,
+            remaining.Keys.ToArray(), ct);
         var locations = await assemblies.GetRouteLocationsAsync(work.WarehouseId,
             availability.Select(x => x.Group.StorageLocationId).Distinct().ToArray(), ct);
         var route = builder.Execute(new PickingRouteRequest(assemblyId,
             work.WarehouseId, DateOnly.FromDateTime(clock.GetLocalNow().DateTime),
             remaining, availability, locations, previousLocationId, nextLocationId));
         return route.IsSuccess
-            ? new PickingRouteView(work.Revision, route.Value!.Steps, route.Value.Gaps)
+            ? new PickingRouteView(work.Revision, route.Value!.Steps, route.Value.Gaps, work)
             : route.Error!;
     }
 }

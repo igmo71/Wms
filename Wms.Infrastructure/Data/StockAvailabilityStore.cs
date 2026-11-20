@@ -10,17 +10,70 @@ namespace Wms.Data;
 public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContext> factory)
     : IStockAvailabilityStore, IStockReservationStore, IStockShortageStore
 {
-    public async Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
-        Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct)
+    public Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
+        Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct) =>
+        ReadSkusAsync(warehouseId, [stockKeepingUnitId], ct);
+
+    public async Task<IReadOnlyList<StockAvailability>> ReadSkusAsync(
+        Guid warehouseId, IReadOnlyCollection<Guid> stockKeepingUnitIds, CancellationToken ct)
     {
+        var skuIds = stockKeepingUnitIds.Distinct().ToArray();
+        if (skuIds.Length == 0) return [];
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await ReadSkuAsync(db, warehouseId, stockKeepingUnitId, ct);
+        var balances = new List<BalanceRow>();
+        var reservations = new List<ReservationRow>();
+        var shortages = new List<ShortageRow>();
+        foreach (var batch in skuIds.Chunk(500))
+        {
+            balances.AddRange(await db.InventoryBalances.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.StockKeepingUnitId))
+                .Select(x => new BalanceRow(new StockGroupKey(x.WarehouseId,
+                    x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate), x.Quantity))
+                .ToArrayAsync(ct));
+            reservations.AddRange(await db.PickingReservations.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.StockKeepingUnitId)
+                    && x.CompletedAtUtc == null)
+                .Select(x => new ReservationRow(new StockGroupKey(x.WarehouseId,
+                    x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
+                    new StockReservationView(x.PickingEntryId, x.PickingAssemblyId, x.Quantity, x.CreatedBy)))
+                .ToArrayAsync(ct));
+            shortages.AddRange(await db.StockShortages.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.StockKeepingUnitId)
+                    && x.ResolvedAtUtc == null)
+                .Select(x => new ShortageRow(new StockGroupKey(x.WarehouseId,
+                    x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
+                    x.ExpectedQuantity - x.FoundQuantity))
+                .ToArrayAsync(ct));
+        }
+        var locationIds = balances.Select(x => x.Group.StorageLocationId)
+            .Concat(reservations.Select(x => x.Group.StorageLocationId))
+            .Concat(shortages.Select(x => x.Group.StorageLocationId)).Distinct().ToArray();
+        var locations = new Dictionary<Guid, LocationRow>();
+        var holds = new List<HoldRow>();
+        foreach (var batch in locationIds.Chunk(500))
+        {
+            foreach (var location in await db.StorageLocations.AsNoTracking()
+                .Where(x => batch.Contains(x.Id))
+                .Select(x => new LocationRow(x.Id, x.Code, x.Name)).ToArrayAsync(ct))
+                locations.Add(location.Id, location);
+            holds.AddRange(await db.StorageLocationLocks.AsNoTracking()
+                .Where(x => batch.Contains(x.StorageLocationId))
+                .Select(x => new HoldRow(x.StorageLocationId,
+                    new StockHoldView(x.OwnerType, x.OwnerId, x.Reason, x.LockedBy)))
+                .ToArrayAsync(ct));
+        }
+        return BuildAvailability(balances, reservations, shortages, locations, holds);
     }
 
     public Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         ICommandExecutionContext context, Guid warehouseId,
         Guid stockKeepingUnitId, CancellationToken ct) =>
         ReadSkuAsync(RequireSession(context).Db, warehouseId, stockKeepingUnitId, ct);
+
+    public Task<IReadOnlyList<StockAvailability>> ReadSkusAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        IReadOnlyCollection<Guid> stockKeepingUnitIds, CancellationToken ct) =>
+        ReadSkusAsync(RequireSession(context).Db, warehouseId, stockKeepingUnitIds, ct);
 
     public async Task<OperationResult> ReserveAsync(
         ICommandExecutionContext context, PickingReservation reservation, CancellationToken ct)
@@ -166,34 +219,42 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             ? location : null;
     }
 
-    private static async Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
+    private static Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         ApplicationDbContext db, Guid warehouseId, Guid skuId, CancellationToken ct,
-        Guid? locationId = null)
+        Guid? locationId = null) =>
+        ReadSkusAsync(db, warehouseId, [skuId], ct, locationId);
+
+    private static async Task<IReadOnlyList<StockAvailability>> ReadSkusAsync(
+        ApplicationDbContext db, Guid warehouseId, IReadOnlyCollection<Guid> stockKeepingUnitIds,
+        CancellationToken ct, Guid? locationId = null)
     {
-        await db.InventoryBalances.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId
-            && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
-        await db.PickingReservations.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId && x.CompletedAtUtc == null
-            && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
-        await db.StockShortages.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId && x.ResolvedAtUtc == null
-            && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
+        var skuIds = stockKeepingUnitIds.ToHashSet();
+        if (skuIds.Count == 0) return [];
+        foreach (var batch in skuIds.Chunk(500))
+        {
+            await db.InventoryBalances.Where(x => x.WarehouseId == warehouseId
+                && batch.Contains(x.StockKeepingUnitId)
+                && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
+            await db.PickingReservations.Where(x => x.WarehouseId == warehouseId
+                && batch.Contains(x.StockKeepingUnitId) && x.CompletedAtUtc == null
+                && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
+            await db.StockShortages.Where(x => x.WarehouseId == warehouseId
+                && batch.Contains(x.StockKeepingUnitId) && x.ResolvedAtUtc == null
+                && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
+        }
 
         var balances = db.InventoryBalances.Local.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId
+            && skuIds.Contains(x.StockKeepingUnitId)
             && (locationId is null || x.StorageLocationId == locationId)).ToArray();
         var reservations = db.PickingReservations.Local.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId && x.CompletedAtUtc is null
+            && skuIds.Contains(x.StockKeepingUnitId) && x.CompletedAtUtc is null
             && (locationId is null || x.StorageLocationId == locationId)).ToArray();
         var shortages = db.StockShortages.Local.Where(x => x.WarehouseId == warehouseId
-            && x.StockKeepingUnitId == skuId && x.ResolvedAtUtc is null
+            && skuIds.Contains(x.StockKeepingUnitId) && x.ResolvedAtUtc is null
             && (locationId is null || x.StorageLocationId == locationId)).ToArray();
-        var groups = balances.Select(x => new StockGroupKey(warehouseId, x.StorageLocationId, skuId, x.ExpirationDate))
-            .Concat(reservations.Select(x => new StockGroupKey(warehouseId, x.StorageLocationId, skuId, x.ExpirationDate)))
-            .Concat(shortages.Select(x => new StockGroupKey(warehouseId, x.StorageLocationId, skuId, x.ExpirationDate)))
-            .Distinct().ToArray();
-        var locationIds = groups.Select(x => x.StorageLocationId).Distinct().ToArray();
+        var locationIds = balances.Select(x => x.StorageLocationId)
+            .Concat(reservations.Select(x => x.StorageLocationId))
+            .Concat(shortages.Select(x => x.StorageLocationId)).Distinct().ToArray();
         var locations = new Dictionary<Guid, StorageLocation>();
         foreach (var batch in locationIds.Chunk(500))
         {
@@ -203,22 +264,54 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             await db.StorageLocationLocks.Where(x => batch.Contains(x.StorageLocationId)).LoadAsync(ct);
         }
 
+        return BuildAvailability(balances, reservations, shortages, locations,
+            db.StorageLocationLocks.Local);
+    }
+
+    private static IReadOnlyList<StockAvailability> BuildAvailability(
+        IEnumerable<InventoryBalance> balances, IEnumerable<PickingReservation> reservations,
+        IEnumerable<StockShortage> shortages, IReadOnlyDictionary<Guid, StorageLocation> locations,
+        IEnumerable<StorageLocationLock> holds) =>
+        BuildAvailability(
+            balances.Select(x => new BalanceRow(new StockGroupKey(x.WarehouseId,
+                x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate), x.Quantity)),
+            reservations.Select(x => new ReservationRow(new StockGroupKey(x.WarehouseId,
+                x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
+                new StockReservationView(x.PickingEntryId, x.PickingAssemblyId, x.Quantity, x.CreatedBy))),
+            shortages.Select(x => new ShortageRow(new StockGroupKey(x.WarehouseId,
+                x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate), x.BlockedQuantity)),
+            locations.ToDictionary(x => x.Key,
+                x => new LocationRow(x.Value.Id, x.Value.Code, x.Value.Name)),
+            holds.Select(x => new HoldRow(x.StorageLocationId,
+                new StockHoldView(x.OwnerType, x.OwnerId, x.Reason, x.LockedBy))));
+
+    private static IReadOnlyList<StockAvailability> BuildAvailability(
+        IEnumerable<BalanceRow> balances, IEnumerable<ReservationRow> reservations,
+        IEnumerable<ShortageRow> shortages, IReadOnlyDictionary<Guid, LocationRow> locations,
+        IEnumerable<HoldRow> holds)
+    {
+        var balancesByGroup = balances.ToDictionary(x => x.Group, x => x.Quantity);
+        var reservationsByGroup = reservations.ToLookup(x => x.Group);
+        var shortagesByGroup = shortages.ToLookup(x => x.Group);
+        var holdsByLocation = holds.ToDictionary(x => x.StorageLocationId, x => x.Hold);
+        var groups = balancesByGroup.Keys.Concat(reservationsByGroup.Select(x => x.Key))
+            .Concat(shortagesByGroup.Select(x => x.Key)).Distinct();
         return groups.Select(key =>
         {
-            var balance = balances.SingleOrDefault(x => x.StorageLocationId == key.StorageLocationId
-                && x.ExpirationDate == key.ExpirationDate);
-            var held = db.StorageLocationLocks.Local.SingleOrDefault(x => x.StorageLocationId == key.StorageLocationId);
-            var reserved = reservations.Where(x => x.StorageLocationId == key.StorageLocationId
-                    && x.ExpirationDate == key.ExpirationDate)
-                .Select(x => new StockReservationView(x.PickingEntryId, x.PickingAssemblyId, x.Quantity, x.CreatedBy))
-                .ToArray();
-            var blocked = shortages.Where(x => x.StorageLocationId == key.StorageLocationId
-                && x.ExpirationDate == key.ExpirationDate).Sum(x => x.BlockedQuantity);
+            var accountingQuantity = balancesByGroup.GetValueOrDefault(key);
+            var held = holdsByLocation.GetValueOrDefault(key.StorageLocationId);
+            var reserved = reservationsByGroup[key].Select(x => x.Reservation).ToArray();
+            var blocked = shortagesByGroup[key].Sum(x => x.BlockedQuantity);
             return new StockAvailability(key, locations[key.StorageLocationId].Code,
-                balance?.Quantity ?? 0, reserved, blocked,
-                held is null ? null : new StockHoldView(held.OwnerType, held.OwnerId, held.Reason, held.LockedBy))
+                accountingQuantity, reserved, blocked, held)
             { LocationName = locations[key.StorageLocationId].Name };
         }).OrderBy(x => x.LocationCode, StringComparer.Ordinal)
             .ThenBy(x => x.Group.ExpirationDate is null).ThenBy(x => x.Group.ExpirationDate).ToArray();
     }
+
+    private readonly record struct BalanceRow(StockGroupKey Group, decimal Quantity);
+    private readonly record struct ReservationRow(StockGroupKey Group, StockReservationView Reservation);
+    private readonly record struct ShortageRow(StockGroupKey Group, decimal BlockedQuantity);
+    private readonly record struct LocationRow(Guid Id, string Code, string? Name);
+    private readonly record struct HoldRow(Guid StorageLocationId, StockHoldView Hold);
 }

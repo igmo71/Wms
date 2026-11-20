@@ -1,4 +1,5 @@
 {
   "DebugBaseAddress": "https://localhost:7249/",
-  "StandaloneBaseAddress": "https://vm-xms-dev:8316/"
+  "StandaloneBaseAddress": "https://vm-xms-dev:8316/",
+  "EnablePerformanceDiagnostics": false
 }

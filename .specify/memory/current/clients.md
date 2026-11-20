@@ -122,6 +122,53 @@ The Mobile home «Отбор и Отгрузка» button opens the replacement 
 The Web «Отгрузка» navigation opens its source documents and WMS orders for
 Operator and Manager.
 
+Mobile assembly details contain the header, WMS plan and active source-document
+statuses and exchange errors. Source JSON snapshots and detailed imported 1C
+lines are read only by the Web detail query, not by this Mobile response.
+
+The SKU screen receives plan/fact rows, pickable totals and replenishment data
+from one replenishment response for the active owner's assembly. The route
+response includes the work rows used to calculate its steps. These screens
+therefore do not request the same work rows separately on a successful refresh.
+When opened from the queue, SKU reuses the just-read assembly details once.
+Ordinary returns to SKU and swipe refresh fetch current data. A successful SKU
+command reuses its refreshed assembly details when loading the new work state.
+When a successful fact-page command returns directly to SKU, it passes its
+just-read assembly details to that page for one appearance, avoiding a second
+assembly lookup. This applies to pick confirmation, shortage reporting and
+completed goods or pallet returns; work and availability are still refreshed.
+The handoff checks the assembly and warehouse IDs and does not clear the
+previously displayed work rows before the new data arrives. If the
+replenishment request fails, SKU still reads its plan and fact separately and
+leaves availability unknown.
+After a pick or shortage from the route, the fact page uses the next route's
+included work rows to refresh plan and fact without a separate work request.
+
+The picking performance strip is off by default in both Debug and Release.
+Set `EnablePerformanceDiagnostics` to `true` in `Resources/Raw/mobile-api.json`
+before building the Mobile app to enable measurement and show the strip on the
+picking queue, SKU, route, 1C-document and fact screens. It retains the latest
+measured load and action, including action results after returning to SKU.
+Measurements cover opening an
+assembly, screen refreshes, cell checks and commands from SKU, fact and 1C
+documents. Each result shows elapsed time, API-call count, summed HTTP time,
+HTTP failures when present, build configuration and whether a debugger is attached.
+The «Показать HTTP-запросы» control expands the latest load and action into
+individual calls in start order, with their HTTP method, shortened API path,
+duration and response status or absence of a response. The expansion choice
+persists between picking screens; the bounded details area scrolls when needed.
+Each call also shows «Сессия ТСД», the time preparing authentication on the device,
+and «API», the server processing time up to the start of the response. Session
+preparation includes secure-storage reads and any token-refresh request or wait.
+An attempted token refresh is marked «обновление токена» in that call's details.
+API time includes server authentication and endpoint processing; it excludes
+the remaining response serialization, transfer and client deserialization.
+Missing measurements are shown as a dash. These times are parts of HTTP duration,
+not extra durations to add to it.
+Elapsed time covers the measured client operation and its nested data loads;
+it does not measure the first displayed frame. HTTP time includes authentication,
+network, server processing and response download, rather than SQL time alone.
+
 The replacement Mobile V1 picking API exposes the assembly work list with
 per-SKU plan and confirmed fact, original-cell fact entries, a recalculated
 route, SKU availability, scanned-cell inspection, pallet hold/return, pick

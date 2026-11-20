@@ -78,7 +78,7 @@ public sealed class StartReplenishmentSource(
                         "В исходной ячейке нет свободного товара нужного SKU и допустимого срока.");
 
                 var proposalState = await replenishments.LoadProposalStateAsync(session,
-                    task.WarehouseId, [task.StockKeepingUnitId], token);
+                    task.WarehouseId, available, token);
                 var locations = proposalState.Locations.ToDictionary(x => x.Id);
                 var reservedCells = await replenishments.ReadReservedLocationIdsAsync(
                     session, task.WarehouseId,

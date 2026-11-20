@@ -69,7 +69,8 @@ internal static class MobileReplenishmentEndpoints
                 x.RecommendedDestinationLocationId,
                 x.RecommendedDestinationCode)
             { RecommendedSourceName = x.RecommendedSourceName,
-                RecommendedDestinationName = x.RecommendedDestinationName }).ToArray()));
+                RecommendedDestinationName = x.RecommendedDestinationName }).ToArray(),
+            MobilePickingEndpoints.MapWork(view.Work), view.PickableBySku));
     }
 
     private static async Task<IResult> OrderAsync(

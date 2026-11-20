@@ -17,6 +17,74 @@ namespace Wms.Tests.Replenishment;
 public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Scoped_proposals_keep_mixed_pallets_and_prohibited_destinations_excluded()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Scoped replenishment" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Requested SKU" };
+        var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Unrequested SKU" };
+        var reserve = Zone(warehouse.Id, "RES", ZoneType.Reserve);
+        var storage = Zone(warehouse.Id, "CMP", ZoneType.Storage);
+        var pallet = Location(warehouse.Id, reserve, 1, allowsMultipleSkus: true);
+        var prohibited = Location(warehouse.Id, storage, 1);
+        var allowed = Location(warehouse.Id, storage, 2, allowsMultipleSkus: true);
+        var oldSource = Location(warehouse.Id, reserve, 3);
+        var oldDestination = Location(warehouse.Id, storage, 3);
+        var (assembly, source) = ActiveAssembly(warehouse.Id, sku.Id, 13);
+        var now = DateTimeOffset.UtcNow;
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+        var cancelled = Value(ReplenishmentTask.Order(Guid.NewGuid(), assembly.Id,
+            warehouse.Id, sku.Id, 1, oldSource.Id, oldDestination.Id, Worker, now));
+        Success(cancelled.Cancel(Worker, now.AddSeconds(1)));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, otherSku, reserve, storage, pallet,
+                prohibited, allowed, oldSource, oldDestination, assembly, source, cancelled,
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    pallet.Id, sku.Id, 4, now, date)),
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    pallet.Id, sku.Id, 6, now, date.AddDays(1))),
+                Balance(warehouse.Id, pallet.Id, otherSku.Id, 3),
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    prohibited.Id, sku.Id, 2, now, date)),
+                Balance(warehouse.Id, prohibited.Id, otherSku.Id, 2),
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
+                    allowed.Id, sku.Id, 1, now, date)),
+                Balance(warehouse.Id, allowed.Id, otherSku.Id, 1));
+            await seed.SaveChangesAsync();
+        }
+
+        var stock = new StockAvailabilityStore(database);
+        var store = new ReplenishmentStore(database);
+        var query = new GetPickingReplenishments(
+            new GetPickingWork(new PickingAssemblyQueryStore(database), Permission()),
+            new BuildPickingRoute(), stock, store, new BuildReplenishmentProposals(),
+            TimeProvider.System);
+        var view = Value(await query.ExecuteAsync(assembly.Id, Worker));
+        Assert.Equal(3m, view.PickableBySku[sku.Id]);
+        var proposal = Assert.Single(view.Proposals);
+        Assert.Equal(pallet.Id, proposal.SourceLocationId);
+        Assert.Equal(allowed.Id, proposal.DestinationLocationId);
+        Assert.Equal(10m, proposal.Quantity);
+        var history = Assert.Single(view.Tasks);
+        Assert.Equal(ReplenishmentTaskStatus.Cancelled, history.Status);
+        Assert.Equal(oldSource.Code, history.RecommendedSourceCode);
+        Assert.Equal(oldDestination.Code, history.RecommendedDestinationCode);
+
+        var order = new OrderReplenishment(
+            new CommandExecutor(new CommandExecutionStore(database)),
+            new PickingAssemblyStore(database), store, stock, new BuildPickingRoute(),
+            new BuildReplenishmentProposals(), Permission(), TimeProvider.System);
+        Value(await order.ExecuteAsync(new(Guid.NewGuid(), assembly.Id,
+            view.Revision, sku.Id, Worker)));
+        await using var verify = database.CreateDbContext();
+        var ordered = await verify.ReplenishmentTasks.SingleAsync(x =>
+            x.PickingAssemblyId == assembly.Id && x.Status == ReplenishmentTaskStatus.Ordered);
+        Assert.Equal(pallet.Id, ordered.RecommendedSourceStorageLocationId);
+        Assert.Equal(allowed.Id, ordered.RecommendedDestinationStorageLocationId);
+        Assert.Equal(10m, ordered.OrderedQuantity);
+    }
+
+    [Fact]
     public async Task Sku_order_creates_all_source_tasks_once_in_one_commit()
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "SKU replenishment order" };

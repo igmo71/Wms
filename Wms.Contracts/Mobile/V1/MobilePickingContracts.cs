@@ -37,8 +37,7 @@ public sealed record MobilePickingSourceResponse(
     Guid SourceRefKey, string? Number, string Status,
     bool Posted, bool DeletionMark, DateTimeOffset? LastCheckedAtUtc,
     string? LastCheckError, DateTimeOffset? StartConfirmedAtUtc,
-    DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError,
-    string PlanSourceSnapshotJson, string? CurrentSourceJson)
+    DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError)
 {
     public MobileShippingExchangeStage? ExchangeStage { get; init; }
     public string? ExchangeError { get; init; }
@@ -123,7 +122,7 @@ public sealed record MobilePickingRouteGapResponse(
 
 public sealed record MobilePickingRouteResponse(
     long Revision, IReadOnlyList<MobilePickingRouteStepResponse> Steps,
-    IReadOnlyList<MobilePickingRouteGapResponse> Gaps);
+    IReadOnlyList<MobilePickingRouteGapResponse> Gaps, MobilePickingWorkResponse Work);
 
 public sealed record MobilePickingAvailabilityResponse(
     Guid StorageLocationId, string LocationCode, DateOnly? ExpirationDate,

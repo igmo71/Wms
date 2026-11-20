@@ -41,6 +41,7 @@ public partial class PickingAssemblyPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        using var measurement = MobilePerformanceDiagnostics.Load("Список сборок");
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         CameraButton.IsVisible = _scanner.ActiveSource == BarcodeScanSource.Camera;
@@ -87,6 +88,7 @@ public partial class PickingAssemblyPage : ContentPage
     private async Task RefreshAsync()
     {
         if (_busy || Warehouse is not { } warehouse) return;
+        using var measurement = MobilePerformanceDiagnostics.Load("Список сборок");
         SetBusy(true);
         try
         {
@@ -155,6 +157,7 @@ public partial class PickingAssemblyPage : ContentPage
     {
         if (_busy || _process.HasPendingCommand || Warehouse is not { } warehouse
             || e.Parameter is not Guid id) return;
+        using var measurement = MobilePerformanceDiagnostics.Load("Открытие сборки");
         SetBusy(true);
         try { await OpenSkuAsync(await _client.GetAsync(id, warehouse.Id)); }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
@@ -184,7 +187,7 @@ public partial class PickingAssemblyPage : ContentPage
     private async Task OpenSkuAsync(MobilePickingAssemblyResponse assembly)
     {
         var page = _services.GetRequiredService<PickingSkuPage>();
-        page.Show(assembly, _process);
+        page.Show(assembly, _process, useSuppliedAssembly: true);
         await Navigation.PushAsync(page);
     }
 

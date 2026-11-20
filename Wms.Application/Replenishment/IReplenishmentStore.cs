@@ -1,4 +1,5 @@
 using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -117,7 +118,8 @@ public interface IReplenishmentStore
     Task<ReplenishmentTaskDetail?> ReadTaskAsync(Guid taskId, CancellationToken ct);
 
     Task<ReplenishmentProposalState> ReadProposalStateAsync(Guid warehouseId,
-        IReadOnlyCollection<Guid> skuIds, CancellationToken ct);
+        IReadOnlyList<StockAvailability> availability,
+        IReadOnlyCollection<Guid> taskLocationIds, CancellationToken ct);
 
     Task<IReadOnlyList<ReplenishmentTask>> ReadAssemblyTasksAsync(
         Guid assemblyId, CancellationToken ct);
@@ -135,5 +137,5 @@ public interface IReplenishmentStore
 
     Task<ReplenishmentProposalState> LoadProposalStateAsync(
         ICommandExecutionContext session, Guid warehouseId,
-        IReadOnlyCollection<Guid> skuIds, CancellationToken ct);
+        IReadOnlyList<StockAvailability> availability, CancellationToken ct);
 }

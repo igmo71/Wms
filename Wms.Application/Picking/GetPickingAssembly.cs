@@ -6,7 +6,7 @@ namespace Wms.Application.Picking;
 public sealed class GetPickingAssembly(
     IPickingAssemblyQueryStore store, WarehousePermission permission)
 {
-    public async Task<OperationResult<PickingAssemblyView>> ExecuteAsync(
+    public async Task<OperationResult<PickingAssemblyOverview>> ExecuteAsync(
         Guid assemblyId, string userId, CancellationToken ct = default)
     {
         if (assemblyId == Guid.Empty || string.IsNullOrWhiteSpace(userId))
@@ -18,7 +18,7 @@ public sealed class GetPickingAssembly(
             if (!managerAccess.IsSuccess)
                 return OperationError.Conflict("Для просмотра сборки нужна роль Operator или Manager.");
         }
-        var assembly = await store.GetAsync(assemblyId, ct);
+        var assembly = await store.GetOverviewAsync(assemblyId, ct);
         return assembly is null
             ? OperationError.NotFound("Сборка WMS не найдена.")
             : assembly;

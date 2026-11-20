@@ -15,6 +15,7 @@ public partial class PickingSkuPage : ContentPage
     private MobilePickingAssemblyResponse? _assembly;
     private MobilePickingWorkResponse? _work;
     private bool _busy;
+    private bool _useSuppliedAssembly;
     private IReadOnlyDictionary<Guid, decimal>? _availableBySku;
     private MobilePickingReplenishmentsResponse? _replenishmentList;
 
@@ -36,19 +37,31 @@ public partial class PickingSkuPage : ContentPage
     public IReadOnlyList<PickingExchangeRow> ExchangeRows { get; private set; } = [];
     private bool IsOwner => _assembly?.ResponsibleUserId == _selection.CurrentUserId;
 
-    public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
+    public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process,
+        bool useSuppliedAssembly = false)
     {
         _process = process;
+        _useSuppliedAssembly = useSuppliedAssembly;
         _work = null;
         _availableBySku = null;
         _replenishmentList = null;
         Apply(assembly);
     }
 
+    internal void UseFreshAssemblyOnReturn(MobilePickingAssemblyResponse assembly)
+    {
+        if (_assembly is not { } current || current.Id != assembly.Id
+            || current.WarehouseId != assembly.WarehouseId) return;
+        _assembly = assembly;
+        _useSuppliedAssembly = true;
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await RefreshAsync();
+        var useSuppliedAssembly = _useSuppliedAssembly;
+        _useSuppliedAssembly = false;
+        await RefreshAsync(useSuppliedAssembly);
     }
 
     private async void OnRefreshing(object? sender, EventArgs e)
@@ -57,48 +70,39 @@ public partial class PickingSkuPage : ContentPage
         SkuRefreshView.IsRefreshing = false;
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(bool useSuppliedAssembly = false)
     {
         if (_busy || _assembly is null) return;
+        using var measurement = MobilePerformanceDiagnostics.Load("SKU");
         SetBusy(true);
         try
         {
-            var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
-            _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            var assembly = useSuppliedAssembly ? _assembly
+                : await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
+            _work = null;
             _availableBySku = null;
             _replenishmentList = null;
             string? replenishmentError = null;
-            string? routeError = null;
             if (assembly.Status == MobilePickingAssemblyStatus.InProgress
                 && assembly.ResponsibleUserId == _selection.CurrentUserId)
             {
                 try
                 {
-                    var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
-                    if (route.Revision == _work.Revision)
-                        _availableBySku = route.Steps.GroupBy(x => x.SkuId)
-                            .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
-                    else routeError = "Сборка изменилась. Обновите доступность SKU.";
-                }
-                catch (MobileApiException exception) { routeError = exception.Message; }
-                catch (HttpRequestException)
-                { routeError = "Не удалось обновить доступность SKU."; }
-                try
-                {
                     var list = await _replenishments.AssemblyAsync(assembly.Id,
                         assembly.WarehouseId);
-                    if (list.Revision == _work.Revision) _replenishmentList = list;
-                    else replenishmentError = "Сборка изменилась. Обновите подпитку.";
+                    _work = list.Work;
+                    _availableBySku = list.PickableBySku;
+                    _replenishmentList = list;
                 }
                 catch (MobileApiException exception)
                 { replenishmentError = exception.Message; }
                 catch (HttpRequestException)
                 { replenishmentError = "Не удалось обновить Подпитки."; }
             }
+            _work ??= await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
             Apply(assembly);
             if (!_process.HasPendingCommand)
-                ErrorLabel.Text = string.Join("\n", new[] { routeError, replenishmentError }
-                    .Where(x => !string.IsNullOrWhiteSpace(x)));
+                ErrorLabel.Text = replenishmentError ?? string.Empty;
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось обновить сборку."; }
@@ -241,7 +245,7 @@ public partial class PickingSkuPage : ContentPage
             if (_replenishmentList is null) return;
             await RunCommandAsync(() => _process.OrderReplenishmentAsync(
                 _assembly.Id, _assembly.WarehouseId, _replenishmentList.Revision,
-                skuId));
+                skuId), operation: "Заказ подпитки");
         }
         else if (row.ReplenishmentState != PickingReplenishmentState.Hidden)
             await DisplayAlertAsync("Подпитка", row.ReplenishmentHint, "Понятно");
@@ -264,7 +268,7 @@ public partial class PickingSkuPage : ContentPage
                 var revision = _assembly.Revision;
                 SetBusy(false);
                 await RunCommandAsync(() => _process.CloseAsync(assemblyId,
-                    warehouseId, revision));
+                    warehouseId, revision), operation: "Закрытие и отгрузка");
                 return;
             }
             var check = await _client.CheckClosureAsync(_assembly.Id, _assembly.WarehouseId);
@@ -284,7 +288,7 @@ public partial class PickingSkuPage : ContentPage
                 "Складской факт будет проведён. Продолжить?", "Закрыть", "Отмена")) return;
             SetBusy(false);
             await RunCommandAsync(() => _process.CloseAsync(_assembly.Id,
-                _assembly.WarehouseId, check.Revision));
+                _assembly.WarehouseId, check.Revision), operation: "Закрытие и отгрузка");
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException) { ErrorLabel.Text = "Не удалось сверить документы 1С."; }
@@ -313,7 +317,7 @@ public partial class PickingSkuPage : ContentPage
     {
         if (_busy || _process.HasPendingCommand || _assembly is null || !IsOwner) return;
         await RunCommandAsync(() => _process.StartAsync(
-            _assembly.Id, _assembly.WarehouseId));
+            _assembly.Id, _assembly.WarehouseId), operation: "Начало отбора");
     }
 
     private async void OnTakeOverClicked(object? sender, EventArgs e)
@@ -323,31 +327,34 @@ public partial class PickingSkuPage : ContentPage
             $"Сейчас за сборку отвечает {_assembly.ResponsibleDisplayName}. Принять её на себя?",
             "Принять", "Отмена")) return;
         await RunCommandAsync(() => _process.TakeOverAsync(
-            _assembly.Id, _assembly.WarehouseId, _assembly.Revision));
+            _assembly.Id, _assembly.WarehouseId, _assembly.Revision), operation: "Принятие сборки");
     }
 
     private async void OnRetryClicked(object? sender, EventArgs e)
     {
         if (_busy || !_process.HasPendingCommand) return;
-        await RunCommandAsync(_process.RetryAsync, retry: true);
+        await RunCommandAsync(_process.RetryAsync, retry: true,
+            operation: $"Повтор: {_process.PendingLabel}");
     }
 
     private async Task RunCommandAsync(Func<Task<MobilePickingAssemblyResponse>> action,
-        bool retry = false)
+        bool retry = false, string operation = "Команда")
     {
         if (_busy || _process.HasPendingCommand && !retry) return;
+        using var measurement = MobilePerformanceDiagnostics.Action(operation);
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         var refreshWork = false;
         try
         {
             var assembly = await action();
-            _work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
+            refreshWork = assembly.Status == MobilePickingAssemblyStatus.InProgress
+                && assembly.ResponsibleUserId == _selection.CurrentUserId;
+            _work = refreshWork ? null
+                : await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
             _availableBySku = null;
             _replenishmentList = null;
             Apply(assembly);
-            refreshWork = assembly.Status == MobilePickingAssemblyStatus.InProgress
-                && IsOwner;
             if (_process.LastStartResult is { Status: MobilePickingAssemblyStatus.Preparing } start)
                 ErrorLabel.Text = string.Join("\n", start.Sources
                     .Where(x => x.Error is not null).Select(x => x.Error));
@@ -364,7 +371,7 @@ public partial class PickingSkuPage : ContentPage
                 : "Действие выполнено, но экран не обновился. Потяните вниз.";
         }
         finally { SetBusy(false); }
-        if (refreshWork) await RefreshAsync();
+        if (refreshWork) await RefreshAsync(useSuppliedAssembly: true);
     }
 
     private void UpdateActions()

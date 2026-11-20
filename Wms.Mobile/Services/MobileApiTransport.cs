@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -10,25 +12,25 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
     public Task<HttpResponseMessage> GetAsync(
         string route,
         CancellationToken ct = default)
-        => SendAsync(() => httpClient.GetAsync(route, ct), ct);
+        => SendAsync(HttpMethod.Get, route, () => httpClient.GetAsync(route, ct), ct);
 
     public Task<HttpResponseMessage> PostAsync<TRequest>(
         string route,
         TRequest request,
         CancellationToken ct = default)
-        => SendAsync(() => httpClient.PostAsJsonAsync(route, request, ct), ct);
+        => SendAsync(HttpMethod.Post, route, () => httpClient.PostAsJsonAsync(route, request, ct), ct);
 
     public Task<HttpResponseMessage> PutAsync<TRequest>(
         string route,
         TRequest request,
         CancellationToken ct = default)
-        => SendAsync(() => httpClient.PutAsJsonAsync(route, request, ct), ct);
+        => SendAsync(HttpMethod.Put, route, () => httpClient.PutAsJsonAsync(route, request, ct), ct);
 
     public Task<HttpResponseMessage> DeleteAsync<TRequest>(
         string route,
         TRequest request,
         CancellationToken ct = default)
-        => SendAsync(async () =>
+        => SendAsync(HttpMethod.Delete, route, async () =>
         {
             using var message = new HttpRequestMessage(HttpMethod.Delete, route)
             {
@@ -38,12 +40,32 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
         }, ct);
 
     private static async Task<HttpResponseMessage> SendAsync(
+        HttpMethod method,
+        string route,
         Func<Task<HttpResponseMessage>> send,
         CancellationToken ct)
     {
+        var operation = MobilePerformanceDiagnostics.CaptureHttpOperation();
+        var started = operation is null ? 0 : Stopwatch.GetTimestamp();
+        var failed = true;
+        int? statusCode = null;
+        TimeSpan? sessionDuration = null;
+        TimeSpan? serverDuration = null;
+        var sessionRefreshed = false;
         try
         {
             HttpResponseMessage response = await send();
+            statusCode = (int)response.StatusCode;
+            if (operation is not null)
+            {
+                if (response.RequestMessage is { } request)
+                {
+                    if (request.Options.TryGetValue(MobilePerformanceDiagnostics.SessionDurationKey, out var duration))
+                        sessionDuration = duration;
+                    request.Options.TryGetValue(MobilePerformanceDiagnostics.SessionRefreshKey, out sessionRefreshed);
+                }
+                serverDuration = ReadServerDuration(response);
+            }
             if (!response.IsSuccessStatusCode)
             {
                 try
@@ -56,6 +78,7 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
                 }
             }
 
+            failed = false;
             return response;
         }
         catch (OperationCanceledException exception) when (!ct.IsCancellationRequested)
@@ -66,6 +89,23 @@ internal sealed class MobileApiTransport(HttpClient httpClient)
                 "Время ожидания ответа WMS истекло. Результат запроса не подтверждён.",
                 exception);
         }
+        finally
+        {
+            operation?.RecordHttp(method.Method, route, started,
+                Stopwatch.GetElapsedTime(started), statusCode, failed,
+                sessionDuration, serverDuration, sessionRefreshed);
+        }
+    }
+
+    private static TimeSpan? ReadServerDuration(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues(MobileDiagnosticHeaders.ServerDurationMilliseconds, out var values)
+            || !decimal.TryParse(values.FirstOrDefault(), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var milliseconds)
+            || milliseconds < 0
+            || milliseconds > TimeSpan.MaxValue.Ticks / (decimal)TimeSpan.TicksPerMillisecond)
+            return null;
+        return TimeSpan.FromTicks((long)(milliseconds * TimeSpan.TicksPerMillisecond));
     }
 
     public static async Task<TResponse> ReadCommandResponseAsync<TResponse>(

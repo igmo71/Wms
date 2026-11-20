@@ -1,10 +1,11 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Wms.Contracts.Mobile.V1;
 
 namespace Wms.Mobile.Services;
 
-internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionStore)
+internal sealed class MobileAuthenticationHandler(CachedMobileSessionStore sessionStore)
     : DelegatingHandler(CreateInnerHandler())
 {
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromMinutes(1);
@@ -19,25 +20,40 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
             return await base.SendAsync(request, cancellationToken);
         }
 
-        var session = await GetCurrentSessionAsync(request.RequestUri, cancellationToken);
+        var measure = MobilePerformanceDiagnostics.CaptureHttpOperation() is not null;
+        var sessionStarted = measure ? Stopwatch.GetTimestamp() : 0;
+        var session = await GetCurrentSessionAsync(request, measure, cancellationToken);
         if (session is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue(
-                session.TokenType,
-                session.AccessToken);
+                session.TokenType, session.AccessToken);
+        }
+        if (measure)
+        {
+            request.Options.Set(MobilePerformanceDiagnostics.SessionDurationKey,
+                Stopwatch.GetElapsedTime(sessionStarted));
+            request.Headers.Add(MobileDiagnosticHeaders.RequestServerDuration, "1");
         }
 
         var response = await base.SendAsync(request, cancellationToken);
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        if (measure)
         {
-            sessionStore.Clear();
+            response.RequestMessage ??= request;
+            if (request.Options.TryGetValue(MobilePerformanceDiagnostics.SessionDurationKey, out var duration))
+                response.RequestMessage.Options.Set(MobilePerformanceDiagnostics.SessionDurationKey, duration);
+            if (request.Options.TryGetValue(MobilePerformanceDiagnostics.SessionRefreshKey, out var refreshed))
+                response.RequestMessage.Options.Set(MobilePerformanceDiagnostics.SessionRefreshKey, refreshed);
         }
+        if (session is not null && response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            sessionStore.ClearIfCurrent(session);
 
         return response;
     }
 
-    private async Task<MobileSession?> GetCurrentSessionAsync(Uri? apiRequestUri, CancellationToken ct)
+    private async Task<MobileSession?> GetCurrentSessionAsync(
+        HttpRequestMessage apiRequest, bool measure, CancellationToken ct)
     {
+        var apiRequestUri = apiRequest.RequestUri;
         var session = await sessionStore.GetAsync();
         if (session is null || session.ExpiresAtUtc > DateTimeOffset.UtcNow + RefreshMargin)
         {
@@ -55,10 +71,11 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
 
             if (apiRequestUri is not { IsAbsoluteUri: true })
             {
-                sessionStore.Clear();
+                sessionStore.ClearIfCurrent(session);
                 return null;
             }
 
+            if (measure) apiRequest.Options.Set(MobilePerformanceDiagnostics.SessionRefreshKey, true);
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
                 new Uri(apiRequestUri, MobileApiRoutes.Refresh))
@@ -71,7 +88,7 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
                 if (response.StatusCode is System.Net.HttpStatusCode.BadRequest
                     or System.Net.HttpStatusCode.Unauthorized)
                 {
-                    sessionStore.Clear();
+                    sessionStore.ClearIfCurrent(session);
                     return null;
                 }
 
@@ -103,9 +120,8 @@ internal sealed class MobileAuthenticationHandler(IMobileSessionStore sessionSto
                     null,
                     response.StatusCode);
 
-            session = ToSession(refreshed);
-            await sessionStore.SaveAsync(session);
-            return session;
+            var renewed = ToSession(refreshed);
+            return await sessionStore.TryRefreshAsync(session, renewed) ? renewed : null;
         }
         finally
         {

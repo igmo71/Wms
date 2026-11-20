@@ -106,8 +106,11 @@ It recommends all currently usable Reserve sources in expiration order, counts
 unselected Storage stock before proposing extra transfers, and reports any
 remaining warehouse deficit. An ordered task consumes its suggested source
 quantity in the recommendation; a physically held cell is unavailable. A
-Storage destination with the SKU is preferred, followed by an empty cell with
-history for that SKU. This read-only calculation creates no replenishment task;
+Storage destination is recommended only when it has a positive balance of that
+SKU and permits its SKU mix; eligible cells sort by code. If none qualifies,
+the recommendation has no destination and the worker selects it by scan during
+the transfer. The recommendation does not use cell/SKU history.
+This read-only calculation creates no replenishment task;
 ordering and physical scans require their own checks. An Operator responsible
 for an active assembly can explicitly order all currently offered proposals
 for one SKU in a single command. The command rechecks the route, stock,

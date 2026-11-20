@@ -21,8 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Exercise the actual platform-independent transport without loading MAUI. -->
+    <!-- Exercise the actual platform-independent Mobile services without loading MAUI. -->
     <Compile Include="..\Wms.Mobile\Services\MobileApiTransport.cs" Link="Mobile\MobileApiTransport.cs" />
+    <Compile Include="..\Wms.Mobile\Services\MobilePerformanceDiagnostics.cs" Link="Mobile\MobilePerformanceDiagnostics.cs" />
+    <Compile Include="..\Wms.Mobile\Services\IMobileSessionStore.cs" Link="Mobile\IMobileSessionStore.cs" />
+    <Compile Include="..\Wms.Mobile\Services\MobileSession.cs" Link="Mobile\MobileSession.cs" />
+    <Compile Include="..\Wms.Mobile\Services\CachedMobileSessionStore.cs" Link="Mobile\CachedMobileSessionStore.cs" />
     <Compile Include="..\Wms.Mobile\Services\MobileApiException.cs" Link="Mobile\MobileApiException.cs" />
     <Compile Include="..\Wms.Mobile\Services\MobileReceivingOrderClient.cs" Link="Mobile\MobileReceivingOrderClient.cs" />
     <Compile Include="..\Wms.Mobile\Services\ReceivingOrderReceivingProcess.cs" Link="Mobile\ReceivingOrderReceivingProcess.cs" />

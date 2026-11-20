@@ -36,7 +36,8 @@ public sealed record MobilePickingReplenishmentsResponse(
     Guid PickingAssemblyId, long Revision,
     IReadOnlyList<MobileReplenishmentProposalResponse> Proposals,
     IReadOnlyList<MobileReplenishmentDeficitResponse> Deficits,
-    IReadOnlyList<MobilePickingReplenishmentTaskResponse> Tasks);
+    IReadOnlyList<MobilePickingReplenishmentTaskResponse> Tasks,
+    MobilePickingWorkResponse Work, IReadOnlyDictionary<Guid, decimal> PickableBySku);
 
 public sealed record MobileReplenishmentQueueItemResponse(
     Guid Id, Guid PickingAssemblyId, string AssemblyNumber,

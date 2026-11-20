@@ -22,7 +22,6 @@ public sealed class ReplenishmentProposalSafetyTests
         var ordered = Value(ReplenishmentTask.Order(Guid.NewGuid(), assemblyId,
             warehouseId, skuId, 2, firstSource, destinationId, "worker",
             DateTimeOffset.UtcNow));
-        var empty = new HashSet<Guid>();
         var result = Value(new BuildReplenishmentProposals().Execute(
             new ReplenishmentProposalRequest(assemblyId, warehouseId,
                 new DateOnly(2026, 5, 1),
@@ -31,11 +30,11 @@ public sealed class ReplenishmentProposalSafetyTests
                  Stock(secondSource, "B", earlier, 2),
                  Stock(destinationId, "C", later, 3)],
                 [new ReplenishmentLocation(firstSource, "A", ZoneType.Reserve,
-                    true, false, false, new HashSet<Guid> { skuId }, empty),
+                    true, false, false, 1, new HashSet<Guid> { skuId }),
                  new ReplenishmentLocation(secondSource, "B", ZoneType.Reserve,
-                    true, false, false, new HashSet<Guid> { skuId }, empty),
+                    true, false, false, 1, new HashSet<Guid> { skuId }),
                  new ReplenishmentLocation(destinationId, "C", ZoneType.Storage,
-                    true, false, false, new HashSet<Guid> { skuId }, empty)],
+                    true, false, false, 1, new HashSet<Guid> { skuId })],
                 [ordered])));
 
         Assert.Empty(result.Deficits);

@@ -23,25 +23,52 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
         var assembly = PickingAssembly(warehouseId, UserId);
         var assemblyId = assembly.Id;
         var date = new DateOnly(2027, 1, 1);
+        var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Batch stock" };
+        var reservationOnlyDate = date.AddMonths(1);
         await using (var db = database.CreateDbContext())
         {
             db.Add(assembly);
+            db.Add(otherSku);
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
                 skuId, 5, DateTimeOffset.UtcNow, date)));
             db.Add(Reservation(warehouseId, locationId, skuId, assemblyId, Guid.NewGuid(), 7));
             db.Add(Value(StockShortage.Report(Guid.NewGuid(), warehouseId, locationId, skuId,
                 date, StockShortageOrigin.Picking, Guid.NewGuid(), 5, 3, null,
                 UserId, DateTimeOffset.UtcNow)));
+            db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
+                otherSku.Id, 20, DateTimeOffset.UtcNow)));
+            db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
+                otherSku.Id, 9, DateTimeOffset.UtcNow, date)));
+            db.Add(Reservation(warehouseId, locationId, otherSku.Id, assemblyId, Guid.NewGuid(), 4));
+            db.Add(Value(PickingReservation.Create(Guid.NewGuid(), assemblyId, warehouseId,
+                locationId, otherSku.Id, reservationOnlyDate, 1, UserId, DateTimeOffset.UtcNow)));
+            db.Add(Value(StockShortage.Report(Guid.NewGuid(), warehouseId, locationId, otherSku.Id,
+                date, StockShortageOrigin.Picking, Guid.NewGuid(), 9, 6, null,
+                UserId, DateTimeOffset.UtcNow)));
             await db.SaveChangesAsync();
         }
 
         var store = new StockAvailabilityStore(database);
-        var groups = await store.ReadSkuAsync(warehouseId, skuId, default);
+        var batch = await store.ReadSkusAsync(warehouseId, [skuId, otherSku.Id, skuId,
+            Guid.NewGuid()], default);
+        Assert.Equal(5, batch.Count);
+        var groups = batch.Where(x => x.Group.StockKeepingUnitId == skuId).ToArray();
         var undated = Assert.Single(groups.Where(x => x.Group.ExpirationDate is null));
         Assert.Equal(10m, undated.AccountingQuantity);
         Assert.Equal(3m, undated.AvailableQuantity);
         Assert.Equal(7m, undated.AvailableForReservedIssue(assemblyId));
         Assert.Equal(3m, Assert.Single(groups.Where(x => x.Group.ExpirationDate == date)).AvailableQuantity);
+        var otherGroups = batch.Where(x => x.Group.StockKeepingUnitId == otherSku.Id).ToArray();
+        var otherUndated = Assert.Single(otherGroups.Where(x => x.Group.ExpirationDate is null));
+        Assert.Equal(20m, otherUndated.AccountingQuantity);
+        Assert.Equal(4m, otherUndated.ReservedQuantity);
+        Assert.Equal(16m, otherUndated.AvailableQuantity);
+        Assert.Equal(6m, Assert.Single(otherGroups.Where(x => x.Group.ExpirationDate == date)).AvailableQuantity);
+        var reservationOnly = Assert.Single(otherGroups.Where(x =>
+            x.Group.ExpirationDate == reservationOnlyDate));
+        Assert.Equal(0m, reservationOnly.AccountingQuantity);
+        Assert.Equal(1m, reservationOnly.ReservedQuantity);
+        Assert.Equal(0m, reservationOnly.AvailableQuantity);
 
         await using (var db = database.CreateDbContext())
         {
@@ -50,12 +77,15 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
             await db.SaveChangesAsync();
         }
 
-        groups = await store.ReadSkuAsync(warehouseId, skuId, default);
-        Assert.All(groups, x => Assert.Equal(0m, x.AvailableQuantity));
+        batch = await store.ReadSkusAsync(warehouseId, [skuId, otherSku.Id], default);
+        Assert.All(batch, x => Assert.Equal(0m, x.AvailableQuantity));
+        groups = batch.Where(x => x.Group.StockKeepingUnitId == skuId).ToArray();
         undated = Assert.Single(groups.Where(x => x.Group.ExpirationDate is null));
         Assert.Equal(3m, undated.AvailableForNewPick(assemblyId));
         Assert.Equal(7m, undated.AvailableForReservedIssue(assemblyId));
         Assert.Equal(0m, undated.AvailableForReservedIssue(Guid.NewGuid()));
+        Assert.Equal(16m, Assert.Single(batch.Where(x => x.Group.StockKeepingUnitId == otherSku.Id
+            && x.Group.ExpirationDate is null)).AvailableForNewPick(assemblyId));
     }
 
     [Theory]
@@ -192,6 +222,9 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
             {
                 Success(await store.ReserveAsync(context,
                     Reservation(warehouseId, locationId, skuId, Guid.NewGuid(), Guid.NewGuid(), 7), ct));
+                var staged = await store.ReadSkusAsync(context, warehouseId,
+                    [skuId, Guid.NewGuid()], ct);
+                Assert.Equal(3m, Assert.Single(staged).AvailableQuantity);
                 var second = await store.ReserveAsync(context,
                     Reservation(warehouseId, locationId, skuId, Guid.NewGuid(), Guid.NewGuid(), 4), ct);
                 Assert.False(second.IsSuccess);

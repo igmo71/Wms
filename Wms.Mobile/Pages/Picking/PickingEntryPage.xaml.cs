@@ -77,6 +77,7 @@ public partial class PickingEntryPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        using var measurement = MobilePerformanceDiagnostics.Load("Карточка отбора");
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         await RefreshAsync();
@@ -100,6 +101,7 @@ public partial class PickingEntryPage : ContentPage
     private async Task RefreshAsync()
     {
         if (_busy || _assembly is null) return;
+        using var measurement = MobilePerformanceDiagnostics.Load("Карточка отбора");
         SetBusy(true);
         try
         {
@@ -245,6 +247,7 @@ public partial class PickingEntryPage : ContentPage
             Apply();
             return;
         }
+        using var measurement = MobilePerformanceDiagnostics.Load("Проверка ячейки");
         SetBusy(true);
         _source = null;
         QuantityEntry.Text = string.Empty;
@@ -362,6 +365,15 @@ public partial class PickingEntryPage : ContentPage
         Func<Task<MobilePickingAssemblyResponse>> execute, bool retry = false)
     {
         if (_busy || _process.HasPendingCommand && !retry) return;
+        using var measurement = MobilePerformanceDiagnostics.Action(action switch
+        {
+            PendingAction.Pick => "Подтверждение отбора",
+            PendingAction.Return => "Возврат товара",
+            PendingAction.Hold => "Снятие поддона",
+            PendingAction.PalletReturn => "Возврат поддона",
+            PendingAction.Shortage => "Сообщение о нехватке",
+            _ => "Команда отбора"
+        });
         _pendingAction = action;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
@@ -391,12 +403,12 @@ public partial class PickingEntryPage : ContentPage
         if (_origin == PickingEntryOrigin.Sku
             && action is (PendingAction.Pick or PendingAction.Shortage))
         {
-            await Navigation.PopAsync();
+            await ReturnAfterActionAsync();
             return;
         }
-        _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
         if (action == PendingAction.Hold)
         {
+            _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
             _palletHeld = true;
             _sku = await _client.SkuAsync(_assembly.Id, _assembly.WarehouseId, _skuId);
             await CheckLocationAfterHoldAsync();
@@ -404,6 +416,7 @@ public partial class PickingEntryPage : ContentPage
         else if (action is PendingAction.Pick or PendingAction.Shortage)
         {
             var route = await _client.RouteAsync(_assembly.Id, _assembly.WarehouseId);
+            _work = route.Work;
             _source = null;
             _palletHeld = false;
             _scannedLocationCode = null;
@@ -433,6 +446,7 @@ public partial class PickingEntryPage : ContentPage
         }
         else if (action == PendingAction.Return)
         {
+            _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
             var remaining = _work.Entries.SingleOrDefault(x => x.Id == _returnEntry?.Id);
             if (remaining is null && _returnEntry?.FromReserve == true
                 && !_work.Entries.Any(x =>
@@ -442,10 +456,18 @@ public partial class PickingEntryPage : ContentPage
                 Apply();
                 ErrorLabel.Text = "Подтвердите возврат поддона в исходную ячейку.";
             }
-            else await Navigation.PopAsync();
+            else await ReturnAfterActionAsync();
         }
         else if (action == PendingAction.PalletReturn)
-            await Navigation.PopAsync();
+            await ReturnAfterActionAsync();
+    }
+
+    private async Task ReturnAfterActionAsync()
+    {
+        if (_assembly is not null && Navigation.NavigationStack.Count >= 2
+            && Navigation.NavigationStack[^2] is PickingSkuPage skuPage)
+            skuPage.UseFreshAssemblyOnReturn(_assembly);
+        await Navigation.PopAsync();
     }
 
     private async Task CheckLocationAfterHoldAsync()

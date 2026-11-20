@@ -4,8 +4,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:Wms.Mobile"
              Title="Отбор и Отгрузка">
-    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
-        <RefreshView x:Name="QueueRefreshView" Refreshing="OnRefreshing">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12">
+        <local:PerformanceDiagnosticsView Margin="0,0,0,8" />
+        <RefreshView x:Name="QueueRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="9">
                     <Picker x:Name="WarehousePicker" Title="Выберите склад"
@@ -38,7 +39,7 @@
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
-        <VerticalStackLayout Grid.Row="1" Spacing="5">
+        <VerticalStackLayout Grid.Row="2" Margin="0,8,0,0" Spacing="5">
             <ActivityIndicator x:Name="ProgressIndicator" HeightRequest="28"
                                IsRunning="False" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />

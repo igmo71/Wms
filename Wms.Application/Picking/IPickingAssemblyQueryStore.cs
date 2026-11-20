@@ -77,6 +77,22 @@ public sealed record PickingAssemblyView(
     public string? WarehouseName { get; init; }
 }
 
+public sealed record PickingAssemblySourceOverview(
+    Guid SourceRefKey, string? Number, ShippingOrderStatus Status,
+    bool Posted, bool DeletionMark, DateTimeOffset? LastCheckedAtUtc,
+    string? LastCheckError, DateTimeOffset? StartConfirmedAtUtc,
+    DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError,
+    ShippingExchangeStage? ExchangeStage, string? ExchangeError);
+
+public sealed record PickingAssemblyOverview(
+    Guid Id, string Number, Guid WarehouseId, PickingAssemblyStatus Status,
+    long Revision, string CreatedBy, string ResponsibleUserId,
+    string ResponsibleDisplayName, DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? FirstStartAttemptAtUtc, DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? ClosedAtUtc,
+    IReadOnlyList<PickingAssemblySourceOverview> Sources,
+    IReadOnlyList<PickingAssemblyPlanLineView> PlanLines);
+
 public sealed record PickingWorkSkuView(Guid SkuId, string? Code,
     string? Name, string? Unit, bool TracksExpirationDate,
     decimal PlannedQuantity, decimal ConfirmedQuantity);
@@ -100,6 +116,7 @@ public interface IPickingAssemblyQueryStore
     Task<IReadOnlyList<PickingAssemblyListItem>> ListForOperatorAsync(
         Guid warehouseId, string userId, CancellationToken ct);
     Task<PickingAssemblyView?> GetAsync(Guid assemblyId, CancellationToken ct);
+    Task<PickingAssemblyOverview?> GetOverviewAsync(Guid assemblyId, CancellationToken ct);
     Task<PickingWorkView?> GetWorkAsync(Guid assemblyId, CancellationToken ct);
     Task<IReadOnlyList<PickingAuditView>> GetAuditAsync(Guid assemblyId, CancellationToken ct);
     Task<IReadOnlyList<PickingAllocationView>> GetPostedAllocationsAsync(

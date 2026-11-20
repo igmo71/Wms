@@ -282,7 +282,10 @@ internal static class MobilePickingEndpoints
         if (work.WarehouseId != warehouseId)
             return MobileEndpointResults.CommandProblem(
                 OperationError.Conflict("Сборка относится к другому складу."));
-        return TypedResults.Ok(new MobilePickingWorkResponse(work.Id,
+        return TypedResults.Ok(MapWork(work));
+    }
+
+    internal static MobilePickingWorkResponse MapWork(PickingWorkView work) => new(work.Id,
             (MobilePickingAssemblyStatus)work.Status, work.Revision,
             work.ResponsibleUserId,
             work.Skus.Select(x => new MobilePickingWorkSkuResponse(x.SkuId,
@@ -292,8 +295,7 @@ internal static class MobilePickingEndpoints
                 x.StorageLocationId, x.LocationCode, x.SkuId,
                 x.ExpirationDate, x.Quantity, x.ConfirmedBy,
                 x.ConfirmedAtUtc, x.FromReserve)
-            { LocationName = x.LocationName }).ToArray()));
-    }
+            { LocationName = x.LocationName }).ToArray());
 
     private static async Task<IResult> GetRouteAsync(
         Guid assemblyId, Guid warehouseId, Guid? previousLocationId,
@@ -317,7 +319,7 @@ internal static class MobilePickingEndpoints
                 x.ExpirationDate, x.Quantity, x.DirectPalletPick)
             { LocationName = x.LocationName }).ToArray(),
             route.Gaps.Select(x => new MobilePickingRouteGapResponse(
-                x.StockKeepingUnitId, x.ExpirationDate, x.Quantity)).ToArray()));
+                x.StockKeepingUnitId, x.ExpirationDate, x.Quantity)).ToArray(), MapWork(route.Work)));
     }
 
     private static async Task<IResult> ScanSourceAsync(
@@ -510,7 +512,7 @@ internal static class MobilePickingEndpoints
                 ExchangeError = x.ExchangeError
             }).ToArray());
 
-    private static MobilePickingAssemblyResponse MapAssembly(PickingAssemblyView view) => new(
+    private static MobilePickingAssemblyResponse MapAssembly(PickingAssemblyOverview view) => new(
         view.Id, view.Number, view.WarehouseId,
         (MobilePickingAssemblyStatus)view.Status, view.Revision,
         view.CreatedBy, view.ResponsibleUserId, view.ResponsibleDisplayName,
@@ -519,8 +521,7 @@ internal static class MobilePickingEndpoints
         view.Sources.Select(x => new MobilePickingSourceResponse(
             x.SourceRefKey, x.Number, x.Status.GetDisplayName(),
             x.Posted, x.DeletionMark, x.LastCheckedAtUtc, x.LastCheckError,
-            x.StartConfirmedAtUtc, x.LastStartAttemptAtUtc, x.LastStartError,
-            x.PlanSourceSnapshotJson, x.CurrentSourceJson)
+            x.StartConfirmedAtUtc, x.LastStartAttemptAtUtc, x.LastStartError)
             {
                 ExchangeStage = x.ExchangeStage is { } stage
                     ? (MobileShippingExchangeStage)stage : null,

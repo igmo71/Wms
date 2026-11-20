@@ -10,8 +10,9 @@
                WidthRequest="240" HeightRequest="40" HorizontalOptions="Start"
                LineBreakMode="TailTruncation" VerticalTextAlignment="Center" />
     </Shell.TitleView>
-    <Grid RowDefinitions="*,Auto" Padding="12" RowSpacing="8">
-        <ScrollView>
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12">
+        <local:PerformanceDiagnosticsView Margin="0,0,0,8" />
+        <ScrollView Grid.Row="1">
             <VerticalStackLayout Spacing="8">
                 <Border x:Name="SkuCard" Padding="9" Stroke="#D4D4D4" BackgroundColor="White">
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
@@ -68,7 +69,7 @@
                        FontSize="12" />
             </VerticalStackLayout>
         </ScrollView>
-        <VerticalStackLayout Grid.Row="1" Spacing="5">
+        <VerticalStackLayout Grid.Row="2" Margin="0,8,0,0" Spacing="5">
             <ActivityIndicator x:Name="ProgressIndicator" HeightRequest="28"
                                IsRunning="False" IsVisible="False" />
             <Label x:Name="ErrorLabel" TextColor="Red" FontSize="12" />

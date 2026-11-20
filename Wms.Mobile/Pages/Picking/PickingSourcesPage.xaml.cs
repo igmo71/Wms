@@ -58,6 +58,7 @@ public partial class PickingSourcesPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        using var measurement = MobilePerformanceDiagnostics.Load("Документы 1С");
         _visible = true;
         _scanner.ScanReceived += OnScanReceived;
         if (_useSuppliedAssembly)
@@ -90,6 +91,7 @@ public partial class PickingSourcesPage : ContentPage
             await UpdateCameraAsync();
             return;
         }
+        using var measurement = MobilePerformanceDiagnostics.Load("Документы 1С");
         SetBusy(true);
         try
         {
@@ -187,14 +189,14 @@ public partial class PickingSourcesPage : ContentPage
             "Документ будет исключён из плана сборки. Продолжить?",
             "Открепить", "Отмена")) return;
         await RunCommandAsync(() => _process.DetachAsync(
-            _assembly.Id, sourceRefKey, _warehouseId));
+            _assembly.Id, sourceRefKey, _warehouseId), operation: "Открепление РО 1С");
     }
 
     private async void OnStartClicked(object? sender, EventArgs e)
     {
         if (_busy || _process.HasPendingCommand || _assembly is null || !IsOwner) return;
         await RunCommandAsync(() => _process.StartAsync(_assembly.Id, _warehouseId),
-            openSkuAfterStart: true);
+            openSkuAfterStart: true, operation: "Начало отбора");
     }
 
     private async void OnTakeOverClicked(object? sender, EventArgs e)
@@ -204,20 +206,22 @@ public partial class PickingSourcesPage : ContentPage
             $"Сейчас за сборку отвечает {_assembly.ResponsibleDisplayName}. Принять её на себя?",
             "Принять", "Отмена")) return;
         await RunCommandAsync(() => _process.TakeOverAsync(
-            _assembly.Id, _warehouseId, _assembly.Revision));
+            _assembly.Id, _warehouseId, _assembly.Revision), operation: "Принятие сборки");
     }
 
     private async void OnRetryClicked(object? sender, EventArgs e)
     {
         if (_busy || !_process.HasPendingCommand) return;
         var wasStart = _process.PendingLabel == "Начать Отбор";
-        await RunCommandAsync(_process.RetryAsync, wasStart, retry: true);
+        await RunCommandAsync(_process.RetryAsync, wasStart, retry: true,
+            operation: $"Повтор: {_process.PendingLabel}");
     }
 
     private async Task RunCommandAsync(Func<Task<MobilePickingAssemblyResponse>> action,
-        bool openSkuAfterStart = false, bool retry = false)
+        bool openSkuAfterStart = false, bool retry = false, string operation = "Команда")
     {
         if (_busy || _process.HasPendingCommand && !retry) return;
+        using var measurement = MobilePerformanceDiagnostics.Action(operation);
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try

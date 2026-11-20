@@ -55,15 +55,13 @@ public sealed class OrderReplenishment(
                 if (!remaining.ContainsKey(request.StockKeepingUnitId))
                     return OperationError.Conflict("Этот SKU больше не требует Подпитки.");
 
-                var availability = new List<StockAvailability>();
-                foreach (var skuId in remaining.Keys)
-                    availability.AddRange(await stock.ReadSkuAsync(session,
-                        assembly.WarehouseId, skuId, token));
-                var state = await replenishments.LoadProposalStateAsync(session,
+                var availability = await stock.ReadSkusAsync(session,
                     assembly.WarehouseId, remaining.Keys.ToArray(), token);
+                var state = await replenishments.LoadProposalStateAsync(session,
+                    assembly.WarehouseId, availability, token);
                 var routeLocations = state.Locations.Select(x =>
                     new PickingRouteLocation(x.Id, x.Code, x.ZoneType,
-                        x.IsActive, x.CurrentSkuIds.Count)).ToArray();
+                        x.IsActive, x.DistinctSkuCount)).ToArray();
                 var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
                 var route = routeBuilder.Execute(new PickingRouteRequest(assembly.Id,
                     assembly.WarehouseId, today, remaining, availability,

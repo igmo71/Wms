@@ -19,6 +19,12 @@ public static class MobileApiRoutes
     public const string StockAvailability = Base + "/stock-availability";
 }
 
+public static class MobileDiagnosticHeaders
+{
+    public const string RequestServerDuration = "X-Wms-Measure-Duration";
+    public const string ServerDurationMilliseconds = "X-Wms-Server-Duration-Ms";
+}
+
 public static class MobileProblemCodes
 {
     public const string InvalidCommand = "invalid_command";

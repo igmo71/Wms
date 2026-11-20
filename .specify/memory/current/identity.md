@@ -67,3 +67,14 @@ Mobile uses the same confirmed accounts. A transient refresh failure
 (transport, `408`, `5xx`, or an unreadable successful response) retains the
 session and does not replay the request with a stale token. A definitive refresh
 rejection (`400` or `401`), or an authenticated API `401`, clears the session.
+
+Mobile restores its session from protected device storage once per app process
+and then shares one in-memory snapshot between sign-in and authenticated HTTP
+calls. Expiration is checked on every request; refreshing a token persists it
+before replacing the cached snapshot. Logout and definitive rejection clear
+both memory and protected storage. A pending restore or a save already queued
+before that clear cannot restore the old credentials; a write finishing after
+clear is removed from protected storage before subsequent storage operations.
+The refresh response can replace only the session that initiated the refresh.
+A delayed rejection clears only the session used by that request. An explicit
+later sign-in can save a new session normally.

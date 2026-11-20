@@ -67,6 +67,7 @@ public partial class PickingRoutePage : ContentPage
     private async Task RefreshAsync()
     {
         if (_busy || _assembly is null) return;
+        using var measurement = MobilePerformanceDiagnostics.Load("Маршрут");
         SetBusy(true);
         try
         {
@@ -74,15 +75,7 @@ public partial class PickingRoutePage : ContentPage
             var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
             _assembly = assembly;
             ApplyHeading(assembly);
-            var work = await _client.WorkAsync(assembly.Id, assembly.WarehouseId);
-            if (route.Revision != work.Revision)
-            {
-                Steps = [];
-                OnPropertyChanged(nameof(Steps));
-                EmptyLabel.IsVisible = true;
-                ErrorLabel.Text = "Сборка изменилась. Обновите маршрут.";
-                return;
-            }
+            var work = route.Work;
             var skus = work.Skus.ToDictionary(x => x.SkuId);
             var available = route.Steps.GroupBy(x => x.SkuId)
                 .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));

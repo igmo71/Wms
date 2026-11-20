@@ -8,8 +8,7 @@ namespace Wms.Application.Replenishment;
 
 public sealed record ReplenishmentLocation(
     Guid Id, string Code, ZoneType ZoneType, bool IsActive, bool IsHeld,
-    bool AllowsMultipleSkus, IReadOnlySet<Guid> CurrentSkuIds,
-    IReadOnlySet<Guid> HistoricalSkuIds)
+    bool AllowsMultipleSkus, int DistinctSkuCount, IReadOnlySet<Guid> RelevantSkuIds)
 {
     public string? Name { get; init; }
 }
@@ -52,8 +51,8 @@ public sealed class BuildReplenishmentProposals
             || request.RouteSteps.Any(x => x.StockKeepingUnitId == Guid.Empty
                 || x.StorageLocationId == Guid.Empty
                 || !WarehouseQuantity.IsPositive(x.Quantity))
-            || request.Locations.Any(x => x.Id == Guid.Empty || x.CurrentSkuIds is null
-                || x.HistoricalSkuIds is null)
+            || request.Locations.Any(x => x.Id == Guid.Empty || x.DistinctSkuCount < 0
+                || x.RelevantSkuIds is null)
             || request.Locations.Select(x => x.Id).Distinct().Count()
                 != request.Locations.Count)
             return OperationError.Invalid("Для расчёта Подпитки нужны сборка, остаточная потребность и доступность.");
@@ -144,13 +143,10 @@ public sealed class BuildReplenishmentProposals
 
             var destination = request.Locations.Where(x =>
                     x.ZoneType == ZoneType.Storage && x.IsActive && !x.IsHeld
-                    && (x.AllowsMultipleSkus || x.CurrentSkuIds.Count == 0
-                        || x.CurrentSkuIds.All(id => id == skuId)))
-                .OrderBy(x => x.CurrentSkuIds.Contains(skuId) ? 0
-                    : x.CurrentSkuIds.Count == 0 && x.HistoricalSkuIds.Contains(skuId) ? 1 : 2)
-                .ThenBy(x => x.Code, StringComparer.Ordinal)
-                .FirstOrDefault(x => x.CurrentSkuIds.Contains(skuId)
-                    || x.CurrentSkuIds.Count == 0 && x.HistoricalSkuIds.Contains(skuId));
+                    && x.RelevantSkuIds.Contains(skuId)
+                    && (x.AllowsMultipleSkus || x.DistinctSkuCount == 1))
+                .OrderBy(x => x.Code, StringComparer.Ordinal)
+                .FirstOrDefault();
 
             foreach (var source in chosen)
                 proposals.Add(new ReplenishmentProposal(skuId, source.Key,

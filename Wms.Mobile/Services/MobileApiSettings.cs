@@ -7,6 +7,8 @@ internal sealed record MobileApiSettings(
     string DebugBaseAddress,
     string StandaloneBaseAddress)
 {
+    public bool EnablePerformanceDiagnostics { get; init; }
+
     public string BaseAddress
     {
         get

@@ -207,6 +207,39 @@ affected stock group. This protects empty reservation groups without serializing
 unrelated groups through a warehouse-wide range read. The owning location revision
 advances with every reservation or hold change. Queries include staged changes from
 the same EF context when a command performs several actions before its final save.
+Read-only route and replenishment queries load availability for their SKU set in
+batches of at most 500, without EF tracking, and share location and hold reads
+across that set. These SQL reads project only stock-group keys and quantities,
+reservation entry/assembly IDs and author, location ID/code/name, and hold
+owner/reason/author. Active shortage projections calculate blocked quantity
+as expected minus found; they omit report comments, lifecycle timestamps and
+row versions. Availability is assembled by warehouse, location, SKU and nullable
+expiration date using indexed in-memory lookups. Command-session reads retain
+tracking and include staged changes before the command's final save. Ordering
+replenishment reads the remaining SKU set in batches through that same session,
+sharing location and hold reads instead of repeating them for each SKU.
+The replenishment query reads assembly work and availability once, then builds
+its route and proposals from those inputs and the loaded replenishment location
+metadata. It invokes the pure route builder directly rather than calling the
+route query and repeating its database reads. Recommendations carry the loaded
+assembly revision; ordering rechecks current state in its command transaction.
+Read-only replenishment location metadata is limited to addresses from the
+loaded SKU availability and recommended addresses of this assembly's tasks,
+including cancelled tasks with empty cells. SQL counts distinct SKU with positive
+balances only for availability locations, in batches of at most 500 addresses;
+the count includes SKU outside the assembly and groups all expiration dates.
+The proposal model carries this count and positive membership of requested SKU
+from the loaded availability for active, unheld Storage destinations. It does not
+load the warehouse-wide cell/SKU composition. Command-session state retains the
+full address set for route ranking, but stock counts are likewise limited to
+availability locations. All location reads project only the needed fields.
+Route and replenishment query results also carry the work projection used in
+their calculation. Replenishment results include pickable quantities grouped by
+SKU from those route steps, avoiding a separate route calculation for SKU cards.
+Mobile assembly lookups use a separate overview projection: header with worker
+display name, active source statuses with exchange errors, and the WMS plan.
+These are three read-only SQL projections without loading source JSON or imported
+document lines. The full Web detail projection continues to serve Manager review.
 
 Domain operations own local invariants and transitions, accept time and user
 identity as inputs, and expose controlled state rather than public mutation.
@@ -353,6 +386,39 @@ Asset comments retain upstream provenance and local modifications; the Apache 2.
 license is packaged in `Resources/Raw/material-symbols-license.txt`.
 Feature clients and Mobile V1 contract source files are grouped by business
 feature over one authenticated transport.
+One singleton `CachedMobileSessionStore` wraps secure-storage persistence for
+both the identity client and authentication handler. It caches the immutable
+session snapshot and serializes initial reads and writes; its implementation
+uses no MAUI APIs. Session restoration, expiration and invalidation rules belong
+to [identity](current/identity.md).
+Picking performance diagnostics use monotonic client timers and operation scopes
+flowing through asynchronous calls. The transport and diagnostic collector are
+platform independent. The collector exposes `INotifyPropertyChanged`; the MAUI
+diagnostic view registers delivery of updates on the UI thread. The shared
+transport counts logical API calls,
+including failed attempts, and accumulates their duration; successful response
+JSON deserialization and page preparation belong to total operation time.
+Nested loads contribute to their enclosing operation, including loads started
+by navigation lifecycle callbacks. The diagnostic display retains the latest
+load and action independently in memory. The packaged Mobile setting enables
+client timers, measurement scopes and display together (see [clients](current/clients.md)).
+Each operation retains its individual logical calls in start order, with method,
+duration and status, for the expandable diagnostic display. Displayed paths omit
+the common Mobile V1 prefix, query values and fragments, and replace GUID path
+segments with `{id}`; headers and request or response bodies are not retained.
+HTTP duration includes authentication refresh inside a logical call; it is not
+a count of underlying network exchanges or database commands. Summed HTTP time
+can exceed elapsed time for concurrent calls. Measurements do not capture frame
+rendering or add server requests.
+Measured Mobile V1 calls set `X-Wms-Measure-Duration: 1`. The API returns
+`X-Wms-Server-Duration-Ms` only for these requests, in invariant-culture
+milliseconds from before authentication through the response's `OnStarting`
+callback. This measures processing until headers
+start, not full response delivery or SQL alone. The Mobile authentication
+handler attaches its session-preparation duration to the request's local
+`HttpRequestMessage.Options`; this value is not sent over the network.
+Transport diagnostics retain both optional durations per logical call and
+ignore invalid or out-of-range timing headers without changing error recovery.
 The Mobile V1 location contract preserves the existing numeric zone-context
 values. Receiving putaway requests a distinct `PutawayDestination` context;
 barcode resolution accepts either Storage or Reserve and responds with the

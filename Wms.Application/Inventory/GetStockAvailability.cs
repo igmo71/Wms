@@ -61,6 +61,11 @@ public sealed record StockAvailability(
 
 public interface IStockAvailabilityStore
 {
+    Task<IReadOnlyList<StockAvailability>> ReadSkusAsync(
+        Guid warehouseId, IReadOnlyCollection<Guid> stockKeepingUnitIds, CancellationToken ct);
+    Task<IReadOnlyList<StockAvailability>> ReadSkusAsync(
+        ICommandExecutionContext context, Guid warehouseId,
+        IReadOnlyCollection<Guid> stockKeepingUnitIds, CancellationToken ct);
     Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct);
     Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(

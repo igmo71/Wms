@@ -66,6 +66,53 @@ public sealed class PickingAssemblyQueryStore(
             .ToArray();
     }
 
+    public async Task<PickingAssemblyOverview?> GetOverviewAsync(Guid assemblyId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var header = await (
+            from assembly in db.PickingAssemblies.AsNoTracking()
+            join user in db.Users.AsNoTracking()
+                on assembly.ResponsibleUserId equals user.Id into users
+            from user in users.DefaultIfEmpty()
+            where assembly.Id == assemblyId
+            select new
+            {
+                assembly.Id, assembly.Number, assembly.WarehouseId, assembly.Status,
+                assembly.OperationalRevision, assembly.CreatedBy, assembly.ResponsibleUserId,
+                assembly.CreatedAtUtc, assembly.FirstStartAttemptAtUtc, assembly.StartedAtUtc,
+                assembly.ClosedAtUtc,
+                DisplayName = user == null ? null : user.DisplayName,
+                UserName = user == null ? null : user.UserName
+            }).SingleOrDefaultAsync(ct);
+        if (header is null) return null;
+
+        var sources = await (
+            from link in db.PickingAssemblySourceLinks.AsNoTracking()
+            join target in db.ShippingExchangeTargets.AsNoTracking()
+                on new { link.PickingAssemblyId, link.ShippingOrderId }
+                equals new { target.PickingAssemblyId, target.ShippingOrderId } into targets
+            from target in targets.DefaultIfEmpty()
+            where link.PickingAssemblyId == assemblyId && link.DetachedAtUtc == null
+            select new PickingAssemblySourceOverview(
+                link.ShippingOrderId, link.ShippingOrder!.Number, link.ShippingOrder.Status,
+                link.ShippingOrder.Posted, link.ShippingOrder.DeletionMark,
+                link.ShippingOrder.LastSourceCheckAtUtc, link.ShippingOrder.LastSourceCheckError,
+                link.StartConfirmedAtUtc, link.LastStartAttemptAtUtc, link.LastStartError,
+                target == null ? null : (ShippingExchangeStage?)target.Stage,
+                target == null ? null : target.LastError)).ToArrayAsync(ct);
+        var plan = await db.PickingAssemblyPlanLines.AsNoTracking()
+            .Where(x => x.PickingAssemblyId == assemblyId)
+            .Select(x => new PickingAssemblyPlanLineView(x.ShippingOrderId,
+                x.StockKeepingUnitId, x.StockKeepingUnit!.Code, x.StockKeepingUnit.Name,
+                x.Quantity)).ToArrayAsync(ct);
+        return new PickingAssemblyOverview(header.Id, header.Number, header.WarehouseId,
+            header.Status, header.OperationalRevision, header.CreatedBy,
+            header.ResponsibleUserId,
+            DisplayName(header.DisplayName, header.UserName, header.ResponsibleUserId),
+            header.CreatedAtUtc, header.FirstStartAttemptAtUtc, header.StartedAtUtc,
+            header.ClosedAtUtc, sources, plan);
+    }
+
     public async Task<PickingAssemblyView?> GetAsync(Guid assemblyId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);

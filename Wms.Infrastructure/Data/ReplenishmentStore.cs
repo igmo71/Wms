@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
 using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Domain;
@@ -415,21 +416,25 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
 
     public async Task<ReplenishmentProposalState> LoadProposalStateAsync(
         ICommandExecutionContext context, Guid warehouseId,
-        IReadOnlyCollection<Guid> skuIds, CancellationToken ct)
+        IReadOnlyList<StockAvailability> availability, CancellationToken ct)
     {
         var db = (context as CommandExecutionStore.Session)?.Db
             ?? throw new InvalidOperationException("Подпитка требует складскую сессию команды.");
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Предложения Подпитки читаются в транзакции команды.");
 
-        return await ReadProposalStateCoreAsync(db, warehouseId, skuIds, ct);
+        // Command route ranking uses the full address set.
+        return await ReadProposalStateCoreAsync(db, warehouseId, availability, [],
+            includeEmptyLocations: true, ct);
     }
 
     public async Task<ReplenishmentProposalState> ReadProposalStateAsync(
-        Guid warehouseId, IReadOnlyCollection<Guid> skuIds, CancellationToken ct)
+        Guid warehouseId, IReadOnlyList<StockAvailability> availability,
+        IReadOnlyCollection<Guid> taskLocationIds, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await ReadProposalStateCoreAsync(db, warehouseId, skuIds, ct);
+        return await ReadProposalStateCoreAsync(db, warehouseId, availability, taskLocationIds,
+            includeEmptyLocations: false, ct);
     }
 
     public async Task<IReadOnlyList<ReplenishmentTask>> ReadAssemblyTasksAsync(
@@ -442,38 +447,53 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
     }
 
     private static async Task<ReplenishmentProposalState> ReadProposalStateCoreAsync(
-        ApplicationDbContext db, Guid warehouseId,
-        IReadOnlyCollection<Guid> skuIds, CancellationToken ct)
+        ApplicationDbContext db, Guid warehouseId, IReadOnlyList<StockAvailability> availability,
+        IReadOnlyCollection<Guid> taskLocationIds, bool includeEmptyLocations, CancellationToken ct)
     {
-        var locations = await db.StorageLocations.AsNoTracking()
-            .Include(x => x.Zone).Include(x => x.Warehouse)
-            .Include(x => x.ActiveLock)
-            .Where(x => x.WarehouseId == warehouseId && !x.IsFolder)
-            .ToArrayAsync(ct);
-        var ids = locations.Select(x => x.Id).ToArray();
-        var current = await db.InventoryBalances.AsNoTracking()
-            .Where(x => x.WarehouseId == warehouseId && x.Quantity > 0
-                && ids.Contains(x.StorageLocationId))
-            .Select(x => new { x.StorageLocationId, x.StockKeepingUnitId })
-            .Distinct().ToArrayAsync(ct);
-        var relevantSkus = skuIds.Distinct().ToArray();
-        var history = await db.InventoryTurnovers.AsNoTracking()
-            .Where(x => x.WarehouseId == warehouseId
-                && relevantSkus.Contains(x.StockKeepingUnitId)
-                && ids.Contains(x.StorageLocationId))
-            .Select(x => new { x.StorageLocationId, x.StockKeepingUnitId })
-            .Distinct().ToArrayAsync(ct);
-        var currentByLocation = current.ToLookup(x => x.StorageLocationId,
-            x => x.StockKeepingUnitId);
-        var historyByLocation = history.ToLookup(x => x.StorageLocationId,
-            x => x.StockKeepingUnitId);
-        var views = locations.Select(x => new ReplenishmentLocation(x.Id, x.Code,
-            x.Zone?.Type ?? ZoneType.Receiving,
-            !x.DeletionMark && x.Zone is { DeletionMark: false }
-                && x.Warehouse is { DeletionMark: false },
-            x.ActiveLock is not null, x.AllowsMultipleSkus,
-            currentByLocation[x.Id].ToHashSet(),
-            historyByLocation[x.Id].ToHashSet()) { Name = x.Name }).ToArray();
+        var stock = availability.Where(x => x.Group.WarehouseId == warehouseId).ToArray();
+        var stockLocationIds = stock.Select(x => x.Group.StorageLocationId).Distinct().ToArray();
+        var relevantSkusByLocation = stock.Where(x => x.AccountingQuantity > 0)
+            .ToLookup(x => x.Group.StorageLocationId, x => x.Group.StockKeepingUnitId);
+        var counts = new Dictionary<Guid, int>();
+        foreach (var batch in stockLocationIds.Chunk(500))
+        {
+            var rows = await db.InventoryBalances.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && x.Quantity > 0
+                    && batch.Contains(x.StorageLocationId))
+                .GroupBy(x => x.StorageLocationId)
+                .Select(group => new
+                {
+                    LocationId = group.Key,
+                    Count = group.Select(x => x.StockKeepingUnitId).Distinct().Count()
+                }).ToArrayAsync(ct);
+            foreach (var row in rows) counts.Add(row.LocationId, row.Count);
+        }
+
+        var warehouseLocations = db.StorageLocations.AsNoTracking()
+            .Where(x => x.WarehouseId == warehouseId && !x.IsFolder);
+        var locationIds = stockLocationIds.Concat(taskLocationIds).Distinct().ToArray();
+        IEnumerable<Guid[]> locationBatches = includeEmptyLocations
+            ? new[] { Array.Empty<Guid>() } : locationIds.Chunk(500);
+        var views = new List<ReplenishmentLocation>();
+        foreach (var batch in locationBatches)
+        {
+            var query = warehouseLocations;
+            if (!includeEmptyLocations) query = query.Where(x => batch.Contains(x.Id));
+            var locations = await query.Select(x => new
+            {
+                x.Id, x.Code, x.Name, x.AllowsMultipleSkus,
+                ZoneType = x.Zone == null ? ZoneType.Receiving : x.Zone.Type,
+                IsActive = !x.DeletionMark && x.Zone != null && !x.Zone.DeletionMark
+                    && x.Warehouse != null && !x.Warehouse.DeletionMark,
+                IsHeld = x.ActiveLock != null
+            }).ToArrayAsync(ct);
+            views.AddRange(locations.Select(x => new ReplenishmentLocation(x.Id, x.Code,
+                x.ZoneType, x.IsActive, x.IsHeld, x.AllowsMultipleSkus,
+                counts.GetValueOrDefault(x.Id),
+                x.ZoneType == ZoneType.Storage && x.IsActive && !x.IsHeld
+                    ? relevantSkusByLocation[x.Id].ToHashSet() : new HashSet<Guid>())
+                { Name = x.Name }));
+        }
         var tasks = await db.ReplenishmentTasks.AsNoTracking()
             .Where(x => x.WarehouseId == warehouseId
                 && (x.Status == ReplenishmentTaskStatus.Ordered

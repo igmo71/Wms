@@ -1,8 +1,11 @@
+using System.Diagnostics;
+using System.Globalization;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Serilog;
 using SerilogTracing;
 using Wms.Application;
+using Wms.Contracts.Mobile.V1;
 using Wms.Data;
 using Wms.Integration;
 using Wms.Integration.OneS.Endpoints;
@@ -84,6 +87,24 @@ public class Program
         }
 
         app.UseHttpsRedirection();
+
+        app.Use((context, next) =>
+        {
+            if (context.Request.Headers[MobileDiagnosticHeaders.RequestServerDuration] == "1"
+                && context.Request.Path.StartsWithSegments(MobileApiRoutes.Base))
+            {
+                var started = Stopwatch.GetTimestamp();
+                context.Response.OnStarting(() =>
+                {
+                    // Headers must be set before the first response bytes are sent.
+                    context.Response.Headers[MobileDiagnosticHeaders.ServerDurationMilliseconds] =
+                        Stopwatch.GetElapsedTime(started).TotalMilliseconds
+                            .ToString("0.000", CultureInfo.InvariantCulture);
+                    return Task.CompletedTask;
+                });
+            }
+            return next(context);
+        });
 
         app.UseAuthentication();
         app.UseAuthorization();
