@@ -240,15 +240,18 @@ public partial class PickingRoutePage : ContentPage
         try
         {
             _assembly = await execute();
-            await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
-                _process, PickingSection.Sku);
+            if (_assembly.Status == MobilePickingAssemblyStatus.Closed)
+                await Navigation.PopAsync();
+            else
+                await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                    _process, PickingSection.Sku);
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
         catch (HttpRequestException)
         {
             ErrorLabel.Text = _process.HasPendingCommand
                 ? "Ответ не подтверждён. Повторите ту же команду."
-                : "Сборка закрыта, но экран не обновился. Вернитесь к SKU.";
+                : "Сборка закрыта, но экран не обновился. Вернитесь к списку сборок.";
         }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }

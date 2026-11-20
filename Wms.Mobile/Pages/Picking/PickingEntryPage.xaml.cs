@@ -22,8 +22,7 @@ public partial class PickingEntryPage : ContentPage
     private string? _scannedLocationCode;
     private string? _initialScanCode;
     private PickingEntryOrigin _origin;
-    private bool _directPalletPick;
-    private bool _palletHeld;
+    private bool _recommendedPalletPick;
     private bool _returnLocationChecked;
     private bool _needsPalletReturn;
     private bool _visible;
@@ -52,10 +51,9 @@ public partial class PickingEntryPage : ContentPage
         _process = process;
         _skuId = skuId;
         _recommendedCode = recommendedCode;
-        _directPalletPick = directPalletPick;
+        _recommendedPalletPick = directPalletPick;
         _origin = origin;
         _initialScanCode = initialScanCode;
-        _palletHeld = false;
         _sku = null;
         _work = null;
         _returnEntry = null;
@@ -108,8 +106,12 @@ public partial class PickingEntryPage : ContentPage
             _assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
             _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
             if (_returnEntry is null)
+            {
                 _sku = await _client.SkuAsync(_assembly.Id,
                     _assembly.WarehouseId, _skuId);
+                if (_origin == PickingEntryOrigin.Sku)
+                    SetLocationChoices(_sku);
+            }
             Apply();
             ErrorLabel.Text = string.Empty;
         }
@@ -140,13 +142,20 @@ public partial class PickingEntryPage : ContentPage
             : sku.ConfirmedQuantity == sku.PlannedQuantity ? Color.FromArgb("#E4F5E7")
             : sku.ConfirmedQuantity > 0 ? Color.FromArgb("#FFF1CF") : Colors.White;
         var canInteract = !_busy && !_process.HasPendingCommand;
+        var choosingLocation = _origin == PickingEntryOrigin.Sku && _returnEntry is null;
+        RecommendationCard.IsVisible = !choosingLocation;
+        LocationChoices.IsVisible = choosingLocation && _source is null;
+        LocationChoices.IsEnabled = canInteract;
+        QuantityCaptionLabel.IsVisible = !choosingLocation || _source is not null;
+        QuantityEntry.IsVisible = QuantityCaptionLabel.IsVisible;
+        ConfirmButton.IsVisible = QuantityCaptionLabel.IsVisible;
         InfoButton.IsEnabled = canInteract;
         QuantityEntry.IsEnabled = canInteract && !_needsPalletReturn
             && (_returnEntry is not null || _source is not null);
         HoldPalletButton.IsEnabled = canInteract;
         ReturnPalletButton.IsEnabled = canInteract;
         ShortageHintLabel.IsVisible = _returnEntry is null && _source is not null;
-        QuantityCaptionLabel.Text = _returnEntry is null ? "Количество к отбору" : "Количество к возврату";
+        QuantityCaptionLabel.Text = _returnEntry is null ? "Количество" : "Количество к возврату";
         SourceAddressLabel.IsVisible = _returnEntry is null && _source is not null;
         SourceCaptionLabel.IsVisible = SourceAddressLabel.IsVisible;
         AvailableBlock.IsVisible = SourceAddressLabel.IsVisible;
@@ -186,13 +195,6 @@ public partial class PickingEntryPage : ContentPage
             RemainingCaptionLabel.Text = "Осталось";
             RemainingLabel.Text = sku is null ? "—"
                 : $"{Math.Max(0, sku.PlannedQuantity - sku.ConfirmedQuantity):0.###}";
-            if (_recommendedCode is null)
-                _recommendedCode = _sku?.Locations
-                    .Where(x => x.AvailableQuantity > 0)
-                    .OrderBy(x => x.ExpirationDate is null)
-                    .ThenBy(x => x.ExpirationDate)
-                    .ThenBy(x => x.LocationCode)
-                    .FirstOrDefault()?.LocationCode;
             var allPicked = _work?.Skus.All(x =>
                 x.ConfirmedQuantity >= x.PlannedQuantity) == true;
             var recommendedName = _sku?.Locations.FirstOrDefault(x =>
@@ -203,10 +205,13 @@ public partial class PickingEntryPage : ContentPage
                     : "Доступной ячейки нет. Ожидается Подпитка или решение руководителя."
                 : (string.IsNullOrWhiteSpace(recommendedName) ? _recommendedCode : recommendedName);
             RecommendationLabel.FontSize = _recommendedCode is null ? 13 : 22;
-            if (_directPalletPick && _recommendedCode is not null)
+            if (_recommendedPalletPick && _recommendedCode is not null)
                 RecommendationCaptionLabel.Text += " · снять весь поддон";
-            StockLabel.Text = _source is null ? "Сканируйте ячейку."
-                : $"Учёт {_source.AccountingQuantity:0.###}, резерв {_source.ReservedQuantity:0.###}, "
+            StockLabel.Text = _source is null
+                ? choosingLocation && _sku?.Locations.Any(IsLocationChoice) == true
+                    ? "Выберите или сканируйте ячейку."
+                    : "Сканируйте ячейку."
+                : $"Остаток {_source.AccountingQuantity:0.###}, резерв {_source.ReservedQuantity:0.###}, "
                     + $"спорное {_source.BlockedQuantity:0.###}";
             ExpiryLabel.Text = _source?.ExpirationDate is DateOnly expiry
                 ? $"Срок: {expiry:dd.MM.yyyy}"
@@ -214,14 +219,26 @@ public partial class PickingEntryPage : ContentPage
                     ? "Срок не указан: проверьте его визуально до подтверждения."
                     : _source is null ? string.Empty : "Срок не указан";
             ConfirmButton.Text = "Подтвердить Отбор";
-            ConfirmButton.IsEnabled = canInteract && _source is not null
-                && (!_directPalletPick || _palletHeld);
-            HoldPalletButton.IsVisible = _source is not null
-                && _directPalletPick && !_palletHeld;
-            ReturnPalletButton.IsVisible = _directPalletPick && _palletHeld
-                && _source is not null && _work?.Entries.Any(x =>
-                    x.StorageLocationId == _source.StorageLocationId) != true;
+            ConfirmButton.IsEnabled = canInteract && _source is { } source
+                && (!source.FromReserve || source.PalletHeld);
+            HoldPalletButton.IsVisible = _source is { FromReserve: true, PalletHeld: false };
+            ReturnPalletButton.IsVisible = _source is { FromReserve: true, PalletHeld: true } pallet
+                && _work?.Entries.Any(x => x.StorageLocationId == pallet.StorageLocationId) != true;
         }
+    }
+
+    private void SetLocationChoices(MobilePickingSkuResponse sku) =>
+        BindableLayout.SetItemsSource(LocationChoices, sku.Locations
+            .Where(IsLocationChoice)
+            .Select(x => new PickingLocationChoice(x, sku.RemainingQuantity)).ToArray());
+
+    private static bool IsLocationChoice(MobilePickingAvailabilityResponse location) =>
+        !location.FromReserve || location.CanPickNow;
+
+    private async void OnLocationTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is PickingLocationChoice choice)
+            await CheckLocationAsync(choice.Location.LocationCode, choice.Location);
     }
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
@@ -234,7 +251,7 @@ public partial class PickingEntryPage : ContentPage
         });
     }
 
-    private async Task CheckLocationAsync(string? code)
+    private async Task CheckLocationAsync(string? code, MobilePickingAvailabilityResponse? choice = null)
     {
         if (!_visible || _busy || _process.HasPendingCommand || _assembly is null
             || string.IsNullOrWhiteSpace(code)) return;
@@ -254,9 +271,8 @@ public partial class PickingEntryPage : ContentPage
         try
         {
             _source = await _client.ScanSourceAsync(_assembly.Id,
-                new(_assembly.WarehouseId, _skuId, code.Trim()));
-            _palletHeld = _sku?.Locations.Any(x =>
-                x.StorageLocationId == _source.StorageLocationId && x.Held) == true;
+                new(_assembly.WarehouseId, _skuId, _scannedLocationCode,
+                    ExpirationDate: choice?.ExpirationDate, DateGroupSelected: choice is not null));
             QuantityEntry.Text = _source.SuggestedQuantity
                 .ToString("0.###", CultureInfo.CurrentCulture);
             Apply();
@@ -297,7 +313,7 @@ public partial class PickingEntryPage : ContentPage
                 ErrorLabel.Text = "Количество превышает предложенное для этой ячейки.";
                 return;
             }
-            if (_directPalletPick && !_palletHeld)
+            if (source.FromReserve && !source.PalletHeld)
             {
                 ErrorLabel.Text = "Сначала снимите весь поддон и подтвердите удержание.";
                 return;
@@ -408,39 +424,44 @@ public partial class PickingEntryPage : ContentPage
         }
         if (action == PendingAction.Hold)
         {
+            var source = _source;
+            _source = null;
+            QuantityEntry.Text = string.Empty;
             _work = await _client.WorkAsync(_assembly.Id, _assembly.WarehouseId);
-            _palletHeld = true;
             _sku = await _client.SkuAsync(_assembly.Id, _assembly.WarehouseId, _skuId);
-            await CheckLocationAfterHoldAsync();
+            if (_origin == PickingEntryOrigin.Sku)
+                SetLocationChoices(_sku);
+            if (source is not null)
+            {
+                _source = await _client.ScanSourceAsync(_assembly.Id,
+                    new(_assembly.WarehouseId, _skuId, source.LocationCode,
+                        ExpirationDate: source.ExpirationDate, DateGroupSelected: true));
+                QuantityEntry.Text = _source.SuggestedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
+            }
         }
         else if (action is PendingAction.Pick or PendingAction.Shortage)
         {
             var route = await _client.RouteAsync(_assembly.Id, _assembly.WarehouseId);
             _work = route.Work;
             _source = null;
-            _palletHeld = false;
             _scannedLocationCode = null;
             QuantityEntry.Text = string.Empty;
             if (route.Steps.FirstOrDefault() is { } next)
             {
                 _skuId = next.SkuId;
                 _recommendedCode = next.LocationCode;
-                _directPalletPick = next.DirectPalletPick;
+                _recommendedPalletPick = next.DirectPalletPick;
                 _sku = await _client.SkuAsync(_assembly.Id, _assembly.WarehouseId, _skuId);
             }
             else
             {
-                _recommendedCode = null;
-                _sku = null;
-                if (route.Gaps.FirstOrDefault() is { } gap)
-                {
-                    _skuId = gap.SkuId;
-                    _sku = await _client.SkuAsync(_assembly.Id,
-                        _assembly.WarehouseId, _skuId);
-                    ErrorLabel.Text = "Оставшийся товар недоступен. Ожидается Подпитка или решение руководителя.";
-                }
-                else
-                    ErrorLabel.Text = "Доступные шаги закончились. Проверьте закрытие сборки.";
+                var previous = Navigation.NavigationStack.Count >= 2
+                    ? Navigation.NavigationStack[^2] as PickingRoutePage : null;
+                await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                    _process, PickingSection.Sku);
+                if (previous is not null)
+                    Navigation.RemovePage(previous);
+                return;
             }
             Apply();
         }
@@ -468,14 +489,6 @@ public partial class PickingEntryPage : ContentPage
             && Navigation.NavigationStack[^2] is PickingSkuPage skuPage)
             skuPage.UseFreshAssemblyOnReturn(_assembly);
         await Navigation.PopAsync();
-    }
-
-    private async Task CheckLocationAfterHoldAsync()
-    {
-        if (_assembly is null || string.IsNullOrWhiteSpace(_scannedLocationCode)) return;
-        _source = await _client.ScanSourceAsync(_assembly.Id,
-            new(_assembly.WarehouseId, _skuId, _scannedLocationCode));
-        Apply();
     }
 
     private async void OnRetryClicked(object? sender, EventArgs e)
@@ -515,3 +528,16 @@ public partial class PickingEntryPage : ContentPage
 }
 
 public enum PickingEntryOrigin { Sku, Route }
+
+public sealed record PickingLocationChoice(MobilePickingAvailabilityResponse Location,
+    decimal RemainingQuantity)
+{
+    public string Address => string.IsNullOrWhiteSpace(Location.LocationName)
+        ? Location.LocationCode : Location.LocationName;
+    public string Expiry => Location.ExpirationDate is DateOnly date
+        ? date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) : "Срок не указан";
+    public string Stock => $"Остаток {Location.AccountingQuantity:0.###}";
+    public string Available => $"Доступно {Location.AvailableQuantity:0.###}";
+    public Color AvailableColor => Location.CanPickNow && Location.AvailableQuantity < RemainingQuantity
+        ? Colors.DarkRed : Color.FromArgb("#202124");
+}

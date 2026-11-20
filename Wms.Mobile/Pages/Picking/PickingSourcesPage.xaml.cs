@@ -118,12 +118,21 @@ public partial class PickingSourcesPage : ContentPage
                 _ => "Сборка отменяется или отменена"
             };
         OwnerLabel.Text = assembly?.ResponsibleDisplayName ?? string.Empty;
+        var closed = assembly?.Status == MobilePickingAssemblyStatus.Closed;
         SourceRows = assembly?.Sources.Select(x => new PickingSourceRow(
             x.SourceRefKey, x.Number ?? x.SourceRefKey.ToString(),
-            x.StartConfirmedAtUtc is not null ? "КОтбору подтверждено"
-                : x.LastStartAttemptAtUtc is not null ? "Переход не подтверждён"
-                : x.Status,
-            x.LastStartError ?? x.LastCheckError,
+            closed
+                ? x.ExchangeStage switch
+                {
+                    MobileShippingExchangeStage.PostConfirmed => "Обмен подтверждён",
+                    MobileShippingExchangeStage.PatchConfirmed => "Ожидается проведение в 1С",
+                    MobileShippingExchangeStage.NeedsReview => "Требуется решение руководителя",
+                    _ => "Ожидается запись в 1С"
+                }
+                : x.StartConfirmedAtUtc is not null ? "КОтбору подтверждено"
+                    : x.LastStartAttemptAtUtc is not null ? "Переход не подтверждён"
+                    : x.Status,
+            closed ? x.ExchangeError : x.LastStartError ?? x.LastCheckError,
             assembly.Status == MobilePickingAssemblyStatus.Draft && IsOwner)).ToArray() ?? [];
         OnPropertyChanged(nameof(SourceRows));
         EmptyLabel.IsVisible = SourceRows.Count == 0;

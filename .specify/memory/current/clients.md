@@ -135,6 +135,8 @@ started replenishment and 1C status restoration.
 ## Mobile picking API
 
 The Mobile home «Отбор и Отгрузка» button opens the replacement assembly queue.
+Its cards show the assembly number and status on one line and list the linked
+1C shipping document numbers below, with exchange warnings when applicable.
 The Web «Отгрузка» navigation opens its source documents and WMS orders for
 Operator and Manager.
 
@@ -193,7 +195,11 @@ closure check and operator-only warehouse close. Every mutating request carries
 a client request ID and the expected assembly revision. A closed assembly
 accepts a replay of its original close request without posting stock again;
 the same close action with a new request ID retries unconfirmed 1C documents.
-The response and refreshed card show the result for each document. Closed
+After the initial WMS close is confirmed from SKU or Route, Mobile returns to
+the assembly queue, including when 1C exchange is still pending.
+The close response includes the result for each document. On the Mobile 1C
+page, each closed assembly's document card shows its exchange stage and any
+exchange error. Closed
 assemblies awaiting exchange remain in every Operator's work list for their
 selected warehouse until all documents are confirmed. The replacement TSD screens
 show plan, currently pickable quantity and confirmed fact per SKU with white,
@@ -237,9 +243,11 @@ on that card uses blue for an available order action, yellow for ordered,
 orange for in progress, and green only when currently pickable quantity covers
 the whole remaining SKU plan and this SKU has a non-cancelled replenishment
 task. The icon is absent when the SKU was already fully pickable without
-replenishment. Where shown, it sits beside the information action. New
-proposals during an existing
-replenishment allow another order. A gray icon with a crossed arrow means no further
+replenishment. Where shown, it sits beside the information action. When the
+remaining plan is not yet covered, in-progress tasks take precedence over
+ordered tasks, and both retain their status color when another proposal exists.
+Tapping that status opens a dialog with «Заказать ещё» when applicable.
+A gray icon with a crossed arrow means no further
 replenishment is currently available; tapping it shows a short explanation.
 The icon is hidden when the SKU plan is already confirmed. The picking worker
 does not see a separate replenishment section or individual task details.
@@ -247,22 +255,33 @@ Unavailable demand may require a Manager decision, and a wrong-cell message
 identifies stocked SKU by name rather than a GUID. Visible cell addresses use
 `StorageLocation.Name`, falling back to `Code`; scanning and validation continue
 to use `Code`. Addresses are larger on picking and replenishment work screens,
-including the shared stock-by-cell view. The route is a recommendation;
-the worker may open an SKU directly, scan a different allowed cell, and confirm
-the offered quantity explicitly. The fact and return pages show a compact SKU
+including the shared stock-by-cell view. From SKU, the fact screen lists
+positive accounting balances in active «Комплектация» cells and the
+currently pickable expiration groups of eligible whole pallets in «Хранение».
+Each row shows «Остаток» and «Доступно» for one cell and expiration group. It sorts by
+expiration ascending with unknown dates last, then by available quantity
+descending and warehouse address descending. The info button opens the full
+stock-by-cell report. «Доступно» is red when the row can be
+picked now and its available quantity is below the remaining SKU demand.
+Tapping a row checks its specific expiration group through the same source
+inspection used by cell scans. The operator confirms the offered quantity
+explicitly. The fact and return pages show a compact SKU
 card with plan, confirmed fact and remaining or return quantity, with the unit
 beside the plan. The recommended or original cell has a separate large address;
 after a pick scan, the actual cell address appears above its stock and expiry.
 The fact and return pages show plan, fact and remaining or return quantity in
 three compact rows beside the SKU, with small captions and ordinary sized SKU
 and quantity values. Cell addresses remain 22 point. The assembly number is shown in smaller
-type beside the page title, truncated visually if needed. Cell input is scan-only
-(device scanner or camera); there is no manual address field or check button.
+type beside the page title, truncated visually if needed. From the route and
+for returns, cell input uses the device scanner or camera. From SKU, both
+scanner sources are available alongside list selection.
 An animated MAUI ActivityIndicator shows loading and command execution.
 Confirmation and pallet actions stay below the scrolling content. The shortage
 hint appears only for a scanned pick, not a return. Inputs and actions are
 disabled while a command is running or awaiting an explicit retry.
 Opened from the route, the fact card refreshes the next route step in place.
+When no route steps remain after a pick or shortage confirmation, the app
+returns to the SKU list, where all outstanding quantities are visible.
 Opened from SKU, it returns to that SKU list after each successful pick or
 shortage confirmation, even if the SKU is not complete. An uncertain response
 keeps the page open; a successful explicit retry follows the same navigation.

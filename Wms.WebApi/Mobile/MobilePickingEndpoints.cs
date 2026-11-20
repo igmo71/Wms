@@ -258,12 +258,20 @@ internal static class MobilePickingEndpoints
         var sku = result.Value!;
         return TypedResults.Ok(new MobilePickingSkuResponse(sku.StockKeepingUnitId,
             sku.PlannedQuantity, sku.ConfirmedQuantity, sku.RemainingQuantity,
-            sku.Availability.Select(x => new MobilePickingAvailabilityResponse(
-                x.Group.StorageLocationId, x.LocationCode,
-                x.Group.ExpirationDate, x.AccountingQuantity,
-                x.AvailableForNewPick(assemblyId), x.ReservedQuantity,
-                x.BlockedQuantity, x.Hold is not null)
-            { LocationName = x.LocationName }).ToArray()));
+            sku.Locations.Select(row =>
+            {
+                var x = row.Stock;
+                return new MobilePickingAvailabilityResponse(
+                    x.Group.StorageLocationId, x.LocationCode,
+                    x.Group.ExpirationDate, x.AccountingQuantity,
+                    x.AvailableForNewPick(assemblyId), x.ReservedQuantity,
+                    x.BlockedQuantity, x.Hold is not null)
+                {
+                    LocationName = x.LocationName,
+                    CanPickNow = row.CanPickNow,
+                    FromReserve = row.FromReserve
+                };
+            }).ToArray()));
     }
 
     private static async Task<IResult> GetWorkAsync(
@@ -345,7 +353,11 @@ internal static class MobilePickingEndpoints
             source.AccountingQuantity, source.AvailableQuantity,
             source.SuggestedQuantity, source.ReservedQuantity,
             source.BlockedQuantity, source.RequiresVisualExpiryCheck)
-        { LocationName = source.LocationName });
+        {
+            LocationName = source.LocationName,
+            FromReserve = source.FromReserve,
+            PalletHeld = source.PalletHeld
+        });
     }
 
     private static async Task<IResult> HoldPalletAsync(

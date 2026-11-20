@@ -57,24 +57,13 @@ public sealed class HoldPickingPallet(CommandExecutor executor, IPickingAssembly
                 var cell = available.Where(x => x.Group.StorageLocationId == location.Id
                     && x.AccountingQuantity > 0).ToArray();
                 var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-                if (cell.Length == 0 || cell.Any(x =>
-                    x.Group.ExpirationDate < today
-                    || x.AccountingQuantity != x.AvailableForNewPick(assembly.Id)))
-                    return OperationError.Conflict("Поддон нельзя полностью отобрать: срок, резерв или блокировка.");
                 var remaining = assembly.PlanLines.Where(x =>
                         x.StockKeepingUnitId == request.StockKeepingUnitId).Sum(x => x.Quantity)
                     - state.Entries.Where(x => x.StockKeepingUnitId == request.StockKeepingUnitId)
                         .Sum(x => x.Quantity);
-                if (cell.Sum(x => x.AccountingQuantity) > remaining)
-                    return OperationError.Conflict("Остаток поддона превышает потребность сборки.");
-                var latest = cell.OrderBy(x => x.Group.ExpirationDate is null)
-                    .ThenBy(x => x.Group.ExpirationDate).Last().Group.ExpirationDate;
-                if (available.Any(x => x.Group.StorageLocationId != location.Id
-                    && x.AvailableForNewPick(assembly.Id) > 0
-                    && (x.Group.ExpirationDate is null || x.Group.ExpirationDate >= today)
-                    && (x.Group.ExpirationDate is not null
-                        && (latest is null || x.Group.ExpirationDate < latest))))
-                    return OperationError.Conflict("Прямой палетный Отбор нарушит очередность сроков.");
+                var palletError = CheckWholePallet(cell, available, location.Id,
+                    assembly.Id, remaining, today);
+                if (palletError is not null) return palletError;
                 var hold = StorageLocationLock.CreateForPicking(location.Id,
                     assembly.Id, clock.GetUtcNow(), request.UserId);
                 if (!hold.IsSuccess) return hold.Error!;
@@ -91,5 +80,24 @@ public sealed class HoldPickingPallet(CommandExecutor executor, IPickingAssembly
                 if (!audit.IsSuccess) return audit.Error!;
                 return new CommandExecutionResult(location.Id, [audit.Value!]);
             }, ct);
+    }
+
+    internal static OperationError? CheckWholePallet(IReadOnlyList<StockAvailability> cell,
+        IReadOnlyList<StockAvailability> availability, Guid locationId, Guid assemblyId,
+        decimal remaining, DateOnly today)
+    {
+        if (cell.Count == 0 || cell.Any(x => x.Group.ExpirationDate < today
+            || x.AccountingQuantity != x.AvailableForNewPick(assemblyId)))
+            return OperationError.Conflict("Поддон нельзя полностью отобрать: срок, резерв или блокировка.");
+        if (cell.Sum(x => x.AccountingQuantity) > remaining)
+            return OperationError.Conflict("Остаток поддона превышает потребность сборки.");
+        var latest = cell.OrderBy(x => x.Group.ExpirationDate is null)
+            .ThenBy(x => x.Group.ExpirationDate).Last().Group.ExpirationDate;
+        if (availability.Any(x => x.Group.StorageLocationId != locationId
+            && x.AvailableForNewPick(assemblyId) > 0
+            && x.Group.ExpirationDate is DateOnly date && date >= today
+            && (latest is null || date < latest)))
+            return OperationError.Conflict("Прямой палетный Отбор нарушит очередность сроков.");
+        return null;
     }
 }

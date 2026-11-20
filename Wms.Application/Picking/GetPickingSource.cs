@@ -12,6 +12,8 @@ public sealed record PickingSourceView(Guid PickingAssemblyId, Guid StorageLocat
     decimal ReservedQuantity, decimal BlockedQuantity, bool RequiresVisualExpiryCheck)
 {
     public string? LocationName { get; init; }
+    public bool FromReserve { get; init; }
+    public bool PalletHeld { get; init; }
 }
 
 public sealed class GetPickingSource(
@@ -37,9 +39,18 @@ public sealed class GetPickingSource(
             || assembly.ResponsibleUserId != userId.Trim())
             return OperationError.Conflict("Для Отбора примите начатую сборку на себя.");
         var availability = await stock.ReadSkuAsync(assembly.WarehouseId, skuId, ct);
-        return PickingSourceRules.Check(state, skuId, normalized.Value!, scannedSkuId,
-            selectedExpirationDate, dateGroupSelected, availability,
-            DateOnly.FromDateTime(clock.GetLocalNow().DateTime));
+        var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+        var result = PickingSourceRules.Check(state, skuId, normalized.Value!, scannedSkuId,
+            selectedExpirationDate, dateGroupSelected, availability, today);
+        if (!result.IsSuccess || result.Value is not { FromReserve: true, PalletHeld: false } pallet)
+            return result;
+        var cell = availability.Where(x => x.Group.StorageLocationId == pallet.StorageLocationId
+            && x.AccountingQuantity > 0).ToArray();
+        var remaining = assembly.PlanLines.Where(x => x.StockKeepingUnitId == skuId).Sum(x => x.Quantity)
+            - state.Entries.Where(x => x.StockKeepingUnitId == skuId).Sum(x => x.Quantity);
+        var error = HoldPickingPallet.CheckWholePallet(cell, availability,
+            pallet.StorageLocationId, assembly.Id, remaining, today);
+        return error is null ? result : error;
     }
 }
 
@@ -82,12 +93,14 @@ internal static class PickingSourceRules
         if (dateGroupSelected && selectedExpirationDate is DateOnly requestedDate
             && requestedDate < today)
             return OperationError.Conflict("Срок годности выбранной группы истёк.");
-        if (location.Zone.Type == ZoneType.Reserve)
+        var fromReserve = location.Zone.Type == ZoneType.Reserve;
+        var ownedHold = fromReserve
+            && location.ActiveLock is { OwnerType: StorageLocationLockOwnerType.PickingAssembly }
+            && location.ActiveLock.OwnerId == assembly.Id;
+        if (fromReserve)
         {
             if (state.CellSkus.Count != 1)
                 return OperationError.Conflict("Прямой Отбор из Хранения требует один SKU на поддоне.");
-            var ownedHold = location.ActiveLock is { OwnerType: StorageLocationLockOwnerType.PickingAssembly }
-                && location.ActiveLock.OwnerId == assembly.Id;
             if (!ownedHold && availability.Where(x => x.Group.StorageLocationId == location.Id)
                     .Sum(x => x.AccountingQuantity) > remaining)
                 return OperationError.Conflict("Вся ячейка Хранения превышает потребность; нужна Подпитка.");
@@ -112,6 +125,6 @@ internal static class PickingSourceRules
             Math.Min(remaining, free), group.ReservedQuantity,
             group.BlockedQuantity, group.Group.ExpirationDate is null
                 && state.CellSkus.Single(x => x.Id == skuId).TracksExpirationDate)
-        { LocationName = location.Name };
+        { LocationName = location.Name, FromReserve = fromReserve, PalletHeld = ownedHold };
     }
 }

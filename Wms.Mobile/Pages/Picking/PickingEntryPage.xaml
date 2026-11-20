@@ -47,13 +47,35 @@
                                 SemanticProperties.Description="Остатки SKU по ячейкам" />
                     </Grid>
                 </Border>
-                <Border Padding="9" Stroke="#D4D4D4">
+                <Border x:Name="RecommendationCard" Padding="9" Stroke="#D4D4D4">
                     <VerticalStackLayout Spacing="3">
                         <Label x:Name="RecommendationCaptionLabel" FontSize="12" />
                         <Label x:Name="RecommendationLabel" FontSize="22" FontAttributes="Bold" />
                     </VerticalStackLayout>
                 </Border>
                 <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+                <VerticalStackLayout x:Name="LocationChoices" Spacing="5" IsVisible="False">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="local:PickingLocationChoice">
+                            <Border Padding="9" Stroke="#D4D4D4">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer CommandParameter="{Binding .}"
+                                                          Tapped="OnLocationTapped" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                                      ColumnSpacing="8" RowSpacing="2">
+                                    <Label Text="{Binding Address}" FontAttributes="Bold" />
+                                    <Label Grid.Row="1" Text="{Binding Expiry}" FontSize="12" />
+                                    <Label Grid.Column="1" Text="{Binding Stock}" FontSize="12"
+                                           HorizontalTextAlignment="End" />
+                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Available}"
+                                           TextColor="{Binding AvailableColor}" FontSize="12"
+                                           HorizontalTextAlignment="End" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
                 <Label x:Name="SourceCaptionLabel" Text="Считанная ячейка" FontSize="12" IsVisible="False" />
                 <Label x:Name="SourceAddressLabel" FontSize="22" FontAttributes="Bold" IsVisible="False" />
                 <HorizontalStackLayout x:Name="AvailableBlock" Spacing="8" IsVisible="False">
@@ -62,7 +84,7 @@
                 </HorizontalStackLayout>
                 <Label x:Name="StockLabel" FontSize="12" />
                 <Label x:Name="ExpiryLabel" FontSize="13" />
-                <Label x:Name="QuantityCaptionLabel" Text="Количество к отбору" FontSize="12" />
+                <Label x:Name="QuantityCaptionLabel" Text="Количество" FontSize="12" />
                 <Entry x:Name="QuantityEntry" Keyboard="Numeric" FontSize="22"
                        Placeholder="Количество" />
                 <Label x:Name="ShortageHintLabel" Text="Если найдено меньше предложенного, укажите весь фактический остаток этого SKU и срока в ячейке, включая ноль."

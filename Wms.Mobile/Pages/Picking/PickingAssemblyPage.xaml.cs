@@ -94,8 +94,10 @@ public partial class PickingAssemblyPage : ContentPage
         {
             var items = await _client.ListAsync(warehouse.Id);
             AssemblyRows = items.Select(x => new PickingAssemblyQueueRow(
-                x.Id, x.Number,
-                $"{StatusText(x.Status)} · РО 1С: {x.Sources.Count} · {x.ResponsibleDisplayName}",
+                x.Id, $"{x.Number} · {StatusText(x.Status)}",
+                x.Sources.Count == 0 ? null : string.Join(", ",
+                    x.Sources.Select(source => string.IsNullOrWhiteSpace(source.Number)
+                        ? "без номера" : source.Number)),
                 x.HasWarning ? "Требуется внимание к документам 1С" : null)).ToArray();
             OnPropertyChanged(nameof(AssemblyRows));
             ErrorLabel.Text = string.Empty;
@@ -248,7 +250,8 @@ public partial class PickingAssemblyPage : ContentPage
 }
 
 public sealed record PickingAssemblyQueueRow(
-    Guid Id, string Number, string DetailText, string? WarningText)
+    Guid Id, string Number, string? DetailText, string? WarningText)
 {
+    public bool HasDocuments => DetailText is not null;
     public bool HasWarning => WarningText is not null;
 }

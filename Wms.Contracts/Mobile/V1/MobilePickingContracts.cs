@@ -130,6 +130,8 @@ public sealed record MobilePickingAvailabilityResponse(
     decimal ReservedQuantity, decimal BlockedQuantity, bool Held)
 {
     public string? LocationName { get; init; }
+    public bool CanPickNow { get; init; }
+    public bool FromReserve { get; init; }
 }
 
 public sealed record MobilePickingSkuResponse(
@@ -150,6 +152,8 @@ public sealed record MobilePickingScannedSourceResponse(
     bool RequiresVisualExpiryCheck)
 {
     public string? LocationName { get; init; }
+    public bool FromReserve { get; init; }
+    public bool PalletHeld { get; init; }
 }
 
 public sealed record MobilePickingHoldPalletRequest(
