@@ -99,7 +99,7 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                 }
                 var shortage = StockShortage.Report(Guid.NewGuid(), assembly.WarehouseId,
                     source.StorageLocationId, request.StockKeepingUnitId,
-                    request.ExpirationDate, StockShortageOrigin.Picking, assembly.Id,
+                    request.ExpirationDate, assembly.Id,
                     request.ExpectedQuantity, request.FoundQuantity, request.Comment,
                     request.UserId, now);
                 if (!shortage.IsSuccess) return shortage.Error!;

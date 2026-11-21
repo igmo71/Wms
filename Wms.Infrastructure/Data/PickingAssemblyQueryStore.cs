@@ -263,7 +263,7 @@ public sealed class PickingAssemblyQueryStore(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var shortages = await db.StockShortages.AsNoTracking()
-            .Where(x => x.Origin == StockShortageOrigin.Picking && x.OriginId == assemblyId)
+            .Where(x => x.PickingAssemblyId == assemblyId)
             .OrderByDescending(x => x.ReportedAtUtc).ToArrayAsync(ct);
         if (shortages.Length == 0) return [];
         var locationIds = shortages.Select(x => x.StorageLocationId).Distinct().ToArray();

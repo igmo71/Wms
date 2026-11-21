@@ -9,7 +9,7 @@ namespace Wms.Application.Replenishment;
 
 public sealed record CompleteReplenishmentSourceRequest(
     Guid RequestId, Guid ReplenishmentTaskId, Guid SourceCycleId,
-    string ScannedSourceLocationCode, bool SourceWasEmpty, string UserId);
+    string ScannedSourceLocationCode, string UserId);
 
 public sealed class CompleteReplenishmentSource(
     CommandExecutor executor, IReplenishmentStore replenishments,
@@ -30,8 +30,7 @@ public sealed class CompleteReplenishmentSource(
             return Task.FromResult<OperationResult<Guid>>(normalized.Error!);
         var code = normalized.Value!;
         var hash = CommandExecutor.ComputeHash(
-            $"{request.ReplenishmentTaskId:N}:{request.SourceCycleId:N}:"
-            + $"{code}:{request.SourceWasEmpty}");
+            $"{request.ReplenishmentTaskId:N}:{request.SourceCycleId:N}:{code}");
         return executor.ExecuteAsync(CommandType, request.RequestId, hash,
             request.UserId, async (session, token) =>
             {
@@ -56,14 +55,8 @@ public sealed class CompleteReplenishmentSource(
                     || source.ActiveLock.OwnerId != task.Id)
                     return OperationError.Conflict(
                         "Отсканируйте исходную ячейку, удерживаемую этим заданием.");
-                if (request.SourceWasEmpty && await replenishments.HasUnblockedStockAsync(
-                        session, task.WarehouseId, source.Id, token))
-                    return OperationError.Conflict(
-                        "В исходной ячейке остался товар. Подтвердите возврат поддона.");
-
                 var now = clock.GetUtcNow();
-                var completed = task.CompleteSource(cycle.Id, source.Id,
-                    request.SourceWasEmpty, request.UserId, now);
+                var completed = task.CompleteSource(cycle.Id, source.Id, request.UserId, now);
                 if (!completed.IsSuccess) return completed.Error!;
                 var released = await replenishments.ReleaseSourceHoldAsync(session,
                     task.WarehouseId, source.Id, task.Id, token);
@@ -88,8 +81,7 @@ public sealed class CompleteReplenishmentSource(
                     null, null, null, task.StockKeepingUnitId, null, null,
                     JsonSerializer.Serialize(new { TaskId = task.Id,
                         CycleId = cycle.Id, SourceLocationId = source.Id,
-                        request.SourceWasEmpty, task.TransferredQuantity,
-                        task.RemainingQuantity, task.Status,
+                        task.TransferredQuantity, task.RemainingQuantity, task.Status,
                         AssemblyCancellationCompleted = assembly?.Status
                             == PickingAssemblyStatus.Cancelled }),
                     commandUserId: request.UserId, commandType: CommandType,

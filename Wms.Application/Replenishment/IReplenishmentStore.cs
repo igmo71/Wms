@@ -50,17 +50,13 @@ public sealed record ReplenishmentTaskTransferView(
 public sealed record ReplenishmentTaskCycleView(
     Guid Id, Guid SourceLocationId, string SourceCode,
     DateTimeOffset StartedAtUtc, DateTimeOffset? CompletedAtUtc,
-    bool? SourceWasEmpty, IReadOnlyList<ReplenishmentTaskTransferView> Transfers)
+    IReadOnlyList<ReplenishmentTaskTransferView> Transfers)
 {
     public string? SourceName { get; init; }
 }
 
 public sealed record ReplenishmentSourceStockView(
-    Guid SkuId, string? SkuName, DateOnly? ExpirationDate,
-    decimal AccountingQuantity, decimal BlockedQuantity)
-{
-    public decimal AvailableQuantity => Math.Max(0, AccountingQuantity - BlockedQuantity);
-}
+    Guid SkuId, string? SkuName, DateOnly? ExpirationDate, decimal AvailableQuantity);
 
 public sealed record ReplenishmentTaskDetail(
     Guid Id, Guid PickingAssemblyId, Guid WarehouseId,
@@ -102,9 +98,6 @@ public interface IReplenishmentStore
 
     Task<ReplenishmentActiveSourceState> LoadActiveSourceAsync(
         ICommandExecutionContext session, Guid taskId, CancellationToken ct);
-
-    Task<bool> HasUnblockedStockAsync(ICommandExecutionContext session,
-        Guid warehouseId, Guid locationId, CancellationToken ct);
 
     Task<OperationResult> ReleaseSourceHoldAsync(ICommandExecutionContext session,
         Guid warehouseId, Guid locationId, Guid taskId, CancellationToken ct);

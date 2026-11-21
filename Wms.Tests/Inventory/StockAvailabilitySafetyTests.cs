@@ -33,7 +33,7 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
                 skuId, 5, DateTimeOffset.UtcNow, date)));
             db.Add(Reservation(warehouseId, locationId, skuId, assemblyId, Guid.NewGuid(), 7));
             db.Add(Value(StockShortage.Report(Guid.NewGuid(), warehouseId, locationId, skuId,
-                date, StockShortageOrigin.Picking, Guid.NewGuid(), 5, 3, null,
+                date, assemblyId, 5, 3, null,
                 UserId, DateTimeOffset.UtcNow)));
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, locationId,
                 otherSku.Id, 20, DateTimeOffset.UtcNow)));
@@ -43,7 +43,7 @@ public sealed class StockAvailabilitySafetyTests(SqlDatabase database)
             db.Add(Value(PickingReservation.Create(Guid.NewGuid(), assemblyId, warehouseId,
                 locationId, otherSku.Id, reservationOnlyDate, 1, UserId, DateTimeOffset.UtcNow)));
             db.Add(Value(StockShortage.Report(Guid.NewGuid(), warehouseId, locationId, otherSku.Id,
-                date, StockShortageOrigin.Picking, Guid.NewGuid(), 9, 6, null,
+                date, assemblyId, 9, 6, null,
                 UserId, DateTimeOffset.UtcNow)));
             await db.SaveChangesAsync();
         }

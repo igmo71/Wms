@@ -1,5 +1,4 @@
 using Wms.Common;
-using Wms.Domain.Enums;
 
 namespace Wms.Domain;
 
@@ -13,8 +12,7 @@ public sealed class StockShortage
     public Guid StorageLocationId { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public DateOnly? ExpirationDate { get; private set; }
-    public StockShortageOrigin Origin { get; private set; }
-    public Guid OriginId { get; private set; }
+    public Guid PickingAssemblyId { get; private set; }
     public decimal ExpectedQuantity { get; private set; }
     public decimal FoundQuantity { get; private set; }
     public decimal BlockedQuantity => ResolvedAtUtc is null ? ExpectedQuantity - FoundQuantity : 0;
@@ -29,14 +27,13 @@ public sealed class StockShortage
 
     public static OperationResult<StockShortage> Report(
         Guid id, Guid warehouseId, Guid storageLocationId, Guid stockKeepingUnitId,
-        DateOnly? expirationDate, StockShortageOrigin origin, Guid originId,
+        DateOnly? expirationDate, Guid pickingAssemblyId,
         decimal expectedQuantity, decimal foundQuantity, string? comment,
         string userId, DateTimeOffset reportedAtUtc)
     {
         if (id == Guid.Empty || warehouseId == Guid.Empty || storageLocationId == Guid.Empty
-            || stockKeepingUnitId == Guid.Empty || originId == Guid.Empty
-            || !Enum.IsDefined(origin))
-            return OperationError.Invalid("Источник и группа недостачи должны быть определены.");
+            || stockKeepingUnitId == Guid.Empty || pickingAssemblyId == Guid.Empty)
+            return OperationError.Invalid("Укажите сборку отбора и группу недостачи.");
         if (!WarehouseQuantity.IsPositive(expectedQuantity)
             || !WarehouseQuantity.IsNonNegative(foundQuantity) || foundQuantity >= expectedQuantity)
             return OperationError.Invalid("Найденное количество должно быть меньше ожидаемого с точностью до 0,001.");
@@ -52,8 +49,7 @@ public sealed class StockShortage
             StorageLocationId = storageLocationId,
             StockKeepingUnitId = stockKeepingUnitId,
             ExpirationDate = expirationDate,
-            Origin = origin,
-            OriginId = originId,
+            PickingAssemblyId = pickingAssemblyId,
             ExpectedQuantity = expectedQuantity,
             FoundQuantity = foundQuantity,
             Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim(),

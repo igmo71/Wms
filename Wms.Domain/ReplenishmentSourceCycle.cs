@@ -13,7 +13,6 @@ public sealed class ReplenishmentSourceCycle
     public string StartedBy { get; private set; } = null!;
     public DateTimeOffset StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
-    public bool? SourceWasEmpty { get; private set; }
     public IReadOnlyCollection<ReplenishmentTransfer> Transfers => _transfers;
 
     internal static OperationResult<ReplenishmentSourceCycle> Create(
@@ -49,8 +48,7 @@ public sealed class ReplenishmentSourceCycle
         return OperationResult.Success();
     }
 
-    internal OperationResult Complete(
-        Guid scannedSourceId, bool sourceWasEmpty, DateTimeOffset completedAtUtc)
+    internal OperationResult Complete(Guid scannedSourceId, DateTimeOffset completedAtUtc)
     {
         if (CompletedAtUtc is not null)
             return OperationError.Conflict("Работа с исходным поддоном уже завершена.");
@@ -61,7 +59,6 @@ public sealed class ReplenishmentSourceCycle
             return OperationError.Invalid("Время возврата поддона предшествует выполненным действиям.");
 
         CompletedAtUtc = completedAtUtc;
-        SourceWasEmpty = sourceWasEmpty;
         return OperationResult.Success();
     }
 }

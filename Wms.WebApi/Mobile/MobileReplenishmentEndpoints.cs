@@ -30,8 +30,6 @@ internal static class MobileReplenishmentEndpoints
             .WithMobileResponses<MobileReplenishmentResourceIdResponse>();
         tasks.MapPost("/{taskId:guid}/transfers", TransferAsync)
             .WithMobileResponses<MobileReplenishmentResourceIdResponse>();
-        tasks.MapPost("/{taskId:guid}/shortages", ReportShortageAsync)
-            .WithMobileResponses<MobileReplenishmentResourceIdResponse>();
         tasks.MapPost("/{taskId:guid}/source-completion", CompleteSourceAsync)
             .WithMobileResponses<MobileReplenishmentResourceIdResponse>();
         return endpoints;
@@ -136,7 +134,7 @@ internal static class MobileReplenishmentEndpoints
             detail.RecommendedDestinationCode,
             detail.Cycles.Select(cycle => new MobileReplenishmentSourceCycleResponse(
                 cycle.Id, cycle.SourceLocationId, cycle.SourceCode,
-                cycle.StartedAtUtc, cycle.CompletedAtUtc, cycle.SourceWasEmpty,
+                cycle.StartedAtUtc, cycle.CompletedAtUtc,
                 cycle.Transfers.Select(transfer => new MobileReplenishmentTransferResponse(
                     transfer.Id, transfer.DestinationLocationId,
                     transfer.DestinationCode, transfer.ExpirationDate,
@@ -145,8 +143,7 @@ internal static class MobileReplenishmentEndpoints
                     { DestinationName = transfer.DestinationName }).ToArray())
                 { SourceName = cycle.SourceName }).ToArray(),
             detail.ActiveSourceStock.Select(x => new MobileReplenishmentSourceStockResponse(
-                x.SkuId, x.SkuName, x.ExpirationDate,
-                x.AccountingQuantity, x.BlockedQuantity)).ToArray())
+                x.SkuId, x.SkuName, x.ExpirationDate, x.AvailableQuantity)).ToArray())
         { RecommendedSourceName = detail.RecommendedSourceName,
             RecommendedDestinationName = detail.RecommendedDestinationName });
     }
@@ -185,24 +182,6 @@ internal static class MobileReplenishmentEndpoints
                 request.ExpirationDate, request.Quantity, userId), ct));
     }
 
-    private static async Task<IResult> ReportShortageAsync(
-        Guid taskId, MobileReplenishmentShortageRequest request,
-        ClaimsPrincipal principal, IReplenishmentStore store,
-        ReportReplenishmentShortage report, CancellationToken ct)
-    {
-        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId is null) return TypedResults.Unauthorized();
-        var warehouse = await CheckTaskWarehouseAsync(store, taskId,
-            request.WarehouseId, ct);
-        if (!warehouse.IsSuccess)
-            return MobileEndpointResults.CommandProblem(warehouse.Error!);
-        return ResourceId(await report.ExecuteAsync(
-            new ReportReplenishmentShortageRequest(request.ClientRequestId,
-                taskId, request.SourceCycleId, request.SkuId,
-                request.ExpirationDate, request.ExpectedQuantity,
-                request.FoundQuantity, userId, request.Comment), ct));
-    }
-
     private static async Task<IResult> CompleteSourceAsync(
         Guid taskId, MobileReplenishmentCompleteSourceRequest request,
         ClaimsPrincipal principal, IReplenishmentStore store,
@@ -216,9 +195,7 @@ internal static class MobileReplenishmentEndpoints
             return MobileEndpointResults.CommandProblem(warehouse.Error!);
         return ResourceId(await complete.ExecuteAsync(
             new CompleteReplenishmentSourceRequest(request.ClientRequestId,
-                taskId, request.SourceCycleId,
-                request.ScannedSourceLocationCode, request.SourceWasEmpty,
-                userId), ct));
+                taskId, request.SourceCycleId, request.ScannedSourceLocationCode, userId), ct));
     }
 
     private static async Task<OperationResult> CheckAssemblyWarehouseAsync(

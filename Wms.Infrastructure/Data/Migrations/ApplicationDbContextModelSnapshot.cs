@@ -1646,9 +1646,6 @@ namespace Wms.Data.Migrations
                     b.Property<Guid>("SourceStorageLocationId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool?>("SourceWasEmpty")
-                        .HasColumnType("bit");
-
                     b.Property<DateTimeOffset>("StartedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -2121,10 +2118,7 @@ namespace Wms.Data.Migrations
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
-                    b.Property<int>("Origin")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("OriginId")
+                    b.Property<Guid>("PickingAssemblyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("ReportedAtUtc")
@@ -2165,11 +2159,11 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("CorrectionMovementId");
 
+                    b.HasIndex("PickingAssemblyId");
+
                     b.HasIndex("StockKeepingUnitId");
 
                     b.HasIndex("StorageLocationId");
-
-                    b.HasIndex("Origin", "OriginId");
 
                     b.HasIndex("WarehouseId", "StorageLocationId", "StockKeepingUnitId", "ExpirationDate")
                         .IsUnique()
@@ -3350,6 +3344,12 @@ namespace Wms.Data.Migrations
                         .WithMany()
                         .HasForeignKey("CorrectionMovementId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Wms.Domain.StockKeepingUnit", null)
                         .WithMany()

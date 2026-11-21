@@ -301,21 +301,27 @@ plan or source discrepancies.
 Mobile V1 also exposes Operator-only replenishment proposals and existing tasks
 for a picking assembly, an explicit order command, the replenisher's ordered
 and active queue, and task detail with source cycles, actual addresses, dated
-transfer history and stock groups on the currently held source. Source scans,
-dated transfers, shortage reports and return or empty-cell confirmation use
-separate commands. Each mutation carries a client request ID; callers retain
-the exact request for an explicit retry after an uncertain response. These
+transfer history and available stock groups on the currently held source.
+Source scans, dated transfers and source completion use separate commands.
+Each mutation carries a client request ID. Callers retain the exact request
+for an explicit retry after an uncertain response. These
 routes and the client serve the replacement Mobile screens. The picking SKU
 screen orders all current proposals for one SKU in one replay-safe command.
 The home screen opens the replenisher's warehouse queue in shipping priority
-order. Its task card shows
-the held source, actual dated stock groups for the requested SKU and other SKU
-for information, posted transfers and the pending pallet return. A worker
-scans the source, destination and source again at completion, explicitly
-confirms quantities and either returns the pallet or confirms the source is
-physically empty. A second source can start after the previous cycle is
-complete. The task page retains the same command ID for explicit retry after
-an uncertain response and reconstructs unfinished work from server detail.
+order. Its task card shows the held source, available quantities by expiration
+for the requested SKU, other SKU for information, and posted transfers. The
+«Хранение» card shows the recommended address before removal and then the
+actual source address for return. A separate card shows the recommended
+«Комплектация» destination. A scan or a tap on an address card opens the
+confirmation dialog for that step. The worker verifies the expiration group
+and transferred quantity on the page before scanning or tapping the
+destination. When a recommendation is absent, the worker scans the address.
+While the source is held, scanning its address opens source completion,
+including after a partial transfer or when the pallet has no goods left.
+Additional scans are ignored while the dialog or command is active. If the
+task still has a remaining quantity, the page prompts for the next source. It
+retains the same command ID for explicit retry after an uncertain response and
+reconstructs unfinished work from server detail.
 
 ## Mobile receiving
 

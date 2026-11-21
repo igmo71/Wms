@@ -97,7 +97,13 @@ public sealed class StartReplenishmentSource(
                     && locations.TryGetValue(x.Group.StorageLocationId, out var candidate)
                     && candidate.IsActive && !candidate.IsHeld
                     && candidate.ZoneType == ZoneType.Reserve).ToArray();
-                var earliest = sourceGroups.OrderBy(x => x.Group.ExpirationDate is null)
+                // Stock still recorded at a completed source cannot block a new
+                // source for this task. Other tasks use the warehouse balances.
+                var completedSources = task.SourceCycles.Select(x => x.SourceStorageLocationId)
+                    .ToHashSet();
+                var earliest = sourceGroups.Where(x => x.Group.StorageLocationId == location.Id
+                        || !completedSources.Contains(x.Group.StorageLocationId))
+                    .OrderBy(x => x.Group.ExpirationDate is null)
                     .ThenBy(x => x.Group.ExpirationDate).FirstOrDefault();
                 var chosen = sourceGroups.Where(x => x.Group.StorageLocationId == location.Id)
                     .OrderBy(x => x.Group.ExpirationDate is null)

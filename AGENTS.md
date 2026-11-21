@@ -15,7 +15,7 @@ explicitly requests it.
   specifications as intended behavior. The code remains the source of truth for
   implementation details.
 - This is an MVP: prefer explicit, straightforward changes that fit the existing structure. Do not introduce abstractions, layers, or infrastructure unless the task needs them.
-- When replacing a screen, route, or workflow, remove obsolete code and links. Keep compatibility aliases or redirects only for a concrete, supported need; do not accumulate them by default.
+- WMS is in development. Remove obsolete code, routes, contracts, and database fields when replacing or removing functionality. Historical compatibility is opt-in. Use migrations and, when needed, clear or recreate the development database.
 - Keep changes scoped to the request. Track deferred ideas in GitHub Issues and implement them only when brought into scope.
 - The `Wms` project is temporary legacy. Replace its scenarios in the corresponding new projects, remove replaced code and references, and eliminate `Wms` after its remaining responsibilities have been replaced.
 - When a task changes implemented business behavior or an integration boundary,

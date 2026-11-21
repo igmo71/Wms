@@ -105,7 +105,6 @@ public static class DependencyInjection
         services.AddScoped<GetPickingReplenishments>();
         services.AddScoped<StartReplenishmentSource>();
         services.AddScoped<ConfirmReplenishmentTransfer>();
-        services.AddScoped<ReportReplenishmentShortage>();
         services.AddScoped<CompleteReplenishmentSource>();
         services.AddScoped<CorrectReplenishmentTransfer>();
         services.AddScoped<IReceivingOrderStore, ReceivingOrderStore>();

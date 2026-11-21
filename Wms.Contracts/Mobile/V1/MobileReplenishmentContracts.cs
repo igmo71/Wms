@@ -63,17 +63,13 @@ public sealed record MobileReplenishmentTransferResponse(
 public sealed record MobileReplenishmentSourceCycleResponse(
     Guid Id, Guid SourceLocationId, string SourceCode,
     DateTimeOffset StartedAtUtc, DateTimeOffset? CompletedAtUtc,
-    bool? SourceWasEmpty, IReadOnlyList<MobileReplenishmentTransferResponse> Transfers)
+    IReadOnlyList<MobileReplenishmentTransferResponse> Transfers)
 {
     public string? SourceName { get; init; }
 }
 
 public sealed record MobileReplenishmentSourceStockResponse(
-    Guid SkuId, string? SkuName, DateOnly? ExpirationDate,
-    decimal AccountingQuantity, decimal BlockedQuantity)
-{
-    public decimal AvailableQuantity => Math.Max(0, AccountingQuantity - BlockedQuantity);
-}
+    Guid SkuId, string? SkuName, DateOnly? ExpirationDate, decimal AvailableQuantity);
 
 public sealed record MobileReplenishmentTaskResponse(
     Guid Id, Guid PickingAssemblyId, Guid WarehouseId,
@@ -103,11 +99,6 @@ public sealed record MobileReplenishmentTransferRequest(
     string DestinationLocationCode, Guid SkuId,
     DateOnly? ExpirationDate, decimal Quantity);
 
-public sealed record MobileReplenishmentShortageRequest(
-    Guid ClientRequestId, Guid WarehouseId, Guid SourceCycleId,
-    Guid SkuId, DateOnly? ExpirationDate,
-    decimal ExpectedQuantity, decimal FoundQuantity, string? Comment = null);
-
 public sealed record MobileReplenishmentCompleteSourceRequest(
     Guid ClientRequestId, Guid WarehouseId, Guid SourceCycleId,
-    string ScannedSourceLocationCode, bool SourceWasEmpty);
+    string ScannedSourceLocationCode);

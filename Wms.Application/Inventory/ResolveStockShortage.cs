@@ -54,13 +54,9 @@ public sealed class ResolveStockShortage(CommandExecutor executor,
                     var posted = await posting.HandleAsync(new PostInventoryMovement.Command(
                         movement.Value!, InventoryPostingKind.StockCorrection, now,
                         ShortageId: shortage.Id,
-                        CorrectionHoldOwner: shortage.Origin == StockShortageOrigin.Picking
-                            ? new InventoryPostingOwner(
-                                StorageLocationLockOwnerType.PickingAssembly,
-                                shortage.OriginId)
-                            : new InventoryPostingOwner(
-                                StorageLocationLockOwnerType.ReplenishmentTask,
-                                shortage.OriginId)), session, token);
+                        CorrectionHoldOwner: new InventoryPostingOwner(
+                            StorageLocationLockOwnerType.PickingAssembly,
+                            shortage.PickingAssemblyId)), session, token);
                     if (!posted.IsSuccess) return posted.Error!;
                     movementId = posted.Value;
                 }
@@ -79,8 +75,7 @@ public sealed class ResolveStockShortage(CommandExecutor executor,
                     movementId is Guid id ? new[] { id } : Array.Empty<Guid>(),
                     commandUserId: request.UserId, commandType: CommandType,
                     requestId: request.RequestId,
-                    pickingAssemblyId: shortage.Origin == StockShortageOrigin.Picking
-                        ? shortage.OriginId : null);
+                    pickingAssemblyId: shortage.PickingAssemblyId);
                 if (!audit.IsSuccess) return audit.Error!;
                 return new CommandExecutionResult(shortage.Id, [audit.Value!]);
             }, ct);

@@ -24,7 +24,8 @@ internal sealed class StockShortageConfiguration : IEntityTypeConfiguration<Stoc
             x.WarehouseId, x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate
         }).IsUnique().HasFilter("[ResolvedAtUtc] IS NULL")
             .HasDatabaseName(DatabaseObjectNames.StockShortagesActiveGroupIndex);
-        builder.HasIndex(x => new { x.Origin, x.OriginId });
+        builder.HasOne<PickingAssembly>().WithMany().HasForeignKey(x => x.PickingAssemblyId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<StorageLocation>().WithMany().HasForeignKey(x => x.StorageLocationId)

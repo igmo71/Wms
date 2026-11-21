@@ -14,9 +14,9 @@ public partial class ReplenishmentTaskPage : ContentPage
     private MobileReplenishmentTaskResponse? _task;
     private Guid _taskId;
     private Guid _warehouseId;
-    private ScanTarget _scanTarget = ScanTarget.Source;
     private bool _visible;
     private bool _busy;
+    private bool _confirmingAddress;
     private bool _cameraRequested;
     private long _scanGeneration;
 
@@ -78,7 +78,7 @@ public partial class ReplenishmentTaskPage : ContentPage
 
     private async Task RefreshAsync()
     {
-        if (_busy || _taskId == Guid.Empty) return;
+        if (_busy || _confirmingAddress || _taskId == Guid.Empty) return;
         SetBusy(true);
         try
         {
@@ -98,20 +98,29 @@ public partial class ReplenishmentTaskPage : ContentPage
         SkuLabel.Text = _task.SkuName ?? _task.SkuId.ToString();
         ProgressLabel.Text = $"Проведено {_task.TransferredQuantity:0.###} из "
             + $"{_task.OrderedQuantity:0.###}; осталось {Remaining:0.###}";
-        StatusLabel.Text = cycle is not null
-            ? $"Поддон снят: {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}. Требуется возврат или подтверждение пустой ячейки."
-            : _task.Status == MobileReplenishmentTaskStatus.Completed
-                ? "Задание завершено" : Remaining == 0
-                    ? "Все количество проведено" : "Ожидается скан источника";
-        RecommendationLabel.Text = $"Источник: {(string.IsNullOrWhiteSpace(_task.RecommendedSourceName) ? _task.RecommendedSourceCode ?? "нет доступного источника" : _task.RecommendedSourceName)}"
-            + $" · Назначение: {(string.IsNullOrWhiteSpace(_task.RecommendedDestinationName) ? _task.RecommendedDestinationCode ?? "выбрать по скану" : _task.RecommendedDestinationName)}";
-        StartPanel.IsVisible = cycle is null && Remaining > 0 && CanOperate;
+        StatusLabel.Text = _task.Status switch
+        {
+            MobileReplenishmentTaskStatus.Completed => "Задание завершено",
+            MobileReplenishmentTaskStatus.Cancelled => "Задание отменено",
+            _ when cycle is not null => "Поддон снят",
+            _ when _task.Cycles.Count > 0 => "Нужен следующий поддон",
+            _ => "Ожидается снятие поддона"
+        };
+        var canStart = cycle is null && Remaining > 0 && CanOperate
+            && _task.Status is MobileReplenishmentTaskStatus.Ordered or MobileReplenishmentTaskStatus.InProgress;
+        var reserveCode = cycle?.SourceCode ?? _task.RecommendedSourceCode;
+        ReservePanel.IsVisible = canStart || cycle is not null;
+        ReserveAddressButton.Text = reserveCode;
+        ReserveAddressButton.IsVisible = !string.IsNullOrWhiteSpace(reserveCode);
+        ReserveActionLabel.Text = cycle is not null ? "Возврат поддона в «Хранение»"
+            : ReserveAddressButton.IsVisible ? "Снять поддон из «Хранения»" : "Сканируйте ячейку «Хранения»";
+        ReturnInstructionLabel.IsVisible = cycle is not null && CanOperate;
         ActivePanel.IsVisible = cycle is not null;
-        StartButton.IsEnabled = !_busy && !_process.HasPendingCommand && CanOperate;
         if (cycle is not null)
         {
-            ActiveSourceLabel.Text = $"Фактический источник: {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}";
-            ReturnRequiredLabel.Text = "Исходная ячейка удерживается до повторного скана.";
+            DestinationAddressButton.Text = _task.RecommendedDestinationCode;
+            DestinationAddressButton.IsVisible = !string.IsNullOrWhiteSpace(_task.RecommendedDestinationCode);
+            DestinationScanLabel.IsVisible = !DestinationAddressButton.IsVisible;
             var selectedGroup = SelectedGroup;
             var groups = _task.ActiveSourceStock
                 .Where(x => x.SkuId == _task.SkuId && x.AvailableQuantity > 0)
@@ -123,32 +132,22 @@ public partial class ReplenishmentTaskPage : ContentPage
             var index = selectedGroup is null ? -1 : Array.FindIndex(groups,
                 x => x.ExpirationDate == selectedGroup.ExpirationDate);
             GroupPicker.SelectedIndex = index >= 0 ? index : groups.Length > 0 ? 0 : -1;
-            StockRows = _task.ActiveSourceStock.Select(x => new ReplenishmentStockRow(
-                x.SkuName ?? x.SkuId.ToString(), x.SkuId == _task.SkuId,
-                x.ExpirationDate, x.AccountingQuantity, x.BlockedQuantity)).ToArray();
+            StockRows = _task.ActiveSourceStock
+                .Where(x => x.SkuId != _task.SkuId && x.AvailableQuantity > 0)
+                .Select(x => new ReplenishmentStockRow(x.SkuName ?? x.SkuId.ToString(),
+                    x.ExpirationDate, x.AvailableQuantity)).ToArray();
             OnPropertyChanged(nameof(StockRows));
+            OtherStockPanel.IsVisible = StockRows.Count > 0;
             if (string.IsNullOrWhiteSpace(QuantityEntry.Text) && SelectedGroup is { } group)
                 QuantityEntry.Text = Math.Min(Remaining, group.Available)
                     .ToString("0.###", CultureInfo.CurrentCulture);
-            if (string.IsNullOrWhiteSpace(DestinationEntry.Text))
-                DestinationEntry.Placeholder = (string.IsNullOrWhiteSpace(_task.RecommendedDestinationName)
-                    ? _task.RecommendedDestinationCode : _task.RecommendedDestinationName) is { } destination
-                    ? $"Сканируйте назначение, рекомендовано {destination}"
-                    : "Сканируйте ячейку Комплектации";
-            TransferButton.IsEnabled = !_busy && !_process.HasPendingCommand
-                && CanOperate && Remaining > 0 && groups.Length > 0;
-            ShortageButton.IsEnabled = TransferButton.IsEnabled;
-            ReturnButton.IsEnabled = !_busy && !_process.HasPendingCommand && CanOperate;
-            EmptyButton.IsEnabled = ReturnButton.IsEnabled;
-            _scanTarget = Remaining == 0 || groups.Length == 0
-                ? ScanTarget.Return : ScanTarget.Destination;
+            TransferPanel.IsVisible = CanOperate && Remaining > 0 && groups.Length > 0;
         }
         else
         {
             StockRows = [];
             OnPropertyChanged(nameof(StockRows));
             GroupPicker.ItemsSource = null;
-            _scanTarget = ScanTarget.Source;
         }
         TransferRows = _task.Cycles.SelectMany(x => x.Transfers.Select(t =>
             new ReplenishmentTransferRow(
@@ -161,39 +160,35 @@ public partial class ReplenishmentTaskPage : ContentPage
     private void OnGroupChanged(object? sender, EventArgs e)
     {
         if (SelectedGroup is { } group)
-        {
             QuantityEntry.Text = Math.Min(Remaining, group.Available)
                 .ToString("0.###", CultureInfo.CurrentCulture);
-            ExpectedEntry.Text = QuantityEntry.Text;
-        }
     }
 
-    private void OnSourceFocused(object? sender, FocusEventArgs e) =>
-        _scanTarget = ScanTarget.Source;
-    private void OnDestinationFocused(object? sender, FocusEventArgs e) =>
-        _scanTarget = ScanTarget.Destination;
-    private void OnReturnFocused(object? sender, FocusEventArgs e) =>
-        _scanTarget = ScanTarget.Return;
+    private async void OnReserveAddressClicked(object? sender, EventArgs e) =>
+        await ConfirmAddressAsync(ActiveCycle?.SourceCode ?? _task?.RecommendedSourceCode);
+
+    private async void OnDestinationAddressClicked(object? sender, EventArgs e) =>
+        await ConfirmAddressAsync(_task?.RecommendedDestinationCode);
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
     {
         var generation = Volatile.Read(ref _scanGeneration);
-        MainThread.BeginInvokeOnMainThread(() =>
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
-            if (!_visible || _busy || generation != Volatile.Read(ref _scanGeneration)) return;
-            var entry = _scanTarget switch
+            if (!_visible || generation != Volatile.Read(ref _scanGeneration)) return;
+            if (scan.Source == BarcodeScanSource.Camera)
             {
-                ScanTarget.Destination => DestinationEntry,
-                ScanTarget.Return => ReturnEntry,
-                _ => SourceEntry
-            };
-            entry.Text = scan.Value;
+                _cameraRequested = false;
+                await UpdateCameraAsync();
+            }
+            await ConfirmAddressAsync(scan.Value);
         });
     }
 
     private async void OnCameraClicked(object? sender, EventArgs e)
     {
-        if (_busy || _scanner.ActiveSource != BarcodeScanSource.Camera) return;
+        if (_busy || _confirmingAddress || _process.HasPendingCommand
+            || _scanner.ActiveSource != BarcodeScanSource.Camera) return;
         _cameraRequested = !_cameraRequested;
         await UpdateCameraAsync();
     }
@@ -201,85 +196,71 @@ public partial class ReplenishmentTaskPage : ContentPage
     private async Task UpdateCameraAsync()
     {
         CameraButton.Text = _cameraRequested ? "Закрыть камеру" : "Сканировать ячейку";
-        if (_visible && !_busy && !_process.HasPendingCommand && _cameraRequested
+        if (_visible && !_busy && !_confirmingAddress && !_process.HasPendingCommand && _cameraRequested
             && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
     }
 
-    private async void OnStartClicked(object? sender, EventArgs e)
+    private Task ConfirmAddressAsync(string? address)
     {
-        if (_busy || _process.HasPendingCommand || _task is null || ActiveCycle is not null
-            || !CanOperate || string.IsNullOrWhiteSpace(SourceEntry.Text)) return;
-        var code = SourceEntry.Text.Trim();
-        if (!await DisplayAlertAsync("Снять поддон",
-            $"Подтвердите источник {code} для SKU {SkuLabel.Text}.",
-            "Подтвердить", "Отмена")) return;
-        await RunCommandAsync(() => _process.StartSourceAsync(_taskId, _warehouseId, code));
-    }
+        if (!_visible || _busy || _confirmingAddress || _process.HasPendingCommand
+            || !CanOperate || _task is not { } task || string.IsNullOrWhiteSpace(address))
+            return Task.CompletedTask;
 
-    private async void OnTransferClicked(object? sender, EventArgs e)
-    {
-        if (_busy || _process.HasPendingCommand || _task is null || !CanOperate
-            || ActiveCycle is not { } cycle || SelectedGroup is not { } group
-            || string.IsNullOrWhiteSpace(DestinationEntry.Text)) return;
+        var code = address.Trim();
+        var cycle = ActiveCycle;
+        if (cycle is null)
+        {
+            if (!ReservePanel.IsVisible) return Task.CompletedTask;
+            return ConfirmCommandAsync("Снять поддон", $"Снять поддон из ячейки {code}?",
+                "Подтвердить", () => _process.StartSourceAsync(_taskId, _warehouseId, code));
+        }
+
+        if (string.Equals(code, cycle.SourceCode, StringComparison.OrdinalIgnoreCase))
+            return ConfirmCommandAsync("Завершить работу с поддоном",
+                $"Подтвердить завершение работы с ячейкой {cycle.SourceCode}?", "Завершить",
+                () => _process.CompleteSourceAsync(_taskId, _warehouseId, cycle.Id, cycle.SourceCode));
+
+        if (!TransferPanel.IsVisible || SelectedGroup is not { } group)
+        {
+            ErrorLabel.Text = $"Сканируйте исходную ячейку {cycle.SourceCode} или нажмите на её карточку.";
+            return Task.CompletedTask;
+        }
         if (!TryQuantity(QuantityEntry.Text, out var quantity)
             || quantity > Remaining || quantity > group.Available)
         {
-            ErrorLabel.Text = "Количество должно быть положительным и не больше остатка заказа и группы срока.";
-            return;
+            ErrorLabel.Text = "Укажите положительное количество с точностью до 0,001 в пределах остатка заказа и группы срока.";
+            return Task.CompletedTask;
         }
-        var destination = DestinationEntry.Text.Trim();
-        if (!await DisplayAlertAsync("Провести Подпитку",
-            $"Перенести {quantity:0.###} из {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)} в {destination}?",
-            "Провести", "Отмена")) return;
-        await RunCommandAsync(() => _process.TransferAsync(_taskId, _warehouseId,
-            cycle.Id, destination, _task.SkuId, group.ExpirationDate, quantity));
+
+        return ConfirmCommandAsync("Провести подпитку",
+            $"Перенести {quantity:0.###} из ячейки {cycle.SourceCode} в {code}?", "Провести",
+            () => _process.TransferAsync(_taskId, _warehouseId, cycle.Id,
+                code, task.SkuId, group.ExpirationDate, quantity));
     }
 
-    private async void OnShortageClicked(object? sender, EventArgs e)
+    private async Task ConfirmCommandAsync(string title, string message, string accept,
+        Func<Task<MobileReplenishmentTaskResponse>> action)
     {
-        if (_busy || _process.HasPendingCommand || _task is null || !CanOperate
-            || ActiveCycle is not { } cycle || SelectedGroup is not { } group) return;
-        if (!TryQuantity(ExpectedEntry.Text, out var expected)
-            || expected > Remaining || expected > group.Available
-            || !decimal.TryParse(FoundEntry.Text, NumberStyles.Number,
-                CultureInfo.CurrentCulture, out var found)
-            || found < 0 || found >= expected)
+        _confirmingAddress = true;
+        Interlocked.Increment(ref _scanGeneration);
+        ErrorLabel.Text = string.Empty;
+        try
         {
-            ErrorLabel.Text = "Укажите ожидаемое количество и меньшее найденное количество выбранного срока.";
-            return;
+            if (_cameraRequested)
+            {
+                _cameraRequested = false;
+                await UpdateCameraAsync();
+            }
+            if (await DisplayAlertAsync(title, message, accept, "Отмена") && _visible)
+                await RunCommandAsync(action);
         }
-        if (!await DisplayAlertAsync("Недостача",
-            $"В {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)} ожидалось {expected:0.###}, найдено {found:0.###}. Зафиксировать расхождение?",
-            "Зафиксировать", "Отмена")) return;
-        await RunCommandAsync(() => _process.ReportShortageAsync(_taskId,
-            _warehouseId, cycle.Id, _task.SkuId, group.ExpirationDate,
-            expected, found, CommentEntry.Text));
-    }
-
-    private async void OnReturnClicked(object? sender, EventArgs e) =>
-        await CompleteSourceAsync(empty: false);
-
-    private async void OnEmptyClicked(object? sender, EventArgs e) =>
-        await CompleteSourceAsync(empty: true);
-
-    private async Task CompleteSourceAsync(bool empty)
-    {
-        if (_busy || _process.HasPendingCommand || !CanOperate
-            || ActiveCycle is not { } cycle || string.IsNullOrWhiteSpace(ReturnEntry.Text)) return;
-        var code = ReturnEntry.Text.Trim();
-        if (code != cycle.SourceCode)
+        finally
         {
-            ErrorLabel.Text = $"Повторно сканируйте исходную ячейку {(string.IsNullOrWhiteSpace(cycle.SourceName) ? cycle.SourceCode : cycle.SourceName)}.";
-            return;
+            Interlocked.Increment(ref _scanGeneration);
+            _confirmingAddress = false;
         }
-        if (!await DisplayAlertAsync(empty ? "Ячейка пуста" : "Вернуть поддон",
-            empty ? $"Подтвердить, что в {code} физически не осталось товара?"
-                : $"Подтвердить возврат поддона в {code}?",
-            "Подтвердить", "Отмена")) return;
-        await RunCommandAsync(() => _process.CompleteSourceAsync(_taskId,
-            _warehouseId, cycle.Id, code, empty));
     }
 
     private async void OnRetryClicked(object? sender, EventArgs e)
@@ -297,13 +278,7 @@ public partial class ReplenishmentTaskPage : ContentPage
         try
         {
             _task = await action();
-            SourceEntry.Text = string.Empty;
-            DestinationEntry.Text = string.Empty;
             QuantityEntry.Text = string.Empty;
-            ExpectedEntry.Text = string.Empty;
-            FoundEntry.Text = string.Empty;
-            CommentEntry.Text = string.Empty;
-            ReturnEntry.Text = string.Empty;
             Apply();
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
@@ -320,6 +295,8 @@ public partial class ReplenishmentTaskPage : ContentPage
     {
         Interlocked.Increment(ref _scanGeneration);
         _busy = busy;
+        var canSelectAddress = !busy && !_process.HasPendingCommand && CanOperate;
+        ReserveAddressButton.IsEnabled = DestinationAddressButton.IsEnabled = canSelectAddress;
         ProgressIndicator.IsVisible = busy;
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
         if (RetryButton.IsVisible) RetryButton.Text = $"Повторить: {_process.PendingLabel}";
@@ -337,9 +314,8 @@ public partial class ReplenishmentTaskPage : ContentPage
 
     private static bool TryQuantity(string? value, out decimal quantity) =>
         decimal.TryParse(value, NumberStyles.Number,
-            CultureInfo.CurrentCulture, out quantity) && quantity > 0;
-
-    private enum ScanTarget { Source, Destination, Return }
+            CultureInfo.CurrentCulture, out quantity)
+        && quantity > 0 && WarehouseQuantityInput.IsSupported(quantity);
 }
 
 public sealed record ReplenishmentGroupRow(DateOnly? ExpirationDate, decimal Available)
@@ -349,12 +325,12 @@ public sealed record ReplenishmentGroupRow(DateOnly? ExpirationDate, decimal Ava
         + $" · доступно {Available.ToString("0.###", CultureInfo.CurrentCulture)}";
 }
 
-public sealed record ReplenishmentStockRow(string SkuName, bool IsTaskSku,
-    DateOnly? ExpirationDate, decimal Accounting, decimal Blocked)
+public sealed record ReplenishmentStockRow(string SkuName,
+    DateOnly? ExpirationDate, decimal AvailableQuantity)
 {
-    public string Text => $"{(IsTaskSku ? "● " : "○ ")}{SkuName} · "
+    public string Text => $"{SkuName} · "
         + (ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : "без срока")
-        + $" · учёт {Accounting:0.###}, спорное {Blocked:0.###}";
+        + $" · {AvailableQuantity:0.###}";
 }
 
 public sealed record ReplenishmentTransferRow(string SourceCode,

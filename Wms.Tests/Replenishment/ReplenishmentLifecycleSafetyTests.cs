@@ -95,22 +95,23 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
         var second = Location(warehouse.Id, reserve, 2);
         var destination = Location(warehouse.Id, storage, 1);
         var (assembly, source) = ActiveAssembly(warehouse.Id, sku.Id, 7);
+        var shortageAssembly = PickingAssembly(warehouse.Id, Worker);
         var revision = assembly.OperationalRevision;
         var expires = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
         await using (var seed = database.CreateDbContext())
         {
             seed.AddRange(warehouse, sku, reserve, storage, first, second,
-                destination, assembly, source,
+                destination, assembly, source, shortageAssembly,
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
                     first.Id, sku.Id, 4, DateTimeOffset.UtcNow, expires)),
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
                     second.Id, sku.Id, 5, DateTimeOffset.UtcNow, expires)),
                 Value(StockShortage.Report(Guid.NewGuid(), warehouse.Id,
-                    first.Id, sku.Id, expires, StockShortageOrigin.Replenishment,
-                    Guid.NewGuid(), 4, 3, null, Worker, DateTimeOffset.UtcNow)),
+                    first.Id, sku.Id, expires, shortageAssembly.Id,
+                    4, 3, null, Worker, DateTimeOffset.UtcNow)),
                 Value(StockShortage.Report(Guid.NewGuid(), warehouse.Id,
-                    second.Id, sku.Id, expires, StockShortageOrigin.Replenishment,
-                    Guid.NewGuid(), 5, 4, null, Worker, DateTimeOffset.UtcNow)));
+                    second.Id, sku.Id, expires, shortageAssembly.Id,
+                    5, 4, null, Worker, DateTimeOffset.UtcNow)));
             await seed.SaveChangesAsync();
         }
 
@@ -142,21 +143,21 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Shortage_block_survives_empty_source_and_second_source_finishes_after_assembly_close()
+    public async Task Partial_transfer_can_continue_from_a_later_dated_source_after_assembly_close()
     {
-        var seed = await SeedOrderedAsync(8, 4, 10);
+        var seed = await SeedOrderedAsync(8, 4, 10, secondSourceDaysLater: 1);
         var commands = Commands();
+        Error(await commands.Start.ExecuteAsync(new(Guid.NewGuid(), seed.TaskId,
+            seed.SecondCode, Worker)), OperationErrorType.Conflict);
         var firstCycleId = Value(await commands.Start.ExecuteAsync(
             new(Guid.NewGuid(), seed.TaskId, seed.FirstCode, Worker)));
-        Value(await commands.Shortage.ExecuteAsync(new(
-            Guid.NewGuid(), seed.TaskId, firstCycleId, seed.SkuId,
-            seed.ExpirationDate, 8, 6, Worker)));
         Value(await commands.Transfer.ExecuteAsync(new(
             Guid.NewGuid(), seed.TaskId, firstCycleId, seed.DestinationCode,
             seed.SkuId, seed.ExpirationDate, 6, Worker)));
-        Value(await commands.Complete.ExecuteAsync(new(
-            Guid.NewGuid(), seed.TaskId, firstCycleId, seed.FirstCode,
-            true, Worker)));
+        var completion = new CompleteReplenishmentSourceRequest(Guid.NewGuid(), seed.TaskId,
+            firstCycleId, seed.FirstCode, Worker);
+        Assert.Equal(firstCycleId, Value(await commands.Complete.ExecuteAsync(completion)));
+        Assert.Equal(firstCycleId, Value(await commands.Complete.ExecuteAsync(completion)));
 
         await using (var close = database.CreateDbContext())
         {
@@ -171,10 +172,9 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
             new(Guid.NewGuid(), seed.TaskId, seed.SecondCode, Worker)));
         Value(await commands.Transfer.ExecuteAsync(new(
             Guid.NewGuid(), seed.TaskId, secondCycleId,
-            seed.DestinationCode, seed.SkuId, seed.ExpirationDate, 4, Worker)));
+            seed.DestinationCode, seed.SkuId, seed.ExpirationDate.AddDays(1), 4, Worker)));
         Value(await commands.Complete.ExecuteAsync(new(
-            Guid.NewGuid(), seed.TaskId, secondCycleId, seed.SecondCode,
-            true, Worker)));
+            Guid.NewGuid(), seed.TaskId, secondCycleId, seed.SecondCode, Worker)));
 
         await using var verify = database.CreateDbContext();
         var task = await verify.ReplenishmentTasks.Include(x => x.SourceCycles)
@@ -185,14 +185,11 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
         Assert.All(task.SourceCycles, x => Assert.NotNull(x.CompletedAtUtc));
         Assert.False(await verify.StorageLocationLocks.AnyAsync(x =>
             x.OwnerId == seed.TaskId));
-        var blocked = await verify.StockShortages.SingleAsync(x =>
-            x.WarehouseId == seed.WarehouseId && x.StorageLocationId == seed.FirstId);
-        Assert.Null(blocked.ResolvedAtUtc);
-        Assert.Equal(2m, blocked.BlockedQuantity);
+        Assert.False(await verify.StockShortages.AnyAsync(x => x.WarehouseId == seed.WarehouseId));
         Assert.Equal(2m, (await verify.InventoryBalances.SingleAsync(x =>
             x.StorageLocationId == seed.FirstId && x.StockKeepingUnitId == seed.SkuId)).Quantity);
-        Assert.Equal(10m, (await verify.InventoryBalances.SingleAsync(x =>
-            x.StorageLocationId == seed.DestinationId)).Quantity);
+        Assert.Equal(10m, await verify.InventoryBalances.Where(x =>
+            x.StorageLocationId == seed.DestinationId).SumAsync(x => x.Quantity));
     }
 
     [Fact]
@@ -283,7 +280,6 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
 
     private (StartReplenishmentSource Start,
         ConfirmReplenishmentTransfer Transfer,
-        ReportReplenishmentShortage Shortage,
         CompleteReplenishmentSource Complete) Commands()
     {
         var executor = new CommandExecutor(new CommandExecutionStore(database));
@@ -295,14 +291,12 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
             new ConfirmReplenishmentTransfer(executor, replenishments,
                 stock, new PostInventoryMovement.Handler(new InventoryPostingStore()),
                 permission, TimeProvider.System),
-            new ReportReplenishmentShortage(executor, replenishments,
-                stock, stock, permission, TimeProvider.System),
             new CompleteReplenishmentSource(executor, replenishments,
                 permission, TimeProvider.System));
     }
 
     private async Task<Seed> SeedOrderedAsync(decimal firstQuantity,
-        decimal secondQuantity, decimal orderedQuantity)
+        decimal secondQuantity, decimal orderedQuantity, int secondSourceDaysLater = 0)
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Replenishment lifecycle" };
         var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Replenished SKU" };
@@ -325,7 +319,7 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
                 first.Id, sku.Id, firstQuantity, now, date)));
         if (secondQuantity > 0)
             db.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
-                second.Id, sku.Id, secondQuantity, now, date)));
+                second.Id, sku.Id, secondQuantity, now, date.AddDays(secondSourceDaysLater))));
         await db.SaveChangesAsync();
         return new Seed(warehouse.Id, assembly.Id, assembly.OperationalRevision,
             task.Id, sku.Id, first.Id, first.Code, second.Code,

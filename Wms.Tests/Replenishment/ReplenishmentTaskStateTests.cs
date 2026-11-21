@@ -23,11 +23,11 @@ public sealed class ReplenishmentTaskStateTests
         Assert.Equal(ReplenishmentTaskStatus.InProgress, task.Status);
         Assert.Null(cycle.CompletedAtUtc);
         Assert.False(task.Cancel(Worker, StartedAt.AddMinutes(2)).IsSuccess);
-        Assert.False(task.CompleteSource(cycle.Id, Guid.NewGuid(), true,
+        Assert.False(task.CompleteSource(cycle.Id, Guid.NewGuid(),
             Worker, StartedAt.AddMinutes(2)).IsSuccess);
         Assert.Null(cycle.CompletedAtUtc);
 
-        Assert.True(task.CompleteSource(cycle.Id, sourceId, true,
+        Assert.True(task.CompleteSource(cycle.Id, sourceId,
             Worker, StartedAt.AddMinutes(2)).IsSuccess);
         Assert.Equal(ReplenishmentTaskStatus.Completed, task.Status);
         Assert.Equal(transfer.Value!.ExpirationDate, Assert.Single(cycle.Transfers).ExpirationDate);
@@ -44,7 +44,7 @@ public sealed class ReplenishmentTaskStateTests
 
         Assert.False(task.StartSource(Guid.NewGuid(), Guid.NewGuid(),
             Worker, StartedAt.AddMinutes(2)).IsSuccess);
-        Assert.True(task.CompleteSource(firstCycle.Id, sourceId, true,
+        Assert.True(task.CompleteSource(firstCycle.Id, sourceId,
             Worker, StartedAt.AddMinutes(2)).IsSuccess);
         Assert.Equal(ReplenishmentTaskStatus.InProgress, task.Status);
         Assert.Equal(2m, task.RemainingQuantity);

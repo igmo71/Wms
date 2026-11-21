@@ -169,11 +169,8 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             && x.Group.ExpirationDate == shortage.ExpirationDate);
         var hold = group?.Hold;
         var ownsHold = hold is null
-            || hold.OwnerId == shortage.OriginId
-                && (shortage.Origin == StockShortageOrigin.Picking
-                    && hold.OwnerType == StorageLocationLockOwnerType.PickingAssembly
-                    || shortage.Origin == StockShortageOrigin.Replenishment
-                    && hold.OwnerType == StorageLocationLockOwnerType.ReplenishmentTask);
+            || hold.OwnerId == shortage.PickingAssemblyId
+                && hold.OwnerType == StorageLocationLockOwnerType.PickingAssembly;
         if (group is null || !ownsHold || group.BlockedQuantity > 0
             || group.AccountingQuantity - group.ReservedQuantity - group.BlockedQuantity
                 < shortage.BlockedQuantity)

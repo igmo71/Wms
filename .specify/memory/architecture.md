@@ -194,6 +194,7 @@ location checks in its own command.
 
 The outbound domain model distinguishes quantity reservations (`PickingReservation`),
 reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).
+Each shortage has a required foreign key to its picking assembly.
 Picking and replenishment have separate hold owner types. Replenishment tasks own
 source cycles and immutable transfer records linked to inventory movements. Finishing
 the transferred quantity and confirming return of the source pallet are distinct

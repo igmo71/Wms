@@ -54,22 +54,27 @@ public sealed class OutboundInventoryPostingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Replenishment_posts_found_quantity_but_keeps_hold_and_disputed_remainder()
+    public async Task Replenishment_respects_a_picking_shortage_and_retains_the_source_hold()
     {
         var (warehouseId, sourceId, destinationId, skuId) = await SeedAsync(ZoneType.Reserve);
         var now = DateTimeOffset.UtcNow;
         var taskId = Guid.NewGuid();
         var otherSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Other pallet SKU" };
+        var assembly = PickingAssembly(warehouseId, UserId);
         var shortage = Value(StockShortage.Report(Guid.NewGuid(), warehouseId, sourceId, skuId,
-            null, StockShortageOrigin.Replenishment, taskId, 10, 8, null, UserId, now));
+            null, assembly.Id, 10, 8, null, UserId, now));
         await using (var db = database.CreateDbContext())
         {
-            db.AddRange(otherSku, shortage,
+            db.AddRange(otherSku, assembly, shortage,
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, sourceId, skuId, 10, now)),
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, sourceId, otherSku.Id, 3, now)),
                 Value(StorageLocationLock.CreateForReplenishment(sourceId, taskId, now, UserId)));
             await db.SaveChangesAsync();
         }
+        var excessive = Value(InventoryMovement.Create(Guid.NewGuid(), warehouseId, sourceId,
+            destinationId, skuId, 9, now, RecorderType.ReplenishmentTask, taskId, 1, UserId));
+        Error(await PostAsync(new(excessive, InventoryPostingKind.Replenishment,
+            now.AddSeconds(1)), Guid.NewGuid()), OperationErrorType.Conflict);
         var movement = Value(InventoryMovement.Create(Guid.NewGuid(), warehouseId, sourceId, destinationId,
             skuId, 8, now, RecorderType.ReplenishmentTask, taskId, 1, UserId));
         var requestId = Guid.NewGuid();
@@ -96,7 +101,7 @@ public sealed class OutboundInventoryPostingSafetyTests(SqlDatabase database)
         var reservation = Value(PickingReservation.Create(Guid.NewGuid(), assembly.Id, warehouseId,
             sourceId, skuId, null, 7, UserId, now));
         var shortage = Value(StockShortage.Report(Guid.NewGuid(), warehouseId, sourceId, skuId,
-            null, StockShortageOrigin.Picking, reservation.PickingAssemblyId, 10, 7, null, UserId, now));
+            null, assembly.Id, 10, 7, null, UserId, now));
         await using (var db = database.CreateDbContext())
         {
             db.Add(assembly);

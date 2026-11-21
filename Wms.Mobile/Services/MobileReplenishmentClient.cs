@@ -51,12 +51,6 @@ public sealed class MobileReplenishmentClient
         PostAsync<MobileReplenishmentTransferRequest>(
             $"{TasksRoute}/{taskId:D}/transfers", request, ct);
 
-    public Task<MobileReplenishmentResourceIdResponse> ReportShortageAsync(
-        Guid taskId, MobileReplenishmentShortageRequest request,
-        CancellationToken ct = default) =>
-        PostAsync<MobileReplenishmentShortageRequest>(
-            $"{TasksRoute}/{taskId:D}/shortages", request, ct);
-
     public Task<MobileReplenishmentResourceIdResponse> CompleteSourceAsync(
         Guid taskId, MobileReplenishmentCompleteSourceRequest request,
         CancellationToken ct = default) =>

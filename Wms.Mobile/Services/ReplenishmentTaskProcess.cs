@@ -22,19 +22,10 @@ public sealed class ReplenishmentTaskProcess(MobileReplenishmentClient client)
             client.TransferAsync(taskId, new(id, warehouseId, cycleId,
                 destinationCode, skuId, expirationDate, quantity)));
 
-    public Task<MobileReplenishmentTaskResponse> ReportShortageAsync(
-        Guid taskId, Guid warehouseId, Guid cycleId, Guid skuId,
-        DateOnly? expirationDate, decimal expected, decimal found, string? comment) =>
-        Begin("Сообщить о недостаче", taskId, warehouseId, id =>
-            client.ReportShortageAsync(taskId, new(id, warehouseId, cycleId,
-                skuId, expirationDate, expected, found, comment)));
-
     public Task<MobileReplenishmentTaskResponse> CompleteSourceAsync(
-        Guid taskId, Guid warehouseId, Guid cycleId, string sourceCode,
-        bool empty) =>
-        Begin(empty ? "Подтвердить пустую ячейку" : "Вернуть поддон",
-            taskId, warehouseId, id => client.CompleteSourceAsync(taskId,
-                new(id, warehouseId, cycleId, sourceCode, empty)));
+        Guid taskId, Guid warehouseId, Guid cycleId, string sourceCode) =>
+        Begin("Завершить работу с поддоном", taskId, warehouseId, id =>
+            client.CompleteSourceAsync(taskId, new(id, warehouseId, cycleId, sourceCode)));
 
     private Task<MobileReplenishmentTaskResponse> Begin(string label,
         Guid taskId, Guid warehouseId,

@@ -127,8 +127,7 @@ public sealed class ReplenishmentTask
     }
 
     public OperationResult CompleteSource(
-        Guid cycleId, Guid scannedSourceId, bool sourceWasEmpty,
-        string userId, DateTimeOffset completedAtUtc)
+        Guid cycleId, Guid scannedSourceId, string userId, DateTimeOffset completedAtUtc)
     {
         if (Status != ReplenishmentTaskStatus.InProgress || AssignedTo != userId)
             return OperationError.Conflict("Завершить работу с поддоном может исполнитель задания.");
@@ -138,7 +137,7 @@ public sealed class ReplenishmentTask
         if (cycle is null)
             return OperationError.NotFound("Цикл источника Подпитки не найден.");
 
-        var result = cycle.Complete(scannedSourceId, sourceWasEmpty, completedAtUtc);
+        var result = cycle.Complete(scannedSourceId, completedAtUtc);
         if (!result.IsSuccess)
             return result;
         UpdatedAtUtc = completedAtUtc;
@@ -146,6 +145,10 @@ public sealed class ReplenishmentTask
         {
             Status = ReplenishmentTaskStatus.Completed;
             CompletedAtUtc = completedAtUtc;
+        }
+        else
+        {
+            RecommendedSourceStorageLocationId = null;
         }
         return OperationResult.Success();
     }

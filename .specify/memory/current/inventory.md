@@ -140,7 +140,9 @@ recommendation. Other ordered tasks keep their original order time and receive
 new source recommendations from remaining stock; a task without a free source
 shows no recommendation. Task start, cell hold, recommendation changes, audit
 and receipt commit together. A later source cycle can start only after the
-previous pallet has been completed.
+previous pallet has been completed. When the worker scans a new source for
+the same task, previously completed sources do not take precedence over it
+in the expiration check. Other work continues to use the warehouse balances.
 Confirming a replenishment transfer checks the scanned Storage destination,
 its active hold and SKU mixing, the active source pallet held by this task,
 and the earliest available expiration group on that pallet. One confirmed
@@ -149,15 +151,13 @@ the common inventory posting operation. The source hold remains until its
 separate completion scan. The movement, both balances and turnovers, task
 progress, transfer record, audit and command receipt are saved together;
 repeating the request ID does not move stock again.
-An Operator can report a shortage in the held source's SKU and expiration
-group. The disputed quantity is blocked separately from the whole-cell hold;
-the found quantity remains available for a dated transfer. A source cycle ends
-only after scanning that same cell and confirming either the physical return
-of its remaining pallet or an empty cell. Empty-cell confirmation checks all
-SKU and expiration groups, excluding separately blocked disputed quantities.
-The command releases the whole-cell hold but keeps shortage blocks. If the
-ordered quantity remains incomplete, the same task awaits another source;
-its prior transfers and assigned replenisher remain recorded.
+A source cycle ends after the worker returns the pallet if it still holds goods,
+rescans the same cell and confirms completion. The command releases the cell
+hold without posting stock. If the ordered quantity remains incomplete, the
+same task awaits another source and retains its prior transfers and assigned
+replenisher. The worker confirms only the quantity actually transferred.
+Physical discrepancies during replenishment are handled administratively
+outside WMS.
 The Manager can correct a posted replenishment step by entering its actual
 transferred quantity and a reason. The original step remains immutable; a
 separate dated stock-correction movement, recorded against that step, transfers

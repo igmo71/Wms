@@ -28,26 +28,6 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
         return new ReplenishmentActiveSourceState(task, source);
     }
 
-    public async Task<bool> HasUnblockedStockAsync(ICommandExecutionContext context,
-        Guid warehouseId, Guid locationId, CancellationToken ct)
-    {
-        var db = (context as CommandExecutionStore.Session)?.Db
-            ?? throw new InvalidOperationException("Подпитка требует складскую сессию команды.");
-        var balances = await db.InventoryBalances.AsNoTracking()
-            .Where(x => x.WarehouseId == warehouseId && x.StorageLocationId == locationId
-                && x.Quantity > 0)
-            .Select(x => new { x.StockKeepingUnitId, x.ExpirationDate, x.Quantity })
-            .ToArrayAsync(ct);
-        var shortages = await db.StockShortages.AsNoTracking()
-            .Where(x => x.WarehouseId == warehouseId && x.StorageLocationId == locationId
-                && x.ResolvedAtUtc == null)
-            .ToArrayAsync(ct);
-        return balances.Any(balance => balance.Quantity > shortages
-            .Where(x => x.StockKeepingUnitId == balance.StockKeepingUnitId
-                && x.ExpirationDate == balance.ExpirationDate)
-            .Sum(x => x.BlockedQuantity));
-    }
-
     public async Task<OperationResult> ReleaseSourceHoldAsync(
         ICommandExecutionContext context, Guid warehouseId, Guid locationId,
         Guid taskId, CancellationToken ct)
@@ -217,7 +197,7 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 cycle.SourceStorageLocationId,
                 codes.GetValueOrDefault(cycle.SourceStorageLocationId)
                     ?? cycle.SourceStorageLocationId.ToString(),
-                cycle.StartedAtUtc, cycle.CompletedAtUtc, cycle.SourceWasEmpty,
+                cycle.StartedAtUtc, cycle.CompletedAtUtc,
                 cycle.Transfers.OrderBy(x => x.ConfirmedAtUtc)
                     .Select(transfer => new ReplenishmentTaskTransferView(
                         transfer.Id, transfer.DestinationStorageLocationId,
@@ -234,10 +214,10 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
             balances.Select(balance => new ReplenishmentSourceStockView(
                 balance.StockKeepingUnitId,
                 skus.GetValueOrDefault(balance.StockKeepingUnitId),
-                balance.ExpirationDate, balance.Quantity,
-                shortages.Where(x => x.StockKeepingUnitId == balance.StockKeepingUnitId
-                    && x.ExpirationDate == balance.ExpirationDate)
-                    .Sum(x => x.BlockedQuantity)))
+                balance.ExpirationDate, Math.Max(0, balance.Quantity - shortages
+                    .Where(x => x.StockKeepingUnitId == balance.StockKeepingUnitId
+                        && x.ExpirationDate == balance.ExpirationDate)
+                    .Sum(x => x.BlockedQuantity))))
                 .OrderBy(x => x.SkuId != task.StockKeepingUnitId)
                 .ThenBy(x => x.ExpirationDate is null)
                 .ThenBy(x => x.ExpirationDate).ToArray())
