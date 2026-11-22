@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Inventory.Counts;
 using Wms.Application.OpeningImports;
 using Wms.Application.Picking;
 using Wms.Application.Receiving;
@@ -56,6 +57,9 @@ public static class DependencyInjection
         services.AddScoped<IInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<IOpeningInventoryPostingStore, InventoryPostingStore>();
         services.AddScoped<PostInventoryMovement.Handler>();
+        services.AddScoped<IInventoryCountStore, InventoryCountStore>();
+        services.AddScoped<InventoryCountCommandService>();
+        services.AddScoped<InventoryCountQueryService>();
         services.AddScoped<StockAvailabilityStore>();
         services.AddScoped<IStockAvailabilityStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
         services.AddScoped<IStockReservationStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());

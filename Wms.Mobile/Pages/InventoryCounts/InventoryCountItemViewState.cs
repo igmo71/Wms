@@ -11,6 +11,9 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
 
     public Guid? ItemId { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
+    public DateOnly? ExpirationDate { get; private set; }
+    public bool RequiresExpiration { get; private set; }
+    public bool ExpirationConfirmed { get; private set; }
     public string SkuName { get; private set; } = string.Empty;
     public string? UnitOfMeasure { get; private set; }
     public decimal ExpectedQuantity { get; private set; }
@@ -24,7 +27,13 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     public string? AccentText { get; private set; }
     public bool HasQuantityError { get; private set; }
     public bool ActionsEnabled { get; private set; }
+    public bool IsQuantityLocked { get; private set; }
 
+    public string? ExpirationText => RequiresExpiration && CountedQuantity > 0 && !ExpirationConfirmed
+        ? "Подтвердите срок годности"
+        : ExpirationDate is DateOnly date
+            ? $"Срок: {date:dd.MM.yyyy}" : RequiresExpiration ? "Срок неизвестен" : null;
+    public bool HasExpirationText => ExpirationText is not null;
     public string QuantitySummary =>
         $"Ожид.: {Format(ExpectedQuantity)} · Факт: {Format(CountedQuantity)} · Разн.: {Format(DifferenceQuantity)} {(string.IsNullOrWhiteSpace(UnitOfMeasure) ? "—" : UnitOfMeasure)}";
     public bool HasAccentText => !string.IsNullOrEmpty(AccentText);
@@ -60,11 +69,13 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     }
 
     public static InventoryCountItemViewState FromPendingSku(
-        MobileInventoryCountSkuSearchResponse sku)
+        MobileInventoryCountSkuSearchResponse sku, DateOnly? expirationDate, bool requiresExpiration)
     {
         var state = new InventoryCountItemViewState
         {
             StockKeepingUnitId = sku.Id,
+            ExpirationDate = expirationDate,
+            RequiresExpiration = requiresExpiration,
             SkuName = sku.Name,
             UnitOfMeasure = sku.UnitOfMeasure,
             ExpectedQuantity = 0,
@@ -81,6 +92,9 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
     {
         var changed = ItemId != item.Id
             || StockKeepingUnitId != item.StockKeepingUnitId
+            || ExpirationDate != item.ExpirationDate
+            || RequiresExpiration != item.RequiresExpiration
+            || ExpirationConfirmed != item.ExpirationConfirmed
             || SkuName != item.SkuName
             || UnitOfMeasure != item.UnitOfMeasure
             || ExpectedQuantity != item.ExpectedQuantity
@@ -92,6 +106,9 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
 
         ItemId = item.Id;
         StockKeepingUnitId = item.StockKeepingUnitId;
+        ExpirationDate = item.ExpirationDate;
+        RequiresExpiration = item.RequiresExpiration;
+        ExpirationConfirmed = item.ExpirationConfirmed;
         SkuName = item.SkuName;
         UnitOfMeasure = item.UnitOfMeasure;
         ExpectedQuantity = item.ExpectedQuantity;
@@ -144,6 +161,12 @@ public sealed class InventoryCountItemViewState : INotifyPropertyChanged
 
         ActionsEnabled = enabled;
         OnPropertyChanged(nameof(ActionsEnabled));
+    }
+
+    public void SetQuantityLocked(bool locked)
+    {
+        IsQuantityLocked = locked;
+        OnPropertyChanged(nameof(IsQuantityLocked));
     }
 
     public void MarkQuantityInvalid()

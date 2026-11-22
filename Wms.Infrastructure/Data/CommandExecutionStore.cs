@@ -88,6 +88,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.InventoryBalancesBusinessKeyIndex,
                             StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.InventoryCountItemsGroupIndex,
+                            StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsOpeningBalanceLineIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.InventoryMovementsReversedMovementIndex,

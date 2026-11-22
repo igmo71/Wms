@@ -21,7 +21,9 @@
                     <MudNavLink Href="picking-assemblies" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AssignmentTurnedIn">Расходные ордера WMS</MudNavLink>
                 </MudNavGroup>
             </AuthorizeView>
-            <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
+            <AuthorizeView Roles="Operator,Manager" Context="inventoryCountContext">
+                <MudNavLink Href="inventory-counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FactCheck">Инвентаризация</MudNavLink>
+            </AuthorizeView>
             <MudNavLink Href="inventory-transfers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MoveUp">Перемещения</MudNavLink>
             <MudNavGroup Title="Остатки и Обороты" Icon="@Icons.Material.Filled.Inventory">
                 <MudNavLink Href="inventory-balances" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Остатки</MudNavLink>

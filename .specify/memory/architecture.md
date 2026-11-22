@@ -8,9 +8,9 @@ conventions. Project-wide principles live in the
 
 | Project | Current responsibility |
 |---|---|
-| `Wms` | Temporary legacy transfer/count workflows, catalog and notification adapters pending replacement; consumes Application contracts and Infrastructure persistence. |
+| `Wms` | Temporary legacy transfer workflow, catalog and notification adapters pending replacement; consumes Application contracts and Infrastructure persistence. |
 | `Wms.Domain` | Extracted domain entities, transitions and shared value/result types; no WMS project dependencies. |
-| `Wms.Application` | Command execution, receiving use cases, shared stock availability and dated posting for receiving/outbound operations; references Domain. |
+| `Wms.Application` | Command execution, receiving, outbound and inventory-count use cases, shared stock availability and dated posting; references Domain. |
 | `Wms.Infrastructure` | EF Core context, configurations, Identity data types and existing migrations; references Application. |
 | `Wms.Integration` | Receiving and shipping source HTTP readers, OData parsers and cutover XLSX reader; references Application. |
 | `Wms.Contracts` | Shared transport contracts. |
@@ -277,15 +277,19 @@ order and loads tracked four-dimensional balances, reservations and shortages
 through the Infrastructure store bound to that command session. It stages the
 movement, balance changes and turnovers for the executor's single commit.
 Receiving LPN closure and putaway use this handler. It also supports picking
-issues, replenishment transfers and stock corrections with distinct recorder
-types. The posting owner can use its own source hold. A picking issue completes
+issues, replenishment transfers, stock corrections and inventory counts with
+distinct recorder types. An authorized posting owner can use its own hold. A picking issue completes
 the exact entry's reservation, while replenishment keeps its source hold until
-the pallet-return command. Legacy transfer and count keep their existing path
-until their separate replacement.
+the pallet-return command. Inventory count commands acquire the common cell row
+lock before reading or changing the held draft. Count lines have a unique
+document/SKU/nullable-expiration key. The count command validates the final cell
+composition before staging movements through the shared handler. Count and
+SKU-mixing audit events reference their cell.
 
 Other existing warehouse mutations in Web/Mobile enter legacy application commands
-through `CommandExecutor`: LPN issuance, transfers and inventory counts.
-Receiving, putaway, picking and replenishment use the new Application executor.
+through `CommandExecutor`: LPN issuance and transfers.
+Receiving, putaway, picking, replenishment and inventory counts use the new
+Application executor.
 The executor owns receipt lookup before mutable validation and external access,
 replay, winning receipt recovery after competing commits, and atomic final save
 of business state plus receipt. Callers supply `CommandContext` with request

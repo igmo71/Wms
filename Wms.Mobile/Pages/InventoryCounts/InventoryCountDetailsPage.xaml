@@ -21,7 +21,7 @@
                     <Label
                         x:Name="InstructionLabel"
                         FontSize="18"
-                        Text="Отсканируйте товар. Каждый принятый скан добавляет одну единицу." />
+                        Text="Отсканируйте товар. При необходимости подтвердите срок." />
                     <local:OperationalCameraScannerView x:Name="CameraScannerView" />
 
                     <Border
@@ -130,6 +130,10 @@
 
                                 <Label
                                     FontSize="15"
+                                    IsVisible="{Binding HasExpirationText}"
+                                    Text="{Binding ExpirationText}" />
+                                <Label
+                                    FontSize="15"
                                     LineBreakMode="TailTruncation"
                                     MaxLines="1"
                                     Text="{Binding QuantitySummary}" />
@@ -167,6 +171,7 @@
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
                                     <Entry
                                         FontSize="20"
+                                        IsReadOnly="{Binding IsQuantityLocked}"
                                         Keyboard="Numeric"
                                         Placeholder="Количество"
                                         Text="{Binding QuantityText, Mode=TwoWay}">

@@ -1,4 +1,5 @@
 @page "/inventory-counts/{Id:guid}"
+@attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Application.Inventory.Counts
 @using Wms.Common
 @using Wms.Domain
@@ -28,11 +29,23 @@ else if (_inventoryCount is null)
 }
 else
 {
+    <AuthorizeView Roles="Operator">
+        <Authorized>
+            @RenderCount(_inventoryCount!, IsDraft)
+        </Authorized>
+        <NotAuthorized>
+            @RenderCount(_inventoryCount!, false)
+        </NotAuthorized>
+    </AuthorizeView>
+}
+
+@code {
+private RenderFragment RenderCount(InventoryCount count, bool canEdit) => @<text>
     <MudStack Spacing="3">
         <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.h5">Инвентаризация №@_inventoryCount.Number</MudText>
+            <MudText Typo="Typo.h5">Инвентаризация №@count.Number</MudText>
             <MudSpacer />
-            @if (IsDraft)
+            @if (canEdit)
             {
                 <MudButton Color="Color.Primary"
                            Variant="Variant.Filled"
@@ -59,7 +72,7 @@ else
             <MudGrid Spacing="2">
                 <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption">Склад</MudText>
-                    <MudText>@_inventoryCount.Warehouse?.Name</MudText>
+                    <MudText>@count.Warehouse?.Name</MudText>
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption">Ячейка</MudText>
@@ -67,25 +80,26 @@ else
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudText Typo="Typo.caption">Статус</MudText>
-                    <MudChip T="string" Size="Size.Small" Color="@_inventoryCount.Status.GetChipColor()">
-                        @_inventoryCount.Status.GetDisplayName()
+                    <MudChip T="string" Size="Size.Small" Color="@count.Status.GetChipColor()">
+                        @count.Status.GetDisplayName()
                     </MudChip>
                 </MudItem>
             </MudGrid>
             <MudDivider Class="my-3" />
             <MudText>
-                Позиций: @_inventoryCount.Items.Count · Пересчитано: @CountedItems · Осталось: @UncountedItems
+                Позиций: @count.Items.Count · Пересчитано: @CountedItems · Осталось: @UncountedItems
             </MudText>
         </MudPaper>
 
-        @if (IsDraft)
+        @if (canEdit)
         {
             <MudPaper Class="pa-4" Elevation="0" Outlined="true">
                 <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Добавить или исправить товар</b></MudText>
                 <MudGrid Spacing="2">
-                    <MudItem xs="12" md="7">
+                    <MudItem xs="12" md="5">
                         <MudAutocomplete T="InventoryCountSkuSearchResult"
-                                         @bind-Value="_selectedSku"
+                                         Value="_selectedSku"
+                                         ValueChanged="SelectSku"
                                          SearchFunc="SearchSkusAsync"
                                          ToStringFunc="GetSkuText"
                                          Label="Наименование, код или штрихкод"
@@ -93,6 +107,16 @@ else
                                          Clearable="true" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_manualExpiration" DateFormat="dd.MM.yyyy"
+                                       Label="Срок годности" Editable="true" Clearable="true"
+                                       Disabled="@(InputsLocked || _selectedSku is null || _manualUnknownExpiration)" />
+                        @if (_selectedSku is not null)
+                        {
+                            <MudCheckBox T="bool" @bind-Value="_manualUnknownExpiration" Label="Срок неизвестен"
+                                         Disabled="@(InputsLocked || _manualExpiration.HasValue)" />
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="2">
                         <MudNumericField T="decimal?"
                                          @bind-Value="_manualQuantity"
                                          Label="Фактически"
@@ -104,7 +128,7 @@ else
                         <MudButton Color="Color.Primary"
                                    Variant="Variant.Filled"
                                    FullWidth="true"
-                                   Disabled="@(InputsLocked || _selectedSku is null || _manualQuantity is null)"
+                                   Disabled="@(!CanSaveManualQuantity)"
                                    OnClick="SaveManualQuantityAsync">
                             Сохранить
                         </MudButton>
@@ -116,10 +140,11 @@ else
         <MudTable Items="SortedItems" Hover="true" Striped="true" Dense="true">
             <HeaderContent>
                 <MudTh>Товар</MudTh>
+                <MudTh>Срок годности</MudTh>
                 <MudTh>Ожидается</MudTh>
                 <MudTh>Фактически</MudTh>
                 <MudTh>Разница</MudTh>
-                @if (IsDraft) { <MudTh></MudTh> }
+                @if (canEdit) { <MudTh></MudTh> }
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Товар">
@@ -128,11 +153,22 @@ else
                         Код: @context.StockKeepingUnit?.Code · @(context.StockKeepingUnit?.BaseUnitOfMeasure?.Description ?? "—")
                     </MudText>
                 </MudTd>
+                <MudTd DataLabel="Срок годности">
+                    @FormatExpiration(context)
+                    @if (canEdit && RequiresExpiration(context) && context.CountedQuantity > 0 && !context.ExpirationConfirmed)
+                    {
+                        <MudButton Size="Size.Small" Disabled="@InputsLocked"
+                                   OnClick="@(() => UpdateQuantityAsync(context, context.CountedQuantity))">
+                            Подтвердить срок
+                        </MudButton>
+                    }
+                </MudTd>
                 <MudTd DataLabel="Ожидается">@FormatQuantity(context.ExpectedQuantity)</MudTd>
                 <MudTd DataLabel="Фактически">
-                    @if (IsDraft)
+                    @if (canEdit)
                     {
                         <MudNumericField T="decimal?"
+                                         @key="(context.Id, _quantityEditorVersion)"
                                          Value="context.CountedQuantity"
                                          ValueChanged="quantity => UpdateQuantityAsync(context, quantity)"
                                          Min="0"
@@ -147,7 +183,7 @@ else
                     }
                 </MudTd>
                 <MudTd DataLabel="Разница">@FormatQuantity(context.DifferenceQuantity)</MudTd>
-                @if (IsDraft)
+                @if (canEdit)
                 {
                     <MudTd>
                         @if (!context.IsExpected)
@@ -162,4 +198,5 @@ else
             </RowTemplate>
         </MudTable>
     </MudStack>
+</text>;
 }

@@ -44,14 +44,13 @@ public sealed class MobileInventoryCountClient
 
     public async Task<MobileInventoryCountScanResponse> IncrementSkuAsync(
         Guid inventoryCountId,
-        string barcode,
-        Guid clientRequestId,
+        MobileIncrementInventoryCountSkuRequest request,
         CancellationToken ct = default)
     {
         var route = $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/sku/scan";
         using HttpResponseMessage response = await _transport.PostAsync(
             route,
-            new MobileIncrementInventoryCountSkuRequest(clientRequestId, barcode),
+            request,
             ct);
         return await MobileApiTransport.ReadCommandResponseAsync<MobileInventoryCountScanResponse>(
             response,
@@ -78,6 +77,8 @@ public sealed class MobileInventoryCountClient
         Guid inventoryCountId,
         Guid stockKeepingUnitId,
         decimal countedQuantity,
+        DateOnly? expirationDate,
+        bool expirationConfirmed,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostDetailsAsync(
@@ -85,18 +86,21 @@ public sealed class MobileInventoryCountClient
             new MobileSetInventoryCountSkuQuantityRequest(
                 clientRequestId,
                 stockKeepingUnitId,
-                countedQuantity),
+                countedQuantity,
+                expirationDate,
+                expirationConfirmed),
             ct);
 
     public Task<MobileInventoryCountDetailsResponse> SetItemQuantityAsync(
         Guid inventoryCountId,
         Guid itemId,
         decimal countedQuantity,
+        bool expirationConfirmed,
         Guid clientRequestId,
         CancellationToken ct = default) =>
         PostDetailsAsync(
             $"{MobileApiRoutes.InventoryCounts}/{inventoryCountId:D}/items/{itemId:D}/quantity",
-            new MobileSetInventoryCountItemQuantityRequest(clientRequestId, countedQuantity),
+            new MobileSetInventoryCountItemQuantityRequest(clientRequestId, countedQuantity, expirationConfirmed),
             ct);
 
     public Task<MobileInventoryCountDetailsResponse> RemoveItemAsync(

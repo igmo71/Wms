@@ -24,8 +24,11 @@ requires `Manager` at execution; imported associations cannot be removed there.
 Changing the SKU expiration-tracking flag also requires `Manager` at execution;
 the one-time opening-stock command may enable it from accepted source rows
 marked `Да` under explicit `Administrator` membership. This command never
-disables an already enabled flag. Zones and storage locations remain
-administrator-only configuration. The cutover topology confirmation command
+disables an already enabled flag. Inventory count commands require `Operator`,
+including posting with differences. Web count documents are visible to
+`Operator` and `Manager`. The [cell mixing permission](inventory.md) requires
+`Manager` at execution. Zone and cell topology require `Administrator`.
+The cutover topology confirmation command
 and the opening-stock confirmation command require explicit `Administrator`
 membership. Public
 self-registration is not offered; administrator-created accounts are confirmed

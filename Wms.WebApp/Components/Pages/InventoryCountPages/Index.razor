@@ -1,4 +1,5 @@
 @page "/inventory-counts"
+@attribute [Authorize(Roles = "Operator,Manager")]
 @using Wms.Common
 @using Wms.Domain
 @using Wms.Domain.Enums
@@ -25,17 +26,25 @@
                      Disabled="@(InputsLocked || _warehouse is null)"
                      Clearable="true"
                      Class="mr-2" />
-    <MudTooltip Text="Чтобы создать инвентаризацию, выберите склад и свободную ячейку.">
-        <span>
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       Disabled="@(InputsLocked || _warehouse is null || _storageLocation is null)"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="CreateAsync">
-                Создать инвентаризацию
+    <AuthorizeView Roles="Operator">
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(InputsLocked || _warehouse is null || _storageLocation is null)"
+                   OnClick="CreateAsync">
+            Открыть инвентаризацию
+        </MudButton>
+    </AuthorizeView>
+    <AuthorizeView Roles="Manager">
+        @if (_storageLocation is not null)
+        {
+            <MudButton Variant="Variant.Outlined"
+                       Disabled="@(_isCreating || _pendingStart is not null)"
+                       OnClick="ChangeMixingAsync">
+                @(_pendingMixing is not null ? "Повторить настройку мульти-SKU"
+                    : _storageLocation.AllowsMultipleSkus ? "Запретить несколько SKU" : "Разрешить несколько SKU")
             </MudButton>
-        </span>
-    </MudTooltip>
+        }
+    </AuthorizeView>
 </MudStack>
 
 @if (_pendingStart is not null)

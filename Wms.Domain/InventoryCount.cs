@@ -60,18 +60,21 @@ public class InventoryCount
     public OperationResult<InventoryCountItem> AddExpectedItem(
         Guid itemId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
         decimal expectedQuantity,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
-        if (expectedQuantity <= 0)
-            return OperationError.Invalid("Ожидаемая строка должна иметь положительный остаток.");
-        return AddItem(itemId, stockKeepingUnitId, expectedQuantity, null, createdAtUtc, createdBy);
+        if (expectedQuantity == 0)
+            return OperationError.Invalid("Ожидаемая строка должна иметь ненулевой остаток.");
+        return AddItem(itemId, stockKeepingUnitId, expirationDate, expectedQuantity, null, false, createdAtUtc, createdBy);
     }
 
     public OperationResult<InventoryCountItem> IncrementSku(
         Guid itemId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
+        bool expirationConfirmed,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -79,11 +82,11 @@ public class InventoryCount
         if (!draftResult.IsSuccess)
             return draftResult.Error!;
 
-        var existingItem = _items.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
+        var existingItem = FindGroup(stockKeepingUnitId, expirationDate);
         if (existingItem is null)
-            return AddItem(itemId, stockKeepingUnitId, 0, 1, updatedAtUtc, updatedBy);
+            return AddItem(itemId, stockKeepingUnitId, expirationDate, 0, 1, expirationConfirmed, updatedAtUtc, updatedBy);
 
-        var incrementResult = existingItem.IncrementCountedQuantity(updatedAtUtc, updatedBy);
+        var incrementResult = existingItem.IncrementCountedQuantity(expirationConfirmed, updatedAtUtc, updatedBy);
         if (!incrementResult.IsSuccess)
             return incrementResult.Error!;
 
@@ -94,6 +97,7 @@ public class InventoryCount
     public OperationResult SetCountedQuantity(
         Guid itemId,
         decimal countedQuantity,
+        bool expirationConfirmed,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -101,7 +105,7 @@ public class InventoryCount
         if (!itemResult.IsSuccess)
             return itemResult.Error!;
 
-        var updateResult = itemResult.Value!.SetCountedQuantity(countedQuantity, updatedAtUtc, updatedBy);
+        var updateResult = itemResult.Value!.SetCountedQuantity(countedQuantity, expirationConfirmed, updatedAtUtc, updatedBy);
         if (!updateResult.IsSuccess)
             return updateResult;
 
@@ -112,7 +116,9 @@ public class InventoryCount
     public OperationResult<InventoryCountItem> SetSkuCountedQuantity(
         Guid itemId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
         decimal countedQuantity,
+        bool expirationConfirmed,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -120,11 +126,11 @@ public class InventoryCount
         if (!draftResult.IsSuccess)
             return draftResult.Error!;
 
-        var existingItem = _items.SingleOrDefault(x => x.StockKeepingUnitId == stockKeepingUnitId);
+        var existingItem = FindGroup(stockKeepingUnitId, expirationDate);
         if (existingItem is null)
-            return AddItem(itemId, stockKeepingUnitId, 0, countedQuantity, updatedAtUtc, updatedBy);
+            return AddItem(itemId, stockKeepingUnitId, expirationDate, 0, countedQuantity, expirationConfirmed, updatedAtUtc, updatedBy);
 
-        var updateResult = existingItem.SetCountedQuantity(countedQuantity, updatedAtUtc, updatedBy);
+        var updateResult = existingItem.SetCountedQuantity(countedQuantity, expirationConfirmed, updatedAtUtc, updatedBy);
         if (!updateResult.IsSuccess)
             return updateResult.Error!;
 
@@ -176,16 +182,18 @@ public class InventoryCount
     private OperationResult<InventoryCountItem> AddItem(
         Guid itemId,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
         decimal expectedQuantity,
         decimal? countedQuantity,
+        bool expirationConfirmed,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
         var draftResult = ValidateDraft();
         if (!draftResult.IsSuccess)
             return draftResult.Error!;
-        if (_items.Any(x => x.StockKeepingUnitId == stockKeepingUnitId))
-            return OperationError.Conflict("Товар уже присутствует в инвентаризации.");
+        if (FindGroup(stockKeepingUnitId, expirationDate) is not null)
+            return OperationError.Conflict("Товар с этим сроком уже присутствует в инвентаризации.");
 
         var lineNumber = _items.Count == 0 ? 1 : _items.Max(x => x.LineNumber) + 1;
         var itemResult = InventoryCountItem.Create(
@@ -193,8 +201,10 @@ public class InventoryCount
             Id,
             lineNumber,
             stockKeepingUnitId,
+            expirationDate,
             expectedQuantity,
             countedQuantity,
+            expirationConfirmed,
             createdAtUtc,
             createdBy);
         if (!itemResult.IsSuccess)
@@ -204,6 +214,9 @@ public class InventoryCount
         Touch(createdAtUtc, createdBy);
         return itemResult;
     }
+
+    private InventoryCountItem? FindGroup(Guid skuId, DateOnly? expirationDate) =>
+        _items.SingleOrDefault(x => x.StockKeepingUnitId == skuId && x.ExpirationDate == expirationDate);
 
     private OperationResult<InventoryCountItem> FindDraftItem(Guid itemId)
     {

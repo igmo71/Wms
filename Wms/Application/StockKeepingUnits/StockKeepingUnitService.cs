@@ -11,20 +11,12 @@ public class StockKeepingUnitService(IDbContextFactory<ApplicationDbContext> dbC
         string? barcode,
         CancellationToken ct = default)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
-        return await ResolveByBarcodeAsync(dbContext, barcode, ct);
-    }
-
-    internal async Task<OperationResult<StockKeepingUnit>> ResolveByBarcodeAsync(
-        ApplicationDbContext dbContext,
-        string? barcode,
-        CancellationToken ct)
-    {
         if (string.IsNullOrEmpty(barcode))
         {
             return OperationError.Invalid("Штрихкод товара не указан.");
         }
 
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var barcodeMatches = await dbContext.SkuBarcodes
             .AsNoTracking()
             .Include(x => x.Sku)

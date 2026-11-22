@@ -16,12 +16,13 @@ public partial class InventoryCountDetailsPage : ContentPage
     private int _searchVersion;
     private InventoryCountPageMode _mode = InventoryCountPageMode.Scanning;
     private InventoryCountItemViewState? _editingItem;
+    private bool _editingExpirationConfirmed;
     private bool _isVisible;
     private bool _scannerSubscribed;
     private bool _busy;
-    private Guid? _pendingScanRequestId;
-    private string? _pendingBarcode;
+    private MobileIncrementInventoryCountSkuRequest? _pendingScan;
     private Guid? _pendingQuantityRequestId;
+    private decimal _pendingQuantity;
     private Guid? _pendingPostRequestId;
     private Guid? _pendingDeleteRequestId;
     private Guid? _pendingRemoveRequestId;
@@ -71,7 +72,7 @@ public partial class InventoryCountDetailsPage : ContentPage
     }
 
     private bool IsDraft => _details.Count.Status == MobileInventoryCountStatus.Draft;
-    private bool HasPendingCommand => _pendingScanRequestId is not null
+    private bool HasPendingCommand => _pendingScan is not null
         || _pendingQuantityRequestId is not null
         || _pendingPostRequestId is not null
         || _pendingDeleteRequestId is not null
@@ -83,7 +84,7 @@ public partial class InventoryCountDetailsPage : ContentPage
     private bool IsScanExpected => IsDraft
         && !_busy
         && _mode == InventoryCountPageMode.Scanning
-        && (!HasPendingCommand || _pendingScanRequestId is not null);
+        && (!HasPendingCommand || _pendingScan is not null);
 
     private void OnScanReceived(object? sender, BarcodeScanEvent scanEvent) =>
         MainThread.BeginInvokeOnMainThread(async () => await IncrementScanAsync(scanEvent.Value));
@@ -92,32 +93,43 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         if (!IsScanExpected)
             return;
-        if (_pendingBarcode is not null && _pendingBarcode != barcode)
+        if (_pendingScan is { } pending && pending.Barcode != barcode)
         {
             ErrorLabel.Text = "Повторите предыдущий штрихкод: ответ сервера не был получен.";
             return;
         }
 
-        _pendingBarcode ??= barcode;
-        _pendingScanRequestId ??= Guid.NewGuid();
+        _pendingScan ??= new(Guid.NewGuid(), barcode, null, null);
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try
         {
             var response = await _inventoryCountClient.IncrementSkuAsync(
-                _details.Count.Id,
-                barcode,
-                _pendingScanRequestId.Value);
-            _pendingScanRequestId = null;
-            _pendingBarcode = null;
+                _details.Count.Id, _pendingScan);
+            if (response.Confirmation is { } confirmation)
+            {
+                _pendingScan = null;
+                ApplyDetails(response.Details);
+                CameraScannerView.Stop();
+                if (!IsDraft || !_isVisible)
+                    return;
+                var (confirmed, date) = await ChooseExpirationAsync(confirmation.SkuId, confirmation.SkuName);
+                if (!confirmed || !_isVisible)
+                    return;
+                _pendingScan = new(Guid.NewGuid(), barcode, date, confirmation.SkuId);
+                response = await _inventoryCountClient.IncrementSkuAsync(_details.Count.Id, _pendingScan);
+            }
+            _pendingScan = null;
             ApplyDetails(response.Details);
-            AccentItem(response.Item.StockKeepingUnitId, "+1");
-            InstructionLabel.Text = "Принято +1. Сканируйте следующий товар.";
+            if (response.Item is { } item)
+            {
+                AccentItem(item.Id, "+1");
+                InstructionLabel.Text = "Принято +1. Сканируйте следующий товар.";
+            }
         }
         catch (MobileApiException exception)
         {
-            _pendingScanRequestId = null;
-            _pendingBarcode = null;
+            _pendingScan = null;
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -226,16 +238,69 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private async Task SelectSkuAsync(MobileInventoryCountSkuSearchResponse sku)
     {
-        await ClearSearchAsync();
-
-        var item = ItemStates.SingleOrDefault(x => x.StockKeepingUnitId == sku.Id);
+        if (_busy || _mode != InventoryCountPageMode.Searching)
+            return;
+        SetBusy(true);
+        var requiresExpiration = sku.RequiresExpiration || ItemStates.Any(x =>
+            x.StockKeepingUnitId == sku.Id && x.ExpirationDate.HasValue);
+        DateOnly? date = null;
+        try
+        {
+            await ClearSearchAsync();
+            if (requiresExpiration)
+            {
+                var (confirmed, chosenDate) = await ChooseExpirationAsync(sku.Id, sku.Name);
+                if (!confirmed || !_isVisible)
+                {
+                    ReturnToScanning();
+                    return;
+                }
+                date = chosenDate;
+            }
+        }
+        finally
+        {
+            SetBusy(false);
+            await UpdateCameraAsync();
+        }
+        var item = ItemStates.SingleOrDefault(x => x.StockKeepingUnitId == sku.Id && x.ExpirationDate == date);
         if (item is null)
         {
-            item = InventoryCountItemViewState.FromPendingSku(sku);
+            item = InventoryCountItemViewState.FromPendingSku(sku, date, requiresExpiration);
             ItemStates.Add(item);
             SortItemStates();
         }
-        BeginQuantityEdit(item);
+        BeginQuantityEdit(item, requiresExpiration);
+    }
+
+    private async Task<(bool Confirmed, DateOnly? Date)> ChooseExpirationAsync(Guid skuId, string skuName)
+    {
+        const string enterDate = "Ввести дату";
+        const string unknown = "Срок неизвестен";
+        var knownDates = _details.Items.Where(x => x.StockKeepingUnitId == skuId)
+            .Select(x => x.ExpirationDate).OfType<DateOnly>().Distinct().Order()
+            .ToDictionary(x => x.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+        var choice = await DisplayActionSheetAsync($"Срок годности · {skuName}", "Отмена", null,
+            [.. knownDates.Keys, enterDate, unknown]);
+        if (choice == unknown)
+            return (true, null);
+        if (choice is not null && knownDates.TryGetValue(choice, out var knownDate))
+            return (true, knownDate);
+        if (choice != enterDate)
+            return (false, null);
+
+        var message = "Введите дату с маркировки, например 31.12.2026.";
+        while (true)
+        {
+            var input = await DisplayPromptAsync("Срок годности", message, "Подтвердить", "Отмена",
+                placeholder: "дд.мм.гггг", maxLength: 10);
+            if (input is null)
+                return (false, null);
+            if (DateOnly.TryParseExact(input.Trim(), "dd.MM.yyyy", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsed))
+                return (true, parsed);
+            message = "Укажите действительную дату в формате дд.мм.гггг.";
+        }
     }
 
     private async void OnPostClicked(object? sender, EventArgs e)
@@ -366,18 +431,18 @@ public partial class InventoryCountDetailsPage : ContentPage
 
     private void SynchronizeItemStates(IReadOnlyList<MobileInventoryCountItemResponse> items)
     {
-        var currentSkuIds = items.Select(x => x.StockKeepingUnitId).ToHashSet();
+        var currentItemIds = items.Select(x => x.Id).ToHashSet();
         for (var index = ItemStates.Count - 1; index >= 0; index--)
         {
             var state = ItemStates[index];
-            if (!state.IsPending && !currentSkuIds.Contains(state.StockKeepingUnitId))
+            if (!state.IsPending && state.ItemId is Guid id && !currentItemIds.Contains(id))
                 ItemStates.RemoveAt(index);
         }
 
         foreach (var item in items)
         {
             var state = ItemStates.SingleOrDefault(x =>
-                x.StockKeepingUnitId == item.StockKeepingUnitId);
+                x.ItemId == item.Id);
             if (state is null)
                 ItemStates.Add(InventoryCountItemViewState.FromItem(item, IsDraft));
             else
@@ -390,7 +455,7 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         var sorted = ItemStates
             .OrderBy(x => x.SkuName, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(x => x.StockKeepingUnitId).ToArray();
+            .ThenBy(x => x.StockKeepingUnitId).ThenBy(x => x.ExpirationDate).ToArray();
         for (var index = 0; index < sorted.Length; index++)
         {
             var currentIndex = ItemStates.IndexOf(sorted[index]);
@@ -429,7 +494,7 @@ public partial class InventoryCountDetailsPage : ContentPage
             await CancelQuantityEditAsync(item);
     }
 
-    private void BeginQuantityEdit(InventoryCountItemViewState item)
+    private void BeginQuantityEdit(InventoryCountItemViewState item, bool expirationConfirmed = false)
     {
         if (_busy
             || HasPendingCommand
@@ -438,8 +503,9 @@ public partial class InventoryCountDetailsPage : ContentPage
 
         CameraScannerView.Stop();
         _editingItem = item;
+        _editingExpirationConfirmed = expirationConfirmed;
         SetMode(InventoryCountPageMode.Editing);
-        AccentItem(item.StockKeepingUnitId, null);
+        AccentItem(item.ItemId, null);
         item.BeginEditing();
         InstructionLabel.Text = item.IsPending
             ? "Введите итоговое количество в новой карточке товара."
@@ -450,13 +516,22 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         if (_busy || !ReferenceEquals(_editingItem, item))
             return;
-        if (!TryReadQuantity(item, out var quantity))
+        var quantity = _pendingQuantity;
+        if (_pendingQuantityRequestId is null && !TryReadQuantity(item, out quantity))
             return;
 
-        _pendingQuantityRequestId ??= Guid.NewGuid();
         SetBusy(true);
+        item.SetQuantityLocked(true);
         try
         {
+            var confirmExpiration = quantity > 0 && item.RequiresExpiration;
+            if (_pendingQuantityRequestId is null && confirmExpiration && !_editingExpirationConfirmed
+                && !await DisplayAlertAsync("Срок годности", item.ExpirationDate is DateOnly date
+                    ? $"На товаре указан срок {date:dd.MM.yyyy}?"
+                    : "Подтвердите, что срок на товаре неизвестен.", "Подтвердить", "Отмена"))
+                return;
+            _pendingQuantity = quantity;
+            _pendingQuantityRequestId ??= Guid.NewGuid();
             MobileInventoryCountDetailsResponse details;
             if (item.IsPending)
             {
@@ -464,6 +539,8 @@ public partial class InventoryCountDetailsPage : ContentPage
                     _details.Count.Id,
                     item.StockKeepingUnitId,
                     quantity,
+                    item.ExpirationDate,
+                    confirmExpiration,
                     _pendingQuantityRequestId.Value);
             }
             else if (item.ItemId is Guid itemId)
@@ -472,6 +549,7 @@ public partial class InventoryCountDetailsPage : ContentPage
                     _details.Count.Id,
                     itemId,
                     quantity,
+                    confirmExpiration,
                     _pendingQuantityRequestId.Value);
             }
             else
@@ -482,8 +560,12 @@ public partial class InventoryCountDetailsPage : ContentPage
             _pendingQuantityRequestId = null;
             item.EndEditing();
             _editingItem = null;
+            if (item.IsPending)
+                ItemStates.Remove(item);
             ApplyDetails(details);
-            AccentItem(item.StockKeepingUnitId, null);
+            var updated = details.Items.SingleOrDefault(x =>
+                x.StockKeepingUnitId == item.StockKeepingUnitId && x.ExpirationDate == item.ExpirationDate);
+            AccentItem(updated?.Id, null);
             ReturnToScanning();
         }
         catch (MobileApiException exception)
@@ -497,6 +579,7 @@ public partial class InventoryCountDetailsPage : ContentPage
         }
         finally
         {
+            item.SetQuantityLocked(_pendingQuantityRequestId is not null);
             SetBusy(false);
             await UpdateCameraAsync();
         }
@@ -600,10 +683,10 @@ public partial class InventoryCountDetailsPage : ContentPage
         }
     }
 
-    private void AccentItem(Guid stockKeepingUnitId, string? text)
+    private void AccentItem(Guid? itemId, string? text)
     {
         foreach (var item in ItemStates)
-            item.SetAccent(item.StockKeepingUnitId == stockKeepingUnitId, text);
+            item.SetAccent(item.ItemId == itemId, text);
     }
 
     private async Task ClearSearchAsync()
@@ -620,7 +703,7 @@ public partial class InventoryCountDetailsPage : ContentPage
     {
         SetMode(InventoryCountPageMode.Scanning);
         StepLabel.Text = "Пересчёт товара";
-        InstructionLabel.Text = "Отсканируйте товар. Каждый принятый скан добавляет одну единицу.";
+        InstructionLabel.Text = "Отсканируйте товар. При необходимости подтвердите срок.";
         ErrorLabel.Text = string.Empty;
     }
 

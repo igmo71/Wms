@@ -13,7 +13,8 @@ public enum InventoryPostingKind
     Reversal,
     PickingIssue,
     Replenishment,
-    StockCorrection
+    StockCorrection,
+    InventoryCount
 }
 
 public sealed record InventoryPostingState(
@@ -57,7 +58,8 @@ public static class PostInventoryMovement
             if (movement is null || !WarehouseQuantity.IsPositive(movement.Quantity))
                 return OperationError.Invalid("Для проведения нужно положительное количество движения.");
             var newStockOperation = command.Kind is InventoryPostingKind.PickingIssue
-                or InventoryPostingKind.Replenishment or InventoryPostingKind.StockCorrection;
+                or InventoryPostingKind.Replenishment or InventoryPostingKind.StockCorrection
+                or InventoryPostingKind.InventoryCount;
             if (!newStockOperation && (movement.LicensePlateNumberId is null
                 || movement.RecorderType != RecorderType.ReceivingOrder))
                 return OperationError.Invalid("Для проведения приемки нужна ссылка на LPN.");
@@ -66,6 +68,7 @@ public static class PostInventoryMovement
                 {
                     InventoryPostingKind.PickingIssue => RecorderType.PickingAssembly,
                     InventoryPostingKind.Replenishment => RecorderType.ReplenishmentTask,
+                    InventoryPostingKind.InventoryCount => RecorderType.InventoryCount,
                     _ => RecorderType.StockCorrection
                 })))
                 return OperationError.Invalid("Регистратор движения не соответствует складской операции.");
@@ -91,6 +94,7 @@ public static class PostInventoryMovement
                     InventoryPostingKind.PickingIssue => sourceId is null || destinationId is not null,
                     InventoryPostingKind.Replenishment => sourceId is null || destinationId is null,
                     InventoryPostingKind.StockCorrection => false,
+                    InventoryPostingKind.InventoryCount => (sourceId is null) == (destinationId is null),
                     _ => true
                 })
                 return OperationError.Invalid("Направление движения не соответствует операции.");
@@ -103,6 +107,8 @@ public static class PostInventoryMovement
                 InventoryPostingKind.Replenishment => new InventoryPostingOwner(
                     StorageLocationLockOwnerType.ReplenishmentTask, movement.RecorderId!.Value),
                 InventoryPostingKind.StockCorrection => command.CorrectionHoldOwner,
+                InventoryPostingKind.InventoryCount => new InventoryPostingOwner(
+                    StorageLocationLockOwnerType.InventoryCount, movement.RecorderId!.Value),
                 _ => null
             };
             var locationIds = new[] { sourceId, destinationId }
@@ -119,11 +125,12 @@ public static class PostInventoryMovement
                 if (command.Kind == InventoryPostingKind.Reversal)
                 {
                     if (locationHold?.OwnerType is StorageLocationLockOwnerType.PickingAssembly
-                        or StorageLocationLockOwnerType.ReplenishmentTask)
-                        return OperationError.Conflict("Ячейка удерживается Отбором или Подпиткой.");
+                        or StorageLocationLockOwnerType.ReplenishmentTask or StorageLocationLockOwnerType.InventoryCount)
+                        return OperationError.Conflict("Ячейка удерживается другой складской операцией.");
                     continue;
                 }
                 if (location.IsFolder || location.DeletionMark || locationHold is not null && !owned
+                    || command.Kind == InventoryPostingKind.InventoryCount && !owned
                     || location.Warehouse is null || location.Warehouse.DeletionMark
                     || location.Zone is null || location.Zone.DeletionMark
                     || location.Zone.WarehouseId != movement.WarehouseId)
@@ -156,6 +163,9 @@ public static class PostInventoryMovement
             if (command.Kind == InventoryPostingKind.StockCorrection
                 && locationIds.Any(x => state.Locations[x].Zone!.Type is not (ZoneType.Storage or ZoneType.Reserve)))
                 return OperationError.Invalid("Корректировка остатка выполняется в Комплектации или Хранении.");
+            if (command.Kind == InventoryPostingKind.InventoryCount
+                && state.Locations[(destinationId ?? sourceId)!.Value].Zone!.Type is not (ZoneType.Storage or ZoneType.Reserve))
+                return OperationError.Invalid("Инвентаризация проводится в Комплектации или Хранении.");
             if (command.Kind is InventoryPostingKind.PickingIssue or InventoryPostingKind.Replenishment
                 && movement.ExpirationDate is DateOnly expiry
                 && expiry < DateOnly.FromDateTime(command.PostedAtUtc.UtcDateTime))
@@ -215,7 +225,9 @@ public static class PostInventoryMovement
                     return destinationResult.Error!;
 
                 var location = state.Locations[destination];
-                if ((location.Zone?.Type is ZoneType.Storage or ZoneType.Reserve)
+                // The count checks the final SKU composition of all its lines before posting them.
+                if (command.Kind != InventoryPostingKind.InventoryCount
+                    && (location.Zone?.Type is ZoneType.Storage or ZoneType.Reserve)
                     && !location.AllowsMultipleSkus
                     && await store.HasMultipleNonzeroSkusAsync(
                         context, movement.WarehouseId, destination, ct))

@@ -28,8 +28,15 @@ exceptions, approved exclusions and corrections,
 and the current status of reviewed mixed cells.
 The storage-location page shows the addresses and count of cells with a current
 prohibited mixed-SKU balance, and the selected cell shows its distinct SKU count.
-Its cell editor and detail view show the multiple-SKU permission for both
-Комплектация and Хранение cells.
+The location detail shows the multiple-SKU permission. In Web «Инвентаризации»,
+a Manager selects a warehouse and cell to change that permission.
+
+Web and TSD «Инвентаризация» show separate rows for the expiration groups of
+each SKU, including the expected signed balance and the counted fact. The TSD
+scan adds one to the confirmed group. When a scan needs a date, the operator
+can choose a displayed date, enter a date from the label or select «Срок
+неизвестен». Manual search can add the discovered group and set its quantity.
+The [count rules](other-workflows.md#inventory-count) apply in both clients.
 
 Operator SKU cards and lists in the replacement receiving, putaway and picking
 workflows provide a small «i» action.

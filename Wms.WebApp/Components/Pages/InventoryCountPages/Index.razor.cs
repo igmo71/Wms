@@ -4,10 +4,10 @@ using MudBlazor;
 using System.Security.Claims;
 using Wms.Application.Inventory.Counts;
 using Wms.Application.Commands;
-using Wms.Application.StorageLocations;
 using Wms.Application.Users;
 using Wms.Application.Warehouses;
 using Wms.Common;
+using Wms.Data;
 using Wms.Domain;
 
 namespace Wms.WebApp.Components.Pages.InventoryCountPages;
@@ -18,7 +18,6 @@ public partial class Index
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private StorageLocationQueryService StorageLocationQueryService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
     [Inject] private ILogger<Index> Logger { get; set; } = null!;
@@ -28,7 +27,8 @@ public partial class Index
     private StorageLocation? _storageLocation;
     private bool _isCreating;
     private (StartInventoryCountCommand Command, CommandContext Context)? _pendingStart;
-    private bool InputsLocked => _isCreating || _pendingStart is not null;
+    private (Guid LocationId, bool Allowed, CommandContext Context)? _pendingMixing;
+    private bool InputsLocked => _isCreating || _pendingStart is not null || _pendingMixing is not null;
     private bool _createFailed;
     private string? _errorMessage;
     private IReadOnlyDictionary<string, string> _userNames = new Dictionary<string, string>();
@@ -88,22 +88,49 @@ public partial class Index
         if (_warehouse is null)
             return [];
 
-        var result = await StorageLocationQueryService.ListAsync(new StorageLocationListQuery
-        {
-            SearchString = searchText,
-            WarehouseId = _warehouse.Id,
-            ZoneType = Domain.Enums.ZoneType.Storage,
-            ExcludeDeleted = true,
-            ExcludeFolders = true,
-            ExcludeLocked = true,
-            SortBy = "Code",
-            Take = 10
-        }, ct);
-        return result.Items;
+        return await InventoryCountQueryService.SearchLocationsAsync(_warehouse.Id, searchText, ct);
     }
 
     private static string GetLocationText(StorageLocation? location) =>
-        StorageLocationDisplay.Format(location);
+        location is null ? string.Empty : $"{StorageLocationDisplay.Format(location)} · {location.Zone?.Name}";
+
+    private async Task ChangeMixingAsync()
+    {
+        if (_isCreating || _pendingStart is not null || _storageLocation is not { } location)
+            return;
+        _isCreating = true;
+        _createFailed = false;
+        try
+        {
+            var userId = await GetCurrentUserIdAsync();
+            if (userId is null)
+            {
+                SetError("Не удалось определить текущего пользователя.");
+                return;
+            }
+            _pendingMixing ??= (location.Id, !location.AllowsMultipleSkus, new(Guid.NewGuid(), userId));
+            var pending = _pendingMixing.Value;
+            if (pending.Context.UserId != userId)
+            {
+                SetError("Повторите операцию под пользователем, который её начал.");
+                return;
+            }
+            var result = await InventoryCountCommandService.SetSkuMixingAsync(
+                pending.LocationId, pending.Allowed, pending.Context);
+            if (result.IsSuccess || result.Error?.Type != OperationErrorType.Failure)
+                _pendingMixing = null;
+            if (result.IsSuccess)
+                location.SetSkuMixing(pending.Allowed);
+            else
+                SetError(result.Error?.Message ?? "Не удалось изменить разрешение смешения.");
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to change SKU mixing for {StorageLocationId}.", location.Id);
+            SetError("Не удалось изменить разрешение смешения.");
+        }
+        finally { _isCreating = false; }
+    }
 
     private async Task CreateAsync()
     {

@@ -1,5 +1,4 @@
 @using Wms.Domain
-@using Wms.Domain.Enums
 
 <MudDialog Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
     <DialogContent>
@@ -31,12 +30,6 @@
                 <MudAutocomplete T="Zone" @bind-Value="_zone" SearchFunc="SearchZonesAsync"
                                  ToStringFunc="ZoneText" Label="Функциональная зона" Required="true"
                                  Disabled="@(StorageLocation is not null)" Clearable="true" />
-                @if (_zone?.Type is ZoneType.Storage or ZoneType.Reserve)
-                {
-                    <MudSwitch T="bool" @bind-Value="_allowsMultipleSkus"
-                               Label="Разрешить хранение нескольких SKU в ячейке"
-                               Color="Color.Primary" />
-                }
             }
 
             <MudText Typo="Typo.subtitle2">Размеры и ограничения</MudText>

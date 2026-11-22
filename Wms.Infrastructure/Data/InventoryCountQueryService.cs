@@ -1,13 +1,31 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Inventory.Counts;
 using Wms.Common;
-using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
-namespace Wms.Application.Inventory.Counts;
+namespace Wms.Data;
 
 public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
+    public async Task<IReadOnlyList<StorageLocation>> SearchLocationsAsync(Guid warehouseId,
+        string? searchText, CancellationToken ct = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        var locations = db.StorageLocations.AsNoTracking().Include(x => x.Zone)
+            .Where(x => x.WarehouseId == warehouseId && !x.DeletionMark && !x.IsFolder
+                && !x.Warehouse!.DeletionMark && !x.Zone!.DeletionMark
+                && (x.Zone.Type == ZoneType.Storage || x.Zone.Type == ZoneType.Reserve));
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            var normalized = StorageLocationAddress.Normalize(term);
+            var code = normalized.IsSuccess ? normalized.Value! : term;
+            locations = locations.Where(x => x.Name.Contains(term) || x.Code.Contains(code));
+        }
+        return await locations.OrderBy(x => x.Code).Take(10).ToListAsync(ct);
+    }
+
     public async Task<InventoryCount?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
@@ -94,7 +112,8 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
 
         var matches = await dbContext.StockKeepingUnits
             .AsNoTracking()
-            .Where(x => !x.DeletionMark
+            .Where(x => (!x.DeletionMark || dbContext.InventoryCountItems.Any(item =>
+                    item.InventoryCountId == inventoryCountId && item.StockKeepingUnitId == x.Id))
                 && ((x.Name != null && x.Name.Contains(term))
                     || (x.Code != null && x.Code.Contains(term))
                     || dbContext.SkuBarcodes.Any(barcode =>
@@ -109,6 +128,9 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
                 UnitOfMeasure = x.BaseUnitOfMeasure == null
                     ? null
                     : x.BaseUnitOfMeasure.Description,
+                RequiresExpiration = x.TracksExpirationDate || dbContext.InventoryCountItems.Any(item =>
+                    item.InventoryCountId == inventoryCountId && item.StockKeepingUnitId == x.Id
+                    && item.ExpirationDate != null),
                 IsExactMatch = (x.Code != null && x.Code == term)
                     || (x.Name != null && x.Name == term)
                     || dbContext.SkuBarcodes.Any(barcode =>
@@ -125,6 +147,7 @@ public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> 
             x.Code,
             x.Name,
             x.UnitOfMeasure,
-            x.IsExactMatch)).ToList();
+            x.IsExactMatch,
+            x.RequiresExpiration)).ToList();
     }
 }

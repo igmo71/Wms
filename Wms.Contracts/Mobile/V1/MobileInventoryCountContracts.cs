@@ -29,7 +29,10 @@ public sealed record MobileInventoryCountItemResponse(
     decimal ExpectedQuantity,
     decimal? CountedQuantity,
     decimal? DifferenceQuantity,
-    bool IsExpected);
+    bool IsExpected,
+    DateOnly? ExpirationDate,
+    bool RequiresExpiration,
+    bool ExpirationConfirmed);
 
 public sealed record MobileInventoryCountDetailsResponse(
     MobileInventoryCountSummaryResponse Count,
@@ -37,7 +40,10 @@ public sealed record MobileInventoryCountDetailsResponse(
 
 public sealed record MobileInventoryCountScanResponse(
     MobileInventoryCountDetailsResponse Details,
-    MobileInventoryCountItemResponse Item);
+    MobileInventoryCountItemResponse? Item,
+    MobileInventoryCountSkuConfirmation? Confirmation = null);
+
+public sealed record MobileInventoryCountSkuConfirmation(Guid SkuId, string SkuName);
 
 public sealed record MobileStartInventoryCountRequest(
     Guid ClientRequestId,
@@ -46,23 +52,29 @@ public sealed record MobileStartInventoryCountRequest(
 
 public sealed record MobileIncrementInventoryCountSkuRequest(
     Guid ClientRequestId,
-    string Barcode);
+    string Barcode,
+    DateOnly? ExpirationDate,
+    Guid? ConfirmedSkuId);
 
 public sealed record MobileInventoryCountSkuSearchResponse(
     Guid Id,
     string Code,
     string Name,
     string? UnitOfMeasure,
-    bool IsExactMatch);
+    bool IsExactMatch,
+    bool RequiresExpiration);
 
 public sealed record MobileSetInventoryCountItemQuantityRequest(
     Guid ClientRequestId,
-    decimal CountedQuantity);
+    decimal CountedQuantity,
+    bool ExpirationConfirmed);
 
 public sealed record MobileSetInventoryCountSkuQuantityRequest(
     Guid ClientRequestId,
     Guid StockKeepingUnitId,
-    decimal CountedQuantity);
+    decimal CountedQuantity,
+    DateOnly? ExpirationDate,
+    bool ExpirationConfirmed);
 
 public sealed record MobileInventoryCountCommandRequest(Guid ClientRequestId);
 

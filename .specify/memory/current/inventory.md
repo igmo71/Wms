@@ -6,8 +6,8 @@ A warehouse contains pickable storage (`Storage`, displayed as `Комплект
 reserve (`Reserve`, displayed as `Хранение`), transit, receiving, and shipping
 zone types. New receiving putaway can post into either Storage or Reserve.
 The replacement picking workflow can use Storage and eligible one-SKU Reserve
-cells. Older transfer and count flows still use their former Storage-only rules
-and are not ready for reserve stock.
+cells. Inventory counts cover both Storage and Reserve. Older transfer flows
+still use their former Storage-only rules for storage cells.
 
 Locations form an arbitrary-depth physical tree within one warehouse. A folder
 may have no functional zone; an operational location belongs to one active zone
@@ -230,21 +230,21 @@ dates. The violation disappears when outward movement leaves at most one such
 SKU; ordinary inflow that would retain mixed stock is rejected.
 
 An active operational location may have one active lock. A lock keeps the
-location visible but excludes it from operational selection and final posting.
+location visible and excludes it from competing warehouse work.
 A locked location cannot be deactivated or converted to a folder. Administrators
 own manual locks; an inventory-count draft owns its lock until posting or
 explicit deletion. Lock release removes the active record; separate lock
 history is not retained.
 
-The Web editor exposes the administrator-controlled permission to hold several
-SKUs for Storage and Reserve locations and shows it in their detail view. It is
-off by default for manual creation and range generation.
+The Manager controls the permission to hold several SKUs for Storage and Reserve
+locations through a separate Web action. The Manager can change it while a
+count holds the cell. It is off by default for manual creation and range generation.
 New receiving putaway applies it to both Storage and Reserve destinations;
 Receiving, Transit, and Shipping positions remain flow locations. With permission off,
 the final recorded stock in a storage-purpose location may contain nonzero balances
 of only one distinct SKU. Different expiration dates of that SKU are allowed;
 retained zero rows do not occupy the location, while negative balances count
-as nonzero. An administrator cannot turn permission off while several SKUs
+as nonzero. A Manager cannot turn permission off while several SKUs
 remain. Receiving putaway, direct and transit-backed transfers, inventory
 count posting, and current picking rollback reject a final mixed state
 without partial effects. A count may replace one SKU with another when its

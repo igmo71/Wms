@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using Wms.Application.Commands;
 using Wms.Application.Inventory.Counts;
-using Wms.Application.StorageLocations;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -17,7 +17,7 @@ internal static class MobileInventoryCountEndpoints
     {
         var group = endpoints.MapGroup(MobileApiRoutes.Base + "/inventory-counts")
             .WithTags("Mobile Inventory Counts")
-            .RequireAuthorization(MobileAuthorization.WarehouseOperatorPolicy);
+            .RequireAuthorization(policy => policy.RequireRole(ApplicationRoles.Operator));
 
         group.MapGet("", ListDraftsAsync)
             .WithMobileResponses<IReadOnlyList<MobileInventoryCountSummaryResponse>>();
@@ -71,21 +71,14 @@ internal static class MobileInventoryCountEndpoints
         MobileStartInventoryCountRequest request,
         ClaimsPrincipal principal,
         InventoryCountQueryService queryService,
-        StorageLocationQueryService storageLocationQueryService,
         InventoryCountCommandService commandService,
         CancellationToken ct)
     {
         var userId = GetUserId(principal);
         if (userId is null)
             return TypedResults.Unauthorized();
-        var location = await storageLocationQueryService.ResolveBarcodeAsync(
-            request.StorageLocationBarcode, request.WarehouseId, ZoneType.Storage, ct);
-        if (!location.IsSuccess)
-            return MobileEndpointResults.CommandProblem(location.Error!);
-        var locationId = location.Value!.Id;
-
         var result = await commandService.StartAsync(
-            new StartInventoryCountCommand(request.WarehouseId, locationId),
+            new StartInventoryCountCommand(request.WarehouseId, Guid.Empty, request.StorageLocationBarcode),
             new CommandContext(request.ClientRequestId, userId),
             ct);
         return await DetailsResultAsync(result, queryService, ct);
@@ -104,15 +97,22 @@ internal static class MobileInventoryCountEndpoints
             return TypedResults.Unauthorized();
 
         var result = await commandService.IncrementSkuAsync(
-            new IncrementInventoryCountSkuCommand(inventoryCountId, request.Barcode),
+            new IncrementInventoryCountSkuCommand(inventoryCountId, request.Barcode,
+                request.ExpirationDate, request.ConfirmedSkuId),
             new CommandContext(request.ClientRequestId, userId),
             ct);
-        if (!result.IsSuccess)
+        var confirmation = result.Error as InventoryCountExpirationRequired;
+        if (!result.IsSuccess && confirmation is null)
             return MobileEndpointResults.CommandProblem(result.Error!);
-        var count = await queryService.GetAsync(inventoryCountId, ct)
-            ?? throw new InvalidOperationException("Результат сканирования товара не найден.");
+        var count = await queryService.GetAsync(inventoryCountId, ct);
+        if (count is null)
+            return MobileEndpointResults.CommandProblem(OperationError.NotFound("Инвентаризация не найдена."));
         var details = MapDetails(count);
-        var item = details.Items.Single(x => x.Id == result.Value);
+        if (confirmation is not null)
+            return TypedResults.Ok(new MobileInventoryCountScanResponse(details, null,
+                new MobileInventoryCountSkuConfirmation(confirmation.SkuId, confirmation.SkuName)));
+        // A replay can follow the later removal of an unexpected row.
+        var item = details.Items.SingleOrDefault(x => x.Id == result.Value);
         return TypedResults.Ok(new MobileInventoryCountScanResponse(details, item));
     }
 
@@ -136,7 +136,8 @@ internal static class MobileInventoryCountEndpoints
                 x.Code,
                 x.Name,
                 x.UnitOfMeasure,
-                x.IsExactMatch)).ToList());
+                x.IsExactMatch,
+                x.RequiresExpiration)).ToList());
     }
 
     private static async Task<IResult> SetSkuQuantityAsync(
@@ -151,7 +152,8 @@ internal static class MobileInventoryCountEndpoints
         if (userId is null)
             return TypedResults.Unauthorized();
         var result = await commandService.SetSkuCountedQuantityAsync(
-            new SetInventoryCountSkuQuantityCommand(inventoryCountId, request.StockKeepingUnitId, request.CountedQuantity),
+            new SetInventoryCountSkuQuantityCommand(inventoryCountId, request.StockKeepingUnitId,
+                request.CountedQuantity, request.ExpirationDate, request.ExpirationConfirmed),
             new CommandContext(request.ClientRequestId, userId),
             ct);
         return await DetailsResultAsync(result, queryService, ct, inventoryCountId);
@@ -170,7 +172,8 @@ internal static class MobileInventoryCountEndpoints
         if (userId is null)
             return TypedResults.Unauthorized();
         var result = await commandService.SetCountedQuantityAsync(
-            new SetInventoryCountQuantityCommand(inventoryCountId, itemId, request.CountedQuantity),
+            new SetInventoryCountQuantityCommand(inventoryCountId, itemId, request.CountedQuantity,
+                request.ExpirationConfirmed),
             new CommandContext(request.ClientRequestId, userId),
             ct);
         return await DetailsResultAsync(result, queryService, ct, inventoryCountId);
@@ -240,9 +243,10 @@ internal static class MobileInventoryCountEndpoints
     {
         if (!result.IsSuccess)
             return MobileEndpointResults.CommandProblem(result.Error!);
-        var count = await queryService.GetAsync(inventoryCountId ?? result.Value, ct)
-            ?? throw new InvalidOperationException("Результат команды инвентаризации не найден.");
-        return TypedResults.Ok(MapDetails(count));
+        var count = await queryService.GetAsync(inventoryCountId ?? result.Value, ct);
+        return count is null
+            ? MobileEndpointResults.CommandProblem(OperationError.NotFound("Инвентаризация не найдена."))
+            : TypedResults.Ok(MapDetails(count));
     }
 
     private static MobileInventoryCountDetailsResponse MapDetails(InventoryCount count) => new(
@@ -258,7 +262,10 @@ internal static class MobileInventoryCountEndpoints
                 x.ExpectedQuantity,
                 x.CountedQuantity,
                 x.DifferenceQuantity,
-                x.IsExpected))
+                x.IsExpected,
+                x.ExpirationDate,
+                InventoryCountCommandService.RequiresExpiration(count, x.StockKeepingUnit!, x.ExpirationDate),
+                x.ExpirationConfirmed))
             .ToList());
 
     private static MobileInventoryCountSummaryResponse MapSummary(InventoryCount count)
@@ -281,7 +288,7 @@ internal static class MobileInventoryCountEndpoints
                 count.Warehouse?.Name ?? string.Empty,
                 zone.Id,
                 zone.Name,
-                MobileStorageLocationContext.Storage),
+                zone.Type == ZoneType.Reserve ? MobileStorageLocationContext.Reserve : MobileStorageLocationContext.Storage),
             count.Status == InventoryCountStatus.Draft
                 ? MobileInventoryCountStatus.Draft
                 : MobileInventoryCountStatus.Posted,

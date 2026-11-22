@@ -4,7 +4,6 @@ using Wms.Application.StorageLocations;
 using Wms.Application.Zones;
 using Wms.Common;
 using Wms.Domain;
-using Wms.Domain.Enums;
 
 namespace Wms.WebApp.Components.Pages.StorageLocationPages;
 
@@ -21,7 +20,6 @@ public partial class StorageLocationDialog
     private Zone? _zone;
     private string _name = string.Empty;
     private bool _isFolder;
-    private bool _allowsMultipleSkus;
     private long? _pickSequence;
     private double? _length;
     private double? _width;
@@ -49,7 +47,6 @@ public partial class StorageLocationDialog
         _code = StorageLocation.Code;
         _zone = StorageLocation.Zone;
         _isFolder = StorageLocation.IsFolder;
-        _allowsMultipleSkus = StorageLocation.AllowsMultipleSkus;
         _pickSequence = StorageLocation.PickSequence;
         _length = StorageLocation.Dimensions.Length;
         _width = StorageLocation.Dimensions.Width;
@@ -136,9 +133,7 @@ public partial class StorageLocationDialog
             _isFolder,
             dimensionsResult.Value,
             coordinatesResult.Value,
-            _pickSequence,
-            !_isFolder && (_zone?.Type is ZoneType.Storage or ZoneType.Reserve)
-                && _allowsMultipleSkus);
+            _pickSequence);
     }
 
     private void Cancel() => MudDialog.Cancel();

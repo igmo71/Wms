@@ -1,34 +1,35 @@
 # Current other warehouse workflows
 
-These workflows remain available, but their behavior with dated or negative
-stock from receiving is not established as production-ready:
-
-| Workflow | Current boundary |
-|---|---|
-| Intra-warehouse transfers | Movements are created without an expiration date, so a dated group cannot be preserved. |
-| Inventory count | A draft covers one ordinary Storage location and snapshots only positive balances by SKU. It cannot represent several date groups of one SKU; negative balances are excluded. |
-
-Legacy transfer and inventory count retain their original posting paths. Their
-replacement will adopt the shared reservation and hold mechanism already used
-by the replacement outbound processes.
-
 ## Inventory count
 
-Start/resume returns an existing draft for the location and warehouse, or creates
-one. Barcode resolution and mutable checks follow receipt lookup; count changes,
-lock, inventory effects and receipt save together without intermediate saves.
+A count covers one active Комплектация or Хранение cell. Opening a cell resumes
+its existing draft. A foreign cell hold, active picking reservation or unresolved
+shortage blocks a new draft. Start atomically takes an exclusive cell hold and
+snapshots every nonzero signed balance by SKU and nullable expiration date.
+Leaving the screen retains the draft and hold. Deleting a draft releases the
+hold without changing stock.
 
-A count covers one ordinary storage location. Draft creation atomically locks
-the location and snapshots positive balances as expected rows. Nullable counted
-quantity means uncounted; zero is explicit. Scan adds one, and manual input may
-set an absolute nonnegative quantity or add an unexpected SKU. Posting requires
-every row, records only nonzero differences, and releases the lock. Leaving the
-screen retains the draft; explicit deletion removes it and releases the lock.
-Posting follows the [Storage location SKU-mixing rule](inventory.md) on the
-final counted state.
+The Operator scans to add one or manually sets a nonnegative quantity for a
+SKU and expiration group. A missing fact is uncounted and zero confirms that
+the group is absent. For a SKU that tracks expiration or has dated count rows,
+positive fact requires an explicit date or confirmation that the date is
+unknown. A readable expired date is recorded as found. A date change is the
+fact of the original and the discovered groups, each with its own quantity.
+
+Posting verifies the complete fact, current balances against the signed
+snapshot and the [SKU-mixing rule](inventory.md) against the final count.
+Each nonzero difference posts for its own SKU and expiration group. Posting
+commits the document, movements, balances, turnovers, audit, repeat-safe
+command receipt and release of the hold together. A repeat of the same command
+does not duplicate movements. A rejected posting retains the draft and hold.
+If mixing caused the rejection, a Manager can allow mixing and the Operator
+can post the same draft. To redistribute the goods first, the Operator deletes
+the draft, the warehouse moves the goods and the Operator recounts the cell.
 
 ## Intra-warehouse transfer
 
+The legacy transfer path creates movements without an expiration date and
+uses the former Storage-only rules for storage cells.
 Transfer creation, movements, completion and Web draft deletion share application
 commands. State, movements, balances, turnover and receipt save together without
 intermediate saves or 1C calls.

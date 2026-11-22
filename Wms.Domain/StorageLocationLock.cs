@@ -32,7 +32,7 @@ public class StorageLocationLock
             lockedAtUtc,
             lockedBy);
 
-    internal static OperationResult<StorageLocationLock> CreateForInventoryCount(
+    public static OperationResult<StorageLocationLock> CreateForInventoryCount(
         Guid storageLocationId,
         Guid inventoryCountId,
         string? reason,

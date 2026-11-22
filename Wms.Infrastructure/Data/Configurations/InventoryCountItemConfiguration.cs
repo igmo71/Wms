@@ -32,8 +32,9 @@ internal class InventoryCountItemConfiguration : IEntityTypeConfiguration<Invent
             .IsRequired();
 
         builder.HasIndex(x => new { x.InventoryCountId, x.LineNumber });
-        builder.HasIndex(x => new { x.InventoryCountId, x.StockKeepingUnitId })
+        builder.HasIndex(x => new { x.InventoryCountId, x.StockKeepingUnitId, x.ExpirationDate })
             .IsUnique()
-            .HasDatabaseName(DatabaseObjectNames.InventoryCountItemsSkuIndex);
+            .HasDatabaseName(DatabaseObjectNames.InventoryCountItemsGroupIndex)
+            .HasFilter(null);
     }
 }

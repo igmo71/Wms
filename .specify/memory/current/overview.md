@@ -13,10 +13,9 @@ shipping documents. WMS imports them, executes warehouse work, and owns
 operational inventory by storage location. Outbound exchange with 1C depends on
 the workflow, as described in [integration](integration.md).
 
-Receiving, putaway, picking and shipping use replacement workflows. Direct and
-transit intra-warehouse transfers and location inventory counts still exist but
-await replacement for dated and signed stock; they are not established as
-production-ready with the new receiving inventory. Inventory
+Receiving, putaway, picking, shipping and location inventory counts use
+replacement workflows. Direct and transit intra-warehouse transfers still
+await replacement for dated and signed stock. Inventory
 history, employee-performance reporting, topology administration, synchronized
 catalogs, and WMS user administration also exist.
 

@@ -21,8 +21,8 @@ public static class DatabaseObjectNames
         "UX_InventoryMovements_OpeningBalanceLine";
     public const string InventoryMovementsReversedMovementIndex =
         "UX_InventoryMovements_ReversedMovementId";
-    public const string InventoryCountItemsSkuIndex =
-        "UX_InventoryCountItems_InventoryCountId_StockKeepingUnitId";
+    public const string InventoryCountItemsGroupIndex =
+        "UX_InventoryCountItems_CountId_SkuId_ExpirationDate";
     public const string InventoryTransfersActiveTransitLocationIndex =
         "IX_InventoryTransfers_TransitStorageLocationId";
     public const string StorageLocationLocksPrimaryKey =

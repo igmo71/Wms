@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Wms.Application.Authorization;
 using Wms.Application.Commands;
+using Wms.Application.Inventory;
 using Wms.Application.Inventory.Counts;
 using Wms.Application.Inventory.Movements;
 using Wms.Application.Inventory.Transfers;
-using Wms.Application.StockKeepingUnits;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -97,24 +98,43 @@ public sealed class InventorySafetyTests(SqlDatabase database)
     }
 
     [Fact]
-    public async Task Inventory_count_posts_positive_and_negative_corrections_once_and_releases_lock()
+    public async Task Inventory_count_posts_signed_dated_groups_once_and_releases_reserve_cell()
     {
-        var setup = await CreateCountSetup(10m, allowsMultipleSkus: true);
+        var date = new DateOnly(2025, 1, 31);
+        var newDate = date.AddMonths(1);
+        var setup = await CreateCountSetup(-2m, zoneType: ZoneType.Reserve, expirationDate: date);
+        await using (var seed = database.CreateDbContext())
+        {
+            var sku = await seed.StockKeepingUnits.SingleAsync(x => x.Id == setup.ExpectedSkuId);
+            sku.SetExpirationTracking(true);
+            seed.Add(Balance(setup.WarehouseId, setup.LocationId, sku.Id, 5m));
+            await seed.SaveChangesAsync();
+        }
         var service = CountService(database);
         var countId = Value(await service.StartAsync(new(setup.WarehouseId, setup.LocationId), Command("count-correction")));
         var count = await LoadCount(countId);
-        Value(await service.SetCountedQuantityAsync(new(countId, count.Items.Single().Id, 8.5m), Command("count-correction")));
-        Value(await service.SetSkuCountedQuantityAsync(new(countId, setup.UnexpectedSkuId, 2.25m), Command("count-correction")));
+        var negative = Assert.Single(count.Items, x => x.ExpirationDate == date);
+        Assert.True(negative.IsExpected);
+        Assert.Equal(-2m, negative.ExpectedQuantity);
+        var undated = Assert.Single(count.Items, x => x.ExpirationDate is null);
+        Error(await service.SetCountedQuantityAsync(new(countId, undated.Id, 2m), Command("count-correction")),
+            OperationErrorType.Invalid);
+        Value(await service.SetCountedQuantityAsync(new(countId, undated.Id, 2m, true), Command("count-correction")));
+        Value(await service.SetCountedQuantityAsync(new(countId, negative.Id, 0m), Command("count-correction")));
+        Value(await service.SetSkuCountedQuantityAsync(
+            new(countId, setup.ExpectedSkuId, 3m, newDate, true), Command("count-correction")));
         var postContext = Command("count-correction");
 
         Value(await service.PostAsync(countId, postContext));
         Value(await service.PostAsync(countId, postContext));
 
         await using var verify = database.CreateDbContext();
-        Assert.Equal(8.5m, (await verify.InventoryBalances.SingleAsync(x => x.StorageLocationId == setup.LocationId && x.StockKeepingUnitId == setup.ExpectedSkuId)).Quantity);
-        Assert.Equal(2.25m, (await verify.InventoryBalances.SingleAsync(x => x.StorageLocationId == setup.LocationId && x.StockKeepingUnitId == setup.UnexpectedSkuId)).Quantity);
-        Assert.Equal(2, await verify.InventoryMovements.CountAsync(x => x.RecorderId == countId && x.PostedAtUtc != null));
-        Assert.Equal(2, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == countId));
+        var balances = await verify.InventoryBalances.Where(x => x.StorageLocationId == setup.LocationId).ToListAsync();
+        Assert.Equal(2m, Assert.Single(balances, x => x.ExpirationDate is null).Quantity);
+        Assert.Equal(0m, Assert.Single(balances, x => x.ExpirationDate == date).Quantity);
+        Assert.Equal(3m, Assert.Single(balances, x => x.ExpirationDate == newDate).Quantity);
+        Assert.Equal(3, await verify.InventoryMovements.CountAsync(x => x.RecorderId == countId && x.PostedAtUtc != null));
+        Assert.Equal(3, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == countId));
         Assert.False(await verify.StorageLocationLocks.AnyAsync(x => x.StorageLocationId == setup.LocationId));
     }
 
@@ -151,6 +171,13 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         Assert.Equal(InventoryCountStatus.Draft,
             (await verify.InventoryCounts.SingleAsync(x => x.Id == secondId)).Status);
         Assert.False(await verify.InventoryMovements.AnyAsync(x => x.RecorderId == secondId));
+        Error(await service.SetSkuMixingAsync(setup.LocationId, true, Command("count-mixed")), OperationErrorType.Conflict);
+        Value(await service.SetSkuMixingAsync(setup.LocationId, true, Command("count-manager")));
+        Value(await service.PostAsync(secondId, Command("count-mixed")));
+        Error(await service.SetSkuMixingAsync(setup.LocationId, false, Command("count-manager")),
+            OperationErrorType.Conflict);
+        Assert.Equal(1m, await verify.InventoryBalances.Where(x => x.StorageLocationId == setup.LocationId
+            && x.StockKeepingUnitId == setup.ExpectedSkuId).Select(x => x.Quantity).SingleAsync());
     }
 
     [Fact]
@@ -183,15 +210,34 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         Assert.Equal(1, await verify.InventoryTurnovers.CountAsync(x => x.InventoryMovement!.RecorderId == countId));
     }
 
-    private async Task<CountSetup> CreateCountSetup(
-        decimal quantity, bool allowsMultipleSkus = false)
+    [Fact]
+    public async Task Concurrent_count_starts_share_one_draft_and_hold()
+    {
+        var setup = await CreateCountSetup(10m);
+        var service = CountService(database);
+        var command = new StartInventoryCountCommand(setup.WarehouseId, setup.LocationId);
+        var starts = await Task.WhenAll(service.StartAsync(command, Command("counter-one")),
+            service.StartAsync(command, Command("counter-two")));
+        var countId = Value(starts[0]);
+        Assert.Equal(countId, Value(starts[1]));
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(1, await verify.InventoryCounts.CountAsync(x =>
+            x.StorageLocationId == setup.LocationId && x.Status == InventoryCountStatus.Draft));
+        Assert.Equal(countId, (await verify.StorageLocationLocks.SingleAsync(x =>
+            x.StorageLocationId == setup.LocationId)).OwnerId);
+    }
+
+    private async Task<CountSetup> CreateCountSetup(decimal quantity, bool allowsMultipleSkus = false,
+        ZoneType zoneType = ZoneType.Storage, DateOnly? expirationDate = null)
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Count safety" };
         var expectedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Expected SKU" };
         var unexpectedSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Unexpected SKU" };
-        var zone = Zone(warehouse.Id, "CS", ZoneType.Storage);
+        var zone = Zone(warehouse.Id, "CS", zoneType);
         var location = Location(warehouse.Id, zone, 1, allowsMultipleSkus);
-        var balance = Balance(warehouse.Id, location.Id, expectedSku.Id, quantity);
+        var balance = Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id, location.Id,
+            expectedSku.Id, quantity, DateTimeOffset.UtcNow, expirationDate, allowNegative: true));
         await using var seed = database.CreateDbContext();
         seed.AddRange(warehouse, expectedSku, unexpectedSku, zone, location, balance);
         await seed.SaveChangesAsync();
@@ -215,7 +261,18 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         new(new CommandExecutor(factory), new InventoryPostingService(NullLogger<InventoryPostingService>.Instance));
 
     private static InventoryCountCommandService CountService(IDbContextFactory<ApplicationDbContext> factory) =>
-        new(new CommandExecutor(factory), new InventoryPostingService(NullLogger<InventoryPostingService>.Instance), new StockKeepingUnitService(factory));
+        new(new Wms.Application.CommandExecution.CommandExecutor(new CommandExecutionStore(factory)),
+            new InventoryCountStore(), new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            new WarehousePermission(new CountPermission()), TimeProvider.System);
+
+    private sealed class CountPermission : IWarehousePermissionStore
+    {
+        public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(userId == "count-manager");
+
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) =>
+            Task.FromResult(userId != "count-manager");
+    }
 
     private sealed record CountSetup(Guid WarehouseId, Guid LocationId, Guid ExpectedSkuId, Guid UnexpectedSkuId, Guid ExpectedBalanceId);
 }

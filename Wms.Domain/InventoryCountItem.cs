@@ -12,14 +12,16 @@ public class InventoryCountItem
     public int LineNumber { get; private set; }
     public Guid StockKeepingUnitId { get; private set; }
     public StockKeepingUnit? StockKeepingUnit { get; private set; }
+    public DateOnly? ExpirationDate { get; private set; }
     public decimal ExpectedQuantity { get; private set; }
     public decimal? CountedQuantity { get; private set; }
+    public bool ExpirationConfirmed { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string CreatedBy { get; private set; } = null!;
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
     public string? UpdatedBy { get; private set; }
 
-    public bool IsExpected => ExpectedQuantity > 0;
+    public bool IsExpected => ExpectedQuantity != 0;
     public bool IsCounted => CountedQuantity.HasValue;
     public decimal? DifferenceQuantity => CountedQuantity - ExpectedQuantity;
     public double? CountedWeightKg => CountedQuantity.HasValue
@@ -31,8 +33,10 @@ public class InventoryCountItem
         Guid inventoryCountId,
         int lineNumber,
         Guid stockKeepingUnitId,
+        DateOnly? expirationDate,
         decimal expectedQuantity,
         decimal? countedQuantity,
+        bool expirationConfirmed,
         DateTimeOffset createdAtUtc,
         string createdBy)
     {
@@ -57,14 +61,17 @@ public class InventoryCountItem
             InventoryCountId = inventoryCountId,
             LineNumber = lineNumber,
             StockKeepingUnitId = stockKeepingUnitId,
+            ExpirationDate = expirationDate,
             ExpectedQuantity = expectedQuantity,
             CountedQuantity = countedQuantity,
+            ExpirationConfirmed = countedQuantity > 0 && expirationConfirmed,
             CreatedAtUtc = createdAtUtc,
             CreatedBy = createdBy.Trim()
         };
     }
 
-    internal OperationResult IncrementCountedQuantity(DateTimeOffset updatedAtUtc, string updatedBy)
+    internal OperationResult IncrementCountedQuantity(bool expirationConfirmed,
+        DateTimeOffset updatedAtUtc, string updatedBy)
     {
         var auditResult = ValidateUpdateAudit(updatedAtUtc, updatedBy);
         if (!auditResult.IsSuccess)
@@ -75,6 +82,7 @@ public class InventoryCountItem
             return OperationError.Invalid("Фактическое количество стало слишком большим.");
 
         CountedQuantity = countedQuantity;
+        ExpirationConfirmed = expirationConfirmed;
         UpdatedAtUtc = updatedAtUtc;
         UpdatedBy = updatedBy.Trim();
         return OperationResult.Success();
@@ -82,6 +90,7 @@ public class InventoryCountItem
 
     internal OperationResult SetCountedQuantity(
         decimal countedQuantity,
+        bool expirationConfirmed,
         DateTimeOffset updatedAtUtc,
         string updatedBy)
     {
@@ -94,6 +103,7 @@ public class InventoryCountItem
             return auditResult;
 
         CountedQuantity = countedQuantity;
+        ExpirationConfirmed = countedQuantity > 0 && expirationConfirmed;
         UpdatedAtUtc = updatedAtUtc;
         UpdatedBy = updatedBy.Trim();
         return OperationResult.Success();
@@ -112,8 +122,8 @@ public class InventoryCountItem
 
     private static OperationResult ValidateQuantities(decimal expectedQuantity, decimal? countedQuantity)
     {
-        if (!WarehouseQuantity.IsNonNegative(expectedQuantity))
-            return OperationError.Invalid("Ожидаемое количество должно быть конечным неотрицательным числом.");
+        if (!WarehouseQuantity.IsSupported(expectedQuantity))
+            return OperationError.Invalid("Ожидаемое количество выходит за допустимые пределы.");
         if (countedQuantity is decimal quantity && !WarehouseQuantity.IsNonNegative(quantity))
             return OperationError.Invalid("Фактическое количество должно быть конечным неотрицательным числом.");
         return OperationResult.Success();

@@ -15,9 +15,6 @@ internal static class PersistenceConflictClassifier
     private static readonly OperationError TransferConflict = OperationError.Conflict(
         "Перемещение изменилось. Обновите данные и повторите операцию.");
 
-    private static readonly OperationError InventoryCountConflict = OperationError.Conflict(
-        "Инвентаризация изменилась. Обновите данные и повторите операцию.");
-
     private static readonly OperationError StorageLocationConflict = OperationError.Conflict(
         "Состояние ячейки изменилось. Обновите данные и повторите операцию.");
 
@@ -43,12 +40,6 @@ internal static class PersistenceConflictClassifier
             if (concurrencyException.Entries.Any(x => x.Entity is InventoryTransfer))
             {
                 error = TransferConflict;
-                return true;
-            }
-
-            if (concurrencyException.Entries.Any(x => x.Entity is InventoryCount))
-            {
-                error = InventoryCountConflict;
                 return true;
             }
 
@@ -122,14 +113,6 @@ internal static class PersistenceConflictClassifier
                     StringComparison.Ordinal))
             {
                 error = TransferConflict;
-                return true;
-            }
-
-            if (sqlException.Message.Contains(
-                    DatabaseObjectNames.InventoryCountItemsSkuIndex,
-                    StringComparison.Ordinal))
-            {
-                error = InventoryCountConflict;
                 return true;
             }
 

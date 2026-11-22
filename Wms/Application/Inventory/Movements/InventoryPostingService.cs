@@ -292,8 +292,7 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
                         "Проведение движения возможно только в активной складской топологии.");
                 }
 
-                if (location.ActiveLock is not null
-                    && !IsOwnedByMovement(location.ActiveLock, movement))
+                if (location.ActiveLock is not null)
                 {
                     return StorageLocationAvailability.LockedConflict(location);
                 }
@@ -302,13 +301,6 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
 
         return OperationResult<IReadOnlyCollection<StorageLocation>>.Success(locations.Values);
     }
-
-    private static bool IsOwnedByMovement(
-        StorageLocationLock locationLock,
-        InventoryMovement movement) =>
-        locationLock.OwnerType == StorageLocationLockOwnerType.InventoryCount
-        && locationLock.OwnerId == movement.RecorderId
-        && movement.RecorderType == RecorderType.InventoryCount;
 
     private static Guid[] GetStorageLocationIds(IReadOnlyCollection<InventoryMovement> movements)
     {

@@ -471,6 +471,12 @@ namespace Wms.Data.Migrations
                         .HasPrecision(15, 3)
                         .HasColumnType("decimal(15,3)");
 
+                    b.Property<bool>("ExpirationConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
                     b.Property<Guid>("InventoryCountId")
                         .HasColumnType("uniqueidentifier");
 
@@ -493,9 +499,9 @@ namespace Wms.Data.Migrations
 
                     b.HasIndex("InventoryCountId", "LineNumber");
 
-                    b.HasIndex("InventoryCountId", "StockKeepingUnitId")
+                    b.HasIndex("InventoryCountId", "StockKeepingUnitId", "ExpirationDate")
                         .IsUnique()
-                        .HasDatabaseName("UX_InventoryCountItems_InventoryCountId_StockKeepingUnitId");
+                        .HasDatabaseName("UX_InventoryCountItems_CountId_SkuId_ExpirationDate");
 
                     b.ToTable("InventoryCountItems");
                 });
@@ -2386,6 +2392,9 @@ namespace Wms.Data.Migrations
                     b.Property<Guid?>("StockKeepingUnitId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("StorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("WarehouseOpeningImportId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2400,6 +2409,8 @@ namespace Wms.Data.Migrations
                     b.HasIndex("ReceivingSourceDocumentId", "OccurredAtUtc");
 
                     b.HasIndex("StockKeepingUnitId", "OccurredAtUtc");
+
+                    b.HasIndex("StorageLocationId", "OccurredAtUtc");
 
                     b.HasIndex("WarehouseOpeningImportId", "OccurredAtUtc");
 
@@ -3490,6 +3501,11 @@ namespace Wms.Data.Migrations
                     b.HasOne("Wms.Domain.StockKeepingUnit", null)
                         .WithMany()
                         .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wms.Domain.StorageLocation", null)
+                        .WithMany()
+                        .HasForeignKey("StorageLocationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Wms.Domain.WarehouseOpeningImport", null)

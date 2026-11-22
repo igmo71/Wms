@@ -18,6 +18,7 @@ public sealed class WarehouseAuditEvent
     public Guid? StockKeepingUnitId { get; private set; }
     public Guid? ReceivingSourceDocumentId { get; private set; }
     public Guid? WarehouseOpeningImportId { get; private set; }
+    public Guid? StorageLocationId { get; private set; }
     public string? BeforeValuesJson { get; private set; }
     public string? AfterValuesJson { get; private set; }
     public string MovementIdsJson { get; private set; } = "[]";
@@ -43,7 +44,8 @@ public sealed class WarehouseAuditEvent
         string? commandType = null,
         Guid? requestId = null,
         Guid? warehouseOpeningImportId = null,
-        Guid? pickingAssemblyId = null)
+        Guid? pickingAssemblyId = null,
+        Guid? storageLocationId = null)
     {
         if (string.IsNullOrWhiteSpace(eventType) || eventType.Length > 100
             || occurredAtUtc == default)
@@ -55,7 +57,7 @@ public sealed class WarehouseAuditEvent
 
         Guid?[] affectedIds = [receivingOrderId, licensePlateNumberId,
             stockKeepingUnitId, receivingSourceDocumentId, warehouseOpeningImportId,
-            pickingAssemblyId];
+            pickingAssemblyId, storageLocationId];
         if (affectedIds.All(x => x is null) || affectedIds.Any(x => x == Guid.Empty))
             return OperationError.Invalid("Событие должно ссылаться на затронутый объект.");
 
@@ -88,6 +90,7 @@ public sealed class WarehouseAuditEvent
             StockKeepingUnitId = stockKeepingUnitId,
             ReceivingSourceDocumentId = receivingSourceDocumentId,
             WarehouseOpeningImportId = warehouseOpeningImportId,
+            StorageLocationId = storageLocationId,
             BeforeValuesJson = beforeValuesJson,
             AfterValuesJson = afterValuesJson,
             MovementIdsJson = JsonSerializer.Serialize(movements),

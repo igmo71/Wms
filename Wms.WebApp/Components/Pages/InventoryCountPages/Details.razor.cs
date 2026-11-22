@@ -5,6 +5,7 @@ using MudBlazor;
 using Wms.Application.Inventory.Counts;
 using Wms.Application.Commands;
 using Wms.Common;
+using Wms.Data;
 using Wms.Domain;
 using Wms.Domain.Enums;
 
@@ -28,6 +29,8 @@ public partial class Details
         .ThenBy(x => x.LineNumber).ToArray() ?? [];
     private InventoryCountSkuSearchResult? _selectedSku;
     private decimal? _manualQuantity;
+    private DateTime? _manualExpiration;
+    private bool _manualUnknownExpiration;
     private bool _isLoading = true;
     private bool _isBusy;
     private bool _isConfirming;
@@ -68,29 +71,73 @@ public partial class Details
         ? string.Empty
         : $"{sku.Name} · {sku.Code}";
 
+    private void SelectSku(InventoryCountSkuSearchResult? sku)
+    {
+        _selectedSku = sku;
+        _manualExpiration = null;
+        _manualUnknownExpiration = false;
+    }
+
+    private bool CanSaveManualQuantity => !InputsLocked && _selectedSku is not null
+        && _manualQuantity is decimal quantity && (quantity == 0 || !_selectedSku.RequiresExpiration
+            || _manualExpiration.HasValue || _manualUnknownExpiration);
+
     private Task SaveManualQuantityAsync()
     {
-        if (InputsLocked || _selectedSku is null || _manualQuantity is not decimal quantity)
+        if (!CanSaveManualQuantity || _selectedSku is null || _manualQuantity is not decimal quantity)
             return Task.CompletedTask;
-        var command = new SetInventoryCountSkuQuantityCommand(Id, _selectedSku.Id, quantity);
+        var date = _manualExpiration is DateTime expiration ? DateOnly.FromDateTime(expiration) : (DateOnly?)null;
+        var command = new SetInventoryCountSkuQuantityCommand(Id, _selectedSku.Id, quantity,
+            date, date.HasValue || _manualUnknownExpiration);
         return RunOperationAsync("Сохранить количество товара",
             context => InventoryCountCommandService.SetSkuCountedQuantityAsync(command, context),
             async () =>
             {
-                _selectedSku = null;
+                SelectSku(null);
                 _manualQuantity = null;
                 await ReloadAsync();
             });
     }
 
-    private Task UpdateQuantityAsync(InventoryCountItem item, decimal? quantity)
+    private async Task UpdateQuantityAsync(InventoryCountItem item, decimal? quantity)
     {
-        if (InputsLocked || quantity is null)
-            return Task.CompletedTask;
-        var command = new SetInventoryCountQuantityCommand(Id, item.Id, quantity.Value);
-        return RunOperationAsync("Сохранить количество строки",
+        if (InputsLocked || quantity is null || _inventoryCount is null)
+            return;
+        var countId = Id;
+        var confirmed = false;
+        if (quantity > 0 && RequiresExpiration(item))
+        {
+            _isConfirming = true;
+            try
+            {
+                var message = item.ExpirationDate is DateOnly date
+                    ? $"На товаре указан срок {date:dd.MM.yyyy}?"
+                    : "Подтвердите, что срок на товаре неизвестен.";
+                confirmed = await DialogService.ShowMessageBoxAsync(
+                    "Срок годности", message, yesText: "Подтвердить", cancelText: "Отмена") == true;
+            }
+            finally { _isConfirming = false; }
+            if (Id != countId)
+                return;
+            if (!confirmed)
+            {
+                _quantityEditorVersion++;
+                return;
+            }
+        }
+        var command = new SetInventoryCountQuantityCommand(countId, item.Id, quantity.Value, confirmed);
+        await RunOperationAsync("Сохранить количество строки",
             context => InventoryCountCommandService.SetCountedQuantityAsync(command, context), ReloadAsync);
     }
+
+    private int _quantityEditorVersion;
+
+    private bool RequiresExpiration(InventoryCountItem item) =>
+        _inventoryCount is not null && item.StockKeepingUnit is { } sku
+        && InventoryCountCommandService.RequiresExpiration(_inventoryCount, sku, item.ExpirationDate);
+
+    private string FormatExpiration(InventoryCountItem item) =>
+        item.ExpirationDate?.ToString("dd.MM.yyyy") ?? (RequiresExpiration(item) ? "Неизвестен" : "—");
 
     private Task RemoveItemAsync(InventoryCountItem item)
     {

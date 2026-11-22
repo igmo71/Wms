@@ -74,7 +74,8 @@ public class StorageLocation
             WarehouseId = warehouseId,
             ZoneId = zoneId,
             ParentId = parentId,
-            Code = normalizedCode.Value!
+            Code = normalizedCode.Value!,
+            AllowsMultipleSkus = details.AllowsMultipleSkus
         };
 
         location.ApplyDetails(details);
@@ -91,15 +92,24 @@ public class StorageLocation
         if (!details.IsFolder && ZoneId is null)
             return OperationError.Invalid("Для места хранения выберите функциональную зону.");
 
-        var eligibilityChanged = IsFolder != details.IsFolder
-            || AllowsMultipleSkus != details.AllowsMultipleSkus;
+        var eligibilityChanged = IsFolder != details.IsFolder;
         ApplyDetails(details);
+        if (IsFolder)
+            AllowsMultipleSkus = false;
         if (eligibilityChanged)
         {
             AdvanceOperationalRevision();
         }
 
         return OperationResult.Success();
+    }
+
+    public void SetSkuMixing(bool allowed)
+    {
+        if (AllowsMultipleSkus == allowed)
+            return;
+        AllowsMultipleSkus = allowed;
+        AdvanceOperationalRevision();
     }
 
     public void Deactivate()
@@ -126,7 +136,6 @@ public class StorageLocation
     {
         Name = details.Name;
         IsFolder = details.IsFolder;
-        AllowsMultipleSkus = details.AllowsMultipleSkus;
         Dimensions = details.Dimensions.Copy();
         Coordinates = details.Coordinates.Copy();
         PickSequence = details.PickSequence;

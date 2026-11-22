@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Wms.Application.DeliveryDirections;
 using Wms.Application.Individuals;
 using Wms.Application.Inventory.Balances;
-using Wms.Application.Inventory.Counts;
 using Wms.Application.Inventory.Movements;
 using Wms.Application.Inventory.Transfers;
 using Wms.Application.Inventory.Turnovers;
@@ -32,8 +31,6 @@ public static class DependencyInjection
         services.AddScoped<DeliveryDirectionService>();
         services.AddScoped<EmployeePerformanceReportService>();
         services.AddScoped<IndividualService>();
-        services.AddScoped<InventoryCountCommandService>();
-        services.AddScoped<InventoryCountQueryService>();
         services.AddScoped<InventoryBalanceQueryService>();
         services.AddScoped<InventoryMovementQueryService>();
         services.AddScoped<InventoryTurnoverQueryService>();
