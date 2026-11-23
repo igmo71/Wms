@@ -54,6 +54,7 @@ public sealed class PickingAssemblyQueryStore(
             x.CreatedAtUtc, x.StartedAtUtc,
             x.ActiveSources.Select(link => new PickingAssemblyListSource(
                 link.ShippingOrderId, link.ShippingOrder?.Number,
+                link.ShippingOrder?.Queue ?? ShippingOrderQueue.Unknown,
                 link.StartConfirmedAtUtc is not null, link.LastStartError,
                 link.ShippingOrder?.LastSourceCheckError)
                 {
@@ -95,6 +96,7 @@ public sealed class PickingAssemblyQueryStore(
             where link.PickingAssemblyId == assemblyId && link.DetachedAtUtc == null
             select new PickingAssemblySourceOverview(
                 link.ShippingOrderId, link.ShippingOrder!.Number, link.ShippingOrder.Status,
+                link.ShippingOrder.Queue,
                 link.ShippingOrder.Posted, link.ShippingOrder.DeletionMark,
                 link.ShippingOrder.LastSourceCheckAtUtc, link.ShippingOrder.LastSourceCheckError,
                 link.StartConfirmedAtUtc, link.LastStartAttemptAtUtc, link.LastStartError,

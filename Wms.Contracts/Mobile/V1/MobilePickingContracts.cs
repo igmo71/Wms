@@ -18,10 +18,19 @@ public enum MobileShippingExchangeStage
     NeedsReview = 3
 }
 
+public enum MobileShippingOrderQueue
+{
+    Unknown = 0,
+    LiveQueue = 1,
+    CollectByDate = 2,
+    OwnDelivery = 3
+}
+
 public sealed record MobilePickingListSourceResponse(
     Guid SourceRefKey, string? Number, bool StartConfirmed,
     string? StartError, string? SourceCheckError)
 {
+    public MobileShippingOrderQueue Queue { get; init; }
     public MobileShippingExchangeStage? ExchangeStage { get; init; }
     public string? ExchangeError { get; init; }
 }
@@ -39,6 +48,7 @@ public sealed record MobilePickingSourceResponse(
     string? LastCheckError, DateTimeOffset? StartConfirmedAtUtc,
     DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError)
 {
+    public MobileShippingOrderQueue Queue { get; init; }
     public MobileShippingExchangeStage? ExchangeStage { get; init; }
     public string? ExchangeError { get; init; }
 }
@@ -110,11 +120,14 @@ public sealed record MobilePickingWorkResponse(
     IReadOnlyList<MobilePickingWorkSkuResponse> Skus,
     IReadOnlyList<MobilePickingWorkEntryResponse> Entries);
 
+public sealed record MobilePickingFreeStockResponse(decimal Quantity, bool HasExpiredStock);
+
 public sealed record MobilePickingRouteStepResponse(
     Guid StorageLocationId, string LocationCode, Guid SkuId,
     DateOnly? ExpirationDate, decimal Quantity, bool DirectPalletPick)
 {
     public string? LocationName { get; init; }
+    public MobilePickingFreeStockResponse? CellAvailability { get; init; }
 }
 
 public sealed record MobilePickingRouteGapResponse(
@@ -132,6 +145,8 @@ public sealed record MobilePickingAvailabilityResponse(
     public string? LocationName { get; init; }
     public bool CanPickNow { get; init; }
     public bool FromReserve { get; init; }
+    public bool HasExpiredStock { get; init; }
+    public bool? OfferedForSelection { get; init; }
 }
 
 public sealed record MobilePickingSkuResponse(

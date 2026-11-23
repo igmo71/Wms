@@ -24,7 +24,8 @@ public sealed class GetPickingWork(
 
 public sealed record PickingRouteView(long Revision,
     IReadOnlyList<PickingRouteStep> Steps,
-    IReadOnlyList<PickingRouteGap> Gaps, PickingWorkView Work);
+    IReadOnlyList<PickingRouteGap> Gaps, PickingWorkView Work,
+    IReadOnlyDictionary<(Guid LocationId, Guid SkuId), PickingFreeStock> StockByCell);
 
 public sealed class GetPickingRoute(
     GetPickingWork workQuery, IPickingAssemblyQueryStore assemblies,
@@ -48,11 +49,16 @@ public sealed class GetPickingRoute(
             remaining.Keys.ToArray(), ct);
         var locations = await assemblies.GetRouteLocationsAsync(work.WarehouseId,
             availability.Select(x => x.Group.StorageLocationId).Distinct().ToArray(), ct);
-        var route = builder.Execute(new PickingRouteRequest(assemblyId,
-            work.WarehouseId, DateOnly.FromDateTime(clock.GetLocalNow().DateTime),
+        var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+        var route = builder.Execute(new PickingRouteRequest(assemblyId, work.WarehouseId, today,
             remaining, availability, locations, previousLocationId, nextLocationId));
-        return route.IsSuccess
-            ? new PickingRouteView(work.Revision, route.Value!.Steps, route.Value.Gaps, work)
-            : route.Error!;
+        if (!route.IsSuccess) return route.Error!;
+
+        var stockByCell = availability.GroupBy(x =>
+                (x.Group.StorageLocationId, x.Group.StockKeepingUnitId))
+            .ToDictionary(x => x.Key, x => PickingFreeStock.Sum(x.Select(group =>
+                PickingFreeStock.ForGroup(group, assemblyId, today))));
+        return new PickingRouteView(work.Revision, route.Value!.Steps, route.Value.Gaps, work,
+            stockByCell);
     }
 }

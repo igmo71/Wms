@@ -58,7 +58,7 @@ public sealed class ShippingSourceQueryStore(
         {
             linksBySource.TryGetValue(source.Id, out var link);
             return new ShippingSourceListItem(source.Id, source.Number, source.Date,
-                source.Status, source.Posted, source.DeletionMark,
+                source.Status, source.Queue, source.Posted, source.DeletionMark,
                 source.WarehouseId, source.Warehouse?.Name,
                 source.ReceiverType switch
                 {

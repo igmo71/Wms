@@ -82,9 +82,10 @@ login, and destination cell address; filters can be combined.
 
 The Web «Отгрузка» group contains «Документы 1С» and «Расходные ордера WMS»
 for Operator and Manager. The first page searches imported shipping orders by 1C number and
-shows their stored source lines, status, warehouse, receiver, latest check and
+shows their stored source lines, warehouse, receiver, latest check and
 active WMS assembly link when that assembly is accessible to the user. The
-assembly detail links back to each source document. The source page reads the
+«Очередь / Статус» column shows the queue icon and name above the 1C status.
+The assembly detail links back to each source document. The source page reads the
 last saved WMS projection, not live 1C;
 an unsuccessful check leaves the saved lines visible with its error. The second
 page is the existing picking assembly list and detail, without a Web creation
@@ -98,7 +99,7 @@ exchange regardless of who closed them. The detail header shows the WMS order
 number, creation date, status and responsible user. «План - Факт» expands each
 picked SKU to its individual cell, expiration date, quantity and picker name
 records. One «Документы 1С» panel lists linked documents with their status,
-receiver, queue display name, planned shipping date and latest check. Each
+receiver, queue icon and name, planned shipping date and latest check. Each
 document expands to its SKU comparison, which shows «План WMS», «План 1С»
 from the latest saved source and either the proposed or posted allocation. A SKU row can expand
 when it combines multiple imported 1C lines from that document. A pending
@@ -143,7 +144,10 @@ started replenishment and 1C status restoration.
 
 The Mobile home «Отбор и Отгрузка» button opens the replacement assembly queue.
 Its cards show the assembly number and status on one line and list the linked
-1C shipping document numbers below, with exchange warnings when applicable.
+1C shipping document numbers below, each with its own queue icon, and exchange
+warnings when applicable. The mobile «Документы 1С» section shows the icon and
+queue name for each document. Mobile V1 includes the current queue type per
+source in both the assembly list and details.
 The Web «Отгрузка» navigation opens its source documents and WMS orders for
 Operator and Manager.
 
@@ -209,7 +213,7 @@ page, each closed assembly's document card shows its exchange stage and any
 exchange error. Closed
 assemblies awaiting exchange remain in every Operator's work list for their
 selected warehouse until all documents are confirmed. The replacement TSD screens
-show plan, currently pickable quantity and confirmed fact per SKU with white,
+show plan, free stock and confirmed fact per SKU with white,
 yellow and green progress,
 and preserve the unit next to the plan quantity. Picking uses the SKU base unit
 `Description`, falling back to `Name`; the Mobile API exposes Russian display
@@ -217,14 +221,23 @@ names for 1C shipping document statuses. Its SKU, route and 1C document
 sections share a compact bottom navigation row. Section changes replace
 the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
-border and gray background. The SKU and route cards both show plan, currently
-pickable route quantity and confirmed fact per SKU; a route card also shows the
-quantity for its own cell. Unknown availability is shown as a dash, not zero.
-The route card shows its address prominently with that cell's quantity on the
-same line, SKU name on the left and plan,
-available and fact in a right-aligned column. The quantity to take in that
-cell is separate from the SKU totals. Date and pallet details take a line
-only when present. Scanning a cell on the current route
+border and gray background. The SKU and route cards both show the assembly's
+plan and confirmed fact per SKU. «Доступно» is the free accounting quantity
+after reservations, disputed quantity and cell holds, independent of the
+quantity suggested by the route. The SKU card totals active «Комплектация»
+cells and adds a separate amount for the whole «Хранение» pallets offered in
+the cell list. The route card totals the current SKU across all expiration
+groups in its own cell. Included expired stock contributes to «Доступно» and
+adds a warning icon alongside the corresponding quantity. Unknown availability
+is shown as a dash. Eligibility to pick follows the
+[inventory rules](inventory.md#stock-availability).
+Route cards appear in route order without step numbers. Each card shows its
+address prominently with «Взять» and the step quantity on the same line, the
+SKU name on the left, and plan, available and fact in a right-aligned column.
+SKU cards show «Не хватает к отбору» when the route cannot cover the remaining
+plan. The route lists the same shortfall by SKU below its steps, including when
+it offers no steps. Date and pallet details take a line only when present.
+Scanning a cell on the current route
 opens the first matching step's fact page with the cell automatically checked;
 quantity and any whole-pallet action still require confirmation. An unmatched
 scan stays on the route with an explanation. The route supports the device
@@ -263,9 +276,11 @@ identifies stocked SKU by name rather than a GUID. Visible cell addresses use
 `StorageLocation.Name`, falling back to `Code`; scanning and validation continue
 to use `Code`. Addresses are larger on picking and replenishment work screens,
 including the shared stock-by-cell view. From SKU, the fact screen lists
-positive accounting balances in active «Комплектация» cells and the
-currently pickable expiration groups of eligible whole pallets in «Хранение».
-Each row shows «Остаток» and «Доступно» for one cell and expiration group. It sorts by
+positive accounting balances in active «Комплектация» cells and the free
+expiration groups of eligible whole pallets in «Хранение». Each row shows
+«Остаток» and «Доступно» for one cell and expiration group and flags included
+expired stock. Shelf and pallet icons distinguish the two zones in the SKU
+totals, route cards and cell list. The cell list sorts by
 expiration ascending with unknown dates last, then by available quantity
 descending and warehouse address descending. The info button opens the full
 stock-by-cell report. «Доступно» is red when the row can be
@@ -315,7 +330,13 @@ for an explicit retry after an uncertain response. These
 routes and the client serve the replacement Mobile screens. The picking SKU
 screen orders all current proposals for one SKU in one replay-safe command.
 The home screen opens the replenisher's warehouse queue in shipping priority
-order. Its task card shows the held source, available quantities by expiration
+order. Queue cards show the priority icon and label next to the small assembly
+number, then the SKU, separate address rows with outgoing and incoming icons,
+posted quantity out of ordered quantity, and status. Mobile V1 provides the
+assignee's display name in the queue response. The card shows it next to
+«В работе» when available.
+
+Task detail shows the held source, available quantities by expiration
 for the requested SKU, other SKU for information, and posted transfers. The
 «Хранение» card shows the recommended address before removal and then the
 actual source address for return. A separate card shows the recommended

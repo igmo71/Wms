@@ -36,6 +36,12 @@
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
                                         <VerticalStackLayout Spacing="2">
                                             <Label Text="{Binding NumberText}" FontAttributes="Bold" />
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                                <Image Source="{Binding QueueIcon}" WidthRequest="16" HeightRequest="16"
+                                                       VerticalOptions="Center" />
+                                                <Label Grid.Column="1" Text="{Binding QueueText}" FontSize="12"
+                                                       VerticalTextAlignment="Center" />
+                                            </Grid>
                                             <Label Text="{Binding StatusText}" FontSize="12" />
                                             <Label Text="{Binding ErrorText}" TextColor="DarkOrange"
                                                    FontSize="12" IsVisible="{Binding HasError}" />

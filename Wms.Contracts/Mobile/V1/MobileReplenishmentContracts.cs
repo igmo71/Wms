@@ -37,13 +37,20 @@ public sealed record MobilePickingReplenishmentsResponse(
     IReadOnlyList<MobileReplenishmentProposalResponse> Proposals,
     IReadOnlyList<MobileReplenishmentDeficitResponse> Deficits,
     IReadOnlyList<MobilePickingReplenishmentTaskResponse> Tasks,
-    MobilePickingWorkResponse Work, IReadOnlyDictionary<Guid, decimal> PickableBySku);
+    MobilePickingWorkResponse Work, IReadOnlyDictionary<Guid, decimal> PickableBySku)
+{
+    public IReadOnlyDictionary<Guid, MobilePickingSkuStockResponse> StockBySku { get; init; } =
+        new Dictionary<Guid, MobilePickingSkuStockResponse>();
+}
+
+public sealed record MobilePickingSkuStockResponse(MobilePickingFreeStockResponse Storage,
+    MobilePickingFreeStockResponse Reserve);
 
 public sealed record MobileReplenishmentQueueItemResponse(
     Guid Id, Guid PickingAssemblyId, string AssemblyNumber,
     Guid SkuId, string? SkuCode, string? SkuName,
     decimal OrderedQuantity, decimal TransferredQuantity,
-    MobileReplenishmentTaskStatus Status, string? AssignedTo,
+    MobileReplenishmentTaskStatus Status, string? AssigneeDisplayName,
     DateTimeOffset OrderedAtUtc, string PriorityQueue,
     Guid? RecommendedSourceLocationId, string? RecommendedSourceCode,
     Guid? RecommendedDestinationLocationId, string? RecommendedDestinationCode)

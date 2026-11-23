@@ -9,7 +9,8 @@ public sealed record PickingSkuView(Guid PickingAssemblyId, Guid StockKeepingUni
     decimal PlannedQuantity, decimal ConfirmedQuantity, decimal RemainingQuantity,
     IReadOnlyList<PickingSkuLocation> Locations);
 
-public sealed record PickingSkuLocation(StockAvailability Stock, bool CanPickNow, bool FromReserve);
+public sealed record PickingSkuLocation(StockAvailability Stock, PickingFreeStock FreeStock,
+    bool CanPickNow, bool FromReserve, bool OfferedForSelection);
 
 public sealed class GetPickingSku(
     IPickingAssemblyStore assemblies, IStockAvailabilityStore stock,
@@ -36,39 +37,53 @@ public sealed class GetPickingSku(
             .Sum(x => x.Quantity);
         var remaining = Math.Max(0, planned - confirmed);
         var availability = await stock.ReadSkuAsync(assembly.WarehouseId, skuId, ct);
-        var cells = availability.Where(x => x.AccountingQuantity > 0)
-            .ToLookup(x => x.Group.StorageLocationId);
         var locations = await queries.GetRouteLocationsAsync(assembly.WarehouseId,
-            cells.Select(x => x.Key).ToArray(), ct);
+            availability.Where(x => x.AccountingQuantity > 0)
+                .Select(x => x.Group.StorageLocationId).Distinct().ToArray(), ct);
         var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-        var eligible = availability.Where(x => x.AvailableForNewPick(assemblyId) > 0
-            && (x.Group.ExpirationDate is null || x.Group.ExpirationDate >= today))
-            .ToHashSet();
-        var earliest = eligible.OrderBy(x => x.Group.ExpirationDate is null)
-            .ThenBy(x => x.Group.ExpirationDate).FirstOrDefault()?.Group.ExpirationDate;
-        var choices = locations.Where(x => x.IsActive
-                && x.ZoneType is ZoneType.Storage or ZoneType.Reserve)
-            .SelectMany(location =>
+        var choices = GetLocations(assemblyId, remaining, today, availability,
+                locations.ToDictionary(x => x.Id))
+            .OrderBy(x => x.Stock.Group.ExpirationDate is null)
+            .ThenBy(x => x.Stock.Group.ExpirationDate)
+            .ThenByDescending(x => x.FreeStock.Quantity)
+            .ThenByDescending(x => new PickingAddress(x.Stock.Group.StorageLocationId,
+                x.Stock.LocationCode), PickingAddressComparer.Instance)
+            .ToArray();
+        return new PickingSkuView(assemblyId, skuId, planned, confirmed, remaining, choices);
+    }
+
+    internal static IEnumerable<PickingSkuLocation> GetLocations(Guid assemblyId,
+        decimal remaining, DateOnly today, IReadOnlyList<StockAvailability> availability,
+        IReadOnlyDictionary<Guid, PickingRouteLocation> locations)
+    {
+        var earliest = availability.Where(x => x.AvailableForNewPick(assemblyId) > 0
+                && x.Group.ExpirationDate >= today)
+            .Min(x => x.Group.ExpirationDate);
+        foreach (var group in availability.Where(x => x.AccountingQuantity > 0)
+            .GroupBy(x => x.Group.StorageLocationId))
+        {
+            if (!locations.TryGetValue(group.Key, out var location) || !location.IsActive
+                || location.ZoneType is not (ZoneType.Storage or ZoneType.Reserve)) continue;
+
+            var cell = group.ToArray();
+            var reserve = location.ZoneType == ZoneType.Reserve;
+            var offeredPallet = false;
+            if (reserve && remaining > 0 && location.DistinctSkuCount == 1)
             {
-                var cell = cells[location.Id].ToArray();
-                var reserve = location.ZoneType == ZoneType.Reserve;
                 var owned = cell.Any(x => x.Hold is { OwnerType: StorageLocationLockOwnerType.PickingAssembly }
                     && x.Hold.OwnerId == assemblyId);
-                var wholePallet = reserve && location.DistinctSkuCount == 1
-                    && (owned || HoldPickingPallet.CheckWholePallet(cell, availability,
-                        location.Id, assemblyId, remaining, today) is null);
-                return cell.Select(row => new
-                {
-                    Row = new PickingSkuLocation(row, remaining > 0 && eligible.Contains(row)
-                        && row.Group.ExpirationDate == earliest && (!reserve || wholePallet), reserve),
-                    Address = new PickingAddress(location.Id, location.Code)
-                });
-            })
-            .OrderBy(x => x.Row.Stock.Group.ExpirationDate is null)
-            .ThenBy(x => x.Row.Stock.Group.ExpirationDate)
-            .ThenByDescending(x => x.Row.Stock.AvailableForNewPick(assemblyId))
-            .ThenByDescending(x => x.Address, PickingAddressComparer.Instance)
-            .Select(x => x.Row).ToArray();
-        return new PickingSkuView(assemblyId, skuId, planned, confirmed, remaining, choices);
+                offeredPallet = owned || HoldPickingPallet.CheckWholePallet(cell, availability,
+                    location.Id, assemblyId, remaining, today) is null;
+            }
+
+            foreach (var row in cell)
+            {
+                var free = PickingFreeStock.ForGroup(row, assemblyId, today);
+                var offered = !reserve || (offeredPallet && free.Quantity > 0);
+                var canPickNow = offered && remaining > 0 && free.Quantity > 0
+                    && !free.HasExpiredStock && row.Group.ExpirationDate == earliest;
+                yield return new PickingSkuLocation(row, free, canPickNow, reserve, offered);
+            }
+        }
     }
 }

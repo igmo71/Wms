@@ -77,8 +77,6 @@ public partial class PickingRoutePage : ContentPage
             ApplyHeading(assembly);
             var work = route.Work;
             var skus = work.Skus.ToDictionary(x => x.SkuId);
-            var available = route.Steps.GroupBy(x => x.SkuId)
-                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
             Steps = route.Steps.Select((x, index) =>
             {
                 var sku = skus.GetValueOrDefault(x.SkuId);
@@ -86,18 +84,25 @@ public partial class PickingRoutePage : ContentPage
                 var plan = sku is null ? "—" : sku.PlannedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
                 var fact = sku is null ? "—" : sku.ConfirmedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
                 return new PickingRouteRow(x.SkuId, x.LocationCode,
-                    x.DirectPalletPick, index == 0,
-                    $"{index + 1}. {name}",
+                    x.DirectPalletPick, index == 0, name,
                     $"План {plan} {sku?.Unit ?? "—"}",
-                    $"Доступно {available[x.SkuId]:0.###}",
+                    x.CellAvailability is { } stock ? $"Доступно {stock.Quantity:0.###}" : "Доступно —",
                     $"Факт {fact}",
-                    $"В этой ячейке: {x.Quantity.ToString("0.###", CultureInfo.CurrentCulture)}",
+                    $"Взять {x.Quantity:0.###}",
                     (x.ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : "")
                     + (x.DirectPalletPick ? " · снять весь поддон" : ""))
-                { Address = string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName };
+                {
+                    Address = string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName,
+                    HasExpiredStock = x.CellAvailability?.HasExpiredStock == true
+                };
             }).ToArray();
             OnPropertyChanged(nameof(Steps));
             EmptyLabel.IsVisible = Steps.Count == 0;
+            var uncovered = route.Gaps.GroupBy(x => x.SkuId)
+                .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
+            UncoveredLabel.Text = string.Join("\n", work.Skus.Where(x => uncovered.ContainsKey(x.SkuId))
+                .Select(x => $"{x.Name ?? x.Code ?? x.SkuId.ToString()} · {uncovered[x.SkuId]:0.###} {x.Unit ?? "—"}"));
+            UncoveredBlock.IsVisible = uncovered.Count > 0;
             ErrorLabel.Text = string.Empty;
         }
         catch (MobileApiException exception)
@@ -105,6 +110,7 @@ public partial class PickingRoutePage : ContentPage
             Steps = [];
             OnPropertyChanged(nameof(Steps));
             EmptyLabel.IsVisible = true;
+            UncoveredBlock.IsVisible = false;
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
@@ -112,6 +118,7 @@ public partial class PickingRoutePage : ContentPage
             Steps = [];
             OnPropertyChanged(nameof(Steps));
             EmptyLabel.IsVisible = true;
+            UncoveredBlock.IsVisible = false;
             ErrorLabel.Text = "Не удалось обновить маршрут.";
         }
         finally { SetBusy(false); await UpdateCameraAsync(); }
@@ -293,5 +300,8 @@ public sealed record PickingRouteRow(Guid SkuId, string LocationCode,
     string StepQuantity, string Detail)
 {
     public string Address { get; init; } = LocationCode;
+    public bool HasExpiredStock { get; init; }
+    public string ZoneIcon => DirectPalletPick ? "picking_pallet.png" : "picking_shelf.png";
+    public string ZoneName => DirectPalletPick ? "Хранение" : "Комплектация";
     public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
 }

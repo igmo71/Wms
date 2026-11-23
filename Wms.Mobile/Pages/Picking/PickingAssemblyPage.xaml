@@ -28,8 +28,19 @@
                                     <VerticalStackLayout Spacing="2">
                                         <Label Text="{Binding Number}" FontAttributes="Bold"
                                                MaxLines="1" LineBreakMode="TailTruncation" />
-                                        <Label Text="{Binding DetailText}" FontSize="12"
-                                               IsVisible="{Binding HasDocuments}" LineBreakMode="WordWrap" />
+                                        <FlexLayout Wrap="Wrap" IsVisible="{Binding HasDocuments}"
+                                                    BindableLayout.ItemsSource="{Binding Sources}">
+                                            <BindableLayout.ItemTemplate>
+                                                <DataTemplate x:DataType="local:PickingAssemblyQueueSourceRow">
+                                                    <HorizontalStackLayout Spacing="4" Margin="0,0,8,0">
+                                                        <Image Source="{Binding QueueIcon}" WidthRequest="16" HeightRequest="16"
+                                                               VerticalOptions="Center"
+                                                               SemanticProperties.Description="{Binding QueueText}" />
+                                                        <Label Text="{Binding Number}" FontSize="12" VerticalTextAlignment="Center" />
+                                                    </HorizontalStackLayout>
+                                                </DataTemplate>
+                                            </BindableLayout.ItemTemplate>
+                                        </FlexLayout>
                                         <Label Text="{Binding WarningText}" TextColor="DarkOrange"
                                                IsVisible="{Binding HasWarning}" FontSize="12" />
                                     </VerticalStackLayout>

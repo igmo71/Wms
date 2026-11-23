@@ -3,7 +3,7 @@ using Wms.Domain.Enums;
 namespace Wms.Application.Picking;
 
 public sealed record PickingAssemblyListSource(
-    Guid SourceRefKey, string? Number, bool StartConfirmed,
+    Guid SourceRefKey, string? Number, ShippingOrderQueue Queue, bool StartConfirmed,
     string? StartError, string? SourceCheckError)
 {
     public ShippingExchangeStage? ExchangeStage { get; init; }
@@ -76,7 +76,7 @@ public sealed record PickingAssemblyView(
 }
 
 public sealed record PickingAssemblySourceOverview(
-    Guid SourceRefKey, string? Number, ShippingOrderStatus Status,
+    Guid SourceRefKey, string? Number, ShippingOrderStatus Status, ShippingOrderQueue Queue,
     bool Posted, bool DeletionMark, DateTimeOffset? LastCheckedAtUtc,
     string? LastCheckError, DateTimeOffset? StartConfirmedAtUtc,
     DateTimeOffset? LastStartAttemptAtUtc, string? LastStartError,

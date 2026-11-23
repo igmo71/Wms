@@ -120,7 +120,7 @@ public partial class PickingSourcesPage : ContentPage
         OwnerLabel.Text = assembly?.ResponsibleDisplayName ?? string.Empty;
         var closed = assembly?.Status == MobilePickingAssemblyStatus.Closed;
         SourceRows = assembly?.Sources.Select(x => new PickingSourceRow(
-            x.SourceRefKey, x.Number ?? x.SourceRefKey.ToString(),
+            x.SourceRefKey, x.Number ?? x.SourceRefKey.ToString(), x.Queue,
             closed
                 ? x.ExchangeStage switch
                 {
@@ -333,7 +333,9 @@ public partial class PickingSourcesPage : ContentPage
 }
 
 public sealed record PickingSourceRow(Guid SourceRefKey, string NumberText,
-    string StatusText, string? ErrorText, bool CanDetach)
+    MobileShippingOrderQueue Queue, string StatusText, string? ErrorText, bool CanDetach)
 {
+    public string QueueIcon => Queue.GetIcon();
+    public string QueueText => Queue.GetDisplayText();
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
 }

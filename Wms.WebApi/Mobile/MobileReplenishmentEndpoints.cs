@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Wms.Application.Picking;
 using Wms.Application.Replenishment;
+using Wms.Application.Users;
 using Wms.Common;
 using Wms.Contracts.Mobile.V1;
 
@@ -68,7 +69,12 @@ internal static class MobileReplenishmentEndpoints
                 x.RecommendedDestinationCode)
             { RecommendedSourceName = x.RecommendedSourceName,
                 RecommendedDestinationName = x.RecommendedDestinationName }).ToArray(),
-            MobilePickingEndpoints.MapWork(view.Work), view.PickableBySku));
+            MobilePickingEndpoints.MapWork(view.Work), view.PickableBySku)
+        {
+            StockBySku = view.StockBySku.ToDictionary(x => x.Key, x =>
+                new MobilePickingSkuStockResponse(MobilePickingEndpoints.MapFreeStock(x.Value.Storage),
+                    MobilePickingEndpoints.MapFreeStock(x.Value.Reserve)))
+        });
     }
 
     private static async Task<IResult> OrderAsync(
@@ -89,25 +95,30 @@ internal static class MobileReplenishmentEndpoints
 
     private static async Task<IResult> ListAsync(
         Guid warehouseId, ClaimsPrincipal principal, GetReplenishmentTasks get,
-        CancellationToken ct)
+        ApplicationUserQueryService userNames, CancellationToken ct)
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return TypedResults.Unauthorized();
         var result = await get.ExecuteAsync(warehouseId, userId, ct);
-        return result.IsSuccess
-            ? TypedResults.Ok<IReadOnlyList<MobileReplenishmentQueueItemResponse>>(
-                result.Value!.Select(x => new MobileReplenishmentQueueItemResponse(
-                    x.Id, x.PickingAssemblyId, x.AssemblyNumber,
-                    x.StockKeepingUnitId, x.SkuCode, x.SkuName,
-                    x.OrderedQuantity, x.TransferredQuantity,
-                    (MobileReplenishmentTaskStatus)x.Status, x.AssignedTo,
-                    x.OrderedAtUtc, x.PriorityQueue.ToString(),
-                    x.RecommendedSourceLocationId, x.RecommendedSourceCode,
-                    x.RecommendedDestinationLocationId,
-                    x.RecommendedDestinationCode)
-                { RecommendedSourceName = x.RecommendedSourceName,
-                    RecommendedDestinationName = x.RecommendedDestinationName }).ToArray())
-            : MobileEndpointResults.CommandProblem(result.Error!);
+        if (!result.IsSuccess)
+            return MobileEndpointResults.CommandProblem(result.Error!);
+
+        var tasks = result.Value!;
+        var names = await userNames.GetDisplayNamesAsync(tasks.Select(x => x.AssignedTo), ct);
+        return TypedResults.Ok<IReadOnlyList<MobileReplenishmentQueueItemResponse>>(
+            tasks.Select(x => new MobileReplenishmentQueueItemResponse(
+                x.Id, x.PickingAssemblyId, x.AssemblyNumber,
+                x.StockKeepingUnitId, x.SkuCode, x.SkuName,
+                x.OrderedQuantity, x.TransferredQuantity,
+                (MobileReplenishmentTaskStatus)x.Status,
+                x.AssignedTo is { } assigneeId ? names.GetValueOrDefault(assigneeId) : null,
+                x.OrderedAtUtc, x.PriorityQueue.ToString(),
+                x.RecommendedSourceLocationId, x.RecommendedSourceCode,
+                x.RecommendedDestinationLocationId, x.RecommendedDestinationCode)
+            {
+                RecommendedSourceName = x.RecommendedSourceName,
+                RecommendedDestinationName = x.RecommendedDestinationName
+            }).ToArray());
     }
 
     private static async Task<IResult> GetTaskAsync(

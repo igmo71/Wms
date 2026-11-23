@@ -264,12 +264,14 @@ internal static class MobilePickingEndpoints
                 return new MobilePickingAvailabilityResponse(
                     x.Group.StorageLocationId, x.LocationCode,
                     x.Group.ExpirationDate, x.AccountingQuantity,
-                    x.AvailableForNewPick(assemblyId), x.ReservedQuantity,
+                    row.FreeStock.Quantity, x.ReservedQuantity,
                     x.BlockedQuantity, x.Hold is not null)
                 {
                     LocationName = x.LocationName,
                     CanPickNow = row.CanPickNow,
-                    FromReserve = row.FromReserve
+                    FromReserve = row.FromReserve,
+                    HasExpiredStock = row.FreeStock.HasExpiredStock,
+                    OfferedForSelection = row.OfferedForSelection
                 };
             }).ToArray()));
     }
@@ -305,6 +307,9 @@ internal static class MobilePickingEndpoints
                 x.ConfirmedAtUtc, x.FromReserve)
             { LocationName = x.LocationName }).ToArray());
 
+    internal static MobilePickingFreeStockResponse MapFreeStock(PickingFreeStock stock) =>
+        new(stock.Quantity, stock.HasExpiredStock);
+
     private static async Task<IResult> GetRouteAsync(
         Guid assemblyId, Guid warehouseId, Guid? previousLocationId,
         Guid? nextLocationId, ClaimsPrincipal principal,
@@ -325,7 +330,10 @@ internal static class MobilePickingEndpoints
             route.Steps.Select(x => new MobilePickingRouteStepResponse(
                 x.StorageLocationId, x.LocationCode, x.StockKeepingUnitId,
                 x.ExpirationDate, x.Quantity, x.DirectPalletPick)
-            { LocationName = x.LocationName }).ToArray(),
+            {
+                LocationName = x.LocationName,
+                CellAvailability = MapFreeStock(route.StockByCell[(x.StorageLocationId, x.StockKeepingUnitId)])
+            }).ToArray(),
             route.Gaps.Select(x => new MobilePickingRouteGapResponse(
                 x.StockKeepingUnitId, x.ExpirationDate, x.Quantity)).ToArray(), MapWork(route.Work)));
     }
@@ -519,6 +527,7 @@ internal static class MobilePickingEndpoints
             x.SourceRefKey, x.Number, x.StartConfirmed,
             x.StartError, x.SourceCheckError)
             {
+                Queue = (MobileShippingOrderQueue)x.Queue,
                 ExchangeStage = x.ExchangeStage is { } stage
                     ? (MobileShippingExchangeStage)stage : null,
                 ExchangeError = x.ExchangeError
@@ -535,6 +544,7 @@ internal static class MobilePickingEndpoints
             x.Posted, x.DeletionMark, x.LastCheckedAtUtc, x.LastCheckError,
             x.StartConfirmedAtUtc, x.LastStartAttemptAtUtc, x.LastStartError)
             {
+                Queue = (MobileShippingOrderQueue)x.Queue,
                 ExchangeStage = x.ExchangeStage is { } stage
                     ? (MobileShippingExchangeStage)stage : null,
                 ExchangeError = x.ExchangeError

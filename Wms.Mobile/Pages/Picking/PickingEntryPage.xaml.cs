@@ -208,7 +208,7 @@ public partial class PickingEntryPage : ContentPage
             if (_recommendedPalletPick && _recommendedCode is not null)
                 RecommendationCaptionLabel.Text += " · снять весь поддон";
             StockLabel.Text = _source is null
-                ? choosingLocation && _sku?.Locations.Any(IsLocationChoice) == true
+                ? choosingLocation && _sku?.Locations.Any(IsOfferedForSelection) == true
                     ? "Выберите или сканируйте ячейку."
                     : "Сканируйте ячейку."
                 : $"Остаток {_source.AccountingQuantity:0.###}, резерв {_source.ReservedQuantity:0.###}, "
@@ -229,11 +229,11 @@ public partial class PickingEntryPage : ContentPage
 
     private void SetLocationChoices(MobilePickingSkuResponse sku) =>
         BindableLayout.SetItemsSource(LocationChoices, sku.Locations
-            .Where(IsLocationChoice)
+            .Where(IsOfferedForSelection)
             .Select(x => new PickingLocationChoice(x, sku.RemainingQuantity)).ToArray());
 
-    private static bool IsLocationChoice(MobilePickingAvailabilityResponse location) =>
-        !location.FromReserve || location.CanPickNow;
+    private static bool IsOfferedForSelection(MobilePickingAvailabilityResponse location) =>
+        location.OfferedForSelection ?? (!location.FromReserve || location.CanPickNow);
 
     private async void OnLocationTapped(object? sender, TappedEventArgs e)
     {
@@ -538,6 +538,9 @@ public sealed record PickingLocationChoice(MobilePickingAvailabilityResponse Loc
         ? date.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) : "Срок не указан";
     public string Stock => $"Остаток {Location.AccountingQuantity:0.###}";
     public string Available => $"Доступно {Location.AvailableQuantity:0.###}";
+    public bool HasExpiredStock => Location.HasExpiredStock;
+    public string ZoneIcon => Location.FromReserve ? "picking_pallet.png" : "picking_shelf.png";
+    public string ZoneName => Location.FromReserve ? "Хранение" : "Комплектация";
     public Color AvailableColor => Location.CanPickNow && Location.AvailableQuantity < RemainingQuantity
         ? Colors.DarkRed : Color.FromArgb("#202124");
 }

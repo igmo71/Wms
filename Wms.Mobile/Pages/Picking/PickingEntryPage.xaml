@@ -64,13 +64,22 @@
                                 </Border.GestureRecognizers>
                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                                       ColumnSpacing="8" RowSpacing="2">
-                                    <Label Text="{Binding Address}" FontAttributes="Bold" />
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
+                                        <Image Source="{Binding ZoneIcon}" WidthRequest="18" HeightRequest="18"
+                                               VerticalOptions="Center" ToolTipProperties.Text="{Binding ZoneName}"
+                                               SemanticProperties.Description="{Binding ZoneName}" />
+                                        <Label Grid.Column="1" Text="{Binding Address}" FontAttributes="Bold" />
+                                    </Grid>
                                     <Label Grid.Row="1" Text="{Binding Expiry}" FontSize="12" />
                                     <Label Grid.Column="1" Text="{Binding Stock}" FontSize="12"
                                            HorizontalTextAlignment="End" />
-                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Available}"
-                                           TextColor="{Binding AvailableColor}" FontSize="12"
-                                           HorizontalTextAlignment="End" />
+                                    <HorizontalStackLayout Grid.Row="1" Grid.Column="1" HorizontalOptions="End" Spacing="3">
+                                        <Label Text="{Binding Available}" TextColor="{Binding AvailableColor}" FontSize="12" />
+                                        <Image Source="picking_expiry_warning.png" WidthRequest="16" HeightRequest="16"
+                                               VerticalOptions="Center" IsVisible="{Binding HasExpiredStock}"
+                                               ToolTipProperties.Text="Есть товар с истёкшим сроком годности"
+                                               SemanticProperties.Description="Есть товар с истёкшим сроком годности" />
+                                    </HorizontalStackLayout>
                                 </Grid>
                             </Border>
                         </DataTemplate>

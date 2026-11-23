@@ -163,7 +163,13 @@ else
                             }
                         </MudTd>
                         <MudTd>@(source.ReceiverName ?? source.ReceiverId?.ToString() ?? "—")</MudTd>
-                        <MudTd>@(source.Queue is { } queue ? queue.GetDisplayName() : "—")</MudTd>
+                        <MudTd>
+                            @{ var queue = source.Queue ?? ShippingOrderQueue.Unknown; }
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@queue.GetIcon()" Size="Size.Small" />
+                                <span>@queue.GetDisplayName()</span>
+                            </MudStack>
+                        </MudTd>
                         <MudTd>@(source.PlannedShippingDate?.ToString("dd.MM.yyyy") ?? "—")</MudTd>
                         <MudTd>
                             @(source.LastCheckedAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Не выполнена")

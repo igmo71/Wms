@@ -31,7 +31,7 @@
                               RowClass="cursor-pointer" RowStyleFunc="SourceRowStyle">
                         <HeaderContent>
                             <MudTh>Документ 1С</MudTh><MudTh>Получатель / склад</MudTh>
-                            <MudTh>Состояние</MudTh><MudTh>Сверка</MudTh><MudTh>Ордер WMS</MudTh>
+                            <MudTh>Очередь<br />Статус</MudTh><MudTh>Сверка</MudTh><MudTh>Ордер WMS</MudTh>
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="Документ 1С">
@@ -42,12 +42,20 @@
                                 <MudText>@(context.ReceiverName ?? "—")</MudText>
                                 <MudText Typo="Typo.caption">@(context.WarehouseName ?? context.WarehouseId.ToString())</MudText>
                             </MudTd>
-                            <MudTd DataLabel="Состояние">
-                                <MudText>@context.Status.GetDisplayName()</MudText>
-                                @if (!context.Posted || context.DeletionMark)
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Warning">@(context.DeletionMark ? "Помечен удалённым" : "Не проведён")</MudText>
-                                }
+                            <MudTd DataLabel="Очередь / Статус">
+                                <MudStack Spacing="0">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@context.Queue.GetIcon()" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@context.Queue.GetDisplayName()</MudText>
+                                    </MudStack>
+                                    <div>
+                                        <MudText Inline="true" Typo="Typo.body2">@context.Status.GetDisplayName()</MudText>
+                                        @if (!context.Posted || context.DeletionMark)
+                                        {
+                                            <MudText Inline="true" Typo="Typo.caption" Color="Color.Warning"> · @(context.DeletionMark ? "Помечен удалённым" : "Не проведён")</MudText>
+                                        }
+                                    </div>
+                                </MudStack>
                             </MudTd>
                             <MudTd DataLabel="Сверка">
                                 @if (context.LastCheckError is not null)

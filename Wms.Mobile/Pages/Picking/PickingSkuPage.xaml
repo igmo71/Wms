@@ -52,13 +52,36 @@
                                             <VerticalStackLayout Grid.Column="1" Spacing="2">
                                                 <Label Text="{Binding PlanText}" TextColor="#202124"
                                                        HorizontalTextAlignment="End" />
-                                                <Label Text="{Binding AvailableText}" TextColor="#202124"
-                                                       HorizontalTextAlignment="End" />
+                                                <HorizontalStackLayout HorizontalOptions="End" Spacing="3">
+                                                    <Label Text="Доступно" TextColor="#202124" />
+                                                    <Image Source="picking_shelf.png" WidthRequest="18" HeightRequest="18"
+                                                           VerticalOptions="Center" IsVisible="{Binding HasStock}"
+                                                           ToolTipProperties.Text="Комплектация"
+                                                           SemanticProperties.Description="Комплектация" />
+                                                    <Label Text="{Binding StorageText}" TextColor="#202124" />
+                                                    <Image Source="picking_expiry_warning.png" WidthRequest="16" HeightRequest="16"
+                                                           VerticalOptions="Center" IsVisible="{Binding HasExpiredStorageStock}"
+                                                           ToolTipProperties.Text="Есть товар с истёкшим сроком годности"
+                                                           SemanticProperties.Description="Есть товар с истёкшим сроком годности" />
+                                                    <HorizontalStackLayout Spacing="3" IsVisible="{Binding HasReserveStock}">
+                                                        <Label Text="+" TextColor="#202124" />
+                                                        <Image Source="picking_pallet.png" WidthRequest="18" HeightRequest="18"
+                                                               VerticalOptions="Center" ToolTipProperties.Text="Хранение"
+                                                               SemanticProperties.Description="Хранение" />
+                                                        <Label Text="{Binding ReserveText}" TextColor="#202124" />
+                                                        <Image Source="picking_expiry_warning.png" WidthRequest="16" HeightRequest="16"
+                                                               VerticalOptions="Center" IsVisible="{Binding HasExpiredReserveStock}"
+                                                               ToolTipProperties.Text="Есть товар с истёкшим сроком годности"
+                                                               SemanticProperties.Description="Есть товар с истёкшим сроком годности" />
+                                                    </HorizontalStackLayout>
+                                                </HorizontalStackLayout>
                                                 <Label Text="{Binding FactText}" TextColor="#202124"
                                                        FontFamily="OpenSansSemibold"
                                                        HorizontalTextAlignment="End" />
                                             </VerticalStackLayout>
                                         </Grid>
+                                        <Label Text="{Binding UncoveredText}" IsVisible="{Binding HasUncoveredQuantity}"
+                                               FontSize="12" TextColor="#A12622" HorizontalTextAlignment="End" />
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                                             <HorizontalStackLayout Spacing="4" VerticalOptions="Start">
                                                 <Button Style="{StaticResource SkuCardAction}"

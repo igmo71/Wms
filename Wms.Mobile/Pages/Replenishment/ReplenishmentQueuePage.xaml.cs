@@ -70,9 +70,9 @@ public partial class ReplenishmentQueuePage : ContentPage
         {
             var tasks = await _client.QueueAsync(warehouse.Id);
             TaskRows = tasks.Select(x => new ReplenishmentQueueRow(x.Id,
-                $"Сборка {x.AssemblyNumber} · {x.SkuName ?? x.SkuCode ?? x.SkuId.ToString()}",
+                x.AssemblyNumber, x.SkuName ?? x.SkuCode ?? x.SkuId.ToString(),
                 x.PriorityQueue, x.OrderedQuantity, x.TransferredQuantity,
-                x.Status, x.AssignedTo,
+                x.Status, x.AssigneeDisplayName,
                 string.IsNullOrWhiteSpace(x.RecommendedSourceName)
                     ? x.RecommendedSourceCode : x.RecommendedSourceName,
                 string.IsNullOrWhiteSpace(x.RecommendedDestinationName)
@@ -107,22 +107,30 @@ public partial class ReplenishmentQueuePage : ContentPage
     }
 }
 
-public sealed record ReplenishmentQueueRow(Guid Id, string Title,
+public sealed record ReplenishmentQueueRow(Guid Id, string AssemblyNumber, string SkuName,
     string Priority, decimal Ordered, decimal Transferred,
-    MobileReplenishmentTaskStatus Status, string? AssignedTo,
-    string? SourceCode, string? DestinationCode)
+    MobileReplenishmentTaskStatus Status, string? AssigneeDisplayName,
+    string? Source, string? Destination)
 {
-    public string PriorityText => "Приоритет: " + (Priority switch
+    public string PriorityIcon => Enum.TryParse<MobileShippingOrderQueue>(Priority, out var queue)
+        ? queue.GetIcon() : MobileShippingOrderQueue.Unknown.GetIcon();
+
+    public string PriorityText => Priority switch
     {
-        "LiveQueue" => "живая очередь",
-        "CollectByDate" => "к дате",
-        "OwnDelivery" => "самовывоз",
-        _ => "не указан"
-    });
+        "LiveQueue" => "Живая очередь",
+        "CollectByDate" => "К дате",
+        "OwnDelivery" => "Самовывоз",
+        _ => "Не указан"
+    };
     public string ProgressText => $"Проведено {Transferred.ToString("0.###", CultureInfo.CurrentCulture)}"
         + $" из {Ordered.ToString("0.###", CultureInfo.CurrentCulture)}";
-    public string AddressText => $"Источник: {SourceCode ?? "выбрать по скану"}"
-        + $" · Назначение: {DestinationCode ?? "выбрать по скану"}";
-    public string StateText => Status == MobileReplenishmentTaskStatus.InProgress
-        ? $"В работе · исполнитель: {AssignedTo}" : "Ожидает начала";
+    public string SourceAddress => Source ?? "выбрать по скану";
+    public string DestinationAddress => Destination ?? "выбрать по скану";
+    public string StateText => Status switch
+    {
+        MobileReplenishmentTaskStatus.InProgress when !string.IsNullOrWhiteSpace(AssigneeDisplayName)
+            => $"В работе · {AssigneeDisplayName}",
+        MobileReplenishmentTaskStatus.InProgress => "В работе",
+        _ => "Ожидает начала"
+    };
 }

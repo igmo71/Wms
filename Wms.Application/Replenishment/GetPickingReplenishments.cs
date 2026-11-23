@@ -29,7 +29,10 @@ public sealed record PickingReplenishmentsView(
     IReadOnlyList<PickingReplenishmentProposalView> Proposals,
     IReadOnlyList<ReplenishmentDeficit> Deficits,
     IReadOnlyList<PickingReplenishmentTaskView> Tasks,
-    PickingWorkView Work, IReadOnlyDictionary<Guid, decimal> PickableBySku);
+    PickingWorkView Work, IReadOnlyDictionary<Guid, decimal> PickableBySku,
+    IReadOnlyDictionary<Guid, PickingSkuStock> StockBySku);
+
+public sealed record PickingSkuStock(PickingFreeStock Storage, PickingFreeStock Reserve);
 
 public sealed class GetPickingReplenishments(
     GetPickingWork workQuery, BuildPickingRoute routeBuilder,
@@ -49,7 +52,7 @@ public sealed class GetPickingReplenishments(
             .ToDictionary(x => x.SkuId,
                 x => x.PlannedQuantity - x.ConfirmedQuantity);
         var availability = await stock.ReadSkusAsync(work.WarehouseId,
-            remaining.Keys.ToArray(), ct);
+            work.Skus.Select(x => x.SkuId).ToArray(), ct);
         var tasks = await store.ReadAssemblyTasksAsync(assemblyId, ct);
         var taskLocationIds = tasks.SelectMany(x => new[]
             { x.RecommendedSourceStorageLocationId, x.RecommendedDestinationStorageLocationId })
@@ -70,6 +73,18 @@ public sealed class GetPickingReplenishments(
             state.Locations, state.ActiveTasks));
         if (!proposals.IsSuccess) return proposals.Error!;
         var locations = state.Locations.ToDictionary(x => x.Id);
+        var pickingLocations = routeLocations.ToDictionary(x => x.Id);
+        var availabilityBySku = availability.ToLookup(x => x.Group.StockKeepingUnitId);
+        var stockBySku = work.Skus.ToDictionary(x => x.SkuId, x =>
+        {
+            var choices = GetPickingSku.GetLocations(assemblyId,
+                remaining.GetValueOrDefault(x.SkuId), today,
+                availabilityBySku[x.SkuId].ToArray(), pickingLocations)
+                .Where(row => row.OfferedForSelection).ToLookup(row => row.FromReserve);
+            return new PickingSkuStock(
+                PickingFreeStock.Sum(choices[false].Select(row => row.FreeStock)),
+                PickingFreeStock.Sum(choices[true].Select(row => row.FreeStock)));
+        });
         return new PickingReplenishmentsView(assemblyId, work.WarehouseId,
             work.Revision,
             proposals.Value!.Proposals.Select(x => new PickingReplenishmentProposalView(
@@ -103,6 +118,6 @@ public sealed class GetPickingReplenishments(
                     ? locations.GetValueOrDefault(targetNameId)?.Name : null
             }).ToArray(), work,
             route.Value!.Steps.GroupBy(x => x.StockKeepingUnitId)
-                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity)));
+                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity)), stockBySku);
     }
 }
