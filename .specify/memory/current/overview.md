@@ -41,13 +41,13 @@ LPN tracks receiving provenance and initial putaway, not stored inventory.
 
 Outbound work uses WMS picking assemblies linked to 1C shipping documents.
 Mobile opens separate picking and replenishment workplaces; Web supports
-Manager review and decisions. Picking records physical fact and reservations
-before a single stock posting at closure. Replenishment posts dated transfers
-when their destinations are confirmed. The same close action starts or retries
-per-document 1C exchange without repeating the stock posting. Cancellation
-keeps started replenishment and unresolved source restoration visible until
-they finish. The former shipping screens, Mobile API and posting commands have
-been removed; `ShippingOrder` remains the imported 1C source projection.
+Manager review and decisions. The warehouse ships as part of closing the
+assembly with «Закрыть и отгрузить». Picking records physical fact and
+reservations for the single stock posting at closure. Replenishment posts
+dated transfers when their destinations are confirmed. The close action starts
+or retries per-document 1C exchange. Cancellation keeps started replenishment
+and unresolved source restoration visible until they finish. `ShippingOrder`
+is the imported 1C source projection.
 
 The detailed stock rules are in [inventory](inventory.md), source and exchange
 rules in [integration](integration.md), and workplaces in [clients](clients.md).

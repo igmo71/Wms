@@ -235,8 +235,11 @@ load the warehouse-wide cell/SKU composition. Command-session state retains the
 full address set for route ranking, but stock counts are likewise limited to
 availability locations. All location reads project only the needed fields.
 Route and replenishment query results also carry the work projection used in
-their calculation. Replenishment results include pickable quantities grouped by
-SKU from those route steps, avoiding a separate route calculation for SKU cards.
+their calculation. Route results carry free stock for a SKU in each step's
+cell. Replenishment results carry per-SKU route coverage and free-stock totals
+by zone. The SKU totals and the single-SKU cell list use the same location
+selection calculation over the loaded availability. This lets the SKU screen
+show free stock and remaining route gaps from one response.
 Mobile assembly lookups use a separate overview projection: header with worker
 display name, active source statuses with exchange errors, and the WMS plan.
 These are three read-only SQL projections without loading source JSON or imported
@@ -317,9 +320,10 @@ command at the API boundary; inventory-count barcode resolution follows receipt 
 The active receiving completion command checks linked source mirrors and saves
 an immutable cycle decision without posting stock. Receiving LPN close posts
 the receipt, and putaway posts each placement through the new executor.
-Picking closure posts stock and saves per-document exchange targets atomically;
-1C PATCH and POST run afterward through per-document serialization and short
-database commands. SQL and 1C remain separate boundaries.
+`CloseAndShipPickingAssembly` invokes picking closure to post the warehouse
+shipment and save per-document exchange targets atomically. It then attempts
+1C PATCH and POST through per-document serialization and short database
+commands. The same entry point retries pending exchange on closed assemblies.
 
 Warehouse commands do not expose staging methods for Mobile receipt
 orchestration. Use business-named private helpers only where they clarify

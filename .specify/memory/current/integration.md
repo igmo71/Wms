@@ -73,7 +73,7 @@ receiving comments remain WMS-owned annotations, not warehouse facts.
 
 ## Outbound source and exchange
 
-Shipping notifications now use the replacement `Wms.Integration` reader and
+Shipping notifications use the `Wms.Integration` reader and
 `SynchronizeShippingSource` use case. They read both item tables and preserve
 the current raw document JSON on the 1C source projection, including rows
 needed for later reconciliation and PATCH construction. A failed read or
@@ -91,8 +91,7 @@ skipped on retry. Before PATCH,
 WMS records an intent for that source. A retry after an uncertain response reads
 1C again and can continue with POST when the status is already `КОтбору`;
 without WMS intent, that status requires investigation. A per-assembly lease
-prevents overlapping start attempts. The picking screens use the replacement
-assembly workflow.
+prevents overlapping start attempts.
 
 For a started assembly, a Manager may change the WMS plan of one linked 1C
 document. The command checks the assembly revision and requires the source JSON
@@ -105,7 +104,7 @@ multi-document SKU allocates automatically; a partial shared SKU needs an
 explicit Manager split within every document's plan. The allocation becomes
 warehouse history only when closure posts it.
 
-The replacement closure check fetches every linked 1C document again, updates
+The closure check fetches every linked 1C document again, updates
 its current projection, and compares it with the stored start snapshot. An
 unreadable source, missing posting, changed warehouse or warehouse operation,
 unexpected status or deletion mark blocks both roles. A changed receiver or
@@ -116,7 +115,7 @@ failed GET leaves the former projection visible as historical data, not as a
 successful current check. Closure still has to recheck its database state
 under the command revision before posting.
 
-The replacement close command performs the fresh check before opening its
+The close command performs the fresh check before opening its
 stock transaction, then verifies the same source JSON and assembly revision
 inside that transaction. It stores an immutable per-document target decision:
 the approved WMS plan, allocated SKU quantities, intended `Shipped` status and
@@ -154,9 +153,9 @@ and saves each confirmation or error in a short command transaction. A fresh
 document must match the reviewed source or the reached target; any other
 change requires Manager review. Deletion mark blocks writes until the same
 document is restored and reviewed. A target already present and posted in 1C
-can be confirmed without another write. The combined close-and-exchange
-application command closes open warehouse work once, then attempts each
-unconfirmed 1C document independently. Its response receipt distinguishes
+can be confirmed without another write. «Закрыть и отгрузить» commits the
+warehouse shipment once, then attempts each unconfirmed 1C document
+independently in the same action. Its response receipt distinguishes
 replay of a lost answer from a new retry ID after a known failure. The same
 Mobile and Web close action retries only unconfirmed documents after warehouse
 closure. Any Operator can retry the exchange regardless of who closed the
@@ -184,5 +183,4 @@ all sources and started replenishments are done. The cancellation request and
 its reason are audited.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
-WMS-to-1C multi-step transitions are not atomic across systems. The operational
-shipping adapter belongs to the replacement outbound workflow.
+WMS-to-1C multi-step transitions are not atomic across systems.

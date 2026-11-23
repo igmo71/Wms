@@ -106,6 +106,8 @@ when it combines multiple imported 1C lines from that document. A pending
 manual allocation is identified in the comparison.
 
 For a Manager, the header offers «Сверить с 1С» and «Закрыть и отгрузить».
+The close action posts the shipment as part of assembly closure in Web and on the TSD,
+using the same [outbound exchange](integration.md#outbound-source-and-exchange).
 «Обновить» reloads saved WMS data and resets the current closure review. It
 also clears the unsubmitted allocation when there is no close request to retry.
 A fresh check retrieves each document, shows blockers and review issues near
@@ -142,7 +144,7 @@ started replenishment and 1C status restoration.
 
 ## Mobile picking API
 
-The Mobile home «Отбор и Отгрузка» button opens the replacement assembly queue.
+The Mobile home «Отбор и Отгрузка» button opens the assembly queue.
 Its cards show the assembly number and status on one line and list the linked
 1C shipping document numbers below, each with its own queue icon, and exchange
 warnings when applicable. The mobile «Документы 1С» section shows the icon and
@@ -155,9 +157,10 @@ Mobile assembly details contain the header, WMS plan and active source-document
 statuses and exchange errors. Source JSON snapshots and detailed imported 1C
 lines are read only by the Web detail query, not by this Mobile response.
 
-The SKU screen receives plan/fact rows, pickable totals and replenishment data
-from one replenishment response for the active owner's assembly. The route
-response includes the work rows used to calculate its steps. These screens
+The SKU screen receives plan/fact rows, free stock by zone, route coverage and
+replenishment data from one replenishment response for the active owner's
+assembly. The route response includes the work rows used to calculate its steps
+and their cells' free stock. These screens
 therefore do not request the same work rows separately on a successful refresh.
 When opened from the queue, SKU reuses the just-read assembly details once.
 Ordinary returns to SKU and swipe refresh fetch current data. A successful SKU

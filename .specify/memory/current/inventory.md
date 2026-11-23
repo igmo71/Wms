@@ -166,9 +166,10 @@ checks current balances, reservations, shortage blocks, cell holds and SKU
 mixing. Task progress reflects the corrected total in the same command. The
 assembly audit retains the reason, old and new quantities and movement ID.
 
-Closing the replacement picking assembly is the sole outbound stock posting
-point. It rechecks each positive entry against its own active reservation and
-protects other reservations and shortage blocks before issuing from the
+«Закрыть и отгрузить» posts the warehouse shipment when the picking assembly
+closes. This is the sole outbound stock posting point. The command rechecks
+each positive entry against its own active reservation and protects other
+reservations and shortage blocks before issuing from the
 original cell and date group. All movements, signed turnovers, balances,
 allocation rows, closure result, released pallet holds, audit and command
 receipt commit together. A zero fact creates no stock movements. There is no

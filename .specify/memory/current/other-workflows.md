@@ -49,8 +49,10 @@ return to scanning or search without losing the source location or transit
 cart. Selection cannot be changed while posting or awaiting a repeat-safe
 retry. A SKU with no available source stock does not advance to quantity entry.
 
-Employee-performance reporting exposes receiving contribution in the
-receiving-order LPN audit rather than the aggregate report. Picking now groups
-positive fact entries by assembly and confirming worker; its duration spans
-that worker's first and last confirmation. Weight totals use current SKU data
-and identify incomplete results.
+## Employee performance
+
+The receiving-order LPN audit shows each worker's receiving contribution.
+The picking report groups positive fact entries from closed assemblies by
+assembly and confirming worker. The time span runs between that worker's
+first and last confirmations. Weight totals use current SKU data and mark
+incomplete results.
