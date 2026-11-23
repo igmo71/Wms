@@ -27,53 +27,29 @@ responsibilities. Each delivered replacement removes its obsolete legacy code,
 registrations and callers. The final replacement also removes the `Wms`
 project and its host references. Development replacement does not require a legacy-operation
 transition or compatibility workflow.
-Application owns the explicit Manager permission check; Infrastructure resolves
-membership from Identity storage for command execution.
-WebApi and WebApp directly reference Application, Infrastructure, and Integration
-as composition roots, while retaining the legacy project for existing services.
-Their shared EF context and new command execution store registration come from Infrastructure;
-Integration registers the receiving source HTTP reader and parser in both hosts;
-its cutover XLSX reader is registered in WebApp only and returns source rows
-without warehouse mutations; WebApp registers both topology and opening-stock
-preview and confirmation use cases that depend on that reader;
-Infrastructure registers the opening-import, inventory-posting, source, order,
-and barcode stores and their use
-cases. `Wms.Mobile` uses
-`Wms.Contracts`. Closing a receiving LPN posts its receipt movement; putaway
-posts its placement movement. The label service issues and reads labels for
-listing and printing.
+WebApi and WebApp compose Application, Infrastructure, Integration, and the
+remaining legacy services. Infrastructure supplies the shared EF context and
+command execution store and resolves role membership from Identity during
+command execution. Integration registers the receiving source reader in both
+hosts. Mobile consumes `Wms.Contracts`.
 
-The cutover topology preview reads warehouse zones, locations and any opening
-import through the Infrastructure store without tracking them. The same store
-can stage validated zones and locations in a command session; the command's
-final save commits them with the import identity, audit event and command receipt.
-The topology confirmation rebuilds the preview in that session and rejects a
-changed signature. It holds a serializable transaction from the saved-state
-read through that final commit, so a concurrent topology edit cannot invalidate
-the checked plan before import. WebApp exposes both stages on an Administrator
-cutover page and keeps the parsed plan for bounded, paged display.
-The opening-stock preview reads the imported source identity, warehouse
-work/stock state, cell purposes and catalog units. Confirmation rebuilds and
-checks its signature inside a serializable command session, then posts one
-movement and turnover per nonzero row, accumulates balances by warehouse, cell,
-SKU and nullable date, enables accepted source date flags, and records the import
-status, audit event and command receipt in one final save. The Web cutover
-page presents the second-stage plan and submits its state-bound signature.
-The confirmation store takes an update lock on the warehouse's opening-import
-row before reading stock state, serializing concurrent stock confirmations.
-The storage-location page reads current prohibited mixed-SKU violations from
-nonzero balances; the violation is not a persisted cell flag.
-An import record is unique by warehouse. Opening movements use its id and
-worksheet row number as provenance; a filtered unique index protects those
-recorder lines. The balance key includes nullable date under SQL Server
-compatibility level 120. A repeated command receipt returns the prior result,
-while a new request cannot post another snapshot to an imported warehouse.
-The warehouse-unique import and filtered opening recorder-line constraint are
-classified as command conflicts if competing saves reach the database.
-The read-only opening-import result query projects the persisted source identity,
-stage actors and times, and compact JSON summaries. It does not require the
-workbook or recalculate historical counts from current balances. The Web page
-combines that saved protocol with a separate live query for mixed-cell violations.
+## Opening stock import
+
+WebApp registers the cutover XLSX reader and the topology and stock preview and
+confirmation use cases. The reader supplies source rows to those use cases.
+
+Both confirmations rebuild and verify their preview signature in a serializable
+command session. Stock confirmation locks the warehouse's opening-import row
+before reading stock state. The final save commits the stage effects, import
+record, audit and command receipt. A unique warehouse import record and a
+filtered unique index on opening movement recorder lines guard concurrent
+saves. Opening movements use the import ID and worksheet row as provenance.
+These constraint failures are classified as command conflicts.
+
+The protocol query reads saved stage identities, actors, times and JSON
+summaries. A separate live query derives mixed-cell violations from current
+nonzero balances. See the [opening stock rules](current/inventory.md#opening-stock-cutover)
+for confirmation, reimport and stock effects.
 
 ## Direction
 
@@ -410,7 +386,8 @@ JSON deserialization and page preparation belong to total operation time.
 Nested loads contribute to their enclosing operation, including loads started
 by navigation lifecycle callbacks. The diagnostic display retains the latest
 load and action independently in memory. The packaged Mobile setting enables
-client timers, measurement scopes and display together (see [clients](current/clients.md)).
+client timers, measurement scopes and display together. See the
+[diagnostic display](current/clients.md#loading-and-diagnostics).
 Each operation retains its individual logical calls in start order, with method,
 duration and status, for the expandable diagnostic display. Displayed paths omit
 the common Mobile V1 prefix, query values and fragments, and replace GUID path
@@ -424,15 +401,17 @@ Measured Mobile V1 calls set `X-Wms-Measure-Duration: 1`. The API returns
 milliseconds from before authentication through the response's `OnStarting`
 callback. This measures processing until headers
 start, not full response delivery or SQL alone. The Mobile authentication
-handler attaches its session-preparation duration to the request's local
-`HttpRequestMessage.Options`; this value is not sent over the network.
-Transport diagnostics retain both optional durations per logical call and
-ignore invalid or out-of-range timing headers without changing error recovery.
-The Mobile V1 location contract preserves the existing numeric zone-context
-values. Receiving putaway requests a distinct `PutawayDestination` context;
-barcode resolution accepts either Storage or Reserve and responds with the
-location's actual purpose. Existing `Storage` requests retain their strict
-Storage check, including direct picking and older transfer scans.
+handler records session-preparation duration in local
+`HttpRequestMessage.Options`. This includes secure-storage reads and token
+refresh or wait. The display marks token refresh attempts. Session and server
+durations are optional components of the logical call's HTTP duration.
+Transport diagnostics ignore invalid or out-of-range timing headers.
+
+Mobile V1 preserves numeric location context values. `PutawayDestination`
+resolves Storage or Reserve and returns the actual zone type. Legacy transfer
+requests with `Storage` resolve only Storage. Picking uses its own source
+inspection endpoint to check Storage or Reserve under the
+[picking rules](current/inventory.md#picking).
 Receiving reads use separate Mobile queue, Web list, Mobile detail, and full
 order queries. Mobile detail omits cycle history and destination-address data
 used only by Web while preserving the Mobile V1 response.

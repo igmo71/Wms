@@ -12,39 +12,24 @@ SKU name. Server-paged views apply that order before paging. Web grids honor an
 explicit sort chosen by the user. Lists of inventory movements and other event
 history retain their event order.
 
-The Administrator-only «Конфигурация» menu links to a separate «Переход со
-старой WMS» page. The page selects a warehouse, previews and confirms topology
-first, then previews and confirms opening stock from a separately selected XLSX
-after SKU synchronization. It pages topology cells and decisions plus stock
-rows, totals and issues, shows source hashes and
-signed/date/mixing exceptions, groups blocking stock issues by reason, and
-requires review before confirmation. The import rules are in
-[inventory](inventory.md).
-Reopening the page and selecting the warehouse reads the saved stage result
-without the XLSX file; the file must be selected again to preview the stock stage.
-Its compact protocol shows separate topology and stock source identities,
-actors and times, accepted and excluded counts, signed and undated stock
-exceptions, approved exclusions and corrections,
-and the current status of reviewed mixed cells.
+Administrators open «Переход со старой WMS» from «Конфигурация». They review
+and confirm topology first, then select an XLSX file to preview and confirm
+opening stock after SKU synchronization. The page lists blocking issues by
+reason and shows the saved protocol after selecting a warehouse again. The
+protocol includes each stage's source hash, actor, time, accepted and excluded
+counts, approved exceptions and current mixed-cell status. A new stock preview
+requires selecting the file again. See the
+[opening stock rules](inventory.md#opening-stock-cutover).
 The storage-location page shows the addresses and count of cells with a current
 prohibited mixed-SKU balance, and the selected cell shows its distinct SKU count.
-The location detail shows the multiple-SKU permission. In Web «Инвентаризации»,
-a Manager selects a warehouse and cell to change that permission.
+The location detail shows whether the cell allows multiple SKUs.
 
-Web and TSD «Инвентаризация» show separate rows for the expiration groups of
-each SKU, including the expected signed balance and the counted fact. The TSD
-scan adds one to the confirmed group. When a scan needs a date, the operator
-can choose a displayed date, enter a date from the label or select «Срок
-неизвестен». Manual search can add the discovered group and set its quantity.
-The [count rules](other-workflows.md#inventory-count) apply in both clients.
-
-Operator SKU cards and lists in the replacement receiving, putaway and picking
-workflows provide a small «i» action.
-The read-only detail shows the SKU's locations and expiration groups in the
-selected warehouse. Available quantity is primary; accounting quantity is
-shown separately only when it differs because of reservations, shortage blocks
-or a whole-cell hold. The unit is shown once, or marked unknown. The Web
-receiving plan and LPN rows use the same view. In Web shipping, «План - Факт»
+Operator SKU cards and lists in receiving, putaway and picking provide an «i»
+action for [availability for new work](inventory.md#stock-availability) by cell
+and expiration group in the selected warehouse. The report shows the accounting
+balance separately when it differs from «Доступно». The unit appears once or is
+marked unknown. The Web receiving plan and LPN rows use the same view. In Web
+shipping, «План - Факт»
 and the selected 1C shipping document's SKU table open it from their first column.
 Mobile reads it through an Operator-only endpoint; Web uses the shared
 application availability query with the same role check.
@@ -56,15 +41,22 @@ code, or barcode and rejoins the same operation as scanning. Decimal 1C GUID
 barcodes accept and normalize leading zeroes.
 
 The receiving putaway destination scan accepts Комплектация and Хранение cells.
-Mobile V1 uses the `PutawayDestination` request context for that scan and returns
-the actual `Storage` or `Reserve` zone type. Other scans using `Storage` remain
-restricted to Комплектация cells.
 
 The Urovo ScanWedge profile must emit barcode data through its broadcast Intent
 only. Simultaneous keyboard-wedge output is disabled because its trailing Enter
 can activate a focused UI action after the Intent scan has already navigated.
 Scanner-driven pages ignore queued scan callbacks from a previous period of
 page activity, including after leaving and returning to the same live page.
+
+## Inventory count
+
+Web and TSD «Инвентаризация» show expected signed stock and counted fact by
+SKU and expiration group. On TSD, a scan adds one to the confirmed group.
+When a date is required, the operator can choose an existing date, enter the
+label date or select «Срок неизвестен». Manual search can add a discovered
+group and set its quantity. A Web Manager can change the cell's SKU-mixing
+permission from «Инвентаризация» by choosing the warehouse and cell. See the
+[count rules](other-workflows.md#inventory-count).
 
 ## Putaway history
 
@@ -142,7 +134,7 @@ requires a reason and zero remaining picked fact; the server also checks
 reservations and returned pallets. An accepted cancellation may wait for
 started replenishment and 1C status restoration.
 
-## Mobile picking API
+## Mobile picking
 
 The Mobile home «Отбор и Отгрузка» button opens the assembly queue.
 Its cards show the assembly number and status on one line and list the linked
@@ -150,58 +142,34 @@ Its cards show the assembly number and status on one line and list the linked
 warnings when applicable. The mobile «Документы 1С» section shows the icon and
 queue name for each document. Mobile V1 includes the current queue type per
 source in both the assembly list and details.
-The Web «Отгрузка» navigation opens its source documents and WMS orders for
-Operator and Manager.
+
+### Loading and diagnostics
 
 Mobile assembly details contain the header, WMS plan and active source-document
 statuses and exchange errors. Source JSON snapshots and detailed imported 1C
 lines are read only by the Web detail query, not by this Mobile response.
 
-The SKU screen receives plan/fact rows, free stock by zone, route coverage and
-replenishment data from one replenishment response for the active owner's
-assembly. The route response includes the work rows used to calculate its steps
-and their cells' free stock. These screens
-therefore do not request the same work rows separately on a successful refresh.
-When opened from the queue, SKU reuses the just-read assembly details once.
-Ordinary returns to SKU and swipe refresh fetch current data. A successful SKU
-command reuses its refreshed assembly details when loading the new work state.
-When a successful fact-page command returns directly to SKU, it passes its
-just-read assembly details to that page for one appearance, avoiding a second
-assembly lookup. This applies to pick confirmation, shortage reporting and
-completed goods or pallet returns; work and availability are still refreshed.
-The handoff checks the assembly and warehouse IDs and does not clear the
-previously displayed work rows before the new data arrives. If the
-replenishment request fails, SKU still reads its plan and fact separately and
-leaves availability unknown.
-After a pick or shortage from the route, the fact page uses the next route's
-included work rows to refresh plan and fact without a separate work request.
+SKU gets plan, fact, free stock and replenishment data from one response for
+the responsible operator's active assembly. If that request fails, SKU loads
+plan and fact separately and shows availability as unknown. The route response
+includes the work rows used to calculate its steps. When navigation supplies a
+just-read assembly for the same ID and warehouse, SKU reuses it once and still
+refreshes work and availability. Ordinary returns and swipe refresh load
+current assembly details. After a pick or shortage from the route, the fact
+page refreshes plan and fact from the recalculated route.
 
-The picking performance strip is off by default in both Debug and Release.
-Set `EnablePerformanceDiagnostics` to `true` in `Resources/Raw/mobile-api.json`
-before building the Mobile app to enable measurement and show the strip on the
-picking queue, SKU, route, 1C-document and fact screens. It retains the latest
-measured load and action, including action results after returning to SKU.
-Measurements cover opening an
-assembly, screen refreshes, cell checks and commands from SKU, fact and 1C
-documents. Each result shows elapsed time, API-call count, summed HTTP time,
-HTTP failures when present, build configuration and whether a debugger is attached.
-The «Показать HTTP-запросы» control expands the latest load and action into
-individual calls in start order, with their HTTP method, shortened API path,
-duration and response status or absence of a response. The expansion choice
-persists between picking screens; the bounded details area scrolls when needed.
-Each call also shows «Сессия ТСД», the time preparing authentication on the device,
-and «API», the server processing time up to the start of the response. Session
-preparation includes secure-storage reads and any token-refresh request or wait.
-An attempted token refresh is marked «обновление токена» in that call's details.
-API time includes server authentication and endpoint processing; it excludes
-the remaining response serialization, transfer and client deserialization.
-Missing measurements are shown as a dash. These times are parts of HTTP duration,
-not extra durations to add to it.
-Elapsed time covers the measured client operation and its nested data loads;
-it does not measure the first displayed frame. HTTP time includes authentication,
-network, server processing and response download, rather than SQL time alone.
+The picking performance strip is off by default. Set
+`EnablePerformanceDiagnostics` in `Resources/Raw/mobile-api.json` before
+building Mobile to show the latest load and action on picking screens. Each
+result shows elapsed time, API call count, total HTTP time and failures, build
+configuration and debugger status. «Показать HTTP-запросы» expands it into calls
+in start order with method, path, duration, status, «Сессия ТСД» and «API».
+Missing timings appear as a dash. The expanded state persists between picking
+screens. See [measurement boundaries](../architecture.md#client-organization).
 
-The replacement Mobile V1 picking API exposes the assembly work list with
+### Assembly work and closure
+
+The Mobile V1 picking API exposes the assembly work list with
 per-SKU plan and confirmed fact, original-cell fact entries, a recalculated
 route, SKU availability, scanned-cell inspection, pallet hold/return, pick
 confirmation, scanned return and shortage reporting. It also exposes a fresh
@@ -215,25 +183,23 @@ The close response includes the result for each document. On the Mobile 1C
 page, each closed assembly's document card shows its exchange stage and any
 exchange error. Closed
 assemblies awaiting exchange remain in every Operator's work list for their
-selected warehouse until all documents are confirmed. The replacement TSD screens
-show plan, free stock and confirmed fact per SKU with white,
-yellow and green progress,
-and preserve the unit next to the plan quantity. Picking uses the SKU base unit
+selected warehouse until all documents are confirmed. Picking uses the SKU base unit
 `Description`, falling back to `Name`; the Mobile API exposes Russian display
 names for 1C shipping document statuses. Its SKU, route and 1C document
 sections share a compact bottom navigation row. Section changes replace
 the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
-border and gray background. The SKU and route cards both show the assembly's
-plan and confirmed fact per SKU. «Доступно» is the free accounting quantity
-after reservations, disputed quantity and cell holds, independent of the
-quantity suggested by the route. The SKU card totals active «Комплектация»
+border and gray background. The SKU and route cards show the assembly's plan,
+confirmed fact and [free stock for this assembly](inventory.md#stock-availability)
+per SKU. The unit appears next to plan. SKU cards use green when fact equals
+plan, yellow for a positive fact that differs from plan and white for zero
+fact against an outstanding plan. The SKU card totals active «Комплектация»
 cells and adds a separate amount for the whole «Хранение» pallets offered in
 the cell list. The route card totals the current SKU across all expiration
 groups in its own cell. Included expired stock contributes to «Доступно» and
 adds a warning icon alongside the corresponding quantity. Unknown availability
-is shown as a dash. Eligibility to pick follows the
-[inventory rules](inventory.md#stock-availability).
+is shown as a dash. The [picking rules](inventory.md#picking) determine the
+route and the quantity shown in «Взять».
 Route cards appear in route order without step numbers. Each card shows its
 address prominently with «Взять» and the step quantity on the same line, the
 SKU name on the left, and plan, available and fact in a right-aligned column.
@@ -274,6 +240,8 @@ A gray icon with a crossed arrow means no further
 replenishment is currently available; tapping it shows a short explanation.
 The icon is hidden when the SKU plan is already confirmed. The picking worker
 does not see a separate replenishment section or individual task details.
+### Cell selection, confirmation and return
+
 Unavailable demand may require a Manager decision, and a wrong-cell message
 identifies stocked SKU by name rather than a GUID. Visible cell addresses use
 `StorageLocation.Name`, falling back to `Code`; scanning and validation continue
@@ -288,18 +256,12 @@ expiration ascending with unknown dates last, then by available quantity
 descending and warehouse address descending. The info button opens the full
 stock-by-cell report. «Доступно» is red when the row can be
 picked now and its available quantity is below the remaining SKU demand.
-Tapping a row checks its specific expiration group through the same source
-inspection used by cell scans. The operator confirms the offered quantity
-explicitly. The fact and return pages show a compact SKU
-card with plan, confirmed fact and remaining or return quantity, with the unit
-beside the plan. The recommended or original cell has a separate large address;
-after a pick scan, the actual cell address appears above its stock and expiry.
-The fact and return pages show plan, fact and remaining or return quantity in
-three compact rows beside the SKU, with small captions and ordinary sized SKU
-and quantity values. Cell addresses remain 22 point. The assembly number is shown in smaller
-type beside the page title, truncated visually if needed. From the route and
-for returns, cell input uses the device scanner or camera. From SKU, both
-scanner sources are available alongside list selection.
+Tapping a row uses the same source check as scanning its cell. The operator
+confirms the offered quantity explicitly. The fact and return pages show plan,
+confirmed fact and remaining or return quantity beside the SKU, with the unit
+beside plan. They show the recommended or original address separately from the
+scanned cell's stock and expiry. The device scanner and camera are available
+from both SKU and the route, with list selection also available from SKU.
 An animated MAUI ActivityIndicator shows loading and command execution.
 Confirmation and pallet actions stay below the scrolling content. The shortage
 hint appears only for a scanned pick, not a return. Inputs and actions are
@@ -310,28 +272,25 @@ returns to the SKU list, where all outstanding quantities are visible.
 Opened from SKU, it returns to that SKU list after each successful pick or
 shortage confirmation, even if the SKU is not complete. An uncertain response
 keeps the page open; a successful explicit retry follows the same navigation.
-Holding a pallet does not leave the page. Its one confirmation button records a full offered pick normally.
-A smaller entered quantity, including zero, opens a shortage confirmation:
-the entered amount is the entire remaining physical quantity of that SKU and
-expiration group in the scanned cell. The prompt shows the offered pick, free
-accounting quantity, found amount and amount to block. Confirmation reserves
-the found fact and reports the shortage in one replay-safe command; cancelling
-changes nothing. The former separate picking-shortage button is removed.
+Holding a pallet keeps the page open. Entering less than the offered quantity,
+including zero, opens the [shortage](inventory.md#picking) confirmation with
+the offered pick, free accounting quantity, found amount and amount to block.
 When closure needs a Manager, the TSD shows the reasons in a visible dialog.
 Returning a confirmed fact requires scanning its original cell and confirming
 the physical return. Other SKU remain selectable when one is unavailable.
 A fresh closure check prevents the TSD Operator from overriding
 plan or source discrepancies.
 
-Mobile V1 also exposes Operator-only replenishment proposals and existing tasks
+## Mobile replenishment
+
+Mobile V1 exposes Operator-only replenishment proposals and existing tasks
 for a picking assembly, an explicit order command, the replenisher's ordered
 and active queue, and task detail with source cycles, actual addresses, dated
 transfer history and available stock groups on the currently held source.
 Source scans, dated transfers and source completion use separate commands.
 Each mutation carries a client request ID. Callers retain the exact request
-for an explicit retry after an uncertain response. These
-routes and the client serve the replacement Mobile screens. The picking SKU
-screen orders all current proposals for one SKU in one replay-safe command.
+for an explicit retry after an uncertain response. From SKU, the operator
+orders the current proposals for one SKU in one action.
 The home screen opens the replenisher's warehouse queue in shipping priority
 order. Queue cards show the priority icon and label next to the small assembly
 number, then the SKU, separate address rows with outgoing and incoming icons,
@@ -472,10 +431,9 @@ A cross detaches a document before the first posted LPN. Before the first scan,
 section navigation is hidden; afterward it appears without a «Готово» action.
 Back from an existing order returns to the queue. An uncertain response retains
 the barcode or source ID and command ID for explicit retry, including creation.
-The LPN editor shows the date field immediately when a selected SKU tracks
-expiration, with no preselected date or enable switch. Saving or closing the
-LPN requires an explicit date no earlier than the current UTC day. A saved date
-remains visible after the flag turns off; closing rejects it if it has expired.
+The LPN editor shows an empty date field when a selected SKU tracks expiration.
+A saved date remains visible after the flag turns off. See the
+[receiving expiry checks](receiving.md#cycle-and-receiving-work) for saving and closing.
 A rejected close after a changed input refreshes the LPN and shows the specific
 server error.
 When an open LPN has no selected SKU, the editor shows the current order SKU

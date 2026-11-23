@@ -5,9 +5,8 @@
 A warehouse contains pickable storage (`Storage`, displayed as `Комплектация`),
 reserve (`Reserve`, displayed as `Хранение`), transit, receiving, and shipping
 zone types. New receiving putaway can post into either Storage or Reserve.
-The replacement picking workflow can use Storage and eligible one-SKU Reserve
-cells. Inventory counts cover both Storage and Reserve. Older transfer flows
-still use their former Storage-only rules for storage cells.
+Picking can use Storage and eligible one-SKU Reserve cells. Inventory counts
+cover both zones. Transfers use Storage cells for their storage endpoints.
 
 Locations form an arbitrary-depth physical tree within one warehouse. A folder
 may have no functional zone; an operational location belongs to one active zone
@@ -54,19 +53,18 @@ of its warehouse.
 
 ## Stock availability
 
-The Application stock-availability query distinguishes accounting quantity,
-active picking reservations, disputed shortage quantity and whole-location
-holds for each warehouse, cell, SKU and nullable expiration date. A negative
-available result is shown as zero. A hold excludes the whole cell from new
-work. Its owning picking assembly can continue selecting its own stock groups,
-with confirmed quantities still subtracted as reservations.
+Availability is calculated by warehouse, cell, SKU and nullable expiration
+date. Free quantity is the accounting balance minus active picking reservations
+and disputed shortage quantity, with a minimum of zero. A cell hold makes the
+entire cell unavailable for new work. When picking uses its own assembly's
+hold, the hold itself does not reduce availability, and all active reservations
+are still subtracted. The general stock report uses availability for new work.
 
 Issuing a picking assembly's reserved quantity uses the accounting balance
 after protecting other reservations and disputed quantity. A fully reserved
 group can therefore have zero available for new work while covering the owning
-assembly's issue. The reservation store changes reservations and holds inside
-the command session under an update lock on the existing cell. Physical scans,
-FEFO and assembly authorization belong to their operational use cases.
+assembly's issue. Physical scans, FEFO and assembly authorization are checked
+by each workflow.
 
 The shared posting handler supports a dated picking issue against the exact
 reservation of a picking entry, a Reserve-to-Storage replenishment under its
@@ -76,14 +74,22 @@ Corrections preserve picked stock and can consume the disputed quantity of the
 referenced shortage. The Manager use case resolves that report in the same
 session. Receiving putaway cannot occupy a cell held by picking or replenishment.
 
-The replacement picking-route builder uses the shared availability view. It
-orders known expiration dates before unknown dates, excludes expired groups,
-and can recommend a full one-SKU Reserve cell before Storage top-up. It reports
-unmet demand separately. New picking application operations read a scanned
-Storage or Reserve cell and show its actual SKU, date group, accounting balance,
-available balance, and suggested quantity. A null date prompts a visual expiry
-check only for a SKU that tracks expiration; the fact retains null. Confirming
-a pick reserves its exact group and records editable fact without moving stock.
+## Expiration day
+
+Picking and replenishment use the application server's local date for expiry
+checks and warnings. A dated group expires after its stated date. Receiving
+uses the [UTC day](receiving.md#cycle-and-receiving-work) for receiving LPNs.
+
+## Picking
+
+The route applies FEFO to free stock: known expiration dates come first,
+earliest first, followed by unknown dates. It excludes expired groups, can
+recommend an eligible whole one-SKU Reserve cell before Storage top-up, and
+reports unmet demand separately. Picking can inspect a selected or scanned
+Storage or Reserve cell. An unknown date prompts a visual expiry check for a
+SKU that tracks expiration. The confirmed fact retains the unknown date.
+Confirming a pick reserves its exact group and records editable fact without
+moving stock.
 Reducing a fact requires a scan of its original cell and confirmation that the
 released quantity is physically there; the matching reservation is reduced
 in the same command. A normal pick confirms the full quantity currently offered
@@ -95,25 +101,24 @@ other free accounting quantity of that group in the same transaction. The
 disputed group therefore does not return as a route step. A Manager either
 posts a stock correction for the blocked quantity or releases a mistaken block,
 preserving the report and decision. This stock decision does not approve a
-shipping plan/fact discrepancy. A direct Reserve pick first holds the whole one-SKU cell; each
-confirmed date group must be taken in full. The
-hold can be released after a confirming scan only when no positive fact remains
-from that cell. The Mobile «Отбор» button opens the replacement picking screens.
+shipping plan/fact discrepancy. A direct Reserve pick first holds the whole
+one-SKU cell; each confirmed date group must be taken in full. Its hold can be
+released after a confirming scan when no positive fact remains from that cell.
 
-The replacement replenishment proposal calculator uses the remaining assembly
-demand, suggested picking steps, shared stock availability and existing tasks.
-It recommends all currently usable Reserve sources in expiration order, counts
-unselected Storage stock before proposing extra transfers, and reports any
-remaining warehouse deficit. An ordered task consumes its suggested source
-quantity in the recommendation; a physically held cell is unavailable. A
-Storage destination is recommended only when it has a positive balance of that
-SKU and permits its SKU mix; eligible cells sort by code. If none qualifies,
-the recommendation has no destination and the worker selects it by scan during
-the transfer. The recommendation does not use cell/SKU history.
-This read-only calculation creates no replenishment task;
-ordering and physical scans require their own checks. An Operator responsible
-for an active assembly can explicitly order all currently offered proposals
-for one SKU in a single command. The command rechecks the route, stock,
+## Replenishment
+
+The proposal calculator starts with the remaining assembly demand and deducts
+the quantities covered by picking steps and active tasks for the same assembly
+and SKU. It considers free stock in expiration order, using Storage before
+Reserve within the same date group. It proposes transfers only for Reserve
+quantities that cover the remaining demand and reports any uncovered deficit.
+An ordered task consumes its suggested source quantity in new proposals, and
+physically held cells are excluded. A recommended Storage destination has a
+positive balance of that SKU and permits its SKU mix. Eligible destinations
+sort by code. If no destination qualifies, the worker selects one by scan.
+
+An Operator responsible for an active assembly can order all currently offered
+proposals for one SKU in a single command. The command rechecks the route, stock,
 sources, destinations and existing tasks in one transaction, then saves all
 tasks, one assembly revision, their audit events and one command receipt
 together. Repeating its request ID returns the same assembly without creating
@@ -165,6 +170,8 @@ the difference between its original source and destination. The shared posting
 checks current balances, reservations, shortage blocks, cell holds and SKU
 mixing. Task progress reflects the corrected total in the same command. The
 assembly audit retains the reason, old and new quantities and movement ID.
+
+## Picking assembly closure and cancellation
 
 «Закрыть и отгрузить» posts the warehouse shipment when the picking assembly
 closes. This is the sole outbound stock posting point. The command rechecks
@@ -230,6 +237,8 @@ disabled contains more than one distinct SKU with nonzero balance, across
 dates. The violation disappears when outward movement leaves at most one such
 SKU; ordinary inflow that would retain mixed stock is rejected.
 
+## Cell holds and SKU mixing
+
 An active operational location may have one active lock. A lock keeps the
 location visible and excludes it from competing warehouse work.
 A locked location cannot be deactivated or converted to a folder. Administrators
@@ -252,6 +261,8 @@ without partial effects. A count may replace one SKU with another when its
 final state contains only the latter. Destination recommendations retain
 their existing scope; a scanned destination is checked at posting.
 
+## Quantities and dimensions
+
 Inventory uses one canonical unit per SKU. Operational quantities are C#
 `decimal` persisted as SQL Server `decimal(15,3)`, matching the current 1C
 `Number(15,3)` boundary; unsupported scale or range is rejected, not rounded.
@@ -271,15 +282,16 @@ base unit is `упак`; the number in the name does not multiply its quantity.
 Refilling into another pack size is represented by a different SKU. Package
 keys and characteristics do not participate in SKU identity.
 
+## Balances, movements, and turnovers
+
 `InventoryBalance` is current signed quantity by warehouse, location, SKU,
 and nullable expiration date. SQL Server keeps one balance key even when the
 date is `null`. Posted `InventoryMovement` records warehouse movement with
 its LPN provenance when applicable, and `InventoryTurnover` is its immutable
 before/delta/after history. Closing a receiving LPN posts the receipt at its
 original Receiving location. Each confirmed partial putaway posts immediately
-from there to Storage or Reserve; order completion posts nothing. Draft picking
-movements do not change inventory. Zero balance rows are retained and support
-historical-location suggestions.
+from there to Storage or Reserve; order completion posts nothing. Zero balance
+rows are retained and support historical-location suggestions.
 The Web balance list shows one row per warehouse, location, SKU and expiration
 date, with an explicit "Не указан" for a balance without a date. Different dates
 remain separate even after the SKU's expiration-tracking flag is turned off.

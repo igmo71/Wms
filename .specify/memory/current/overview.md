@@ -13,11 +13,11 @@ shipping documents. WMS imports them, executes warehouse work, and owns
 operational inventory by storage location. Outbound exchange with 1C depends on
 the workflow, as described in [integration](integration.md).
 
-Receiving, putaway, picking, shipping and location inventory counts use
-replacement workflows. Direct and transit intra-warehouse transfers still
-await replacement for dated and signed stock. Inventory
-history, employee-performance reporting, topology administration, synchronized
-catalogs, and WMS user administration also exist.
+WMS supports receiving, putaway, picking with shipment at assembly closure,
+replenishment and location inventory counts. The current direct and transit
+[transfer workflows](other-workflows.md#intra-warehouse-transfer) use undated
+stock. WMS also provides stock history, employee-performance reports, topology
+administration, synchronized catalogs, and user administration.
 
 The supported interactive clients are `Wms.WebApp` and Android `Wms.Mobile`.
 `Wms.WebApi` exposes authenticated Mobile V1 plus separate 1C integration
@@ -35,7 +35,7 @@ editing behavior. Counts of lines and pallets are integers, and weight is a
 separate kg measure. Order progress does not total quantities across SKUs;
 TSD receiving shows progress by line count. TSD picking shows plan, free stock
 and confirmed fact, with separate instructions and warnings for the route.
-See [picking clients](clients.md#mobile-picking-api).
+See [picking clients](clients.md#mobile-picking).
 
 LPN tracks receiving provenance and initial putaway, not stored inventory.
 

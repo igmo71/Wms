@@ -76,9 +76,9 @@ migration compatibility separately before changing a non-disposable database.
 ### Cutover rehearsal database
 
 Use an isolated disposable database for warehouse-cutover rehearsals. The
-opening import allows one topology stage and one stock snapshot per warehouse
-between operational-data resets. A new request cannot replace a confirmed stock
-snapshot until the operational-data cleanup resets that stage. Keep both XLSX
+opening import confirms topology first, then one stock snapshot per warehouse.
+Operational-data cleanup preserves the confirmed topology and resets the stock
+stage, allowing a new snapshot against the retained cells. Keep both XLSX
 files when they differ, the snapshot time, each source SHA-256 and the saved
 import protocol with the rehearsal results. Inspect the protocol on the
 Administrator «Переход со старой WMS» page
@@ -113,8 +113,8 @@ and confirm topology in the new WMS; synchronize SKU and unit catalogs; preview
 and confirm stock from the same or a later workbook with its recorded Moscow-time
 snapshot. Inspect the saved protocol and balances, then resume warehouse work
 only in the new WMS. The export does not migrate unfinished orders, LPNs or
-transfers. The detailed checks are in the
-[cutover validation guide](../../specs/010-topology-opening-balances/quickstart.md).
+transfers. The [opening stock rules](../memory/current/inventory.md#opening-stock-cutover)
+describe the import checks and stored protocol.
 
 ### 3. Publish and start applications
 
@@ -217,10 +217,10 @@ database migration version, Mobile build, warehouse, actors and results.
 1. Restore a backup into an isolated test database, apply the release migrations
    and confirm that the selected application version works with that schema.
 2. Check the enabled Web and Mobile workflows on representative dated stock.
-   Include receiving, putaway, picking with replenishment and closing with
-   shipment. Include replacement transfer and count workflows when they enter
-   the release scope. Verify the explicit Operator, Manager and Administrator
-   permissions for the delivered operations.
+   Include receiving, putaway, picking with replenishment, closing with
+   shipment, and inventory count. When the release includes intra-warehouse
+   transfers, exercise their supported stock scenarios. Verify the explicit
+   Operator, Manager and Administrator permissions for the delivered operations.
 3. Interrupt a warehouse command and repeat it after reopening its state. Check
    the single warehouse effect, movement history, balances and command receipt.
    Simulate PATCH/POST failures in the test 1C database and verify the retained

@@ -129,11 +129,11 @@ after confirming the saved SKU, quantity, and date. If the LPN changed since it 
 displayed for confirmation, Web closing is rejected and requires a refresh.
 
 The local SKU expiration-tracking flag belongs to WMS. A Web Manager can switch
-it with an audit event; catalog imports preserve it. Saving an LPN item for an
-SKU whose flag is enabled requires an explicitly selected date. A date before
-the current UTC day cannot be saved, and closing rejects an LPN whose saved
-date has since expired, even if the flag was later disabled. Today's date is
-allowed. Saved dates survive a later flag change and do not merge stock groups.
+it with an audit event; catalog imports preserve it. Saving an LPN item or
+closing its LPN requires an explicit date when the SKU flag is enabled. Any
+supplied date must be at or after the current UTC day.
+Closing rechecks a saved date even when the flag is off. Saved dates survive a
+later flag change and keep their stock groups separate.
 
 A current-cycle Operator in Mobile or Manager in Web can complete an order when
 no receiving LPN is open. Completion tries to check every linked source, then
