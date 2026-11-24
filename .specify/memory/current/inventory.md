@@ -203,9 +203,9 @@ cutover page, using a separately selected XLSX file after SKU catalog
 synchronization. The stock file may differ from the topology file. The preview
 requires a previously imported topology, a declared snapshot time, active
 target cells with matching functional purposes, known SKU GUIDs, and
-matching canonical units. It blocks operational stock or work, unresolved mixed
-cells, unsupported quantities, and changed warehouse state. Missing SKUs and
-cells are not created during stock confirmation. Only one opening snapshot can
+matching canonical units. It blocks operational stock or work, unsupported
+quantities, and changed warehouse state. Missing SKUs and cells are not
+created during stock confirmation. Only one opening snapshot can
 be confirmed per warehouse between operational-data resets. An exact retry with
 the original command key returns the recorded result; a new request for the same
 or another workbook conflicts while that snapshot exists. The operational-data
@@ -224,18 +224,17 @@ Accepted zero rows make no movement. The import status, declared time, stock
 file name and hash, source summary, stock effects, SKU flags, audit and command
 receipt commit together; failed confirmation leaves the topology-only stage intact.
 
-Exactly these reviewed cells permit several SKUs: `1C09A1`, `1G09A1`,
+The imported topology permits several SKUs in these cells: `1C09A1`, `1G09A1`,
 `1K09A1`, `1M09A1`, `1O09A1`, `1Q09A1`, `1U11A1`, `2O01A1`, `2O02A1`,
-`2O03A1`, `2O04A1`, `2O05A1`, `2O06A1`, `2O07A1`, `2O08A1`. These eight
-reviewed cells retain their mixed opening stock with mixing disabled:
-`1H05A7`, `1K03A5`, `1O08C6`, `1R04A5`, `1R05B1`, `1T03C3`, `2A02F2`,
-`3E07B1`. Their addresses are recorded in the import summary. The Web page
-applies this reviewed mixing policy to Storage and Reserve; Shipping and
-Receiving cells may contain several SKUs in the opening snapshot. It derives a
-violation whenever a Комплектация or Хранение cell with mixing
-disabled contains more than one distinct SKU with nonzero balance, across
-dates. The violation disappears when outward movement leaves at most one such
-SKU; ordinary inflow that would retain mixed stock is rejected.
+`2O03A1`, `2O04A1`, `2O05A1`, `2O06A1`, `2O07A1`, `2O08A1`. In the opening
+snapshot, a Комплектация or Хранение cell with mixing disabled may retain
+several SKUs with nonzero balances across dates. The preview warns about each
+such cell for manual correction after cutover, and confirmation records the
+addresses in the import summary and audit. Shipping and Receiving cells may
+contain several SKUs in the opening snapshot. Normal operations apply the
+[cell mixing rules](#cell-holds-and-sku-mixing). The current violation clears
+when the cell contains at most one SKU with a nonzero balance or the Manager
+enables mixing.
 
 ## Cell holds and SKU mixing
 

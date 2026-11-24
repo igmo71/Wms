@@ -40,14 +40,15 @@ public sealed record OpeningStockTotal(
     decimal SignedQuantity, int Rows);
 
 public sealed record OpeningStockIssue(
-    int? RowNumber, string? Address, string Message, bool BlocksConfirmation);
+    int? RowNumber, string? Address, string Message, bool BlocksConfirmation,
+    bool IsMixedCell = false);
 
 public sealed record OpeningStockCounts(
     int SourceRows, int AcceptedRows, int CorrectedRows, int ExcludedRows,
     int BlockingRows, int SourceStockRows, int AcceptedStockRows,
     int NonzeroRows, int ZeroRows,
     int NegativeRows, int MissingRequiredDates, int PastDates,
-    int ReviewedMixedCells, int UnreviewedMixedCells,
+    int MixedCellsToCorrect,
     decimal SignedQuantity, decimal ExcludedQuantity,
     int BlockingIssues, int InformationalIssues);
 
@@ -257,32 +258,18 @@ public static class OpeningStockPlanBuilder
                 validStockRows.Add((row, location!, sku!));
         }
 
-        var reviewedMixedCells = 0;
-        var unreviewedMixedCells = 0;
-        var firstStockRowByLocation = validStockRows.GroupBy(x => x.Location.Id)
-            .ToDictionary(x => x.Key, x => x.First());
+        var locationsById = state.Locations.ToDictionary(x => x.Id);
         foreach (var group in runningBalances.Where(x => x.Value != 0)
             .GroupBy(x => x.Key.LocationId))
         {
-            if (group.Select(x => x.Key.SkuId).Distinct().Take(2).Count() <= 1)
+            var location = locationsById[group.Key];
+            if (location.AllowsMultipleSkus
+                || location.Purpose is not (ZoneType.Storage or ZoneType.Reserve)
+                || group.Select(x => x.Key.SkuId).Distinct().Take(2).Count() <= 1)
                 continue;
-            var first = firstStockRowByLocation[group.Key];
-            var location = first.Location;
-            if (location.Purpose is not (ZoneType.Storage or ZoneType.Reserve))
-                continue;
-            if (first.Row.MixingPolicy == OpeningImportMixingPolicy.ProhibitedMixedOpeningStock
-                && !location.AllowsMultipleSkus)
-            {
-                reviewedMixedCells++;
-                issues.Add(new(null, location.Address,
-                    "Согласованная ячейка с несколькими SKU при запрете смешения; исходный факт сохранится.", false));
-            }
-            else if (first.Row.MixingPolicy != OpeningImportMixingPolicy.ApprovedMultipleSkus)
-            {
-                unreviewedMixedCells++;
-                issues.Add(new(null, location.Address,
-                    "Несколько SKU в ячейке вне согласованного списка; требуется решение.", true));
-            }
+            issues.Add(new(null, location.Address,
+                "В ячейке с запретом смешения есть несколько SKU. После загрузки разместите товары по отдельным ячейкам.",
+                BlocksConfirmation: false, IsMixedCell: true));
         }
 
         var totals = validStockRows.GroupBy(x => (x.Sku.Id, x.Location.Purpose))
@@ -290,7 +277,8 @@ public static class OpeningStockPlanBuilder
                 x.Key.Purpose!.Value, x.Sum(row => row.Row.Quantity ?? 0), x.Count()))
             .OrderBy(x => x.SkuName, StringComparer.Ordinal)
             .ThenBy(x => x.Purpose).ThenBy(x => x.StockKeepingUnitId).ToArray();
-        var orderedIssues = issues.OrderBy(x => x.RowNumber ?? int.MaxValue)
+        var orderedIssues = issues.OrderByDescending(x => x.BlocksConfirmation)
+            .ThenByDescending(x => x.IsMixedCell).ThenBy(x => x.RowNumber ?? int.MaxValue)
             .ThenBy(x => x.Address, StringComparer.Ordinal).ToArray();
         var counts = new OpeningStockCounts(
             decisions.Count, decisions.Count(x => x.Outcome == OpeningImportRowOutcome.Accepted),
@@ -301,10 +289,10 @@ public static class OpeningStockPlanBuilder
             validStockRows.Count(x => x.Row.Quantity != 0),
             validStockRows.Count(x => x.Row.Quantity == 0),
             validStockRows.Count(x => x.Row.Quantity < 0), missingRequiredDates, pastDates,
-            reviewedMixedCells, unreviewedMixedCells,
+            orderedIssues.Count(x => x.IsMixedCell),
             validStockRows.Sum(x => x.Row.Quantity ?? 0), excludedQuantity,
             orderedIssues.Count(x => x.BlocksConfirmation),
-            orderedIssues.Count(x => !x.BlocksConfirmation));
+            orderedIssues.Count(x => !x.BlocksConfirmation && !x.IsMixedCell));
         var signature = Sign(warehouseId, sourceSha256, declaredSnapshotAt,
             state, decisions, counts);
         return new OpeningStockPlan(warehouseId, sourceSha256, signature,

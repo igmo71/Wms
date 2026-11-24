@@ -15,9 +15,11 @@ history retain their event order.
 Administrators open «Переход со старой WMS» from «Конфигурация». They review
 and confirm topology first, then select an XLSX file to preview and confirm
 opening stock after SKU synchronization. The page lists blocking issues by
-reason and shows the saved protocol after selecting a warehouse again. The
+reason and shows warnings for mixed cells that need manual correction.
+The Administrator acknowledges the warnings before confirming. The saved
 protocol includes each stage's source hash, actor, time, accepted and excluded
-counts, approved exceptions and current mixed-cell status. A new stock preview
+counts, approved exceptions, and each imported mixed cell's current violation
+status. It is available after selecting the warehouse again. A new stock preview
 requires selecting the file again. See the
 [opening stock rules](inventory.md#opening-stock-cutover).
 The storage-location page shows the addresses and count of cells with a current

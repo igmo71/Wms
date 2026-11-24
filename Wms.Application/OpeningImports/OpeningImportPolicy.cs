@@ -14,8 +14,7 @@ public enum OpeningImportRowOutcome
 public enum OpeningImportMixingPolicy
 {
     Default,
-    ApprovedMultipleSkus,
-    ProhibitedMixedOpeningStock
+    ApprovedMultipleSkus
 }
 
 public sealed record OpeningImportRowDecision(
@@ -45,12 +44,6 @@ public static class OpeningImportPolicy
         "1C09A1", "1G09A1", "1K09A1", "1M09A1", "1O09A1", "1Q09A1",
         "1U11A1", "2O01A1", "2O02A1", "2O03A1", "2O04A1", "2O05A1",
         "2O06A1", "2O07A1", "2O08A1"
-    ];
-
-    private static readonly HashSet<string> ProhibitedMixedAddresses =
-    [
-        "1H05A7", "1K03A5", "1O08C6", "1R04A5",
-        "1R05B1", "1T03C3", "2A02F2", "3E07B1"
     ];
 
     public static OpeningImportRowDecision Interpret(OpeningExportRow row)
@@ -148,9 +141,7 @@ public static class OpeningImportPolicy
 
         var mixingPolicy = ApprovedMultipleSkuAddresses.Contains(address)
             ? OpeningImportMixingPolicy.ApprovedMultipleSkus
-            : ProhibitedMixedAddresses.Contains(address)
-                ? OpeningImportMixingPolicy.ProhibitedMixedOpeningStock
-                : OpeningImportMixingPolicy.Default;
+            : OpeningImportMixingPolicy.Default;
         return new OpeningImportRowDecision(row, OpeningImportRowOutcome.Accepted,
             area, group, address, purpose, mixingPolicy, null);
     }

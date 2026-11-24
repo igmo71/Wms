@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Wms.Common;
 using Wms.Domain;
 
@@ -29,7 +30,7 @@ public sealed record OpeningStockResult(
     int SourceRows, int AcceptedRows, int CorrectedRows, int ExcludedRows,
     int NonzeroRows, int ZeroRows, int NegativeRows,
     int MissingRequiredDates, int PastDates, decimal SignedQuantity,
-    IReadOnlyList<string> ReviewedMixedAddresses,
+    [property: JsonPropertyName("ReviewedMixedAddresses")] IReadOnlyList<string> MixedAddresses,
     int Movements, int Balances, int ExpirationFlagsEnabled,
     string? SourceName = null, string? SourceSha256 = null);
 
@@ -64,7 +65,7 @@ public sealed class GetOpeningImportResult(IOpeningImportResultStore store)
             if (topology?.Counts is null || topology.Exclusions is null
                 || topology.Corrections is null
                 || saved.Status == WarehouseOpeningImportStatus.StockImported &&
-                    (stock?.ReviewedMixedAddresses is null
+                    (stock?.MixedAddresses is null
                         || saved.StockImportedAtUtc is null
                         || saved.StockImportedBy is null
                         || saved.DeclaredSnapshotAt is null))

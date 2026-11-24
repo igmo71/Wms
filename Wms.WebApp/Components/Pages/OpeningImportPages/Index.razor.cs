@@ -61,7 +61,7 @@ public partial class Index
     private bool StockAcknowledgementRequired => _stockPlan is { } plan
         && (plan.Counts.ExcludedRows > 0 || plan.Counts.CorrectedRows > 0
             || plan.Counts.NegativeRows > 0 || plan.Counts.MissingRequiredDates > 0
-            || plan.Counts.PastDates > 0 || plan.Counts.ReviewedMixedCells > 0);
+            || plan.Counts.PastDates > 0 || plan.Counts.MixedCellsToCorrect > 0);
 
     private IReadOnlyList<OpeningImportRowDecision> VisibleSpecialDecisions =>
         Slice(_specialDecisions, _specialPage);

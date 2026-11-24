@@ -23,21 +23,17 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
     private static readonly byte[] StockWorkbook = [2, 4, 6, 8];
     private static readonly DateTimeOffset SnapshotAt =
         new(2026, 11, 2, 12, 0, 0, TimeSpan.FromHours(3));
-    private static readonly string[] ReviewedAddresses =
-    [
-        "1H05A7", "1K03A5", "1O08C6", "1R04A5",
-        "1R05B1", "1T03C3", "2A02F2", "3E07B1"
-    ];
+    private static readonly string[] MixedAddresses = ["3C07B1", "3E07B1"];
 
     [Fact]
-    public async Task Signed_dated_duplicates_and_eight_reviewed_mixed_cells_post_once_without_inflow_bypass()
+    public async Task Signed_dated_duplicates_and_mixed_cells_post_once_without_inflow_bypass()
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Opening stock" };
         var firstSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "First" };
         var secondSku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Second" };
         var date = new DateOnly(2027, 1, 15);
         var rows = new List<OpeningExportRow>();
-        foreach (var address in ReviewedAddresses)
+        foreach (var address in MixedAddresses)
         {
             rows.Add(Row(rows.Count + 2, address, "Комплектация", firstSku.Id, 1m));
             rows.Add(Row(rows.Count + 2, address, "Комплектация", secondSku.Id, 1m));
@@ -62,8 +58,8 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
             .BuildPlanAsync(warehouse.Id, StockWorkbook, SnapshotAt);
         Assert.True(plan.CanConfirm, string.Join("; ", plan.Issues
             .Where(x => x.BlocksConfirmation).Select(x => x.Message)));
-        Assert.Equal(8, plan.Counts.ReviewedMixedCells);
-        Assert.Equal(0, plan.Counts.UnreviewedMixedCells);
+        Assert.Equal(MixedAddresses.Length, plan.Counts.MixedCellsToCorrect);
+        Assert.Equal(MixedAddresses, plan.Issues.Where(x => x.IsMixedCell).Select(x => x.Address));
         var command = new ConfirmOpeningStockCommand(Guid.NewGuid(), warehouse.Id,
             "stock.xlsx", StockWorkbook, SnapshotAt, plan.Signature, Actor);
         var confirm = Confirm(reader, database);
@@ -103,7 +99,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
 
             var balances = await verify.InventoryBalances
                 .Where(x => x.WarehouseId == warehouse.Id).ToArrayAsync();
-            Assert.Equal(20, balances.Length);
+            Assert.Equal(8, balances.Length);
             Assert.Equal(3m, Assert.Single(balances.Where(x =>
                 x.StorageLocationId == cells["1A01A1"].Id
                 && x.StockKeepingUnitId == firstSku.Id && x.ExpirationDate == date)).Quantity);
@@ -134,7 +130,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
             var import = await verify.WarehouseOpeningImports.SingleAsync(x => x.Id == importId);
             Assert.Equal(WarehouseOpeningImportStatus.StockImported, import.Status);
             Assert.Equal(SnapshotAt, import.DeclaredSnapshotAt);
-            Assert.Contains(ReviewedAddresses[0], import.StockSummary);
+            Assert.All(MixedAddresses, address => Assert.Contains(address, import.StockSummary));
             Assert.Contains("stock.xlsx", import.StockSummary);
             Assert.Contains(Convert.ToHexString(SHA256.HashData(StockWorkbook)), import.StockSummary);
             Assert.Equal(1, await verify.CommandReceipts.CountAsync(x => x.RequestId == command.RequestId));
@@ -142,8 +138,8 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
 
         var violations = await new OpeningImportStore(database)
             .LoadViolationsAsync(warehouse.Id, default);
-        Assert.Equal(8, violations.Count);
-        Assert.All(ReviewedAddresses, address => Assert.Contains(violations,
+        Assert.Equal(MixedAddresses.Length, violations.Count);
+        Assert.All(MixedAddresses, address => Assert.Contains(violations,
             x => x.StorageLocationId == cells[address].Id && x.DistinctSkuCount == 2));
 
         var secondRequest = await confirm.ExecuteAsync(command with
@@ -171,7 +167,7 @@ public sealed class OpeningStockImportTests(SqlDatabase database)
             await seed.SaveChangesAsync();
         }
         var movement = Value(InventoryMovement.Create(Guid.NewGuid(), warehouse.Id,
-            receiving.Id, cells[ReviewedAddresses[0]].Id, secondSku.Id, 1m,
+            receiving.Id, cells[MixedAddresses[0]].Id, secondSku.Id, 1m,
             DateTimeOffset.UtcNow, RecorderType.ReceivingOrder, Guid.NewGuid(), 1,
             Actor, licensePlateNumberId: batch.Labels.Single().Id));
         var executor = new CommandExecutor(new CommandExecutionStore(database));

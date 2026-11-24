@@ -105,10 +105,8 @@ public sealed class ConfirmOpeningStock(
                     enabledFlags++;
                 }
 
-                var reviewedMixedAddresses = ReviewedMixedAddresses(plan);
-                if (reviewedMixedAddresses.Length != plan.Counts.ReviewedMixedCells)
-                    return OperationError.Invalid(
-                        "Состав согласованных смешанных ячеек изменился.");
+                var mixedAddresses = plan.Issues.Where(x => x.IsMixedCell)
+                    .Select(x => x.Address!).ToArray();
                 var summary = JsonSerializer.Serialize(new
                 {
                     SourceName = sourceName, plan.SourceSha256, plan.DeclaredSnapshotAt,
@@ -117,7 +115,7 @@ public sealed class ConfirmOpeningStock(
                     plan.Counts.NonzeroRows, plan.Counts.ZeroRows,
                     plan.Counts.NegativeRows, plan.Counts.MissingRequiredDates,
                     plan.Counts.PastDates, plan.Counts.SignedQuantity,
-                    ReviewedMixedAddresses = reviewedMixedAddresses,
+                    ReviewedMixedAddresses = mixedAddresses,
                     Movements = posted.Value!.Movements,
                     Balances = posted.Value.Balances,
                     ExpirationFlagsEnabled = enabledFlags
@@ -141,7 +139,7 @@ public sealed class ConfirmOpeningStock(
                         Movements = posted.Value.Movements,
                         Balances = posted.Value.Balances,
                         ExpirationFlagsEnabled = enabledFlags,
-                        ReviewedMixedAddresses = reviewedMixedAddresses
+                        ReviewedMixedAddresses = mixedAddresses
                     }),
                     commandUserId: command.UserId,
                     commandType: CommandType,
@@ -153,15 +151,4 @@ public sealed class ConfirmOpeningStock(
                 return new CommandExecutionResult(state.Import.Id, [audit.Value!]);
             }, ct);
     }
-
-    private static string[] ReviewedMixedAddresses(OpeningStockPlan plan) =>
-        plan.Rows.Where(x => (x.Outcome is OpeningImportRowOutcome.Accepted
-                or OpeningImportRowOutcome.Corrected)
-                && x.MixingPolicy == OpeningImportMixingPolicy.ProhibitedMixedOpeningStock
-                && x.Address is not null && x.StockKeepingUnitId is not null)
-            .GroupBy(x => x.Address!, StringComparer.Ordinal)
-            .Where(group => group.GroupBy(x => (x.StockKeepingUnitId, x.ExpirationDate))
-                .Where(skuDate => skuDate.Sum(x => x.Quantity.GetValueOrDefault()) != 0)
-                .Select(x => x.Key.StockKeepingUnitId).Distinct().Take(2).Count() > 1)
-            .Select(x => x.Key).OrderBy(x => x, StringComparer.Ordinal).ToArray();
 }

@@ -124,10 +124,10 @@
                     <MudText><b>Подтверждено:</b> @MoscowTime(saved.StockImportedAtUtc) МСК · @saved.StockImportedBy</MudText>
                     <MudText>Строк: @stock.SourceRows; принято: @stock.AcceptedRows; исправлено: @stock.CorrectedRows; исключено: @stock.ExcludedRows; ненулевых: @stock.NonzeroRows; движений: @stock.Movements; остатков: @stock.Balances.</MudText>
                     <MudText>Количество со знаком: @stock.SignedQuantity.ToString("+#,##0.###;-#,##0.###;0"); отрицательных строк: @stock.NegativeRows; без обязательной даты: @stock.MissingRequiredDates; с прошедшей датой: @stock.PastDates; включено требований даты: @stock.ExpirationFlagsEnabled.</MudText>
-                    @if (stock.ReviewedMixedAddresses.Count > 0)
+                    @if (stock.MixedAddresses.Count > 0)
                     {
-                        <MudText Typo="Typo.subtitle2">Согласованные ячейки с запретом смешения (@stock.ReviewedMixedAddresses.Count)</MudText>
-                        <MudTable T="string" Items="stock.ReviewedMixedAddresses" Dense="true" Elevation="0">
+                        <MudText Typo="Typo.subtitle2">Ячейки, загруженные с нарушением запрета смешения (@stock.MixedAddresses.Count)</MudText>
+                        <MudTable T="string" Items="stock.MixedAddresses" Dense="true" Elevation="0">
                             <HeaderContent><MudTh>Адрес</MudTh><MudTh>Текущее состояние</MudTh></HeaderContent>
                             <RowTemplate>
                                 <MudTd>@context</MudTd>
@@ -242,7 +242,7 @@
                 <MudText>Строк: @_stockPlan.Counts.SourceRows; строк с товаром: @_stockPlan.Counts.SourceStockRows; принято: @_stockPlan.Counts.AcceptedStockRows; ненулевых: @_stockPlan.Counts.NonzeroRows; нулевых: @_stockPlan.Counts.ZeroRows.</MudText>
                 <MudText>Суммарное количество со знаком: @_stockPlan.Counts.SignedQuantity.ToString("+#,##0.###;-#,##0.###;0"); отрицательных строк: @_stockPlan.Counts.NegativeRows; исключённое количество: @_stockPlan.Counts.ExcludedQuantity.ToString("+#,##0.###;-#,##0.###;0").</MudText>
                 <MudText>Проверка каталога: @StockCatalogIssueCount замечаний; без обязательной даты: @_stockPlan.Counts.MissingRequiredDates; с прошедшей датой: @_stockPlan.Counts.PastDates.</MudText>
-                <MudText>Смешанные ячейки: @_stockPlan.Counts.ReviewedMixedCells согласованных с запретом, @_stockPlan.Counts.UnreviewedMixedCells без решения. Исключено строк: @_stockPlan.Counts.ExcludedRows; исправлено: @_stockPlan.Counts.CorrectedRows.</MudText>
+                <MudText>Исключено строк: @_stockPlan.Counts.ExcludedRows; исправлено: @_stockPlan.Counts.CorrectedRows.</MudText>
                 @if (!_stockPlan.CanConfirm)
                 {
                     <MudAlert Severity="Severity.Error">Блокирующих замечаний: @_stockPlan.Counts.BlockingIssues. Загрузка остатков недоступна.</MudAlert>
@@ -255,6 +255,14 @@
                 {
                     <MudAlert Severity="Severity.Info">Подтверждение запишет начальные остатки и движения. Даты останутся указанными в выгрузке или неизвестными; отрицательные количества сохранят знак.</MudAlert>
                 }
+                @if (_stockPlan.Counts.MixedCellsToCorrect > 0)
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        Ячеек с несколькими SKU при запрете смешения: @_stockPlan.Counts.MixedCellsToCorrect.
+                        При подтверждении остатки сохранятся как в файле.
+                        После загрузки распределите товары так, чтобы в каждой из этих ячеек осталось не больше одного SKU.
+                    </MudAlert>
+                }
 
                 <MudText Typo="Typo.subtitle2">Замечания (@_stockPlan.Issues.Count)</MudText>
                 <MudTable T="OpeningStockIssue" Items="VisibleStockIssues" Dense="true" Elevation="0">
@@ -262,7 +270,7 @@
                     <RowTemplate>
                         <MudTd>@(context.RowNumber?.ToString() ?? "—")</MudTd>
                         <MudTd>@context.Address</MudTd>
-                        <MudTd>@(context.BlocksConfirmation ? "Ошибка" : "Информация")</MudTd>
+                        <MudTd>@(context.IsMixedCell ? "Предупреждение" : context.BlocksConfirmation ? "Ошибка" : "Информация")</MudTd>
                         <MudTd>@context.Message</MudTd>
                     </RowTemplate>
                 </MudTable>
