@@ -42,8 +42,7 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
         Success(assembly.FreezeForStart(Worker, startedAt));
         Success(assembly.ClaimStart(leaseId, startedAt, startedAt.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, startedAt, null));
-        Success(assembly.CompleteStart(leaseId, startedAt));
-        Success(assembly.ReleaseStart(leaseId));
+        Success(assembly.CompleteStart(startedAt));
         await using (var seed = database.CreateDbContext())
         {
             seed.AddRange(warehouse, sku, zone, location, source, assembly,
@@ -55,16 +54,17 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
         var executor = new CommandExecutor(new CommandExecutionStore(database));
         var assemblyStore = new PickingAssemblyStore(database);
         var stock = new StockAvailabilityStore(database);
+        var routeStock = new AdjustPickingRouteStock(assemblyStore, stock, new BuildPickingRoute());
         var pick = new ConfirmPick(executor, assemblyStore, stock, stock,
             new ReplenishmentStore(database),
-            permission, TimeProvider.System);
+            permission, routeStock, TimeProvider.System);
         var report = new ReportPickingShortage(executor, assemblyStore, stock,
-            stock, stock, permission, TimeProvider.System);
+            stock, stock, permission, routeStock, TimeProvider.System);
         var resolve = new ResolveStockShortage(executor, stock,
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
             permission, TimeProvider.System);
         var reduce = new ReducePick(executor, assemblyStore, stock,
-            permission, TimeProvider.System);
+            permission, routeStock, TimeProvider.System);
 
         var takeOver = new TakeOverPickingAssembly(executor, assemblyStore,
             permission, TimeProvider.System);
@@ -139,6 +139,8 @@ public sealed class PickingReturnSafetyTests(SqlDatabase database)
             x.Id == entryId)).Quantity);
         Assert.Equal(0m, (await final.PickingReservations.SingleAsync(x =>
             x.PickingEntryId == entryId)).Quantity);
+        Assert.Equal(2m, (await final.PickingRouteReservations.SingleAsync(x =>
+            x.PickingAssemblyId == assembly.Id && x.StorageLocationId == location.Id)).Quantity);
         Assert.Equal(1, await final.InventoryMovements.CountAsync(x =>
             x.RecorderId == shortageId));
         Assert.Equal(1, await final.CommandReceipts.CountAsync(x =>

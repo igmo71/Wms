@@ -100,7 +100,8 @@ skipped on retry. Before PATCH,
 WMS records an intent for that source. A retry after an uncertain response reads
 1C again and can continue with POST when the status is already `КОтбору`;
 without WMS intent, that status requires investigation. A per-assembly lease
-prevents overlapping start attempts.
+prevents overlapping 1C start attempts. After all sources confirm, WMS
+[allocates stock](inventory.md#picking) from persisted confirmations.
 
 For a started assembly, a Manager may change the WMS plan of one linked 1C
 document. The command checks the assembly revision and requires the source JSON

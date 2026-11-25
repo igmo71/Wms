@@ -22,6 +22,7 @@ public sealed record InventoryPostingState(
     IReadOnlyDictionary<Guid, InventoryBalance> Balances)
 {
     public IReadOnlyList<PickingReservation> Reservations { get; init; } = [];
+    public IReadOnlyList<PickingRouteReservation> RouteReservations { get; init; } = [];
     public IReadOnlyList<StockShortage> Shortages { get; init; } = [];
 }
 
@@ -192,7 +193,9 @@ public static class PostInventoryMovement
             if (sourceId is Guid protectedSource)
             {
                 var reserved = state.Reservations.Where(x => x.StorageLocationId == protectedSource
-                    && x != ownReservation).Sum(x => x.Quantity);
+                    && x != ownReservation).Sum(x => x.Quantity)
+                    + state.RouteReservations.Where(x => x.StorageLocationId == protectedSource)
+                        .Sum(x => x.Quantity);
                 var blocked = state.Shortages.Where(x => x.StorageLocationId == protectedSource
                     && x != resolvedShortage).Sum(x => x.BlockedQuantity);
                 var accounting = state.Balances.GetValueOrDefault(protectedSource)?.Quantity ?? 0;

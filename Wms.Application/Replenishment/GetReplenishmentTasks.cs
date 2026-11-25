@@ -1,4 +1,5 @@
 using Wms.Application.Authorization;
+using Wms.Application.Picking;
 using Wms.Common;
 using Wms.Domain.Enums;
 
@@ -34,7 +35,7 @@ public sealed class GetReplenishmentTasks(
             new ReplenishmentTaskListItem(x.Id, x.PickingAssemblyId,
                 x.AssemblyNumber, x.StockKeepingUnitId, x.SkuCode, x.SkuName,
                 x.OrderedQuantity, x.TransferredQuantity, x.Status, x.AssignedTo,
-                x.OrderedAtUtc, x.SourceQueues.OrderBy(Rank).FirstOrDefault(),
+                x.OrderedAtUtc, x.SourceQueues.OrderBy(ShippingQueuePriority.Rank).FirstOrDefault(),
                 x.RecommendedSourceLocationId, x.RecommendedSourceCode,
                 x.RecommendedDestinationLocationId,
                 x.RecommendedDestinationCode)
@@ -42,18 +43,10 @@ public sealed class GetReplenishmentTasks(
                 RecommendedSourceName = x.RecommendedSourceName,
                 RecommendedDestinationName = x.RecommendedDestinationName
             })
-            .OrderBy(x => Rank(x.PriorityQueue))
+            .OrderBy(x => ShippingQueuePriority.Rank(x.PriorityQueue))
             .ThenBy(x => x.OrderedAtUtc)
             .ThenBy(x => x.Id)
             .ToArray();
         return OperationResult<IReadOnlyList<ReplenishmentTaskListItem>>.Success(ordered);
     }
-
-    private static int Rank(ShippingOrderQueue queue) => queue switch
-    {
-        ShippingOrderQueue.LiveQueue => 0,
-        ShippingOrderQueue.CollectByDate => 1,
-        ShippingOrderQueue.OwnDelivery => 2,
-        _ => 3
-    };
 }

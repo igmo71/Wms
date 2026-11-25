@@ -180,7 +180,7 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
         foreach (var source in sources)
             Success(assembly.RecordSourceStartResult(leaseId, source.RefKey,
                 started, null));
-        Success(assembly.CompleteStart(leaseId, started));
+        Success(assembly.CompleteStart(started));
         var quantity = 5m * documentCount;
         var entry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
             location.Id, sku.Id, null, quantity, Operator, DateTimeOffset.UtcNow));

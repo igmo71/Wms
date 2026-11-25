@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Picking;
 using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Data;
@@ -29,7 +30,7 @@ public sealed class ReplenishmentPostingSafetyTests(SqlDatabase database)
         var firstDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
         var secondDate = firstDate.AddDays(30);
         var now = DateTimeOffset.UtcNow;
-        var (assembly, shippingSource) = ActiveAssembly(warehouse.Id, sku.Id, 10);
+        var (assembly, shippingSource) = ActiveAssembly(warehouse.Id, sku.Id, 8);
         var task = Value(ReplenishmentTask.Order(Guid.NewGuid(), assembly.Id,
             warehouse.Id, sku.Id, 10, source.Id, destination.Id, Worker, now));
         var cycle = Value(task.StartSource(Guid.NewGuid(), source.Id, Worker, now));
@@ -51,11 +52,13 @@ public sealed class ReplenishmentPostingSafetyTests(SqlDatabase database)
             await seed.SaveChangesAsync();
         }
 
+        var stock = new StockAvailabilityStore(database);
+        var routeStock = new AdjustPickingRouteStock(new PickingAssemblyStore(database), stock, new BuildPickingRoute());
         var transfer = new ConfirmReplenishmentTransfer(
             new CommandExecutor(new CommandExecutionStore(database)),
-            new ReplenishmentStore(database), new StockAvailabilityStore(database),
+            new ReplenishmentStore(database), stock,
             new PostInventoryMovement.Handler(new InventoryPostingStore()),
-            Permission(), TimeProvider.System);
+            Permission(), routeStock, TimeProvider.System);
         var rejectedId = Guid.NewGuid();
         var rejected = await transfer.ExecuteAsync(new ConfirmReplenishmentTransferRequest(
             rejectedId, task.Id, cycle.Id, fullDestination.Code, sku.Id,
@@ -72,12 +75,18 @@ public sealed class ReplenishmentPostingSafetyTests(SqlDatabase database)
                 x.RecorderId == task.Id));
             Assert.False(await verify.CommandReceipts.AnyAsync(x =>
                 x.RequestId == rejectedId));
+            Assert.False(await verify.PickingRouteReservations.AnyAsync(x => x.PickingAssemblyId == assembly.Id));
         }
 
         var firstRequest = new ConfirmReplenishmentTransferRequest(Guid.NewGuid(),
-            task.Id, cycle.Id, destination.Code, sku.Id, firstDate, 4, Worker);
+            task.Id, cycle.Id, destination.Code, sku.Id, firstDate, 2, Worker);
         Value(await transfer.ExecuteAsync(firstRequest));
         Value(await transfer.ExecuteAsync(firstRequest));
+        Value(await transfer.ExecuteAsync(firstRequest with { RequestId = Guid.NewGuid() }));
+        var partial = (await stock.ReadSkuAsync(warehouse.Id, sku.Id, default)).Single(x =>
+            x.Group.StorageLocationId == destination.Id && x.Group.ExpirationDate == firstDate);
+        Assert.Equal(4m, partial.AvailableForRoute(assembly.Id));
+        Assert.Equal(0m, partial.AvailableQuantity);
         Value(await transfer.ExecuteAsync(firstRequest with
         {
             RequestId = Guid.NewGuid(), ExpirationDate = secondDate, Quantity = 6
@@ -88,20 +97,29 @@ public sealed class ReplenishmentPostingSafetyTests(SqlDatabase database)
             .ThenInclude(x => x.Transfers).SingleAsync(x => x.Id == task.Id);
         Assert.Equal(10m, posted.TransferredQuantity);
         Assert.Equal(ReplenishmentTaskStatus.InProgress, posted.Status);
-        Assert.Equal(2, Assert.Single(posted.SourceCycles).Transfers.Count);
-        Assert.Equal(2, await final.InventoryMovements.CountAsync(x =>
+        var transfers = Assert.Single(posted.SourceCycles).Transfers;
+        Assert.Equal(3, transfers.Count);
+        Assert.Equal(3, await final.InventoryMovements.CountAsync(x =>
             x.RecorderId == task.Id && x.RecorderType == RecorderType.ReplenishmentTask));
-        Assert.Equal(4, await final.InventoryTurnovers.CountAsync(x =>
+        Assert.Equal(6, await final.InventoryTurnovers.CountAsync(x =>
             x.InventoryMovement!.RecorderId == task.Id));
-        Assert.Equal(2, await final.CommandReceipts.CountAsync(x =>
+        var transferIds = transfers.Select(x => x.Id).ToArray();
+        Assert.Equal(3, await final.CommandReceipts.CountAsync(x =>
             x.CommandType == "replenishment.transfer.confirm"
-            && x.UserId == Worker));
+            && transferIds.Contains(x.ResultResourceId)));
         Assert.Equal(3m, (await final.InventoryBalances.SingleAsync(x =>
             x.StorageLocationId == source.Id && x.StockKeepingUnitId == otherSku.Id)).Quantity);
         Assert.Equal(4m, (await final.InventoryBalances.SingleAsync(x =>
             x.StorageLocationId == destination.Id && x.ExpirationDate == firstDate)).Quantity);
         Assert.Equal(6m, (await final.InventoryBalances.SingleAsync(x =>
             x.StorageLocationId == destination.Id && x.ExpirationDate == secondDate)).Quantity);
+        var allocations = await final.PickingRouteReservations.Where(x => x.PickingAssemblyId == assembly.Id)
+            .OrderBy(x => x.ExpirationDate).ToArrayAsync();
+        Assert.Equal(new[] { 4m, 4m }, allocations.Select(x => x.Quantity));
+        Assert.All(allocations, x => Assert.Equal(destination.Id, x.StorageLocationId));
+        var surplus = (await stock.ReadSkuAsync(warehouse.Id, sku.Id, default)).Single(x =>
+            x.Group.StorageLocationId == destination.Id && x.Group.ExpirationDate == secondDate);
+        Assert.Equal(2m, surplus.AvailableQuantity);
         Assert.True(await final.StorageLocationLocks.AnyAsync(x =>
             x.StorageLocationId == source.Id && x.OwnerId == task.Id));
     }

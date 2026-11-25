@@ -32,8 +32,7 @@ internal static class ReplenishmentTestScenario
         Success(assembly.FreezeForStart(Worker, now));
         Success(assembly.ClaimStart(leaseId, now, now.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, now, null));
-        Success(assembly.CompleteStart(leaseId, now));
-        Success(assembly.ReleaseStart(leaseId));
+        Success(assembly.CompleteStart(now));
         return (assembly, source);
     }
 

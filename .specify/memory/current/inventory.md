@@ -54,15 +54,17 @@ of its warehouse.
 ## Stock availability
 
 Availability is calculated by warehouse, cell, SKU and nullable expiration
-date. Free quantity is the accounting balance minus active picking reservations
-and disputed shortage quantity, with a minimum of zero. A cell hold makes the
-entire cell unavailable for new work. When picking uses its own assembly's
+date. Free quantity is the accounting balance minus stored route reservations,
+active confirmed-pick reservations and disputed shortage quantity, with a
+minimum of zero. A cell hold makes the entire cell unavailable for new work.
+When picking uses its own assembly's
 hold, the hold itself does not reduce availability, and all active reservations
 are still subtracted. The general stock report uses availability for new work.
 
 Issuing a picking assembly's reserved quantity uses the accounting balance
-after protecting other reservations and disputed quantity. A fully reserved
-group can therefore have zero available for new work while covering the owning
+after protecting other confirmed-pick reservations, route reservations and
+disputed quantity. A fully reserved group can therefore have zero available
+for new work while covering the owning
 assembly's issue. Physical scans, FEFO and assembly authorization are checked
 by each workflow.
 
@@ -82,23 +84,42 @@ uses the [UTC day](receiving.md#cycle-and-receiving-work) for receiving LPNs.
 
 ## Picking
 
-The route applies FEFO to free stock: known expiration dates come first,
-earliest first, followed by unknown dates. It excludes expired groups, can
-recommend an eligible whole one-SKU Reserve cell before Storage top-up, and
-reports unmet demand separately. Picking can inspect a selected or scanned
+After all active 1C documents confirm their start, the assembly waits for
+stock allocation. The warehouse orders ready assemblies by the highest
+current queue priority of their active documents, then by the time the last
+document was confirmed and assembly ID. The priority order is live queue,
+collect by date, own delivery, then unspecified. Starting an assembly
+allocates available stock to its route and records the assembly in progress
+in the same command, including when no stock is available. Later starts
+leave already allocated quantities in place.
+
+Initial allocation applies FEFO to free stock. The working route applies the
+same order to the assembly's reservations, earliest known expiration first,
+then unknown dates. It excludes expired groups, can recommend an eligible
+whole one-SKU Reserve cell before Storage top-up, and reports unmet demand
+separately. Picking can inspect a selected or scanned
 Storage or Reserve cell. An unknown date prompts a visual expiry check for a
 SKU that tracks expiration. The confirmed fact retains the unknown date.
-Confirming a pick reserves its exact group and records editable fact without
-moving stock.
+Confirming a pick records editable fact and its confirmed reservation without
+moving stock. The same command consumes the route reservation at the scanned
+address or releases the replaced quantity when the operator chooses another
+eligible address. Release uses ordinary cells first. A route reservation for
+an unheld Reserve pallet is released as a whole, and any returned demand is
+allocated again. Other held pallets remain assigned to their assembly.
 Reducing a fact requires a scan of its original cell and confirmation that the
 released quantity is physically there; the matching reservation is reduced
-in the same command. A normal pick confirms the full quantity currently offered
-for the scanned SKU, cell and expiration group. When the operator finds less,
+in the same command. The return checks available stock for the reopened
+demand. A plan increase does the same for newly added demand. A plan decrease
+releases the excess route quantity and keeps established physical pallet
+holds until their own release. A normal pick confirms the full quantity
+offered for the scanned SKU, cell and expiration group. When the operator finds less,
 including zero, the found quantity means the entire remaining physical stock
-of that group in the cell. The shortage command checks the scanned free
-accounting quantity, reserves the found positive fact once, and blocks all
-other free accounting quantity of that group in the same transaction. The
-disputed group therefore does not return as a route step. A Manager either
+of that group in the cell. Expected physical quantity excludes confirmed
+picks and includes quantities still in the cell for other assemblies.
+The shortage command records the found fact, blocks the missing quantity and
+releases all route reservations in the group together. It searches other
+groups for replacements in queue priority order, then by assembly start time
+and ID. Uncovered quantities remain route gaps. A Manager either
 posts a stock correction for the blocked quantity or releases a mistaken block,
 preserving the report and decision. This stock decision does not approve a
 shipping plan/fact discrepancy. A direct Reserve pick first holds the whole
@@ -108,10 +129,11 @@ released after a confirming scan when no positive fact remains from that cell.
 ## Replenishment
 
 The proposal calculator starts with the remaining assembly demand and deducts
-the quantities covered by picking steps and active tasks for the same assembly
-and SKU. It considers free stock in expiration order, using Storage before
-Reserve within the same date group. It proposes transfers only for Reserve
-quantities that cover the remaining demand and reports any uncovered deficit.
+the quantities covered by its reserved route and active tasks for the same
+assembly and SKU. It then considers free stock in expiration order, using
+Storage before Reserve within the same date group. It proposes Reserve
+transfers for the remaining demand and reports any uncovered deficit. A
+Reserve source must also be eligible for a whole-cell hold.
 An ordered task consumes its suggested source quantity in new proposals, and
 physically held cells are excluded. A recommended Storage destination has a
 positive balance of that SKU and permits its SKU mix. Eligible destinations
@@ -132,9 +154,8 @@ its original ordered quantity. Cancelled tasks remain in the assembly's history;
 if demand later rises, a new task must be ordered explicitly.
 
 The replenisher's active-task query lists ordered and in-progress tasks for
-one warehouse. It reads the current queue of every linked 1C document on each
-request and uses the highest priority in a multi-document assembly: live queue,
-collect by date, own delivery, then unspecified. Equal priorities sort by the
+one warehouse. It reads current source queues on each request and uses the
+same [assembly priority](#picking) as stock allocation. Equal priorities sort by the
 original order time and task ID. The query does not change a started task's
 assignee or order time.
 Starting a replenishment source requires an Operator's source-cell scan. The
@@ -152,10 +173,13 @@ Confirming a replenishment transfer checks the scanned Storage destination,
 its active hold and SKU mixing, the active source pallet held by this task,
 and the earliest available expiration group on that pallet. One confirmed
 quantity moves one SKU and one expiration group from Reserve to Storage through
-the common inventory posting operation. The source hold remains until its
-separate completion scan. The movement, both balances and turnovers, task
-progress, transfer record, audit and command receipt are saved together;
-repeating the request ID does not move stock again.
+the common inventory posting operation. The destination quantity is reserved
+for the ordering assembly up to its uncovered demand and the resulting free
+quantity in that group. Surplus and arrivals for an assembly that has left
+active picking stay free. The source hold remains until its separate completion
+scan. The movement, both balances and turnovers, task progress, transfer
+record, route reservation, audit and command receipt are saved together.
+Repeating the request ID preserves the original result.
 A source cycle ends after the worker returns the pallet if it still holds goods,
 rescans the same cell and confirms completion. The command releases the cell
 hold without posting stock. If the ordered quantity remains incomplete, the
@@ -178,8 +202,8 @@ closes. This is the sole outbound stock posting point. The command rechecks
 each positive entry against its own active reservation and protects other
 reservations and shortage blocks before issuing from the
 original cell and date group. All movements, signed turnovers, balances,
-allocation rows, closure result, released pallet holds, audit and command
-receipt commit together. A zero fact creates no stock movements. There is no
+allocation rows, closure result, released route reservations and pallet holds,
+audit and command receipt commit together. A zero fact creates no stock movements. There is no
 intermediate Shipping-zone balance.
 Closing cancels replenishment orders that have not scanned a source. Started
 tasks continue independently of the closed picking fact and retain their
@@ -187,9 +211,11 @@ transfers in the destination cell.
 
 A Manager can request cancellation of an unclosed picking assembly only after
 every picked quantity has been returned through its original-cell scan, all
-active picking reservations are gone, and any direct-pick pallet hold has been
-released after its return scan. Cancellation posts no stock movement. Ordered
-replenishments are cancelled in the same command; completed transfers remain
+confirmed-pick reservations are gone, and any direct-pick pallet hold has been
+released after its return scan. The acceptance command frees unpicked route
+reservations immediately, including for an assembly with pending work.
+Cancellation posts no stock movement. Ordered replenishments are cancelled
+in the same command; completed transfers remain
 in their destination cells. An already started replenishment keeps the assembly
 in `CancellationPending` until that task finishes. An unresolved physical
 shortage remains a separate blocked stock group for Manager review.

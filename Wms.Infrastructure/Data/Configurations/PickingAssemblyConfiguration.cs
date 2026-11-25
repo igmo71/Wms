@@ -27,6 +27,7 @@ internal sealed class PickingAssemblyConfiguration : IEntityTypeConfiguration<Pi
         builder.Navigation(x => x.PlanLines).HasField("_planLines")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Ignore(x => x.ActiveSources);
+        builder.Ignore(x => x.IsReadyForAllocation);
         builder.ToTable(t => t.HasCheckConstraint("CK_PickingAssemblies_NumberFormat",
             "LEN([Number]) = 13 AND [Number] LIKE '[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]'"));
     }

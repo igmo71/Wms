@@ -47,14 +47,16 @@ public sealed class InventoryCountStore : IInventoryCountStore
             .Select(x => new InventoryCountBalance(x.StockKeepingUnitId, x.ExpirationDate, x.Quantity))
             .ToListAsync(ct);
 
-    public async Task<bool> HasStockCommitmentsAsync(ICommandExecutionContext session,
+    public Task<InventoryCountStockCommitments> GetStockCommitmentsAsync(ICommandExecutionContext session,
         Guid locationId, CancellationToken ct)
     {
         var db = Db(session);
-        return await db.PickingReservations.AnyAsync(
-                   x => x.StorageLocationId == locationId && x.CompletedAtUtc == null, ct)
-               || await db.StockShortages.AnyAsync(
-                   x => x.StorageLocationId == locationId && x.ResolvedAtUtc == null, ct);
+        return db.StorageLocations.AsNoTracking().Where(location => location.Id == locationId)
+            .Select(location => new InventoryCountStockCommitments(
+                db.PickingRouteReservations.Any(x => x.StorageLocationId == location.Id),
+                db.PickingReservations.Any(x => x.StorageLocationId == location.Id && x.CompletedAtUtc == null),
+                db.StockShortages.Any(x => x.StorageLocationId == location.Id && x.ResolvedAtUtc == null)))
+            .SingleAsync(ct);
     }
 
     public async Task<OperationResult<StockKeepingUnit>> ResolveSkuAsync(ICommandExecutionContext session,

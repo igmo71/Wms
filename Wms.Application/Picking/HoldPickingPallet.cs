@@ -86,15 +86,19 @@ public sealed class HoldPickingPallet(CommandExecutor executor, IPickingAssembly
         IReadOnlyList<StockAvailability> availability, Guid locationId, Guid assemblyId,
         decimal remaining, DateOnly today)
     {
+        var assigned = cell.Any(x => x.RouteReservedFor(assemblyId) > 0);
+        decimal Available(StockAvailability row) => assigned
+            ? row.AvailableForRoute(assemblyId) : row.AvailableForAssemblyPick(assemblyId);
         if (cell.Count == 0 || cell.Any(x => x.Group.ExpirationDate < today
-            || x.AccountingQuantity != x.AvailableForNewPick(assemblyId)))
+            || x.AccountingQuantity != Available(x)))
             return OperationError.Conflict("Поддон нельзя полностью отобрать: срок, резерв или блокировка.");
-        if (cell.Sum(x => x.AccountingQuantity) > remaining)
+        if (cell.Sum(x => x.AccountingQuantity) > remaining
+            - PickingSourceRules.HeldElsewhere(availability, assemblyId, locationId))
             return OperationError.Conflict("Остаток поддона превышает потребность сборки.");
         var latest = cell.OrderBy(x => x.Group.ExpirationDate is null)
             .ThenBy(x => x.Group.ExpirationDate).Last().Group.ExpirationDate;
         if (availability.Any(x => x.Group.StorageLocationId != locationId
-            && x.AvailableForNewPick(assemblyId) > 0
+            && Available(x) > 0
             && x.Group.ExpirationDate is DateOnly date && date >= today
             && (latest is null || date < latest)))
             return OperationError.Conflict("Прямой палетный Отбор нарушит очередность сроков.");

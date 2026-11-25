@@ -18,7 +18,8 @@ public sealed record StartPickingAssemblyResult(
 public sealed class StartPickingAssembly(
     CommandExecutor executor, ICommandExecutionStore commandStore,
     IPickingAssemblyStore store, SynchronizeShippingSource synchronize,
-    IShippingSourceWriter writer, WarehousePermission permission, TimeProvider clock)
+    IShippingSourceWriter writer, WarehousePermission permission,
+    AllocatePickingStart allocate, TimeProvider clock)
 {
     private const string ClaimType = "picking.assembly.start.claim";
     private const string SourceType = "picking.assembly.start.source";
@@ -49,8 +50,8 @@ public sealed class StartPickingAssembly(
             return OperationError.NotFound("Сборка WMS не найдена.");
         if (assembly.ResponsibleUserId != request.UserId.Trim())
             return OperationError.Conflict("Сначала примите сборку на себя.");
-        if (assembly.Status == PickingAssemblyStatus.InProgress)
-            return await ReadResultAsync(assembly.Id, ct);
+        if (assembly.Status == PickingAssemblyStatus.InProgress || assembly.IsReadyForAllocation)
+            return await RespondAsync(request, hash, ct);
         if (assembly.Status is not (PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing))
             return OperationError.Conflict("Начало Отбора для этой сборки недоступно.");
 
@@ -124,6 +125,21 @@ public sealed class StartPickingAssembly(
             await ReleaseAsync(request, leaseId, CancellationToken.None);
         }
 
+        return await RespondAsync(request, hash, ct);
+    }
+
+    private async Task<OperationResult<StartPickingAssemblyResult>> RespondAsync(
+        StartPickingAssemblyRequest request, string hash, CancellationToken ct)
+    {
+        var assembly = await store.ReadAssemblyAsync(request.PickingAssemblyId, ct);
+        if (assembly is null)
+            return OperationError.NotFound("Сборка WMS не найдена.");
+        if (assembly.IsReadyForAllocation)
+        {
+            var allocation = await allocate.ExecuteAsync(request, assembly.WarehouseId, ct);
+            if (!allocation.IsSuccess)
+                return allocation.Error!;
+        }
         var response = await executor.ExecuteAsync(ResponseType, request.RequestId, hash,
             request.UserId, (session, operationCt) => Task.FromResult(
                 Effect("picking.assembly.start-response", request.PickingAssemblyId,
@@ -262,16 +278,10 @@ public sealed class StartPickingAssembly(
                 if (assembly is null)
                     return OperationError.NotFound("Сборка WMS не найдена.");
                 var now = clock.GetUtcNow();
-                if (assembly.ActiveSources.All(x => x.StartConfirmedAtUtc is not null))
-                {
-                    var completed = assembly.CompleteStart(leaseId, now);
-                    if (!completed.IsSuccess)
-                        return completed.Error!;
-                }
                 var released = assembly.ReleaseStart(leaseId);
                 if (!released.IsSuccess)
                     return released.Error!;
-                return Effect("picking.assembly.start-finished", assembly.Id,
+                return Effect("picking.assembly.start-lease-released", assembly.Id,
                     request.UserId, ReleaseType, releaseId, now,
                     new { Status = assembly.Status.ToString() });
             }, ct);

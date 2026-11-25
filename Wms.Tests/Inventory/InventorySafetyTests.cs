@@ -19,6 +19,42 @@ namespace Wms.Tests.Inventory;
 public sealed class InventorySafetyTests(SqlDatabase database)
 {
     [Fact]
+    public async Task Route_reserved_stock_limits_transfer_availability_and_posting()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Reserved transfer stock" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Reserved transfer SKU" };
+        var zone = Zone(warehouse.Id, "TR", ZoneType.Storage);
+        var source = Location(warehouse.Id, zone, 1);
+        var destination = Location(warehouse.Id, zone, 2);
+        var assembly = PickingAssembly(warehouse.Id, "route-picker");
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, source, destination, assembly,
+                Balance(warehouse.Id, source.Id, sku.Id, 10m),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id, source.Id, sku.Id, null, 8m)));
+            await seed.SaveChangesAsync();
+        }
+
+        var service = TransferService(database);
+        var transfer = Value(await service.CreateAsync(new(warehouse.Id, null), Command("transfer-worker")));
+        var query = new InventoryTransferQueryService(database);
+        Assert.Equal(2m, Value(await query.GetAvailableDirectQuantityAsync(transfer, source.Id, sku.Id)));
+        var match = Assert.Single(Value(await query.SearchAvailableDirectSkusAsync(transfer, source.Id, "Reserved", 10)));
+        Assert.Equal(2m, match.AvailableQuantity);
+        Assert.Equal(2m, Assert.Single(await query.GetStorageLocationBalancesAsync(source.Id)).Quantity);
+
+        Error(await service.MoveDirectAsync(new(transfer, source.Id, destination.Id, sku.Id, 3m),
+            Command("transfer-worker")), OperationErrorType.Conflict);
+        Value(await service.MoveDirectAsync(new(transfer, source.Id, destination.Id, sku.Id, 2m),
+            Command("transfer-worker")));
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(8m, (await verify.InventoryBalances.SingleAsync(x => x.StorageLocationId == source.Id)).Quantity);
+        Assert.Equal(2m, (await verify.InventoryBalances.SingleAsync(x => x.StorageLocationId == destination.Id)).Quantity);
+        Assert.Single(await verify.InventoryMovements.Where(x => x.RecorderId == transfer).ToArrayAsync());
+    }
+
+    [Fact]
     public async Task Concurrent_transfers_cannot_withdraw_the_same_stock_twice()
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Transfer race" };
@@ -95,6 +131,41 @@ public sealed class InventorySafetyTests(SqlDatabase database)
         Assert.Equal(2m, await verify.InventoryBalances
             .Where(x => x.WarehouseId == warehouse.Id)
             .SumAsync(x => x.Quantity));
+    }
+
+    [Fact]
+    public async Task Inventory_count_reports_all_blocking_stock_commitments()
+    {
+        var setup = await CreateCountSetup(10m);
+        var assembly = PickingAssembly(setup.WarehouseId, "picker");
+        var now = DateTimeOffset.UtcNow;
+        var otherDate = DateOnly.FromDateTime(now.UtcDateTime).AddDays(30);
+        var entry = Value(PickingEntry.Create(assembly.Id, setup.WarehouseId, setup.LocationId,
+            setup.ExpectedSkuId, null, 2m, "picker", now));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(assembly, entry,
+                Value(PickingRouteReservation.Create(assembly.Id, setup.WarehouseId,
+                    setup.LocationId, setup.ExpectedSkuId, null, 3m)),
+                Value(PickingReservation.Create(entry.Id, assembly.Id, setup.WarehouseId,
+                    setup.LocationId, setup.ExpectedSkuId, null, 2m, "picker", now)),
+                Value(InventoryBalance.Create(Guid.NewGuid(), setup.WarehouseId,
+                    setup.LocationId, setup.ExpectedSkuId, 4m, now, otherDate)),
+                Value(StockShortage.Report(Guid.NewGuid(), setup.WarehouseId, setup.LocationId,
+                    setup.ExpectedSkuId, otherDate, assembly.Id, 4m, 0m, null, "picker", now)));
+            await seed.SaveChangesAsync();
+        }
+
+        var result = await CountService(database).StartAsync(
+            new(setup.WarehouseId, setup.LocationId), Command("counter"));
+        Error(result, OperationErrorType.Conflict);
+        var message = result.Error!.Message;
+        Assert.Contains("товар закреплён за сборкой", message);
+        Assert.Contains("есть резерв подтверждённого отбора", message);
+        Assert.Contains("недостача ожидает решения руководителя", message);
+        await using var verify = database.CreateDbContext();
+        Assert.False(await verify.InventoryCounts.AnyAsync(x => x.StorageLocationId == setup.LocationId));
+        Assert.False(await verify.StorageLocationLocks.AnyAsync(x => x.StorageLocationId == setup.LocationId));
     }
 
     [Fact]

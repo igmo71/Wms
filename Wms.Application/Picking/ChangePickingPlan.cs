@@ -17,7 +17,7 @@ public sealed record ChangePickingPlanRequest(Guid RequestId, Guid PickingAssemb
 
 public sealed class ChangePickingPlan(CommandExecutor executor,
     IPickingAssemblyStore assemblies, IReplenishmentStore replenishments,
-    WarehousePermission permission, TimeProvider clock)
+    WarehousePermission permission, AdjustPickingRouteStock routeStock, TimeProvider clock)
 {
     private const string CommandType = "picking.plan.change";
 
@@ -67,10 +67,27 @@ public sealed class ChangePickingPlan(CommandExecutor executor,
                 var changed = assembly.ChangePlan(request.ShippingOrderId,
                     request.PlanBySku, request.ExpectedRevision);
                 if (!changed.IsSuccess) return changed.Error!;
+                foreach (var line in assembly.PlanLines.Where(x => x.ShippingOrderId == request.ShippingOrderId
+                    && !before.ContainsKey(x.StockKeepingUnitId)))
+                    session.Stage(line);
+
+                var skuIds = before.Keys.Union(request.PlanBySku.Keys).Order().ToArray();
+                var quantitiesChanged = skuIds.Where(x =>
+                    before.GetValueOrDefault(x) != request.PlanBySku.GetValueOrDefault(x)).ToArray();
+                var locations = await assemblies.LockRouteLocationsAsync(session, assembly.WarehouseId,
+                    quantitiesChanged, token);
+                var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+                foreach (var skuId in quantitiesChanged)
+                {
+                    var delta = request.PlanBySku.GetValueOrDefault(skuId) - before.GetValueOrDefault(skuId);
+                    var adjusted = await routeStock.ApplyPlanChangeAsync(session, work,
+                        locations, skuId, delta, today, token);
+                    if (!adjusted.IsSuccess) return adjusted.Error!;
+                }
                 var now = clock.GetUtcNow();
                 var cancelled = await CancelUnneededReplenishments.ExecuteAsync(
                     replenishments, session, assembly, work.Entries,
-                    before.Keys.Union(request.PlanBySku.Keys).ToArray(),
+                    skuIds,
                     request.UserId, now, CommandType, request.RequestId, token);
                 if (!cancelled.IsSuccess) return cancelled.Error!;
                 var reviewedHash = Convert.ToHexString(SHA256.HashData(
@@ -88,7 +105,7 @@ public sealed class ChangePickingPlan(CommandExecutor executor,
                     requestId: request.RequestId, pickingAssemblyId: assembly.Id);
                 if (!summary.IsSuccess) return summary.Error!;
                 audits.Add(summary.Value!);
-                foreach (var skuId in before.Keys.Union(request.PlanBySku.Keys).Order())
+                foreach (var skuId in skuIds)
                 {
                     var previous = before.GetValueOrDefault(skuId);
                     var next = request.PlanBySku.GetValueOrDefault(skuId);

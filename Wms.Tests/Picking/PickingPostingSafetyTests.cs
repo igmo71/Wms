@@ -46,7 +46,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
         Success(assembly.FreezeForStart(UserId, startedAt));
         Success(assembly.ClaimStart(leaseId, startedAt, startedAt.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, startedAt, null));
-        Success(assembly.CompleteStart(leaseId, startedAt));
+        Success(assembly.CompleteStart(startedAt));
 
         var firstEntry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
             first.Id, sku.Id, null, 4, UserId, DateTimeOffset.UtcNow));
@@ -146,6 +146,8 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Zero picking close" };
         var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Unpicked SKU" };
+        var zone = Zone(warehouse.Id, "CMP", ZoneType.Storage);
+        var location = Location(warehouse.Id, zone, 1);
         var sourceId = Guid.NewGuid();
         var snapshot = Source(sourceId, warehouse.Id, sku.Id, Guid.NewGuid());
         var source = Value(ShippingOrder.Create(SourceImport(snapshot,
@@ -163,11 +165,12 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
         Success(assembly.FreezeForStart(UserId, startedAt));
         Success(assembly.ClaimStart(leaseId, startedAt, startedAt.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, startedAt, null));
-        Success(assembly.CompleteStart(leaseId, startedAt));
-        Success(assembly.ReleaseStart(leaseId));
+        Success(assembly.CompleteStart(startedAt));
         await using (var seed = database.CreateDbContext())
         {
-            seed.AddRange(warehouse, sku, source, assembly);
+            seed.AddRange(warehouse, sku, zone, location, source, assembly,
+                Balance(warehouse.Id, location.Id, sku.Id, 10),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id, location.Id, sku.Id, null, 10)));
             await seed.SaveChangesAsync();
         }
 
@@ -205,6 +208,8 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
                 x.RecorderId == assembly.Id).ToArrayAsync());
             Assert.False(await verify.PickingClosures.AnyAsync(x =>
                 x.PickingAssemblyId == assembly.Id));
+            Assert.Equal(10m, (await verify.PickingRouteReservations.SingleAsync(x =>
+                x.PickingAssemblyId == assembly.Id)).Quantity);
         }
 
         var freshRevision = (await store.ReadAssemblyAsync(assembly.Id,
@@ -223,6 +228,8 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
         Assert.Equal(0m, allocation.Quantity);
         Assert.Single(await final.ShippingExchangeTargets.Where(x =>
             x.PickingAssemblyId == assembly.Id).ToArrayAsync());
+        Assert.False(await final.PickingRouteReservations.AnyAsync(x => x.PickingAssemblyId == assembly.Id));
+        Assert.Equal(10m, (await final.InventoryBalances.SingleAsync(x => x.StorageLocationId == location.Id)).Quantity);
     }
 
     [Fact]
@@ -250,7 +257,7 @@ public sealed class PickingPostingSafetyTests(SqlDatabase database)
         Success(assembly.FreezeForStart(UserId, startedAt));
         Success(assembly.ClaimStart(leaseId, startedAt, startedAt.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, startedAt, null));
-        Success(assembly.CompleteStart(leaseId, startedAt));
+        Success(assembly.CompleteStart(startedAt));
         var entry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
             location.Id, sku.Id, null, 10, UserId, DateTimeOffset.UtcNow));
         await using (var seed = database.CreateDbContext())

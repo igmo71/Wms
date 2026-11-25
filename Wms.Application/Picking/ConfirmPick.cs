@@ -18,7 +18,7 @@ public sealed record ConfirmPickRequest(Guid RequestId, Guid PickingAssemblyId,
 public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore assemblies,
     IStockAvailabilityStore stock, IStockReservationStore reservations,
     IReplenishmentStore replenishments, WarehousePermission permission,
-    TimeProvider clock)
+    AdjustPickingRouteStock routeStock, TimeProvider clock)
 {
     private const string CommandType = "picking.pick.confirm";
 
@@ -45,8 +45,11 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
             {
                 var access = await permission.RequireOperatorAsync(request.UserId, token);
                 if (!access.IsSuccess) return access.Error!;
-                var state = await assemblies.LoadWorkAsync(session,
-                    request.PickingAssemblyId, code, token);
+                var loaded = await assemblies.LoadStockChangeAsync(session,
+                    request.PickingAssemblyId, code, request.StockKeepingUnitId, token);
+                if (!loaded.IsSuccess) return loaded.Error!;
+                var stockChange = loaded.Value!;
+                var state = stockChange.Work;
                 var assembly = state.Assembly;
                 if (assembly is null) return OperationError.NotFound("Сборка WMS не найдена.");
                 var changed = assembly.RecordPhysicalWork(request.UserId,
@@ -54,10 +57,10 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                 if (!changed.IsSuccess) return changed.Error!;
                 var availability = await stock.ReadSkuAsync(session, assembly.WarehouseId,
                     request.StockKeepingUnitId, token);
+                var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
                 var checkedSource = PickingSourceRules.Check(state,
                     request.StockKeepingUnitId, code, request.ScannedSkuId,
-                    request.ExpirationDate, true, availability,
-                    DateOnly.FromDateTime(clock.GetLocalNow().DateTime));
+                    request.ExpirationDate, true, availability, today);
                 if (!checkedSource.IsSuccess) return checkedSource.Error!;
                 var source = checkedSource.Value!;
                 if (request.Quantity > source.SuggestedQuantity)
@@ -83,13 +86,18 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                     request.StockKeepingUnitId, request.ExpirationDate,
                     request.Quantity, request.UserId, now);
                 if (!reservation.IsSuccess) return reservation.Error!;
+                var consumed = routeStock.Consume(session, stockChange, source, request.Quantity);
+                if (!consumed.IsSuccess) return consumed.Error!;
                 var reserved = await reservations.ReserveAsync(session,
                     reservation.Value!, token);
                 if (!reserved.IsSuccess) return reserved.Error!;
                 session.Stage(entry.Value!);
+                var entries = state.Entries.Append(entry.Value!).ToArray();
+                var replacement = await routeStock.ReplaceAsync(session, state with { Entries = entries },
+                    stockChange.Locations, request.StockKeepingUnitId, consumed.Value, today, token);
+                if (!replacement.IsSuccess) return replacement.Error!;
                 var cancelled = await CancelUnneededReplenishments.ExecuteAsync(
-                    replenishments, session, assembly,
-                    state.Entries.Append(entry.Value!).ToArray(),
+                    replenishments, session, assembly, entries,
                     [request.StockKeepingUnitId], request.UserId, now,
                     CommandType, request.RequestId, token);
                 if (!cancelled.IsSuccess) return cancelled.Error!;

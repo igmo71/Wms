@@ -47,6 +47,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();
     public DbSet<StorageLocationLock> StorageLocationLocks => Set<StorageLocationLock>();
     public DbSet<PickingReservation> PickingReservations => Set<PickingReservation>();
+    public DbSet<PickingRouteReservation> PickingRouteReservations => Set<PickingRouteReservation>();
     public DbSet<StockShortage> StockShortages => Set<StockShortage>();
     public DbSet<ReplenishmentTask> ReplenishmentTasks => Set<ReplenishmentTask>();
     public DbSet<ReplenishmentSourceCycle> ReplenishmentSourceCycles => Set<ReplenishmentSourceCycle>();

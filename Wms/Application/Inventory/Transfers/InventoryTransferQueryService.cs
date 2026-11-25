@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Inventory.Movements;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -106,13 +107,15 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
             return sourceAvailabilityResult.Error!;
         }
 
-        return await dbContext.InventoryBalances
+        var balances = dbContext.InventoryBalances
             .AsNoTracking()
             .Where(x => x.WarehouseId == transfer.WarehouseId
                 && x.StorageLocationId == sourceStorageLocationId
-                && x.StockKeepingUnitId == stockKeepingUnitId)
-            .Select(x => (decimal?)x.Quantity)
-            .SingleOrDefaultAsync(ct) ?? 0;
+                && x.StockKeepingUnitId == stockKeepingUnitId);
+        var available = await UndatedInventoryAvailability.Read(dbContext, balances)
+            .Select(x => (decimal?)(x.Balance.Quantity - x.CommittedQuantity))
+            .SingleOrDefaultAsync(ct);
+        return Math.Max(0, available ?? 0);
     }
 
     public async Task<OperationResult<IReadOnlyList<InventoryTransferSkuSearchResult>>>
@@ -162,7 +165,7 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
                 "Исходная ячейка должна быть активной обычной ячейкой склада перемещения.");
         }
 
-        var matches = await dbContext.InventoryBalances
+        var balances = dbContext.InventoryBalances
             .AsNoTracking()
             .Where(x => x.WarehouseId == transfer.WarehouseId
                 && x.StorageLocationId == sourceStorageLocationId
@@ -175,21 +178,23 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
                     || dbContext.SkuBarcodes.Any(barcode =>
                         barcode.SkuId == x.StockKeepingUnitId
                         && barcode.Value != null
-                        && barcode.Value.Contains(term))))
+                        && barcode.Value.Contains(term))));
+        var matches = await UndatedInventoryAvailability.Read(dbContext, balances)
+            .Where(x => x.Balance.Quantity > x.CommittedQuantity)
             .Select(x => new
             {
-                Id = x.StockKeepingUnitId,
-                Code = x.StockKeepingUnit!.Code ?? string.Empty,
-                Name = x.StockKeepingUnit.Name ?? string.Empty,
-                UnitOfMeasure = x.StockKeepingUnit.BaseUnitOfMeasure == null
+                Id = x.Balance.StockKeepingUnitId,
+                Code = x.Balance.StockKeepingUnit!.Code ?? string.Empty,
+                Name = x.Balance.StockKeepingUnit.Name ?? string.Empty,
+                UnitOfMeasure = x.Balance.StockKeepingUnit.BaseUnitOfMeasure == null
                     ? null
-                    : x.StockKeepingUnit.BaseUnitOfMeasure.Description,
-                AvailableQuantity = x.Quantity,
-                IsExactMatch = (x.StockKeepingUnit.Code != null
-                        && x.StockKeepingUnit.Code == term)
-                    || (x.StockKeepingUnit.Name != null && x.StockKeepingUnit.Name == term)
+                    : x.Balance.StockKeepingUnit.BaseUnitOfMeasure.Description,
+                AvailableQuantity = x.Balance.Quantity - x.CommittedQuantity,
+                IsExactMatch = (x.Balance.StockKeepingUnit.Code != null
+                        && x.Balance.StockKeepingUnit.Code == term)
+                    || (x.Balance.StockKeepingUnit.Name != null && x.Balance.StockKeepingUnit.Name == term)
                     || dbContext.SkuBarcodes.Any(barcode =>
-                        barcode.SkuId == x.StockKeepingUnitId
+                        barcode.SkuId == x.Balance.StockKeepingUnitId
                         && barcode.Value == term)
             })
             .OrderBy(x => x.Name)
@@ -472,17 +477,19 @@ public class InventoryTransferQueryService(IDbContextFactory<ApplicationDbContex
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var balances = await dbContext.InventoryBalances
+        var balances = dbContext.InventoryBalances
             .AsNoTracking()
             .Include(x => x.StockKeepingUnit)
                 .ThenInclude(x => x!.BaseUnitOfMeasure)
-            .Where(x => x.StorageLocationId == storageLocationId && x.Quantity > 0)
-            .OrderBy(x => x.StockKeepingUnit!.Name)
+            .Where(x => x.StorageLocationId == storageLocationId && x.Quantity > 0);
+        var available = await UndatedInventoryAvailability.Read(dbContext, balances)
+            .Where(x => x.Balance.Quantity > x.CommittedQuantity)
+            .OrderBy(x => x.Balance.StockKeepingUnit!.Name)
             .ToListAsync(ct);
-        return balances.Select(x => new InventoryTransferStorageLocationBalance
+        return available.Select(x => new InventoryTransferStorageLocationBalance
         {
-            StockKeepingUnit = x.StockKeepingUnit!,
-            Quantity = x.Quantity
+            StockKeepingUnit = x.Balance.StockKeepingUnit!,
+            Quantity = x.Balance.Quantity - x.CommittedQuantity
         })
             .ToList();
     }

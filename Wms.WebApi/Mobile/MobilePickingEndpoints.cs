@@ -364,7 +364,8 @@ internal static class MobilePickingEndpoints
         {
             LocationName = source.LocationName,
             FromReserve = source.FromReserve,
-            PalletHeld = source.PalletHeld
+            PalletHeld = source.PalletHeld,
+            ExpectedPhysicalQuantity = source.ExpectedPhysicalQuantity
         });
     }
 

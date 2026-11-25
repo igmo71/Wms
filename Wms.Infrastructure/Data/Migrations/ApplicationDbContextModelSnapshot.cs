@@ -1320,6 +1320,49 @@ namespace Wms.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Wms.Domain.PickingRouteReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ExpirationDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("PickingAssemblyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(15, 3)
+                        .HasColumnType("decimal(15,3)");
+
+                    b.Property<Guid>("StockKeepingUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StorageLocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PickingAssemblyId");
+
+                    b.HasIndex("StockKeepingUnitId");
+
+                    b.HasIndex("StorageLocationId");
+
+                    b.HasIndex("WarehouseId", "StorageLocationId", "StockKeepingUnitId", "ExpirationDate", "PickingAssemblyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PickingRouteReservations_Group");
+
+                    b.ToTable("PickingRouteReservations", t =>
+                        {
+                            t.HasCheckConstraint("CK_PickingRouteReservations_Quantity", "[Quantity] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Wms.Domain.ReceivingCycle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3007,6 +3050,33 @@ namespace Wms.Data.Migrations
                 });
 
             modelBuilder.Entity("Wms.Domain.PickingReservation", b =>
+                {
+                    b.HasOne("Wms.Domain.PickingAssembly", null)
+                        .WithMany()
+                        .HasForeignKey("PickingAssemblyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StockKeepingUnit", null)
+                        .WithMany()
+                        .HasForeignKey("StockKeepingUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.StorageLocation", null)
+                        .WithMany()
+                        .HasForeignKey("StorageLocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wms.Domain.Warehouse", null)
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Wms.Domain.PickingRouteReservation", b =>
                 {
                     b.HasOne("Wms.Domain.PickingAssembly", null)
                         .WithMany()

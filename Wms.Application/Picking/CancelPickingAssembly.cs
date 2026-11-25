@@ -65,6 +65,8 @@ public sealed class CancelPickingAssembly(
                 var requested = assembly.RequestCancellation(request.UserId,
                     request.ExpectedRevision, now);
                 if (!requested.IsSuccess) return requested.Error!;
+                var releasedRouteReservations = await assemblies.ReleaseAllRouteReservationsAsync(
+                    session, assembly.Id, [], token);
                 if (activeTasks == 0 && assembly.ActiveSources.Count == 0)
                 {
                     var completed = assembly.CompleteCancellation(now,
@@ -78,6 +80,7 @@ public sealed class CancelPickingAssembly(
                     JsonSerializer.Serialize(new { assembly.Status,
                         assembly.OperationalRevision, CancelledReplenishments = cancelledTasks,
                         ActiveReplenishments = activeTasks,
+                        ReleasedRouteReservations = releasedRouteReservations,
                         PendingSources = assembly.ActiveSources.Count,
                         Reason = request.Reason?.Trim() }),
                     commandUserId: request.UserId, commandType: CommandType,

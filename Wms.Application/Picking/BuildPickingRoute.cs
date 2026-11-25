@@ -35,7 +35,13 @@ public sealed record PickingRoute(
 // the availability, FEFO and location checks in its own command transaction.
 public sealed class BuildPickingRoute
 {
-    public OperationResult<PickingRoute> Execute(PickingRouteRequest request)
+    public OperationResult<PickingRoute> Execute(PickingRouteRequest request) =>
+        Build(request, reservedOnly: false);
+
+    public OperationResult<PickingRoute> ExecuteReserved(PickingRouteRequest request) =>
+        Build(request, reservedOnly: true);
+
+    private static OperationResult<PickingRoute> Build(PickingRouteRequest request, bool reservedOnly)
     {
         if (request is null || request.PickingAssemblyId == Guid.Empty
             || request.WarehouseId == Guid.Empty
@@ -44,6 +50,13 @@ public sealed class BuildPickingRoute
             || request.RemainingBySku.Any(x => x.Key == Guid.Empty
                 || !WarehouseQuantity.IsNonNegative(x.Value)))
             return OperationError.Invalid("Для маршрута нужны сборка, потребность и доступность.");
+
+        decimal Available(StockAvailability row) => reservedOnly
+            ? row.AvailableForRoute(request.PickingAssemblyId)
+            : row.AvailableForNewPick(request.PickingAssemblyId);
+        decimal PalletQuantity(StockAvailability row) => reservedOnly
+            ? Math.Max(0, row.AccountingQuantity - row.ReservedFor(request.PickingAssemblyId) - row.BlockedQuantity)
+            : row.AccountingQuantity;
 
         var locations = request.Locations.ToDictionary(x => x.Id);
         var ordered = request.Locations.Select(x => new PickingAddress(x.Id, x.Code))
@@ -61,7 +74,7 @@ public sealed class BuildPickingRoute
                 && location.IsActive
                 && location.ZoneType is (ZoneType.Storage or ZoneType.Reserve)
                 && (x.Group.ExpirationDate is null || x.Group.ExpirationDate >= request.Today)
-                && x.AvailableForNewPick(request.PickingAssemblyId) > 0)
+                && Available(x) > 0)
             .ToArray();
         var bySku = new List<(Guid SkuId, Queue<PickingRouteStep> Steps,
             PickingRouteGap[] Gaps)>();
@@ -69,8 +82,7 @@ public sealed class BuildPickingRoute
         {
             var available = groups.Where(x => x.Group.StockKeepingUnitId == skuId).ToArray();
             var buckets = available.GroupBy(x => x.Group.ExpirationDate)
-                .Select(x => new DateBucket(x.Key, x.Sum(row =>
-                    row.AvailableForNewPick(request.PickingAssemblyId))))
+                .Select(x => new DateBucket(x.Key, x.Sum(Available)))
                 .OrderBy(x => x.Date is null).ThenBy(x => x.Date).ToArray();
             var demand = required;
             foreach (var bucket in buckets)
@@ -89,8 +101,8 @@ public sealed class BuildPickingRoute
             {
                 var pallet = reserveCells.Where(cell => IsEligiblePallet(cell,
                         request.Availability, locations[cell[0].Group.StorageLocationId],
-                        buckets, request.PickingAssemblyId))
-                    .OrderByDescending(cell => cell.Sum(x => x.AccountingQuantity))
+                        buckets, Available, PalletQuantity))
+                    .OrderByDescending(cell => cell.Sum(PalletQuantity))
                     .ThenBy(cell => NearestStorageDistance(cell[0].Group.StorageLocationId,
                         available, buckets, locations, ranks))
                     .ThenBy(cell => PickingAddressComparer.AdditionalTravel(
@@ -102,10 +114,11 @@ public sealed class BuildPickingRoute
                     .ThenBy(x => x.Group.ExpirationDate))
                 {
                     var bucket = buckets.Single(x => x.Date == group.Group.ExpirationDate);
-                    bucket.Remaining -= group.AccountingQuantity;
+                    var quantity = PalletQuantity(group);
+                    bucket.Remaining -= quantity;
                     palletSteps.Add(new PickingRouteStep(group.Group.StorageLocationId,
                         locations[group.Group.StorageLocationId].Code, skuId,
-                        group.Group.ExpirationDate, group.AccountingQuantity, true)
+                        group.Group.ExpirationDate, quantity, true)
                     { LocationName = locations[group.Group.StorageLocationId].Name });
                 }
                 reserveCells = reserveCells.Where(x =>
@@ -122,19 +135,17 @@ public sealed class BuildPickingRoute
                     .ToArray();
                 while (bucket.Remaining > 0 && candidates.Length > 0)
                 {
-                    var exact = candidates.Where(x =>
-                        x.AvailableForNewPick(request.PickingAssemblyId) == bucket.Remaining)
+                    var exact = candidates.Where(x => Available(x) == bucket.Remaining)
                         .OrderBy(x => PickingAddressComparer.AdditionalTravel(
                             ranks[x.Group.StorageLocationId], previous, next))
                         .ThenByDescending(x => ranks[x.Group.StorageLocationId])
                         .FirstOrDefault();
                     var chosen = exact ?? candidates
-                        .OrderBy(x => x.AvailableForNewPick(request.PickingAssemblyId))
+                        .OrderBy(Available)
                         .ThenBy(x => PickingAddressComparer.AdditionalTravel(
                             ranks[x.Group.StorageLocationId], previous, next))
                         .ThenByDescending(x => ranks[x.Group.StorageLocationId]).First();
-                    var quantity = Math.Min(bucket.Remaining,
-                        chosen.AvailableForNewPick(request.PickingAssemblyId));
+                    var quantity = Math.Min(bucket.Remaining, Available(chosen));
                     storageSteps.Add(new PickingRouteStep(chosen.Group.StorageLocationId,
                         locations[chosen.Group.StorageLocationId].Code, skuId,
                         bucket.Date, quantity, false)
@@ -175,17 +186,17 @@ public sealed class BuildPickingRoute
 
     private static bool IsEligiblePallet(StockAvailability[] cell,
         IReadOnlyList<StockAvailability> allAvailability,
-        PickingRouteLocation location, DateBucket[] buckets, Guid assemblyId)
+        PickingRouteLocation location, DateBucket[] buckets,
+        Func<StockAvailability, decimal> available, Func<StockAvailability, decimal> palletQuantity)
     {
         if (location.DistinctSkuCount != 1 || cell.Length == 0) return false;
-        var allInCell = allAvailability.Where(x =>
-            x.Group.StorageLocationId == location.Id && x.AccountingQuantity > 0).ToArray();
-        if (allInCell.Length != cell.Length || cell.Any(x =>
-            x.AccountingQuantity != x.AvailableForNewPick(assemblyId))) return false;
+        var groupCount = allAvailability.Count(x =>
+            x.Group.StorageLocationId == location.Id && palletQuantity(x) > 0);
+        if (groupCount != cell.Length || cell.Any(x => palletQuantity(x) != available(x))) return false;
         foreach (var group in cell)
         {
             var bucket = buckets.SingleOrDefault(x => x.Date == group.Group.ExpirationDate);
-            if (bucket is null || group.AccountingQuantity > bucket.Remaining)
+            if (bucket is null || palletQuantity(group) > bucket.Remaining)
                 return false;
         }
         var latest = cell.OrderBy(x => x.Group.ExpirationDate is null)
@@ -193,7 +204,7 @@ public sealed class BuildPickingRoute
         return buckets.Where(x => x.Remaining > 0 &&
                 (x.Date is not null && latest is null || x.Date < latest))
             .All(bucket => cell.Where(x => x.Group.ExpirationDate == bucket.Date)
-                .Sum(x => x.AccountingQuantity) == bucket.Remaining);
+                .Sum(palletQuantity) == bucket.Remaining);
     }
 
     private static int NearestStorageDistance(Guid palletId,

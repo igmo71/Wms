@@ -11,6 +11,7 @@ public sealed record ReplenishmentLocation(
     bool AllowsMultipleSkus, int DistinctSkuCount, IReadOnlySet<Guid> RelevantSkuIds)
 {
     public string? Name { get; init; }
+    public bool HasPickingCommitment { get; init; }
 }
 
 public sealed record ReplenishmentProposalRequest(
@@ -84,6 +85,7 @@ public sealed class BuildReplenishmentProposals
                     && locations.TryGetValue(x.Group.StorageLocationId, out var location)
                     && location.IsActive && !location.IsHeld
                     && location.ZoneType is (ZoneType.Storage or ZoneType.Reserve)
+                    && !location.HasPickingCommitment
                     && x.AvailableQuantity > 0)
                 .Select(x => new StockGroup(x.Group.StorageLocationId,
                     x.Group.ExpirationDate, locations[x.Group.StorageLocationId].ZoneType,
@@ -94,19 +96,6 @@ public sealed class BuildReplenishmentProposals
                 .ThenByDescending(x => x.Available)
                 .ThenBy(x => locations[x.LocationId].Code, StringComparer.Ordinal)
                 .ToArray();
-
-            // Route steps already account for part of the free stock. A later
-            // Storage group may become usable after an earlier Reserve group is
-            // replenished, even when the current route reports it as a gap.
-            foreach (var step in request.RouteSteps.Where(x =>
-                x.StockKeepingUnitId == skuId))
-            {
-                var group = stockGroups.FirstOrDefault(x =>
-                    x.LocationId == step.StorageLocationId
-                    && x.ExpirationDate == step.ExpirationDate);
-                if (group is not null)
-                    group.Available = Math.Max(0, group.Available - step.Quantity);
-            }
 
             // An ordered task is not a stock reservation yet, but its suggested
             // source must not be offered to another task at the same time.

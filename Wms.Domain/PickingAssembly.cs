@@ -188,16 +188,20 @@ public sealed class PickingAssembly
         return OperationResult.Success();
     }
 
-    public OperationResult CompleteStart(Guid leaseId, DateTimeOffset atUtc)
+    public bool IsReadyForAllocation => Status == PickingAssemblyStatus.Preparing
+        && ActiveSources.Count > 0
+        && ActiveSources.All(x => x.StartConfirmedAtUtc is not null);
+
+    public OperationResult CompleteStart(DateTimeOffset atUtc)
     {
-        if (Status != PickingAssemblyStatus.Preparing || StartLeaseId != leaseId
-            || ActiveSources.Count == 0
-            || ActiveSources.Any(x => x.StartConfirmedAtUtc is null))
+        if (!IsReadyForAllocation)
             return OperationError.Conflict("Все документы 1С должны быть подготовлены к Отбору.");
         if (FirstStartAttemptAtUtc is not DateTimeOffset startAtUtc || atUtc < startAtUtc)
             return OperationError.Invalid("Время начала сборки недопустимо.");
         Status = PickingAssemblyStatus.InProgress;
         StartedAtUtc = atUtc;
+        StartLeaseId = null;
+        StartLeaseUntilUtc = null;
         OperationalRevision++;
         return OperationResult.Success();
     }
@@ -219,6 +223,8 @@ public sealed class PickingAssembly
 
     public OperationResult ReleaseStart(Guid leaseId)
     {
+        if (StartedAtUtc is not null && StartLeaseId is null)
+            return OperationResult.Success();
         if (StartLeaseId != leaseId)
             return OperationError.Conflict("Попытка начала Отбора уже заменена другой.");
         StartLeaseId = null;
@@ -266,6 +272,14 @@ public sealed class PickingAssembly
             return OperationError.Conflict("Сначала примите сборку на себя.");
         if (OperationalRevision != expectedRevision)
             return OperationError.Conflict("Сборка изменилась. Обновите предложения Подпитки.");
+        OperationalRevision++;
+        return OperationResult.Success();
+    }
+
+    public OperationResult RecordRouteAdjustment()
+    {
+        if (Status != PickingAssemblyStatus.InProgress)
+            return OperationError.Conflict("Закрепление можно изменить только для начатой сборки.");
         OperationalRevision++;
         return OperationResult.Success();
     }

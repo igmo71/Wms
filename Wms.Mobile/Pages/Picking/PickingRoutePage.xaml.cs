@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Wms.Contracts.Mobile.V1;
 using Wms.Mobile.Scanning;
@@ -10,6 +11,7 @@ public partial class PickingRoutePage : ContentPage
 {
     private readonly MobilePickingClient _client;
     private readonly IOperationalBarcodeScanner _scanner;
+    private readonly MobileWarehouseSelection _selection;
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
@@ -19,12 +21,14 @@ public partial class PickingRoutePage : ContentPage
 
     public PickingRoutePage(MobilePickingClient client,
         IOperationalBarcodeScanner scanner,
+        MobileWarehouseSelection selection,
         PickingAssemblyProcess process,
         IServiceProvider services)
     {
         InitializeComponent();
         _client = client;
         _scanner = scanner;
+        _selection = selection;
         _process = process;
         _services = services;
         BindingContext = this;
@@ -32,12 +36,13 @@ public partial class PickingRoutePage : ContentPage
     }
 
     public IReadOnlyList<PickingRouteRow> Steps { get; private set; } = [];
+    private bool CanWork => _assembly is { Status: MobilePickingAssemblyStatus.InProgress } assembly
+        && assembly.ResponsibleUserId == _selection.CurrentUserId;
 
     public void Show(MobilePickingAssemblyResponse assembly, PickingAssemblyProcess process)
     {
-        _assembly = assembly;
         _process = process;
-        ApplyHeading(assembly);
+        ApplyAssembly(assembly);
     }
 
     protected override async void OnAppearing()
@@ -69,14 +74,26 @@ public partial class PickingRoutePage : ContentPage
         if (_busy || _assembly is null) return;
         using var measurement = MobilePerformanceDiagnostics.Load("Маршрут");
         SetBusy(true);
+        ErrorLabel.Text = string.Empty;
         try
         {
             var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
-            var route = await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
-            _assembly = assembly;
-            ApplyHeading(assembly);
+            ApplyAssembly(assembly);
+            var route = await LoadRouteAsync(assembly);
+            if (route is null)
+            {
+                ClearRoute();
+                if (_assembly is { Status: MobilePickingAssemblyStatus.InProgress })
+                {
+                    EmptyLabel.Text = "Сборка назначена другому оператору.";
+                    EmptyLabel.IsVisible = true;
+                }
+                return;
+            }
             var work = route.Work;
             var skus = work.Skus.ToDictionary(x => x.SkuId);
+            var availableBySku = route.Steps.GroupBy(x => x.SkuId)
+                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
             Steps = route.Steps.Select((x, index) =>
             {
                 var sku = skus.GetValueOrDefault(x.SkuId);
@@ -86,7 +103,7 @@ public partial class PickingRoutePage : ContentPage
                 return new PickingRouteRow(x.SkuId, x.LocationCode,
                     x.DirectPalletPick, index == 0, name,
                     $"План {plan} {sku?.Unit ?? "—"}",
-                    x.CellAvailability is { } stock ? $"Доступно {stock.Quantity:0.###}" : "Доступно —",
+                    $"Доступно {availableBySku[x.SkuId]:0.###}",
                     $"Факт {fact}",
                     $"Взять {x.Quantity:0.###}",
                     (x.ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : "")
@@ -97,35 +114,59 @@ public partial class PickingRoutePage : ContentPage
                 };
             }).ToArray();
             OnPropertyChanged(nameof(Steps));
+            RouteHint.IsVisible = Steps.Count > 0;
+            EmptyLabel.Text = work.Skus.All(x => x.ConfirmedQuantity >= x.PlannedQuantity)
+                ? "Отбор по маршруту завершён." : "Доступных шагов нет.";
             EmptyLabel.IsVisible = Steps.Count == 0;
             var uncovered = route.Gaps.GroupBy(x => x.SkuId)
                 .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
             UncoveredLabel.Text = string.Join("\n", work.Skus.Where(x => uncovered.ContainsKey(x.SkuId))
                 .Select(x => $"{x.Name ?? x.Code ?? x.SkuId.ToString()} · {uncovered[x.SkuId]:0.###} {x.Unit ?? "—"}"));
             UncoveredBlock.IsVisible = uncovered.Count > 0;
-            ErrorLabel.Text = string.Empty;
         }
         catch (MobileApiException exception)
         {
-            Steps = [];
-            OnPropertyChanged(nameof(Steps));
-            EmptyLabel.IsVisible = true;
-            UncoveredBlock.IsVisible = false;
+            ClearRoute();
             ErrorLabel.Text = exception.Message;
         }
         catch (HttpRequestException)
         {
-            Steps = [];
-            OnPropertyChanged(nameof(Steps));
-            EmptyLabel.IsVisible = true;
-            UncoveredBlock.IsVisible = false;
+            ClearRoute();
             ErrorLabel.Text = "Не удалось обновить маршрут.";
         }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
 
-    private void ApplyHeading(MobilePickingAssemblyResponse assembly)
+    private async Task<MobilePickingRouteResponse?> LoadRouteAsync(MobilePickingAssemblyResponse assembly)
     {
+        if (!CanWork)
+            return null;
+        try
+        {
+            return await _client.RouteAsync(assembly.Id, assembly.WarehouseId);
+        }
+        catch (MobileApiException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
+        {
+            // The assembly can close or change hands between the two reads.
+            ApplyAssembly(await _client.GetAsync(assembly.Id, assembly.WarehouseId));
+            if (CanWork)
+                throw;
+            return null;
+        }
+    }
+
+    private void ClearRoute()
+    {
+        Steps = [];
+        OnPropertyChanged(nameof(Steps));
+        RouteHint.IsVisible = false;
+        EmptyLabel.IsVisible = false;
+        UncoveredBlock.IsVisible = false;
+    }
+
+    private void ApplyAssembly(MobilePickingAssemblyResponse assembly)
+    {
+        _assembly = assembly;
         PickingTitle.Set(HeaderTitleLabel, "Отбор", assembly.Number);
         Title = $"Отбор · {assembly.Number}";
         StatusLabel.Text = assembly.Status switch
@@ -158,7 +199,7 @@ public partial class PickingRoutePage : ContentPage
 
     private async Task OpenScannedStepAsync(string? code)
     {
-        if (!_visible || _busy || _process.HasPendingCommand || _assembly is null
+        if (!_visible || _busy || _process.HasPendingCommand || !CanWork || Steps.Count == 0
             || string.IsNullOrWhiteSpace(code)) return;
         var scannedCode = code.Trim();
         var row = Steps.FirstOrDefault(x => string.Equals(x.LocationCode,
@@ -174,7 +215,7 @@ public partial class PickingRoutePage : ContentPage
 
     private async Task OpenStepAsync(PickingRouteRow row, string? scannedCode)
     {
-        if (_assembly is null || _busy || _process.HasPendingCommand) return;
+        if (_assembly is null || !CanWork || _busy || _process.HasPendingCommand) return;
         SetBusy(true);
         ErrorLabel.Text = string.Empty;
         try
@@ -207,7 +248,7 @@ public partial class PickingRoutePage : ContentPage
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || _assembly is null) return;
+        if (_busy || _process.HasPendingCommand || _assembly is null || !CanWork) return;
         SetBusy(true);
         try
         {
@@ -273,14 +314,15 @@ public partial class PickingRoutePage : ContentPage
         var canNavigate = !busy && !_process.HasPendingCommand && _assembly is not null;
         SkuButton.IsEnabled = canNavigate;
         SourcesButton.IsEnabled = canNavigate;
-        CloseButton.IsEnabled = canNavigate;
+        CloseButton.IsVisible = CanWork;
+        CloseButton.IsEnabled = canNavigate && CanWork;
         NavigationPage.SetHasBackButton(this, !busy && !_process.HasPendingCommand);
         if (busy) CameraScannerView.Stop();
     }
 
     private async Task UpdateCameraAsync()
     {
-        if (_visible && !_busy && !_process.HasPendingCommand
+        if (_visible && !_busy && !_process.HasPendingCommand && CanWork && Steps.Count > 0
             && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
