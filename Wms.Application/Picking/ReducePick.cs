@@ -15,7 +15,7 @@ public sealed record ReducePickRequest(Guid RequestId, Guid PickingAssemblyId,
 
 public sealed class ReducePick(CommandExecutor executor, IPickingAssemblyStore assemblies,
     IStockReservationStore reservations, WarehousePermission permission,
-    TimeProvider clock)
+    AdjustPickingRouteStock routeStock, TimeProvider clock)
 {
     private const string CommandType = "picking.pick.reduce";
 
@@ -43,8 +43,11 @@ public sealed class ReducePick(CommandExecutor executor, IPickingAssemblyStore a
             {
                 var access = await permission.RequireOperatorAsync(request.UserId, token);
                 if (!access.IsSuccess) return access.Error!;
-                var state = await assemblies.LoadWorkAsync(session,
-                    request.PickingAssemblyId, code, token);
+                var loaded = await assemblies.LoadReturnStockAsync(session,
+                    request.PickingAssemblyId, request.PickingEntryId, code, token);
+                if (!loaded.IsSuccess) return loaded.Error!;
+                var stockChange = loaded.Value!;
+                var state = stockChange.Work;
                 var assembly = state.Assembly;
                 if (assembly is null) return OperationError.NotFound("Сборка WMS не найдена.");
                 var changed = assembly.RecordPhysicalWork(request.UserId,
@@ -64,6 +67,9 @@ public sealed class ReducePick(CommandExecutor executor, IPickingAssemblyStore a
                 var released = await reservations.ReduceAsync(session, entry.Id,
                     request.Quantity, now, token);
                 if (!released.IsSuccess) return released.Error!;
+                var assigned = await routeStock.AllocateReturnedAsync(session, stockChange, entry,
+                    request.Quantity, DateOnly.FromDateTime(clock.GetLocalNow().DateTime), token);
+                if (!assigned.IsSuccess) return assigned.Error!;
                 var audit = WarehouseAuditEvent.Create("picking.pick.reduced",
                     now, request.UserId, null, null, null,
                     entry.StockKeepingUnitId, null,

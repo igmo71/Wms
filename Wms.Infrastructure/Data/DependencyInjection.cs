@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<AttachPickingSource>();
         services.AddScoped<DetachPickingSource>();
         services.AddScoped<StartPickingAssembly>();
+        services.AddScoped<AllocatePickingStart>();
         services.AddScoped<GetPickingAssemblies>();
         services.AddScoped<GetPickingAssembly>();
         services.AddScoped<GetPickingWork>();
@@ -87,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<HoldPickingPallet>();
         services.AddScoped<ReturnPickingPallet>();
         services.AddScoped<ConfirmPick>();
+        services.AddScoped<AdjustPickingRouteStock>();
         services.AddScoped<ReducePick>();
         services.AddScoped<ReportPickingShortage>();
         services.AddScoped<ResolveStockShortage>();

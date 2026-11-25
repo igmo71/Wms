@@ -64,7 +64,7 @@ public sealed class GetPickingReplenishments(
             new PickingRouteLocation(x.Id, x.Code, x.ZoneType,
                 x.IsActive, x.DistinctSkuCount) { Name = x.Name }).ToArray();
         var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-        var route = routeBuilder.Execute(new PickingRouteRequest(assemblyId,
+        var route = routeBuilder.ExecuteReserved(new PickingRouteRequest(assemblyId,
             work.WarehouseId, today, remaining, availability, routeLocations));
         if (!route.IsSuccess) return route.Error!;
         var proposals = builder.Execute(new ReplenishmentProposalRequest(
@@ -73,17 +73,19 @@ public sealed class GetPickingReplenishments(
             state.Locations, state.ActiveTasks));
         if (!proposals.IsSuccess) return proposals.Error!;
         var locations = state.Locations.ToDictionary(x => x.Id);
-        var pickingLocations = routeLocations.ToDictionary(x => x.Id);
-        var availabilityBySku = availability.ToLookup(x => x.Group.StockKeepingUnitId);
+        var stepsBySku = route.Value!.Steps.ToLookup(x => x.StockKeepingUnitId);
+        var expiredBySku = availability.Where(x => x.Group.ExpirationDate < today
+                && x.RouteReservedFor(assemblyId) > 0)
+            .ToLookup(x => x.Group.StockKeepingUnitId);
         var stockBySku = work.Skus.ToDictionary(x => x.SkuId, x =>
         {
-            var choices = GetPickingSku.GetLocations(assemblyId,
-                remaining.GetValueOrDefault(x.SkuId), today,
-                availabilityBySku[x.SkuId].ToArray(), pickingLocations)
-                .Where(row => row.OfferedForSelection).ToLookup(row => row.FromReserve);
+            var steps = stepsBySku[x.SkuId].ToLookup(step => step.DirectPalletPick);
+            var expiredZones = expiredBySku[x.SkuId]
+                .Select(group => locations.GetValueOrDefault(group.Group.StorageLocationId)?.ZoneType)
+                .ToHashSet();
             return new PickingSkuStock(
-                PickingFreeStock.Sum(choices[false].Select(row => row.FreeStock)),
-                PickingFreeStock.Sum(choices[true].Select(row => row.FreeStock)));
+                new PickingFreeStock(steps[false].Sum(step => step.Quantity), expiredZones.Contains(ZoneType.Storage)),
+                new PickingFreeStock(steps[true].Sum(step => step.Quantity), expiredZones.Contains(ZoneType.Reserve)));
         });
         return new PickingReplenishmentsView(assemblyId, work.WarehouseId,
             work.Revision,
@@ -117,7 +119,6 @@ public sealed class GetPickingReplenishments(
                 RecommendedDestinationName = x.RecommendedDestinationStorageLocationId is Guid targetNameId
                     ? locations.GetValueOrDefault(targetNameId)?.Name : null
             }).ToArray(), work,
-            route.Value!.Steps.GroupBy(x => x.StockKeepingUnitId)
-                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity)), stockBySku);
+            stepsBySku.ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity)), stockBySku);
     }
 }

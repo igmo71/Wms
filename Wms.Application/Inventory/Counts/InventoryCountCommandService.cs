@@ -32,10 +32,9 @@ public sealed class InventoryCountCommandService(CommandExecutor executor, IInve
                 return OperationError.Invalid("Выберите активную ячейку Комплектации или Хранения.");
             if (location.ActiveLock is { OwnerType: StorageLocationLockOwnerType.InventoryCount, OwnerId: Guid countId })
                 return new CountEffect(countId, location.Id, new { InventoryCountId = countId, Resumed = true });
-            if (location.ActiveLock is { } locationLock)
-                return OperationError.Conflict($"Ячейка {location.DisplayAddress} заблокирована: {locationLock.Reason}");
-            if (await store.HasStockCommitmentsAsync(session, location.Id, token))
-                return OperationError.Conflict("Ячейка содержит активный резерв отбора или неразрешённую недостачу.");
+            var block = await GetStockBlockAsync(session, location, token, location.ActiveLock?.Reason);
+            if (block is not null)
+                return block;
 
             var created = InventoryCount.Create(Guid.NewGuid(), now.LocalDateTime.ToString("yyMMdd-HHmmss"),
                 now.LocalDateTime.Date, location.WarehouseId, location.Id, now, context.UserId);
@@ -141,8 +140,9 @@ public sealed class InventoryCountCommandService(CommandExecutor executor, IInve
             var (count, location) = draft.Value;
             if (!IsCountLocation(location))
                 return OperationError.Conflict("Ячейка стала недоступна для проведения.");
-            if (await store.HasStockCommitmentsAsync(session, location.Id, token))
-                return OperationError.Conflict("Ячейка содержит активный резерв отбора или неразрешённую недостачу.");
+            var block = await GetStockBlockAsync(session, location, token);
+            if (block is not null)
+                return block;
 
             var balances = await store.LoadBalancesAsync(session, count.WarehouseId, location.Id, token);
             var expected = count.Items.Where(x => x.IsExpected)
@@ -226,6 +226,23 @@ public sealed class InventoryCountCommandService(CommandExecutor executor, IInve
     public static bool RequiresExpiration(InventoryCount count, StockKeepingUnit sku, DateOnly? expirationDate) =>
         sku.TracksExpirationDate || expirationDate.HasValue
         || count.Items.Any(x => x.StockKeepingUnitId == sku.Id && x.ExpirationDate.HasValue);
+
+    private async Task<OperationError?> GetStockBlockAsync(ICommandExecutionContext session,
+        StorageLocation location, CancellationToken ct, string? holdReason = null)
+    {
+        var commitments = await store.GetStockCommitmentsAsync(session, location.Id, ct);
+        var reasons = new List<string>();
+        if (holdReason is not null)
+            reasons.Add(holdReason);
+        if (commitments.HasRouteReservation)
+            reasons.Add("товар закреплён за сборкой");
+        if (commitments.HasConfirmedPickReservation)
+            reasons.Add("есть резерв подтверждённого отбора");
+        if (commitments.HasOpenShortage)
+            reasons.Add("недостача ожидает решения руководителя");
+        return reasons.Count == 0 ? null : OperationError.Conflict(
+            $"Ячейка {location.DisplayAddress} заблокирована — {string.Join(", ", reasons)}.");
+    }
 
     private static OperationError? ValidateGroup(InventoryCount count, StockKeepingUnit sku,
         DateOnly? expirationDate, bool confirmed, decimal quantity)

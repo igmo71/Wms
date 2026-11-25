@@ -119,10 +119,24 @@ Notification handling calls that use case, while the existing warehouse plan
 changes only for a linked draft assembly in the same EF transaction.
 New links and plan lines of an already tracked assembly are explicitly staged
 for insertion; source synchronization likewise stages newly added draft lines.
-The start use case records its freeze, short execution lease, source PATCH intent,
-per-source outcome, and completion through command receipts and audit. HTTP
-calls happen between those database commands; no EF transaction spans a 1C
-request. The Integration writer owns the outbound PATCH and POST protocol.
+The start use case records its freeze, short execution lease, source PATCH intent
+and per-source outcome through command receipts and audit. HTTP calls happen
+between those database commands. The Integration writer owns the outbound PATCH
+and POST protocol. Once confirmations are persisted, each allocation command
+takes a warehouse-scoped SQL application lock, selects the next ready assembly,
+then locks candidate locations in ID order before rereading stock. It commits
+the route reservations, location revisions, assembly status, audit and receipt
+together. A repeated start can enter allocation from persisted confirmations.
+Pick confirmation and shortage commands also take location locks in ID order.
+They include the scanned address and the SKU's stock and reservation locations
+so a manual substitution or a shared shortage can update all affected
+reservations in a single command.
+Confirmation of a replenishment transfer reserves its destination quantity for
+the active ordering assembly in the posting transaction, under the same
+destination lock.
+Plan changes and scanned returns maintain the route reservations within their
+command transaction. Closing or accepting cancellation releases outstanding
+route reservations in that same warehouse transaction.
 The picking query store returns assembly lists and details with the current
 responsible user's display name, source check outcomes and WMS plan. Takeover
 uses the assembly operational revision and the same command receipt/audit path;
@@ -164,12 +178,16 @@ and release the active source link only after the return is verified.
 Application has a pure address comparer and picking-route builder over the
 shared stock-availability view and supplied location metadata. The builder
 keeps FEFO before cell-clearing choices, selects only fully available one-SKU
-reserve cells for direct pallet picking, and reports unmet quantities. It is
-used by the replacement route query; physical confirmation repeats stock and
-location checks in its own command.
+reserve cells for direct pallet picking, and reports unmet quantities. Initial
+allocation uses free quantities. The working route and replenishment use the
+same calculation restricted to the current assembly's route reservations.
+Physical confirmation repeats stock and location checks in its own command.
 
-The outbound domain model distinguishes quantity reservations (`PickingReservation`),
-reported shortages (`StockShortage`), and whole-location holds (`StorageLocationLock`).
+The outbound domain model distinguishes route reservations (`PickingRouteReservation`),
+confirmed-pick reservations (`PickingReservation`), reported shortages
+(`StockShortage`), and whole-location holds (`StorageLocationLock`).
+A route reservation stores positive quantity for one assembly and stock group.
+Its unique index includes groups with an unknown expiration date.
 Each shortage has a required foreign key to its picking assembly.
 Picking and replenishment have separate hold owner types. Replenishment tasks own
 source cycles and immutable transfer records linked to inventory movements. Finishing
@@ -187,7 +205,8 @@ the same EF context when a command performs several actions before its final sav
 Read-only route and replenishment queries load availability for their SKU set in
 batches of at most 500, without EF tracking, and share location and hold reads
 across that set. These SQL reads project only stock-group keys and quantities,
-reservation entry/assembly IDs and author, location ID/code/name, and hold
+the route reservation's assembly ID, confirmed reservation entry/assembly IDs
+and author, location ID/code/name, and hold
 owner/reason/author. Active shortage projections calculate blocked quantity
 as expected minus found; they omit report comments, lifecycle timestamps and
 row versions. Availability is assembled by warehouse, location, SKU and nullable

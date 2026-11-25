@@ -1,4 +1,5 @@
 using Wms.Application.Inventory;
+using Wms.Application.Picking;
 using Wms.Application.Replenishment;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -9,7 +10,7 @@ namespace Wms.Tests.Replenishment;
 public sealed class ReplenishmentProposalSafetyTests
 {
     [Fact]
-    public void Existing_order_and_later_storage_do_not_create_excess_replenishment()
+    public void Existing_order_and_later_storage_count_route_quantity_once()
     {
         var warehouseId = Guid.NewGuid();
         var assemblyId = Guid.NewGuid();
@@ -25,10 +26,12 @@ public sealed class ReplenishmentProposalSafetyTests
         var result = Value(new BuildReplenishmentProposals().Execute(
             new ReplenishmentProposalRequest(assemblyId, warehouseId,
                 new DateOnly(2026, 5, 1),
-                new Dictionary<Guid, decimal> { [skuId] = 7 }, [],
+                new Dictionary<Guid, decimal> { [skuId] = 8 },
+                [new PickingRouteStep(destinationId, "C", skuId, later, 1, false)],
                 [Stock(firstSource, "A", earlier, 4),
                  Stock(secondSource, "B", earlier, 2),
-                 Stock(destinationId, "C", later, 3)],
+                 Stock(destinationId, "C", later, 2) with
+                 { RouteReservations = [new StockRouteReservationView(assemblyId, 1)] }],
                 [new ReplenishmentLocation(firstSource, "A", ZoneType.Reserve,
                     true, false, false, 1, new HashSet<Guid> { skuId }),
                  new ReplenishmentLocation(secondSource, "B", ZoneType.Reserve,

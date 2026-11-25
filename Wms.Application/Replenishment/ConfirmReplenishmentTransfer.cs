@@ -3,6 +3,7 @@ using System.Text.Json;
 using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
 using Wms.Application.Inventory;
+using Wms.Application.Picking;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -17,7 +18,7 @@ public sealed record ConfirmReplenishmentTransferRequest(
 public sealed class ConfirmReplenishmentTransfer(
     CommandExecutor executor, IReplenishmentStore replenishments,
     IStockAvailabilityStore stock, PostInventoryMovement.Handler posting,
-    WarehousePermission permission, TimeProvider clock)
+    WarehousePermission permission, AdjustPickingRouteStock routeStock, TimeProvider clock)
 {
     private const string CommandType = "replenishment.transfer.confirm";
 
@@ -124,6 +125,10 @@ public sealed class ConfirmReplenishmentTransfer(
                     movement.Value!, InventoryPostingKind.Replenishment, now),
                     session, token);
                 if (!posted.IsSuccess) return posted.Error!;
+                var reserved = await routeStock.AllocateReplenishmentAsync(session, task.PickingAssemblyId,
+                    destination, new StockGroupKey(task.WarehouseId, destination.Id, task.StockKeepingUnitId,
+                        request.ExpirationDate), request.Quantity, available, token);
+                if (!reserved.IsSuccess) return reserved.Error!;
                 var audit = WarehouseAuditEvent.Create(
                     "replenishment.transfer.confirmed", now, request.UserId,
                     null, null, null, task.StockKeepingUnitId, null, null,
@@ -132,7 +137,7 @@ public sealed class ConfirmReplenishmentTransfer(
                         SourceLocationId = source.Id,
                         DestinationLocationId = destination.Id,
                         request.ExpirationDate, request.Quantity,
-                        task.TransferredQuantity }),
+                        task.TransferredQuantity, RouteReservedQuantity = reserved.Value }),
                     movementIds: [movement.Value!.Id],
                     commandUserId: request.UserId, commandType: CommandType,
                     requestId: request.RequestId,

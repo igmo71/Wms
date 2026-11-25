@@ -19,8 +19,8 @@
                        MaxLines="1" LineBreakMode="TailTruncation"
                        HorizontalTextAlignment="End" />
             </Grid>
-            <Label Text="Маршрут рекомендательный. Сканируйте ячейку из списка или выберите пункт."
-                   FontSize="12" />
+            <Label x:Name="RouteHint" Text="Сканируйте ячейку из списка или выберите шаг."
+                   FontSize="12" IsVisible="False" />
             <local:OperationalCameraScannerView x:Name="CameraScannerView" />
         </VerticalStackLayout>
         <RefreshView x:Name="RouteRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
@@ -96,7 +96,7 @@
             <Button x:Name="RetryButton" Text="Повторить команду"
                     Clicked="OnRetryClicked" IsVisible="False" />
             <Button x:Name="CloseButton" Text="Закрыть и отгрузить"
-                    Clicked="OnCloseClicked" />
+                    Clicked="OnCloseClicked" IsVisible="False" />
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
                 <Button x:Name="SkuButton" Text="SKU" FontSize="12"
                         Padding="2,8" Clicked="OnSkuClicked" />

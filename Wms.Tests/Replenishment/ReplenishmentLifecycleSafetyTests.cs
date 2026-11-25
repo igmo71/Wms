@@ -46,21 +46,32 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
                 Balance(warehouse.Id, pallet.Id, otherSku.Id, 3),
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
                     prohibited.Id, sku.Id, 2, now, date)),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id,
+                    prohibited.Id, sku.Id, date, 2)),
                 Balance(warehouse.Id, prohibited.Id, otherSku.Id, 2),
                 Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id,
                     allowed.Id, sku.Id, 1, now, date)),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id,
+                    allowed.Id, sku.Id, date, 1)),
                 Balance(warehouse.Id, allowed.Id, otherSku.Id, 1));
             await seed.SaveChangesAsync();
         }
 
         var stock = new StockAvailabilityStore(database);
         var store = new ReplenishmentStore(database);
+        var pickingQueries = new PickingAssemblyQueryStore(database);
+        var pickingWork = new GetPickingWork(pickingQueries, Permission());
         var query = new GetPickingReplenishments(
-            new GetPickingWork(new PickingAssemblyQueryStore(database), Permission()),
+            pickingWork,
             new BuildPickingRoute(), stock, store, new BuildReplenishmentProposals(),
             TimeProvider.System);
         var view = Value(await query.ExecuteAsync(assembly.Id, Worker));
         Assert.Equal(3m, view.PickableBySku[sku.Id]);
+        Assert.Equal(3m, view.StockBySku[sku.Id].Storage.Quantity);
+        var route = Value(await new GetPickingRoute(pickingWork, pickingQueries, stock, new BuildPickingRoute(),
+            TimeProvider.System).ExecuteAsync(assembly.Id, Worker));
+        Assert.Equal(view.PickableBySku[sku.Id], route.Steps.Sum(x => x.Quantity));
+        Assert.Equal(10m, route.Gaps.Sum(x => x.Quantity));
         var proposal = Assert.Single(view.Proposals);
         Assert.Equal(pallet.Id, proposal.SourceLocationId);
         Assert.Equal(allowed.Id, proposal.DestinationLocationId);
@@ -190,6 +201,8 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
             x.StorageLocationId == seed.FirstId && x.StockKeepingUnitId == seed.SkuId)).Quantity);
         Assert.Equal(10m, await verify.InventoryBalances.Where(x =>
             x.StorageLocationId == seed.DestinationId).SumAsync(x => x.Quantity));
+        Assert.False(await verify.PickingRouteReservations.AnyAsync(x =>
+            x.PickingAssemblyId == seed.AssemblyId && x.ExpirationDate == seed.ExpirationDate.AddDays(1)));
     }
 
     [Fact]
@@ -207,12 +220,20 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
             cancelledFirst.TaskId, cancelledFirst.FirstCode, Worker)),
             OperationErrorType.Conflict);
 
-        var startedFirst = await SeedOrderedAsync(4, 0, 4);
+        var startedFirst = await SeedOrderedWithPickingStockAsync();
+        await using (var reserve = database.CreateDbContext())
+        {
+            reserve.Add(Value(PickingRouteReservation.Create(startedFirst.AssemblyId, startedFirst.WarehouseId,
+                startedFirst.DestinationId, startedFirst.SkuId, startedFirst.ExpirationDate, 4)));
+            await reserve.SaveChangesAsync();
+        }
         Value(await commands.Start.ExecuteAsync(new(Guid.NewGuid(),
             startedFirst.TaskId, startedFirst.FirstCode, Worker)));
-        Value(await cancelled.ExecuteAsync(new(Guid.NewGuid(),
+        var cancelAfterScan = new CancelPickingAssemblyRequest(Guid.NewGuid(),
             startedFirst.AssemblyId, startedFirst.AssemblyRevision,
-            Manager, "Сборка отменена после скана")));
+            Manager, "Сборка отменена после скана");
+        Value(await cancelled.ExecuteAsync(cancelAfterScan));
+        Value(await cancelled.ExecuteAsync(cancelAfterScan));
 
         await using var verify = database.CreateDbContext();
         Assert.Equal(ReplenishmentTaskStatus.Cancelled,
@@ -228,6 +249,11 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
                 x.Id == startedFirst.AssemblyId)).Status);
         Assert.True(await verify.StorageLocationLocks.AnyAsync(x =>
             x.OwnerId == startedFirst.TaskId));
+        var stock = await new StockAvailabilityStore(database)
+            .ReadSkuAsync(startedFirst.WarehouseId, startedFirst.SkuId, default);
+        var destination = stock.Single(x => x.Group.StorageLocationId == startedFirst.DestinationId);
+        Assert.Equal(4m, destination.AvailableQuantity);
+        Assert.Equal(0m, destination.RouteReservedFor(startedFirst.AssemblyId));
     }
 
     [Fact]
@@ -238,7 +264,8 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
         var replenishments = new ReplenishmentStore(database);
         var stock = new StockAvailabilityStore(database);
         var pick = new ConfirmPick(executor, assemblies, stock, stock,
-            replenishments, Permission(), TimeProvider.System);
+            replenishments, Permission(), new AdjustPickingRouteStock(assemblies, stock, new BuildPickingRoute()),
+            TimeProvider.System);
         var start = Commands().Start;
 
         var cancelledFirst = await SeedOrderedWithPickingStockAsync();
@@ -285,12 +312,13 @@ public sealed class ReplenishmentLifecycleSafetyTests(SqlDatabase database)
         var executor = new CommandExecutor(new CommandExecutionStore(database));
         var replenishments = new ReplenishmentStore(database);
         var stock = new StockAvailabilityStore(database);
+        var routeStock = new AdjustPickingRouteStock(new PickingAssemblyStore(database), stock, new BuildPickingRoute());
         var permission = Permission();
         return (new StartReplenishmentSource(executor, replenishments,
                 stock, stock, permission, TimeProvider.System),
             new ConfirmReplenishmentTransfer(executor, replenishments,
                 stock, new PostInventoryMovement.Handler(new InventoryPostingStore()),
-                permission, TimeProvider.System),
+                permission, routeStock, TimeProvider.System),
             new CompleteReplenishmentSource(executor, replenishments,
                 permission, TimeProvider.System));
     }

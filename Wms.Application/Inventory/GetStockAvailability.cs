@@ -12,6 +12,8 @@ public readonly record struct StockGroupKey(
 public sealed record StockReservationView(
     Guid PickingEntryId, Guid PickingAssemblyId, decimal Quantity, string CreatedBy);
 
+public sealed record StockRouteReservationView(Guid PickingAssemblyId, decimal Quantity);
+
 public sealed record StockHoldView(
     StorageLocationLockOwnerType OwnerType, Guid? OwnerId, string Reason, string LockedBy);
 
@@ -24,17 +26,35 @@ public sealed record StockAvailability(
     StockHoldView? Hold)
 {
     public string? LocationName { get; init; }
-    public decimal ReservedQuantity => Reservations.Sum(x => x.Quantity);
+    public IReadOnlyList<StockRouteReservationView> RouteReservations { get; init; } = [];
+    public decimal ConfirmedReservedQuantity => Reservations.Sum(x => x.Quantity);
+    public decimal ReservedQuantity => ConfirmedReservedQuantity
+        + RouteReservations.Sum(x => x.Quantity);
 
     public decimal AvailableQuantity => AvailableForNewPick(null);
 
-    public decimal AvailableForNewPick(Guid? pickingAssemblyId)
+    public decimal AvailableForNewPick(Guid? pickingAssemblyId) =>
+        AvailableForPicking(pickingAssemblyId, 0);
+
+    public decimal RouteReservedFor(Guid assemblyId) =>
+        RouteReservations.Where(x => x.PickingAssemblyId == assemblyId).Sum(x => x.Quantity);
+
+    public decimal AvailableForRoute(Guid assemblyId)
+    {
+        var owned = RouteReservedFor(assemblyId);
+        return Math.Min(owned, AvailableForPicking(assemblyId, owned));
+    }
+
+    public decimal AvailableForAssemblyPick(Guid assemblyId) =>
+        AvailableForPicking(assemblyId, RouteReservedFor(assemblyId));
+
+    private decimal AvailableForPicking(Guid? pickingAssemblyId, decimal owned)
     {
         if (Hold is not null && (pickingAssemblyId is null
             || Hold.OwnerType != StorageLocationLockOwnerType.PickingAssembly
             || Hold.OwnerId != pickingAssemblyId))
             return 0;
-        return Math.Max(0, AccountingQuantity - ReservedQuantity - BlockedQuantity);
+        return Math.Max(0, AccountingQuantity - (ReservedQuantity - owned) - BlockedQuantity);
     }
 
     public decimal ReservedFor(Guid pickingAssemblyId) =>
@@ -42,12 +62,8 @@ public sealed record StockAvailability(
 
     public decimal AvailableForReservedIssue(Guid pickingAssemblyId)
     {
-        if (Hold is not null && (Hold.OwnerType != StorageLocationLockOwnerType.PickingAssembly
-            || Hold.OwnerId != pickingAssemblyId))
-            return 0;
         var owned = ReservedFor(pickingAssemblyId);
-        return Math.Min(owned, Math.Max(0,
-            AccountingQuantity - (ReservedQuantity - owned) - BlockedQuantity));
+        return Math.Min(owned, AvailableForPicking(pickingAssemblyId, owned));
     }
 
     public decimal AvailableForReplenishment(Guid replenishmentTaskId)

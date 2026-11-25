@@ -46,12 +46,12 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
         var storageLocationIds = GetStorageLocationIds(movements);
         var stockKeepingUnitIds = movements.Select(x => x.StockKeepingUnitId).Distinct().ToArray();
 
-        var balances = await dbContext.InventoryBalances
+        var balances = await UndatedInventoryAvailability.Read(dbContext, dbContext.InventoryBalances
             .Where(x => warehouseIds.Contains(x.WarehouseId)
                 && storageLocationIds.Contains(x.StorageLocationId)
-                && stockKeepingUnitIds.Contains(x.StockKeepingUnitId))
+                && stockKeepingUnitIds.Contains(x.StockKeepingUnitId)))
             .ToDictionaryAsync(
-                x => (x.WarehouseId, x.StorageLocationId, x.StockKeepingUnitId),
+                x => (x.Balance.WarehouseId, x.Balance.StorageLocationId, x.Balance.StockKeepingUnitId),
                 ct);
 
         foreach (var movement in movements)
@@ -110,7 +110,8 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
 
     private OperationResult ApplyMovement(
         InventoryMovement movement,
-        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId), InventoryBalance> balances,
+        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId),
+            UndatedInventoryAvailability.AvailableBalance> balances,
         ApplicationDbContext dbContext,
         DateTimeOffset occurredAtUtc)
     {
@@ -148,22 +149,27 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
     private OperationResult ApplySource(
         InventoryMovement movement,
         Guid storageLocationId,
-        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId), InventoryBalance> balances,
+        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId),
+            UndatedInventoryAvailability.AvailableBalance> balances,
         ApplicationDbContext dbContext,
         DateTimeOffset occurredAtUtc)
     {
         var key = (movement.WarehouseId, storageLocationId, movement.StockKeepingUnitId);
-        if (!balances.TryGetValue(key, out var balance))
+        if (!balances.TryGetValue(key, out var source))
         {
             logger.LogError("Остаток в позиции-источнике не найден. Движение: {MovementId}", movement.Id);
             return OperationError.Failure("Остаток в позиции-источнике не найден.");
         }
 
+        var balance = source.Balance;
         if (balance.Quantity < movement.Quantity)
         {
             logger.LogError("Недостаточно остатка в позиции-источнике. Движение: {MovementId}", movement.Id);
             return OperationError.Failure("Недостаточно остатка в позиции-источнике.");
         }
+
+        if (balance.Quantity - movement.Quantity < source.CommittedQuantity)
+            return OperationError.Conflict("Недостаточно остатка после защиты резервов и спорного количества.");
 
         var changeResult = balance.Adjust(-movement.Quantity, occurredAtUtc);
         if (!changeResult.IsSuccess)
@@ -182,16 +188,17 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
     private static OperationResult ApplyDestination(
         InventoryMovement movement,
         Guid storageLocationId,
-        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId), InventoryBalance> balances,
+        Dictionary<(Guid WarehouseId, Guid StorageLocationId, Guid StockKeepingUnitId),
+            UndatedInventoryAvailability.AvailableBalance> balances,
         ApplicationDbContext dbContext,
         DateTimeOffset occurredAtUtc)
     {
         var key = (movement.WarehouseId, storageLocationId, movement.StockKeepingUnitId);
         InventoryBalanceChange change;
 
-        if (balances.TryGetValue(key, out var balance))
+        if (balances.TryGetValue(key, out var destination))
         {
-            var changeResult = balance.Adjust(movement.Quantity, occurredAtUtc);
+            var changeResult = destination.Balance.Adjust(movement.Quantity, occurredAtUtc);
             if (!changeResult.IsSuccess)
             {
                 return changeResult.Error!;
@@ -213,9 +220,9 @@ public class InventoryPostingService(ILogger<InventoryPostingService> logger)
                 return balanceResult.Error!;
             }
 
-            balance = balanceResult.Value!;
+            var balance = balanceResult.Value!;
             change = new InventoryBalanceChange(0, movement.Quantity, movement.Quantity);
-            balances.Add(key, balance);
+            balances.Add(key, new UndatedInventoryAvailability.AvailableBalance { Balance = balance });
             dbContext.InventoryBalances.Add(balance);
         }
 

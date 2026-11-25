@@ -14,6 +14,7 @@ public sealed record PickingSourceView(Guid PickingAssemblyId, Guid StorageLocat
     public string? LocationName { get; init; }
     public bool FromReserve { get; init; }
     public bool PalletHeld { get; init; }
+    public decimal ExpectedPhysicalQuantity { get; init; }
 }
 
 public sealed class GetPickingSource(
@@ -107,24 +108,41 @@ internal static class PickingSourceRules
         }
         var eligible = availability.Where(x => x.Group.StockKeepingUnitId == skuId
             && (x.Group.ExpirationDate is null || x.Group.ExpirationDate >= today)
-            && x.AvailableForNewPick(assembly.Id) > 0)
+            && x.AvailableForAssemblyPick(assembly.Id) > 0)
             .OrderBy(x => x.Group.ExpirationDate is null)
             .ThenBy(x => x.Group.ExpirationDate).ToArray();
         if (eligible.Length == 0)
             return OperationError.Conflict("Свободного товара для Отбора нет.");
-        var firstDate = eligible[0].Group.ExpirationDate;
-        var group = eligible.FirstOrDefault(x => x.Group.StorageLocationId == location.Id
-            && (!dateGroupSelected || x.Group.ExpirationDate == selectedExpirationDate));
+        var group = eligible.Where(x => x.Group.StorageLocationId == location.Id
+                && (!dateGroupSelected || x.Group.ExpirationDate == selectedExpirationDate))
+            .OrderByDescending(x => x.AvailableForRoute(assembly.Id) > 0)
+            .FirstOrDefault();
         if (group is null)
             return OperationError.Conflict("В выбранной ячейке и группе срока нет доступного товара.");
+        var assigned = group.AvailableForRoute(assembly.Id);
+        var firstDate = eligible.First(x => assigned == 0 || x.AvailableForRoute(assembly.Id) > 0)
+            .Group.ExpirationDate;
         if (group.Group.ExpirationDate != firstDate)
             return OperationError.Conflict("Сначала требуется отобрать товар с более ранним сроком годности.");
-        var free = group.AvailableForNewPick(assembly.Id);
+        var available = assigned > 0 ? assigned : group.AvailableForNewPick(assembly.Id);
+        var remainingOutsideOtherPallets = remaining - HeldElsewhere(availability, assembly.Id, location.Id);
+        if (remainingOutsideOtherPallets <= 0)
+            return OperationError.Conflict("Оставшийся товар уже закреплён на удерживаемом поддоне.");
+
         return new PickingSourceView(assembly.Id, location.Id, scannedCode, skuId,
-            group.Group.ExpirationDate, group.AccountingQuantity, free,
-            Math.Min(remaining, free), group.ReservedQuantity,
+            group.Group.ExpirationDate, group.AccountingQuantity, available,
+            Math.Min(remainingOutsideOtherPallets, available), group.ReservedQuantity,
             group.BlockedQuantity, group.Group.ExpirationDate is null
                 && state.CellSkus.Single(x => x.Id == skuId).TracksExpirationDate)
-        { LocationName = location.Name, FromReserve = fromReserve, PalletHeld = ownedHold };
+        {
+            LocationName = location.Name, FromReserve = fromReserve, PalletHeld = ownedHold,
+            ExpectedPhysicalQuantity = Math.Max(0, group.AccountingQuantity - group.ConfirmedReservedQuantity)
+        };
     }
+
+    internal static decimal HeldElsewhere(IEnumerable<StockAvailability> availability, Guid assemblyId, Guid locationId) =>
+        availability.Where(x => x.Group.StorageLocationId != locationId
+                && x.Hold is { OwnerType: StorageLocationLockOwnerType.PickingAssembly } hold
+                && hold.OwnerId == assemblyId)
+            .Sum(x => x.RouteReservedFor(assemblyId));
 }

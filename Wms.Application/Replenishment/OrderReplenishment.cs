@@ -63,7 +63,7 @@ public sealed class OrderReplenishment(
                     new PickingRouteLocation(x.Id, x.Code, x.ZoneType,
                         x.IsActive, x.DistinctSkuCount)).ToArray();
                 var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-                var route = routeBuilder.Execute(new PickingRouteRequest(assembly.Id,
+                var route = routeBuilder.ExecuteReserved(new PickingRouteRequest(assembly.Id,
                     assembly.WarehouseId, today, remaining, availability,
                     routeLocations));
                 if (!route.IsSuccess) return route.Error!;

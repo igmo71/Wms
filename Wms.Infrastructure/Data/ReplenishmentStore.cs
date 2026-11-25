@@ -332,7 +332,11 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
             .Where(x => x.WarehouseId == warehouseId
                 && ids.Contains(x.StorageLocationId)
                 && x.CompletedAtUtc == null)
-            .Select(x => x.StorageLocationId).Distinct().ToArrayAsync(ct)).ToHashSet();
+            .Select(x => x.StorageLocationId)
+            .Union(db.PickingRouteReservations.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && ids.Contains(x.StorageLocationId))
+                .Select(x => x.StorageLocationId))
+            .ToArrayAsync(ct)).ToHashSet();
     }
 
     public async Task<IReadOnlyList<ReplenishmentQueueEntry>> ReadQueueAsync(
@@ -471,14 +475,17 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 ZoneType = x.Zone == null ? ZoneType.Receiving : x.Zone.Type,
                 IsActive = !x.DeletionMark && x.Zone != null && !x.Zone.DeletionMark
                     && x.Warehouse != null && !x.Warehouse.DeletionMark,
-                IsHeld = x.ActiveLock != null
+                IsHeld = x.ActiveLock != null,
+                HasPickingCommitment = x.Zone != null && x.Zone.Type == ZoneType.Reserve
+                    && (db.PickingReservations.Any(row => row.StorageLocationId == x.Id && row.CompletedAtUtc == null)
+                        || db.PickingRouteReservations.Any(row => row.StorageLocationId == x.Id))
             }).ToArrayAsync(ct);
             views.AddRange(locations.Select(x => new ReplenishmentLocation(x.Id, x.Code,
                 x.ZoneType, x.IsActive, x.IsHeld, x.AllowsMultipleSkus,
                 counts.GetValueOrDefault(x.Id),
                 x.ZoneType == ZoneType.Storage && x.IsActive && !x.IsHeld
                     ? relevantSkusByLocation[x.Id].ToHashSet() : new HashSet<Guid>())
-                { Name = x.Name }));
+                { Name = x.Name, HasPickingCommitment = x.HasPickingCommitment }));
         }
         var tasks = await db.ReplenishmentTasks.AsNoTracking()
             .Where(x => x.WarehouseId == warehouseId

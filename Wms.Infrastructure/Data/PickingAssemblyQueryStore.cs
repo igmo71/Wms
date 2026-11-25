@@ -296,9 +296,16 @@ public sealed class PickingAssemblyQueryStore(
     public async Task<IReadOnlyList<PickingRouteLocation>> GetRouteLocationsAsync(
         Guid warehouseId, IReadOnlyCollection<Guid> locationIds, CancellationToken ct)
     {
+        if (locationIds.Count == 0) return [];
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await ReadRouteLocationsAsync(db, warehouseId, locationIds, ct);
+    }
+
+    internal static async Task<IReadOnlyList<PickingRouteLocation>> ReadRouteLocationsAsync(
+        ApplicationDbContext db, Guid warehouseId, IReadOnlyCollection<Guid> locationIds, CancellationToken ct)
+    {
         var ids = locationIds.Distinct().ToArray();
         if (ids.Length == 0) return [];
-        await using var db = await contextFactory.CreateDbContextAsync(ct);
         var counts = await db.InventoryBalances.AsNoTracking()
             .Where(x => x.WarehouseId == warehouseId
                 && ids.Contains(x.StorageLocationId) && x.Quantity > 0)

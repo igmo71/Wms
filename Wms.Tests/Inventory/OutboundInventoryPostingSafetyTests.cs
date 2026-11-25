@@ -93,6 +93,41 @@ public sealed class OutboundInventoryPostingSafetyTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Route_reserved_stock_is_protected_from_correction()
+    {
+        var (warehouseId, sourceId, _, skuId) = await SeedAsync(ZoneType.Storage);
+        var now = DateTimeOffset.UtcNow;
+        var assembly = PickingAssembly(warehouseId, UserId);
+        var reservation = Value(PickingRouteReservation.Create(
+            assembly.Id, warehouseId, sourceId, skuId, null, 8));
+        await using (var db = database.CreateDbContext())
+        {
+            db.AddRange(assembly, reservation,
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouseId, sourceId, skuId, 10, now)));
+            await db.SaveChangesAsync();
+        }
+
+        var availability = new StockAvailabilityStore(database);
+        var group = Assert.Single(await availability.ReadSkuAsync(warehouseId, skuId, default));
+        Assert.Equal(2m, group.AvailableQuantity);
+
+        var excessive = Value(InventoryMovement.Create(Guid.NewGuid(), warehouseId, sourceId, null,
+            skuId, 3, now, RecorderType.StockCorrection, Guid.NewGuid(), 1, UserId));
+        Error(await PostAsync(new(excessive, InventoryPostingKind.StockCorrection,
+            now.AddSeconds(1)), Guid.NewGuid()), OperationErrorType.Conflict);
+
+        var correction = Value(InventoryMovement.Create(Guid.NewGuid(), warehouseId, sourceId, null,
+            skuId, 2, now, RecorderType.StockCorrection, Guid.NewGuid(), 1, UserId));
+        Value(await PostAsync(new(correction, InventoryPostingKind.StockCorrection,
+            now.AddSeconds(1)), Guid.NewGuid()));
+
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(8m, (await verify.InventoryBalances.SingleAsync(x => x.WarehouseId == warehouseId)).Quantity);
+        Assert.Equal(8m, (await verify.PickingRouteReservations.SingleAsync(x => x.Id == reservation.Id)).Quantity);
+        Assert.False(await verify.InventoryMovements.AnyAsync(x => x.Id == excessive.Id));
+    }
+
+    [Fact]
     public async Task Shortage_correction_preserves_picked_stock_and_clears_only_its_block_atomically()
     {
         var (warehouseId, sourceId, _, skuId) = await SeedAsync(ZoneType.Storage);

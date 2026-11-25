@@ -56,7 +56,10 @@ public sealed class GetPickingSku(
         decimal remaining, DateOnly today, IReadOnlyList<StockAvailability> availability,
         IReadOnlyDictionary<Guid, PickingRouteLocation> locations)
     {
-        var earliest = availability.Where(x => x.AvailableForNewPick(assemblyId) > 0
+        var earliest = availability.Where(x => x.AvailableForAssemblyPick(assemblyId) > 0
+                && x.Group.ExpirationDate >= today)
+            .Min(x => x.Group.ExpirationDate);
+        var earliestReserved = availability.Where(x => x.AvailableForRoute(assemblyId) > 0
                 && x.Group.ExpirationDate >= today)
             .Min(x => x.Group.ExpirationDate);
         foreach (var group in availability.Where(x => x.AccountingQuantity > 0)
@@ -80,8 +83,9 @@ public sealed class GetPickingSku(
             {
                 var free = PickingFreeStock.ForGroup(row, assemblyId, today);
                 var offered = !reserve || (offeredPallet && free.Quantity > 0);
+                var firstDate = row.AvailableForRoute(assemblyId) > 0 ? earliestReserved : earliest;
                 var canPickNow = offered && remaining > 0 && free.Quantity > 0
-                    && !free.HasExpiredStock && row.Group.ExpirationDate == earliest;
+                    && !free.HasExpiredStock && row.Group.ExpirationDate == firstDate;
                 yield return new PickingSkuLocation(row, free, canPickNow, reserve, offered);
             }
         }

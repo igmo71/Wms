@@ -152,7 +152,7 @@ Mobile assembly details contain the header, WMS plan and active source-document
 statuses and exchange errors. Source JSON snapshots and detailed imported 1C
 lines are read only by the Web detail query, not by this Mobile response.
 
-SKU gets plan, fact, free stock and replenishment data from one response for
+SKU gets plan, fact, route availability and replenishment data from one response for
 the responsible operator's active assembly. If that request fails, SKU loads
 plan and fact separately and shows availability as unknown. The route response
 includes the work rows used to calculate its steps. When navigation supplies a
@@ -193,22 +193,23 @@ sections share a compact bottom navigation row. Section changes replace
 the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
 border and gray background. The SKU and route cards show the assembly's plan,
-confirmed fact and [free stock for this assembly](inventory.md#stock-availability)
-per SKU. The unit appears next to plan. SKU cards use green when fact equals
+confirmed fact and availability from the [reserved route](inventory.md#picking)
+per SKU. The SKU card breaks the total down into «Комплектация» and eligible
+whole «Хранение» pallets, while each route card shows the SKU's total across
+its steps. The unit appears next to plan. SKU cards use green when fact equals
 plan, yellow for a positive fact that differs from plan and white for zero
-fact against an outstanding plan. The SKU card totals active «Комплектация»
-cells and adds a separate amount for the whole «Хранение» pallets offered in
-the cell list. The route card totals the current SKU across all expiration
-groups in its own cell. Included expired stock contributes to «Доступно» and
-adds a warning icon alongside the corresponding quantity. Unknown availability
-is shown as a dash. The [picking rules](inventory.md#picking) determine the
-route and the quantity shown in «Взять».
+fact against an outstanding plan. An expired reservation can add a warning
+alongside the quantity. Unknown availability is shown as a dash.
 Route cards appear in route order without step numbers. Each card shows its
 address prominently with «Взять» and the step quantity on the same line, the
 SKU name on the left, and plan, available and fact in a right-aligned column.
 SKU cards show «Не хватает к отбору» when the route cannot cover the remaining
 plan. The route lists the same shortfall by SKU below its steps, including when
-it offers no steps. Date and pallet details take a line only when present.
+it offers no steps. When the fact covers the plan, the empty route shows
+«Отбор по маршруту завершён». The scan instruction and scanner are available
+while there are route steps. The Route page refreshes the assembly status and
+owner before requesting working steps and offers closing to the active owner.
+Date and pallet details take a line only when present.
 Scanning a cell on the current route
 opens the first matching step's fact page with the cell automatically checked;
 quantity and any whole-pallet action still require confirmation. An unmatched
@@ -277,7 +278,8 @@ shortage confirmation, even if the SKU is not complete. An uncertain response
 keeps the page open; a successful explicit retry follows the same navigation.
 Holding a pallet keeps the page open. Entering less than the offered quantity,
 including zero, opens the [shortage](inventory.md#picking) confirmation with
-the offered pick, free accounting quantity, found amount and amount to block.
+the offered pick, expected physical quantity for the whole group, found amount
+and amount to block.
 When closure needs a Manager, the TSD shows the reasons in a visible dialog.
 Returning a confirmed fact requires scanning its original cell and confirming
 the physical return. Other SKU remain selectable when one is unavailable.

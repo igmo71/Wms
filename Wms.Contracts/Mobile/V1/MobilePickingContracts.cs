@@ -169,6 +169,7 @@ public sealed record MobilePickingScannedSourceResponse(
     public string? LocationName { get; init; }
     public bool FromReserve { get; init; }
     public bool PalletHeld { get; init; }
+    public decimal ExpectedPhysicalQuantity { get; init; }
 }
 
 public sealed record MobilePickingHoldPalletRequest(

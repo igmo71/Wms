@@ -50,15 +50,17 @@ public sealed class GetPickingRoute(
         var locations = await assemblies.GetRouteLocationsAsync(work.WarehouseId,
             availability.Select(x => x.Group.StorageLocationId).Distinct().ToArray(), ct);
         var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
-        var route = builder.Execute(new PickingRouteRequest(assemblyId, work.WarehouseId, today,
+        var route = builder.ExecuteReserved(new PickingRouteRequest(assemblyId, work.WarehouseId, today,
             remaining, availability, locations, previousLocationId, nextLocationId));
         if (!route.IsSuccess) return route.Error!;
 
-        var stockByCell = availability.GroupBy(x =>
-                (x.Group.StorageLocationId, x.Group.StockKeepingUnitId))
-            .ToDictionary(x => x.Key, x => PickingFreeStock.Sum(x.Select(group =>
-                PickingFreeStock.ForGroup(group, assemblyId, today))));
-        return new PickingRouteView(work.Revision, route.Value!.Steps, route.Value.Gaps, work,
-            stockByCell);
+        var workingRoute = route.Value!;
+        var expired = availability.Where(x => x.Group.ExpirationDate < today
+                && x.RouteReservedFor(assemblyId) > 0)
+            .Select(x => (x.Group.StorageLocationId, x.Group.StockKeepingUnitId)).ToHashSet();
+        var stockByCell = workingRoute.Steps.GroupBy(x => (x.StorageLocationId, x.StockKeepingUnitId))
+            .ToDictionary(x => x.Key, x => new PickingFreeStock(
+                x.Sum(step => step.Quantity), expired.Contains(x.Key)));
+        return new PickingRouteView(work.Revision, workingRoute.Steps, workingRoute.Gaps, work, stockByCell);
     }
 }

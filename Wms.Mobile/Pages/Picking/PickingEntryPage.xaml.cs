@@ -322,18 +322,18 @@ public partial class PickingEntryPage : ContentPage
             {
                 var address = string.IsNullOrWhiteSpace(source.LocationName)
                     ? source.LocationCode : source.LocationName;
-                var missing = source.AvailableQuantity - quantity;
+                var missing = source.ExpectedPhysicalQuantity - quantity;
                 var unit = _work?.Skus.FirstOrDefault(x => x.SkuId == _skuId)?.Unit ?? "ед.";
                 if (!await DisplayAlertAsync("Недостача в ячейке",
                     $"В ячейке {address} предложено отобрать {source.SuggestedQuantity:0.###} {unit}. "
-                    + $"Свободно по учёту {source.AvailableQuantity:0.###} {unit}; фактически в ячейке {quantity:0.###} {unit}. "
+                    + $"Ожидается в ячейке {source.ExpectedPhysicalQuantity:0.###} {unit}; найдено {quantity:0.###} {unit}. "
                     + $"Отобрать найденное и заблокировать недостачу {missing:0.###} {unit} до решения руководителя?",
                     "Подтвердить недостачу", "Отмена")) return;
                 await RunActionAsync(PendingAction.Shortage,
                     () => _process.ReportShortageAsync(_assembly.Id,
                         _assembly.WarehouseId, _assembly.Revision,
                         source.LocationCode, _skuId, source.ExpirationDate,
-                        source.AvailableQuantity, quantity, null));
+                        source.ExpectedPhysicalQuantity, quantity, null));
             }
             else
                 await RunActionAsync(PendingAction.Pick,

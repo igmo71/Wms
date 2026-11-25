@@ -1,4 +1,5 @@
 using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
 using Wms.Common;
 using Wms.Domain;
 using Wms.Domain.Enums;
@@ -21,6 +22,13 @@ public sealed record PickingCancellationState(
     IReadOnlyList<StorageLocationLock> PalletHolds,
     IReadOnlyList<ReplenishmentTask> Replenishments);
 
+public sealed record PickingStartSelection(PickingAssembly? Requested, PickingAssembly? Next);
+
+public sealed record PickingRouteStockLocation(StorageLocation Location, PickingRouteLocation Route);
+
+public sealed record PickingStockChangeState(PickingWorkState Work,
+    IReadOnlyList<PickingRouteStockLocation> Locations, IReadOnlyList<PickingRouteReservation> Reservations);
+
 public interface IPickingAssemblyStore
 {
     Task<Guid?> FindLinkedAssemblyIdAsync(Guid sourceId, CancellationToken ct);
@@ -28,6 +36,24 @@ public interface IPickingAssemblyStore
     Task<ShippingOrder?> ReadSourceAsync(Guid sourceId, CancellationToken ct);
     Task<PickingAssembly?> LoadAssemblyAsync(
         ICommandExecutionContext session, Guid assemblyId, CancellationToken ct);
+    Task<OperationResult<PickingStartSelection>> LoadNextReadyStartAsync(
+        ICommandExecutionContext session, Guid warehouseId, Guid assemblyId, CancellationToken ct);
+    Task<IReadOnlyList<PickingRouteStockLocation>> LockRouteLocationsAsync(
+        ICommandExecutionContext session, Guid warehouseId,
+        IReadOnlyCollection<Guid> skuIds, CancellationToken ct);
+    Task<OperationResult<PickingStockChangeState>> LoadStockChangeAsync(ICommandExecutionContext session,
+        Guid assemblyId, string locationCode, Guid skuId, CancellationToken ct);
+    Task<OperationResult<PickingStockChangeState>> LoadReturnStockAsync(ICommandExecutionContext session,
+        Guid assemblyId, Guid entryId, string locationCode, CancellationToken ct);
+    Task<IReadOnlyList<PickingWorkState>> LoadRouteOwnersAsync(ICommandExecutionContext session,
+        IReadOnlyCollection<Guid> assemblyIds, Guid skuId, CancellationToken ct);
+    void RemoveRouteReservation(ICommandExecutionContext session, PickingRouteReservation reservation);
+    Task<PickingRouteReservation?> FindRouteReservationAsync(ICommandExecutionContext session,
+        Guid assemblyId, StockGroupKey group, CancellationToken ct);
+    Task<IReadOnlyList<PickingRouteReservation>> LoadOwnRouteReservationsAsync(
+        ICommandExecutionContext session, Guid assemblyId, Guid skuId, CancellationToken ct);
+    Task<int> ReleaseAllRouteReservationsAsync(ICommandExecutionContext session,
+        Guid assemblyId, IReadOnlyCollection<Guid> postingLocations, CancellationToken ct);
     Task<ShippingOrder?> LoadSourceAsync(
         ICommandExecutionContext session, Guid sourceId, CancellationToken ct);
     Task<bool> AreKnownSkusAsync(ICommandExecutionContext session,

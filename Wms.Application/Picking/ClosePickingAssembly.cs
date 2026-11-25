@@ -160,6 +160,8 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                     .ThenBy(x => x.StockKeepingUnitId)
                     .ThenBy(x => x.ExpirationDate)
                     .ThenBy(x => x.Id).ToArray();
+                var releasedRouteReservations = await assemblies.ReleaseAllRouteReservationsAsync(
+                    session, assembly.Id, picked.Select(x => x.StorageLocationId).Distinct().ToArray(), token);
                 for (var index = 0; index < picked.Length; index++)
                 {
                     var entry = picked[index];
@@ -202,6 +204,7 @@ public sealed class ClosePickingAssembly(CommandExecutor executor,
                         EntryCount = picked.Length,
                         DocumentCount = review.Sources.Count,
                         CancelledReplenishments = cancelledReplenishments,
+                        ReleasedRouteReservations = releasedRouteReservations,
                         ManagerOverride = request.ManagerOverride,
                         Reason = request.DecisionReason?.Trim() }),
                     movements, commandUserId: request.UserId,

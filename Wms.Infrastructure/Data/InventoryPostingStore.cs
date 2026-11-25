@@ -69,6 +69,10 @@ public sealed class InventoryPostingStore : IInventoryPostingStore,
             && locationIds.Contains(x.StorageLocationId)
             && x.StockKeepingUnitId == movement.StockKeepingUnitId
             && x.ExpirationDate == movement.ExpirationDate && x.CompletedAtUtc == null).LoadAsync(ct);
+        await db.PickingRouteReservations.Where(x => x.WarehouseId == movement.WarehouseId
+            && locationIds.Contains(x.StorageLocationId)
+            && x.StockKeepingUnitId == movement.StockKeepingUnitId
+            && x.ExpirationDate == movement.ExpirationDate).LoadAsync(ct);
         await db.StockShortages.Where(x => x.WarehouseId == movement.WarehouseId
             && locationIds.Contains(x.StorageLocationId)
             && x.StockKeepingUnitId == movement.StockKeepingUnitId
@@ -78,6 +82,10 @@ public sealed class InventoryPostingStore : IInventoryPostingStore,
             Reservations = db.PickingReservations.Local.Where(x => x.WarehouseId == movement.WarehouseId
                 && locationIds.Contains(x.StorageLocationId) && x.StockKeepingUnitId == movement.StockKeepingUnitId
                 && x.ExpirationDate == movement.ExpirationDate && x.CompletedAtUtc is null).ToArray(),
+            RouteReservations = db.PickingRouteReservations.Local
+                .Where(x => x.WarehouseId == movement.WarehouseId && locationIds.Contains(x.StorageLocationId)
+                    && x.StockKeepingUnitId == movement.StockKeepingUnitId
+                    && x.ExpirationDate == movement.ExpirationDate).ToArray(),
             Shortages = db.StockShortages.Local.Where(x => x.WarehouseId == movement.WarehouseId
                 && locationIds.Contains(x.StorageLocationId) && x.StockKeepingUnitId == movement.StockKeepingUnitId
                 && x.ExpirationDate == movement.ExpirationDate && x.ResolvedAtUtc is null).ToArray()

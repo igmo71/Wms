@@ -39,7 +39,7 @@ public sealed class EmployeePerformancePickingTests(SqlDatabase database)
         Success(assembly.FreezeForStart("worker-a", started));
         Success(assembly.ClaimStart(leaseId, started, started.AddMinutes(10)));
         Success(assembly.RecordSourceStartResult(leaseId, sourceId, started, null));
-        Success(assembly.CompleteStart(leaseId, started));
+        Success(assembly.CompleteStart(started));
         var first = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
             location.Id, sku.Id, null, 2, "worker-a",
             started.AddMinutes(1)));

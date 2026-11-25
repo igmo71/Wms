@@ -3,9 +3,11 @@
 ## Inventory count
 
 A count covers one active Комплектация or Хранение cell. Opening a cell resumes
-its existing draft. A foreign cell hold, active picking reservation or unresolved
-shortage blocks a new draft. Start atomically takes an exclusive cell hold and
-snapshots every nonzero signed balance by SKU and nullable expiration date.
+its existing draft. A foreign cell hold, route reservation, active confirmed-pick
+reservation or unresolved shortage blocks a new draft. Start atomically takes
+an exclusive cell hold and snapshots every nonzero signed balance by SKU and
+nullable expiration date. A rejected start or posting shows the cell address
+and the applicable blocking reasons.
 Leaving the screen retains the draft and hold. Deleting a draft releases the
 hold without changing stock.
 
@@ -29,7 +31,8 @@ the draft, the warehouse moves the goods and the Operator recounts the cell.
 ## Intra-warehouse transfer
 
 The legacy transfer path creates movements without an expiration date and
-uses the former Storage-only rules for storage cells.
+uses the former Storage-only rules for storage cells. Source quantities follow
+the [free-stock calculation](inventory.md#stock-availability) for the undated group.
 Transfer creation, movements, completion and Web draft deletion share application
 commands. State, movements, balances, turnover and receipt save together without
 intermediate saves or 1C calls.

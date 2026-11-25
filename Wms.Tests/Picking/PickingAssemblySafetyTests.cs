@@ -15,6 +15,65 @@ namespace Wms.Tests.Picking;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class PickingAssemblySafetyTests(SqlDatabase database)
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PickingRouteReservation_issues_concurrent_ready_starts_in_priority_order_once(
+        bool laterStartHasPriority)
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Concurrent picking starts" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Picking SKU" };
+        var zone = Zone(warehouse.Id, "PK", ZoneType.Storage);
+        var location = Location(warehouse.Id, zone, 1);
+        var first = PickingAssembly(warehouse.Id, "first-picker");
+        var second = PickingAssembly(warehouse.Id, "second-picker");
+        var now = DateTimeOffset.UtcNow;
+        var firstSource = ShippingOrder(Guid.NewGuid(), warehouse.Id, sku.Id, 8, ShippingOrderQueue.CollectByDate);
+        var secondSource = ShippingOrder(Guid.NewGuid(), warehouse.Id, sku.Id, 8,
+            laterStartHasPriority ? ShippingOrderQueue.LiveQueue : ShippingOrderQueue.CollectByDate);
+
+        MarkReady(first, firstSource.Id, now);
+        MarkReady(second, secondSource.Id, now.AddMilliseconds(1));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, location, firstSource, secondSource, first, second,
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id, location.Id, sku.Id, 10, now)));
+            await seed.SaveChangesAsync();
+        }
+
+        var reader = new MutableReader([]);
+        var writer = new MutableWriter(reader, Guid.NewGuid());
+        var start = Start(reader, writer);
+        var firstRequest = new StartPickingAssemblyRequest(Guid.NewGuid(), first.Id, "first-picker");
+        var secondRequest = new StartPickingAssemblyRequest(Guid.NewGuid(), second.Id, "second-picker");
+        var completed = await Task.WhenAll(start.ExecuteAsync(firstRequest), start.ExecuteAsync(secondRequest));
+        Assert.All(completed, result => Assert.Equal(PickingAssemblyStatus.InProgress, Value(result).Status));
+        Assert.Equal(PickingAssemblyStatus.InProgress, Value(await start.ExecuteAsync(firstRequest)).Status);
+        Assert.Equal(PickingAssemblyStatus.InProgress, Value(await start.ExecuteAsync(secondRequest)).Status);
+        Assert.Empty(writer.PatchCalls);
+
+        await using var verify = database.CreateDbContext();
+        var reservations = await verify.PickingRouteReservations
+            .Where(x => x.WarehouseId == warehouse.Id).ToDictionaryAsync(x => x.PickingAssemblyId);
+        Assert.Equal(2, reservations.Count);
+        Assert.Equal(laterStartHasPriority ? 2m : 8m, reservations[first.Id].Quantity);
+        Assert.Equal(laterStartHasPriority ? 8m : 2m, reservations[second.Id].Quantity);
+        Assert.Equal(2, await verify.CommandReceipts.CountAsync(x =>
+            x.CommandType == "picking.assembly.start.allocate"
+            && (x.ResultResourceId == first.Id || x.ResultResourceId == second.Id)));
+        Assert.False(await verify.PickingEntries.AnyAsync(x => x.WarehouseId == warehouse.Id));
+
+        void MarkReady(PickingAssembly assembly, Guid sourceId, DateTimeOffset readyAt)
+        {
+            var lease = Guid.NewGuid();
+            Value(assembly.AttachSource(sourceId, "{\"version\":1}",
+                new Dictionary<Guid, decimal> { [sku.Id] = 8 }, assembly.ResponsibleUserId, now));
+            Success(assembly.FreezeForStart(assembly.ResponsibleUserId, now));
+            Success(assembly.ClaimStart(lease, now, now.AddMinutes(10)));
+            Success(assembly.RecordSourceStartResult(lease, sourceId, readyAt, null));
+        }
+    }
+
     [Fact]
     public async Task Concurrent_attach_never_duplicates_source_and_conflicted_request_can_retry()
     {
@@ -96,9 +155,7 @@ public sealed class PickingAssemblySafetyTests(SqlDatabase database)
             new ShippingSourceStore(database), TimeProvider.System);
         var writer = new MutableWriter(reader, secondId);
         var executor = new CommandExecutor(new CommandExecutionStore(database));
-        var start = new StartPickingAssembly(executor,
-            new CommandExecutionStore(database), new PickingAssemblyStore(database),
-            synchronize, writer, Permission(), TimeProvider.System);
+        var start = Start(reader, writer);
         var request = new StartPickingAssemblyRequest(Guid.NewGuid(), assembly.Id, "operator");
 
         var partial = Value(await start.ExecuteAsync(request));
@@ -143,12 +200,23 @@ public sealed class PickingAssemblySafetyTests(SqlDatabase database)
 
     private static WarehousePermission Permission() => new(new OperatorPermission());
 
+    private StartPickingAssembly Start(IShippingSourceReader reader, IShippingSourceWriter writer)
+    {
+        var commandStore = new CommandExecutionStore(database);
+        var executor = new CommandExecutor(commandStore);
+        var store = new PickingAssemblyStore(database);
+        return new StartPickingAssembly(executor, commandStore, store,
+            new SynchronizeShippingSource(reader, new ShippingSourceStore(database), TimeProvider.System),
+            writer, Permission(), new AllocatePickingStart(executor, store, new StockAvailabilityStore(database),
+                new BuildPickingRoute(), TimeProvider.System), TimeProvider.System);
+    }
+
     private static ShippingOrder ShippingOrder(Guid id, Guid warehouseId,
-        Guid skuId, decimal quantity)
+        Guid skuId, decimal quantity, ShippingOrderQueue queue = ShippingOrderQueue.Unknown)
     {
         var order = Value(Wms.Domain.ShippingOrder.Create(new ShippingOrderImportSnapshot(
             id, false, true, "РО 1С", DateTime.UtcNow, warehouseId, null,
-            ShippingOrderStatus.Prepared, ShippingOrderQueue.Unknown, null, null,
+            ShippingOrderStatus.Prepared, queue, null, null,
             WarehouseOperation.CustomerShipment, Guid.NewGuid(), PartyType.Partner,
             [new ShippingOrderItemImportSnapshot(1, skuId, quantity, quantity,
                 ShippingOrderAction.PickUp)], []), DateTimeOffset.UtcNow));

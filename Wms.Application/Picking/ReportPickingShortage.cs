@@ -18,7 +18,7 @@ public sealed record ReportPickingShortageRequest(
 public sealed class ReportPickingShortage(CommandExecutor executor,
     IPickingAssemblyStore assemblies, IStockAvailabilityStore stock,
     IStockReservationStore reservations, IStockShortageStore shortages,
-    WarehousePermission permission, TimeProvider clock)
+    WarehousePermission permission, AdjustPickingRouteStock routeStock, TimeProvider clock)
 {
     private const string CommandType = "picking.shortage.report";
 
@@ -54,8 +54,11 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
             {
                 var access = await permission.RequireOperatorAsync(request.UserId, token);
                 if (!access.IsSuccess) return access.Error!;
-                var state = await assemblies.LoadWorkAsync(session,
-                    request.PickingAssemblyId, code, token);
+                var loaded = await assemblies.LoadStockChangeAsync(session,
+                    request.PickingAssemblyId, code, request.StockKeepingUnitId, token);
+                if (!loaded.IsSuccess) return loaded.Error!;
+                var stockChange = loaded.Value!;
+                var state = stockChange.Work;
                 var assembly = state.Assembly;
                 if (assembly is null) return OperationError.NotFound("Сборка WMS не найдена.");
                 var changed = assembly.RecordPhysicalWork(request.UserId,
@@ -63,22 +66,24 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                 if (!changed.IsSuccess) return changed.Error!;
                 var availability = await stock.ReadSkuAsync(session, assembly.WarehouseId,
                     request.StockKeepingUnitId, token);
+                var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
                 var checkedSource = PickingSourceRules.Check(state,
                     request.StockKeepingUnitId, code, null,
-                    request.ExpirationDate, true, availability,
-                    DateOnly.FromDateTime(clock.GetLocalNow().DateTime));
+                    request.ExpirationDate, true, availability, today);
                 if (!checkedSource.IsSuccess) return checkedSource.Error!;
                 var source = checkedSource.Value!;
                 if (state.Location!.Zone!.Type == ZoneType.Reserve
                     && (state.Location.ActiveLock?.OwnerType != StorageLocationLockOwnerType.PickingAssembly
                         || state.Location.ActiveLock.OwnerId != assembly.Id))
                     return OperationError.Conflict("Перед сообщением о недостаче на поддоне удержите ячейку.");
-                if (request.ExpectedQuantity != source.AvailableQuantity
+                if (request.ExpectedQuantity != source.ExpectedPhysicalQuantity
                     || request.FoundQuantity >= source.SuggestedQuantity)
                     return OperationError.Conflict(
                         "Остаток или потребность изменились. Повторно сканируйте ячейку перед подтверждением недостачи.");
 
                 var now = clock.GetUtcNow();
+                var released = routeStock.ReleaseShortGroup(session, stockChange, source, request.FoundQuantity);
+                if (!released.IsSuccess) return released.Error!;
                 PickingEntry? newEntry = null;
                 if (request.FoundQuantity > 0)
                 {
@@ -105,6 +110,27 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                 if (!shortage.IsSuccess) return shortage.Error!;
                 var blocked = await shortages.ReportAsync(session, shortage.Value!, token);
                 if (!blocked.IsSuccess) return blocked.Error!;
+
+                var quantities = released.Value!;
+                var affected = await assemblies.LoadRouteOwnersAsync(session, quantities.Keys.ToArray(),
+                    request.StockKeepingUnitId, token);
+                var reportingWork = newEntry is null ? state : state with { Entries = [.. state.Entries, newEntry] };
+                foreach (var work in affected.Select(x => x.Assembly!.Id == assembly.Id ? reportingWork : x)
+                    .OrderBy(x => x.Assembly!.ActiveSources.Select(link =>
+                        ShippingQueuePriority.Rank(link.ShippingOrder?.Queue ?? ShippingOrderQueue.Unknown))
+                        .DefaultIfEmpty(ShippingQueuePriority.Rank(ShippingOrderQueue.Unknown)).Min())
+                    .ThenBy(x => x.Assembly!.StartedAtUtc).ThenBy(x => x.Assembly!.Id))
+                {
+                    var owner = work.Assembly!;
+                    if (owner.Id != assembly.Id)
+                    {
+                        var adjustment = owner.RecordRouteAdjustment();
+                        if (!adjustment.IsSuccess) return adjustment.Error!;
+                    }
+                    var replacement = await routeStock.ReplaceAsync(session, work, stockChange.Locations,
+                        request.StockKeepingUnitId, quantities[owner.Id], today, token);
+                    if (!replacement.IsSuccess) return replacement.Error!;
+                }
                 var audit = WarehouseAuditEvent.Create("picking.shortage.reported",
                     now, request.UserId, null, null, null,
                     request.StockKeepingUnitId, null, null,
@@ -112,6 +138,8 @@ public sealed class ReportPickingShortage(CommandExecutor executor,
                         source.StorageLocationId, request.ExpirationDate,
                         request.ExpectedQuantity, request.FoundQuantity,
                         PickingEntryId = newEntry?.Id,
+                        AffectedAssemblyIds = affected.Where(x => x.Assembly!.Id != assembly.Id)
+                            .Select(x => x.Assembly!.Id).Order().ToArray(),
                         Comment = request.Comment?.Trim() }),
                     commandUserId: request.UserId, commandType: CommandType,
                     requestId: request.RequestId, pickingAssemblyId: assembly.Id);

@@ -33,6 +33,7 @@ BEGIN TRY
     DELETE FROM [dbo].[ReplenishmentTransfers];
     DELETE FROM [dbo].[StockShortages];
     DELETE FROM [dbo].[PickingReservations];
+    DELETE FROM [dbo].[PickingRouteReservations];
     DELETE FROM [dbo].[ReplenishmentSourceCycles];
     DELETE FROM [dbo].[ReplenishmentTasks];
     DELETE FROM [dbo].[PickingEntries];

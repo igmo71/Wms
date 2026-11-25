@@ -22,6 +22,7 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
         await using var db = await factory.CreateDbContextAsync(ct);
         var balances = new List<BalanceRow>();
         var reservations = new List<ReservationRow>();
+        var routeReservations = new List<RouteReservationRow>();
         var shortages = new List<ShortageRow>();
         foreach (var batch in skuIds.Chunk(500))
         {
@@ -37,6 +38,12 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
                     x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
                     new StockReservationView(x.PickingEntryId, x.PickingAssemblyId, x.Quantity, x.CreatedBy)))
                 .ToArrayAsync(ct));
+            routeReservations.AddRange(await db.PickingRouteReservations.AsNoTracking()
+                .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.StockKeepingUnitId))
+                .Select(x => new RouteReservationRow(new StockGroupKey(x.WarehouseId,
+                    x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
+                    new StockRouteReservationView(x.PickingAssemblyId, x.Quantity)))
+                .ToArrayAsync(ct));
             shortages.AddRange(await db.StockShortages.AsNoTracking()
                 .Where(x => x.WarehouseId == warehouseId && batch.Contains(x.StockKeepingUnitId)
                     && x.ResolvedAtUtc == null)
@@ -47,6 +54,7 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
         }
         var locationIds = balances.Select(x => x.Group.StorageLocationId)
             .Concat(reservations.Select(x => x.Group.StorageLocationId))
+            .Concat(routeReservations.Select(x => x.Group.StorageLocationId))
             .Concat(shortages.Select(x => x.Group.StorageLocationId)).Distinct().ToArray();
         var locations = new Dictionary<Guid, LocationRow>();
         var holds = new List<HoldRow>();
@@ -62,7 +70,7 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
                     new StockHoldView(x.OwnerType, x.OwnerId, x.Reason, x.LockedBy)))
                 .ToArrayAsync(ct));
         }
-        return BuildAvailability(balances, reservations, shortages, locations, holds);
+        return BuildAvailability(balances, reservations, routeReservations, shortages, locations, holds);
     }
 
     public Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
@@ -120,10 +128,16 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
 
         await session.Db.PickingReservations.Where(x => x.StorageLocationId == hold.StorageLocationId
             && x.CompletedAtUtc == null).LoadAsync(ct);
-        if (session.Db.PickingReservations.Local.Any(x => x.StorageLocationId == hold.StorageLocationId
-            && x.CompletedAtUtc is null
-            && (hold.OwnerType != StorageLocationLockOwnerType.PickingAssembly
-                || x.PickingAssemblyId != hold.OwnerId)))
+        await session.Db.PickingRouteReservations.Where(x => x.StorageLocationId == hold.StorageLocationId)
+            .LoadAsync(ct);
+        var pickingOwnerId = hold.OwnerType == StorageLocationLockOwnerType.PickingAssembly
+            ? hold.OwnerId : null;
+        var reservedByOtherWork = session.Db.PickingReservations.Local.Any(
+            x => x.StorageLocationId == hold.StorageLocationId && x.CompletedAtUtc is null
+                && x.PickingAssemblyId != pickingOwnerId)
+            || session.Db.PickingRouteReservations.Local.Any(
+                x => x.StorageLocationId == hold.StorageLocationId && x.PickingAssemblyId != pickingOwnerId);
+        if (reservedByOtherWork)
             return OperationError.Conflict("В ячейке есть количество, зарезервированное другой работой.");
 
         location.AdvanceOperationalRevision();
@@ -235,6 +249,9 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             await db.PickingReservations.Where(x => x.WarehouseId == warehouseId
                 && batch.Contains(x.StockKeepingUnitId) && x.CompletedAtUtc == null
                 && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
+            await db.PickingRouteReservations.Where(x => x.WarehouseId == warehouseId
+                && batch.Contains(x.StockKeepingUnitId)
+                && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
             await db.StockShortages.Where(x => x.WarehouseId == warehouseId
                 && batch.Contains(x.StockKeepingUnitId) && x.ResolvedAtUtc == null
                 && (locationId == null || x.StorageLocationId == locationId)).LoadAsync(ct);
@@ -246,11 +263,15 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
         var reservations = db.PickingReservations.Local.Where(x => x.WarehouseId == warehouseId
             && skuIds.Contains(x.StockKeepingUnitId) && x.CompletedAtUtc is null
             && (locationId is null || x.StorageLocationId == locationId)).ToArray();
+        var routeReservations = db.PickingRouteReservations.Local.Where(x => x.WarehouseId == warehouseId
+            && skuIds.Contains(x.StockKeepingUnitId)
+            && (locationId is null || x.StorageLocationId == locationId)).ToArray();
         var shortages = db.StockShortages.Local.Where(x => x.WarehouseId == warehouseId
             && skuIds.Contains(x.StockKeepingUnitId) && x.ResolvedAtUtc is null
             && (locationId is null || x.StorageLocationId == locationId)).ToArray();
         var locationIds = balances.Select(x => x.StorageLocationId)
             .Concat(reservations.Select(x => x.StorageLocationId))
+            .Concat(routeReservations.Select(x => x.StorageLocationId))
             .Concat(shortages.Select(x => x.StorageLocationId)).Distinct().ToArray();
         var locations = new Dictionary<Guid, StorageLocation>();
         foreach (var batch in locationIds.Chunk(500))
@@ -261,12 +282,13 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             await db.StorageLocationLocks.Where(x => batch.Contains(x.StorageLocationId)).LoadAsync(ct);
         }
 
-        return BuildAvailability(balances, reservations, shortages, locations,
+        return BuildAvailability(balances, reservations, routeReservations, shortages, locations,
             db.StorageLocationLocks.Local);
     }
 
     private static IReadOnlyList<StockAvailability> BuildAvailability(
         IEnumerable<InventoryBalance> balances, IEnumerable<PickingReservation> reservations,
+        IEnumerable<PickingRouteReservation> routeReservations,
         IEnumerable<StockShortage> shortages, IReadOnlyDictionary<Guid, StorageLocation> locations,
         IEnumerable<StorageLocationLock> holds) =>
         BuildAvailability(
@@ -275,6 +297,9 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             reservations.Select(x => new ReservationRow(new StockGroupKey(x.WarehouseId,
                 x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
                 new StockReservationView(x.PickingEntryId, x.PickingAssemblyId, x.Quantity, x.CreatedBy))),
+            routeReservations.Select(x => new RouteReservationRow(new StockGroupKey(x.WarehouseId,
+                x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate),
+                new StockRouteReservationView(x.PickingAssemblyId, x.Quantity))),
             shortages.Select(x => new ShortageRow(new StockGroupKey(x.WarehouseId,
                 x.StorageLocationId, x.StockKeepingUnitId, x.ExpirationDate), x.BlockedQuantity)),
             locations.ToDictionary(x => x.Key,
@@ -284,14 +309,17 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
 
     private static IReadOnlyList<StockAvailability> BuildAvailability(
         IEnumerable<BalanceRow> balances, IEnumerable<ReservationRow> reservations,
+        IEnumerable<RouteReservationRow> routeReservations,
         IEnumerable<ShortageRow> shortages, IReadOnlyDictionary<Guid, LocationRow> locations,
         IEnumerable<HoldRow> holds)
     {
         var balancesByGroup = balances.ToDictionary(x => x.Group, x => x.Quantity);
         var reservationsByGroup = reservations.ToLookup(x => x.Group);
+        var routeReservationsByGroup = routeReservations.ToLookup(x => x.Group);
         var shortagesByGroup = shortages.ToLookup(x => x.Group);
         var holdsByLocation = holds.ToDictionary(x => x.StorageLocationId, x => x.Hold);
         var groups = balancesByGroup.Keys.Concat(reservationsByGroup.Select(x => x.Key))
+            .Concat(routeReservationsByGroup.Select(x => x.Key))
             .Concat(shortagesByGroup.Select(x => x.Key)).Distinct();
         return groups.Select(key =>
         {
@@ -301,13 +329,17 @@ public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContex
             var blocked = shortagesByGroup[key].Sum(x => x.BlockedQuantity);
             return new StockAvailability(key, locations[key.StorageLocationId].Code,
                 accountingQuantity, reserved, blocked, held)
-            { LocationName = locations[key.StorageLocationId].Name };
+            {
+                LocationName = locations[key.StorageLocationId].Name,
+                RouteReservations = routeReservationsByGroup[key].Select(x => x.Reservation).ToArray()
+            };
         }).OrderBy(x => x.LocationCode, StringComparer.Ordinal)
             .ThenBy(x => x.Group.ExpirationDate is null).ThenBy(x => x.Group.ExpirationDate).ToArray();
     }
 
     private readonly record struct BalanceRow(StockGroupKey Group, decimal Quantity);
     private readonly record struct ReservationRow(StockGroupKey Group, StockReservationView Reservation);
+    private readonly record struct RouteReservationRow(StockGroupKey Group, StockRouteReservationView Reservation);
     private readonly record struct ShortageRow(StockGroupKey Group, decimal BlockedQuantity);
     private readonly record struct LocationRow(Guid Id, string Code, string? Name);
     private readonly record struct HoldRow(Guid StorageLocationId, StockHoldView Hold);

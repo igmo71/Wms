@@ -106,6 +106,8 @@ public sealed class CommandExecutionStore(IDbContextFactory<ApplicationDbContext
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.PickingReservationsPrimaryKey,
                             StringComparison.Ordinal)
+                        || sql.Message.Contains(DatabaseObjectNames.PickingRouteReservationsGroupIndex,
+                            StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.StockShortagesActiveGroupIndex,
                             StringComparison.Ordinal)
                         || sql.Message.Contains(DatabaseObjectNames.ReplenishmentActiveSourceIndex,
