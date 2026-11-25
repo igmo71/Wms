@@ -28,6 +28,8 @@ disables an already enabled flag. Inventory count commands require `Operator`,
 including posting with differences. Web count documents are visible to
 `Operator` and `Manager`. The [cell mixing permission](inventory.md) requires
 `Manager` at execution. Zone and cell topology require `Administrator`.
+The Web [stock reconciliation report](clients.md#stock-reconciliation-report)
+requires explicit `Manager` membership at the page and when reading balances.
 The cutover topology confirmation command
 and the opening-stock confirmation command require explicit `Administrator`
 membership. Public

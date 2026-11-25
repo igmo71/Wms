@@ -312,3 +312,14 @@ inventory concurrency failures become business conflicts.
 Transfer and inventory-count boundaries are in
 [other warehouse workflows](other-workflows.md). The outbound stock rules are
 described above; the 1C exchange rules are in [integration](integration.md).
+
+## Stock reconciliation
+
+Stock reconciliation compares accounting balances by warehouse and SKU. The
+WMS side sums signed `InventoryBalance` quantities across all cells and
+expiration dates, including stock posted in Receiving. Reservations and holds
+do not reduce the total. The 1C side sums the [register balances](integration.md#stock-reconciliation-source)
+by the same catalog GUIDs. One row represents each pair with a nonzero total on
+either side. An absent pair in a successfully read source contributes zero.
+The signed difference is WMS minus 1C in the SKU's base unit, with exact decimal
+comparison.

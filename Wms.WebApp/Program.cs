@@ -4,6 +4,7 @@ using MudBlazor.Services;
 using Serilog;
 using Wms.Application;
 using Wms.Application.OpeningImports;
+using Wms.Application.Reports;
 using Wms.Application.Users;
 using Wms.Data;
 using Wms.Integration;
@@ -62,6 +63,9 @@ public class Program
         builder.Services.AddIntegrationServices(builder.Configuration);
         builder.Services.AddReceivingSourceReader(builder.Configuration);
         builder.Services.AddShippingSourceReader(builder.Configuration);
+        builder.Services.AddOneCStockBalanceReader(builder.Configuration);
+        builder.Services.AddScoped<IStockReconciliationStore, StockReconciliationStore>();
+        builder.Services.AddScoped<GetStockReconciliation>();
         builder.Services.AddOpeningExportReader();
         builder.Services.AddScoped<PreviewOpeningTopology>();
         builder.Services.AddScoped<ConfirmOpeningTopology>();

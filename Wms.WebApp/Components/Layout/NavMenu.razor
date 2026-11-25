@@ -33,6 +33,9 @@
             <MudNavGroup Title="Отчеты" Icon="@Icons.Material.Filled.Assessment">
                 <MudNavLink Href="reports/employee-performance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Groups">Производительность сотрудников</MudNavLink>
                 <MudNavLink Href="reports/undated-expiration-stock" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventBusy">Остатки без срока</MudNavLink>
+                <AuthorizeView Roles="@ApplicationRoles.Manager" Context="stockReconciliationContext">
+                    <MudNavLink Href="reports/stock-reconciliation" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CompareArrows">Сверка остатков</MudNavLink>
+                </AuthorizeView>
             </MudNavGroup>
             <AuthorizeView Roles="@ApplicationRoles.ManagerOrAdministrator" Context="catalogContext">
                 <MudNavGroup Title="Справочники" Icon="@Icons.Material.Filled.Settings">

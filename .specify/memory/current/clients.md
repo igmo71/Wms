@@ -72,6 +72,21 @@ newest first, with server paging. The page filters
 by inclusive local date range, LPN number, SKU name substring, user name or
 login, and destination cell address; filters can be combined.
 
+## Stock reconciliation report
+
+Web opens «Сверка остатков» from «Отчеты». «Сформировать» and «Обновить» read
+both sources and show their separate read times. The page holds the result in
+server memory. A failed refresh clears the previous result and displays the
+error. The optional warehouse filter lists the imported warehouse catalog and
+defaults to «Все склады». The grid shows only discrepancies by default and
+highlights them in light red. «Показать все строки» also shows matching pairs.
+The grid searches SKU name or code, sorts all displayed columns, defaults to
+ascending SKU name with warehouse as the next key, and pages the filtered rows.
+An SKU missing from the WMS catalog appears by GUID with an explicit label.
+Filters and paging use the loaded result. See the
+[comparison rules](inventory.md#stock-reconciliation) and
+[access rules](identity.md#identity-and-access).
+
 ## Web picking assemblies
 
 The Web «Отгрузка» group contains «Документы 1С» and «Расходные ордера WMS»

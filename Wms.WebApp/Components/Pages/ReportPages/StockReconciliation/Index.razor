@@ -1,0 +1,83 @@
+@page "/reports/stock-reconciliation"
+@using Wms.Application.Reports
+@using Wms.Data
+@attribute [Authorize(Roles = ApplicationRoles.Manager)]
+
+<PageTitle>Сверка остатков</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h5">Сверка остатков</MudText>
+    <MudSpacer />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadAsync" Disabled="_loading">
+        @(_report is null ? "Сформировать" : "Обновить")
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+@if (_report is { } report)
+{
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Остатки прочитаны: WMS — @ReadTime(report.WmsReadAtUtc), 1С — @ReadTime(report.OneCReadAtUtc)
+    </MudText>
+
+    <MudPaper Class="pa-3 mb-4" Elevation="1">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="4">
+                <MudSelect T="Guid?" @bind-Value="_warehouseId" @bind-Value:after="ApplyFilters"
+                           Label="Склад" Placeholder="Все склады" Clearable="true" Disabled="_loading">
+                    @foreach (var warehouse in report.Warehouses)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)warehouse.Id)">@warehouse.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField T="string" @bind-Value="_search" @bind-Value:after="ApplyFilters"
+                              Label="Поиск по SKU" Immediate="true" DebounceInterval="300" Clearable="true"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Disabled="_loading" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSwitch T="bool" @bind-Value="_showAll" @bind-Value:after="ApplyFilters"
+                           Color="Color.Primary" Label="Показать все строки" Disabled="_loading" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudDataGrid T="StockReconciliationRow" Items="_visibleRows" @bind-CurrentPage="_page"
+                 SortMode="SortMode.Single" AllowUnsorted="false" Filterable="false" Dense="true"
+                 Hover="true" RowsPerPage="25" RowStyleFunc="RowStyle">
+        <Columns>
+            <PropertyColumn Property="row => row.WarehouseName" Title="Склад" />
+            <PropertyColumn Property="row => row.SkuName" Title="SKU" InitialDirection="SortDirection.Ascending">
+                <CellTemplate>
+                    @context.Item.SkuName
+                    @if (!context.Item.SkuKnown)
+                    {
+                        <MudText Typo="Typo.caption">Нет в справочнике WMS</MudText>
+                    }
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="row => row.SkuCode" Title="Код" />
+            <PropertyColumn Property="row => row.UnitOfMeasure" Title="Ед. изм.">
+                <CellTemplate>@(context.Item.UnitOfMeasure ?? "Неизвестно")</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="row => row.WmsQuantity" Title="Остаток WMS" Format="N3" />
+            <PropertyColumn Property="row => row.OneCQuantity" Title="Остаток 1С" Format="N3" />
+            <PropertyColumn Property="row => row.Difference" Title="Разница (WMS − 1С)" Format="+#,0.000;-#,0.000;0.000" />
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="StockReconciliationRow" PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+        <NoRecordsContent>
+            <MudText Class="pa-4">@EmptyMessage</MudText>
+        </NoRecordsContent>
+    </MudDataGrid>
+}

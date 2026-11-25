@@ -71,6 +71,15 @@ WMS owns its receiving location, facts, cycles, LPNs, movements, users, and
 timestamps. Current receiving has no direct line-comment command. Historical
 receiving comments remain WMS-owned annotations, not warehouse facts.
 
+## Stock reconciliation source
+
+The Web stock reconciliation reader makes one authenticated OData GET to
+`AccumulationRegister_ТоварыНаСкладах/Balance()` for all warehouses, selecting
+`Номенклатура_Key`, `Склад_Key`, and `ВНаличииBalance`. It reads signed quantities
+in the SKU's base unit. A transport error, invalid payload, or continuation
+marker fails the read as a whole. An empty valid collection is a successful read.
+See the [comparison rules](inventory.md#stock-reconciliation).
+
 ## Outbound source and exchange
 
 Shipping notifications use the `Wms.Integration` reader and
