@@ -91,9 +91,9 @@ The Manager «Расходные ордера WMS» page lists picking assemblie
 Operator sees all closed assemblies awaiting 1C exchange and can retry that
 exchange regardless of who closed them. The detail header shows the WMS order
 number, creation date, status and responsible user. «План - Факт» expands each
-picked SKU to its individual cell, expiration date, quantity and picker name
-records. One «Документы 1С» panel lists linked documents with their status,
-receiver, queue icon and name, planned shipping date and latest check. Each
+picked SKU to show the cell, expiration date, quantity, picker name and
+confirmation time for each entry. One «Документы 1С» panel lists linked documents
+with their status, receiver, queue icon and name, planned shipping date and latest check. Each
 document expands to its SKU comparison, which shows «План WMS», «План 1С»
 from the latest saved source and either the proposed or posted allocation. A SKU row can expand
 when it combines multiple imported 1C lines from that document. A pending
@@ -119,7 +119,8 @@ reason, and then retries the exchange without changing the warehouse fact.
 Physical picking quantities remain editable only through the TSD workflow.
 «Подпитки» lists the assembly's ordered, in-progress, completed and cancelled
 tasks with their ordered and transferred quantities. Each task with posted steps
-expands to their original and current effective quantities. A Manager can enter
+expands to their original and current effective quantities, the replenisher who
+confirmed each step and its confirmation time. A Manager can enter
 the actual transferred quantity and reason. The dialog keeps its command ID for
 an uncertain response. The separate
 correction movement and task progress are described in [inventory](inventory.md).

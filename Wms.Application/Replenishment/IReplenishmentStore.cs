@@ -31,7 +31,7 @@ public sealed record ReplenishmentTransferView(
     Guid Id, Guid TaskId, Guid StockKeepingUnitId, string? SkuName,
     string SourceLocationCode, string DestinationLocationCode,
     DateOnly? ExpirationDate, decimal OriginalQuantity,
-    decimal EffectiveQuantity, DateTimeOffset ConfirmedAtUtc);
+    decimal EffectiveQuantity, string ConfirmedBy, DateTimeOffset ConfirmedAtUtc);
 
 public sealed record ReplenishmentTaskSummary(
     Guid Id, Guid StockKeepingUnitId, string? SkuName,

@@ -30,7 +30,7 @@ public partial class Details
     private IReadOnlyList<PickingAllocationView> _postedAllocations = [];
     private IReadOnlyList<PickingShortageView> _shortages = [];
     private IReadOnlyList<ReplenishmentTaskSummary> _replenishmentTasks = [];
-    private IReadOnlyDictionary<string, string> _pickerNames = new Dictionary<string, string>();
+    private IReadOnlyDictionary<string, string> _performerNames = new Dictionary<string, string>();
     private IReadOnlyCollection<PickingAllocationInput>? _manualAllocations;
     private ClosePickingAssemblyRequest? _pendingCloseRequest;
     private CancelPickingAssemblyRequest? _pendingCancelRequest;
@@ -98,12 +98,14 @@ public partial class Details
             _error = "Эта сборка недоступна для повтора обмена.";
         }
         _work = _assembly is null ? null : await Assemblies.GetWorkAsync(Id, CancellationToken.None);
-        _pickerNames = await UserNames.GetUserNamesAsync(_work?.Entries.Select(x => x.ConfirmedBy) ?? []);
         _audit = _assembly is null ? [] : await Assemblies.GetAuditAsync(Id, CancellationToken.None);
         _postedAllocations = _assembly is null ? [] : await Assemblies.GetPostedAllocationsAsync(Id, CancellationToken.None);
         _shortages = _assembly is null ? [] : await Assemblies.GetShortagesAsync(Id, CancellationToken.None);
         _replenishmentTasks = _assembly is null ? []
             : await Replenishments.ReadAssemblyTaskSummariesAsync(Id, CancellationToken.None);
+        var pickerIds = _work?.Entries.Select(x => x.ConfirmedBy) ?? [];
+        var replenisherIds = _replenishmentTasks.SelectMany(x => x.Transfers).Select(x => x.ConfirmedBy);
+        _performerNames = await UserNames.GetUserNamesAsync(pickerIds.Concat(replenisherIds));
     }
 
     private async Task CheckAsync()
@@ -384,8 +386,8 @@ public partial class Details
         _work?.Skus.FirstOrDefault(x => x.SkuId == skuId) is { } sku
             ? sku.Name ?? sku.Code ?? skuId.ToString() : skuId.ToString();
 
-    private string PickerName(string userId) =>
-        _pickerNames.TryGetValue(userId, out var name) && name != userId
+    private string PerformerName(string userId) =>
+        _performerNames.TryGetValue(userId, out var name) && name != userId
             ? name : "Пользователь не найден";
 
     private static void ToggleDetails<T>(HashSet<T> expandedRows, T id) where T : notnull

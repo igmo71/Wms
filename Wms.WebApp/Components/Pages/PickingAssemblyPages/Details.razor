@@ -122,12 +122,13 @@ else
                             <MudTd colspan="6">
                                 <MudTable T="PickingWorkEntryView" Items="_work?.Entries.Where(x => x.SkuId == sku.SkuId) ?? []"
                                           Dense="true" Elevation="0">
-                                    <HeaderContent><MudTh>Ячейка</MudTh><MudTh>Срок</MudTh><MudTh>Количество</MudTh><MudTh>Сборщик</MudTh></HeaderContent>
+                                    <HeaderContent><MudTh>Ячейка</MudTh><MudTh>Срок</MudTh><MudTh>Количество</MudTh><MudTh>Сборщик</MudTh><MudTh>Время</MudTh></HeaderContent>
                                     <RowTemplate>
                                         <MudTd DataLabel="Ячейка">@context.LocationCode</MudTd>
                                         <MudTd DataLabel="Срок">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
                                         <MudTd DataLabel="Количество">@context.Quantity.ToString("0.###")</MudTd>
-                                        <MudTd DataLabel="Сборщик">@PickerName(context.ConfirmedBy)</MudTd>
+                                        <MudTd DataLabel="Сборщик">@PerformerName(context.ConfirmedBy)</MudTd>
+                                        <MudTd DataLabel="Время">@context.ConfirmedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
                                     </RowTemplate>
                                 </MudTable>
                             </MudTd>
@@ -339,13 +340,14 @@ else
                                 <MudTable T="ReplenishmentTransferView" Items="task.Transfers" Dense="true" Elevation="0">
                                     <HeaderContent>
                                         <MudTh>Источник → назначение</MudTh><MudTh>Срок</MudTh><MudTh>Исходный шаг</MudTh>
-                                        <MudTh>Текущий итог</MudTh><MudTh>Время</MudTh><MudTh></MudTh>
+                                        <MudTh>Текущий итог</MudTh><MudTh>Подпитал</MudTh><MudTh>Время</MudTh><MudTh></MudTh>
                                     </HeaderContent>
                                     <RowTemplate>
                                         <MudTd DataLabel="Источник → назначение">@context.SourceLocationCode → @context.DestinationLocationCode</MudTd>
                                         <MudTd DataLabel="Срок">@(context.ExpirationDate?.ToString("dd.MM.yyyy") ?? "Не указан")</MudTd>
                                         <MudTd DataLabel="Исходный шаг">@context.OriginalQuantity.ToString("0.###")</MudTd>
                                         <MudTd DataLabel="Текущий итог">@context.EffectiveQuantity.ToString("0.###")</MudTd>
+                                        <MudTd DataLabel="Подпитал">@PerformerName(context.ConfirmedBy)</MudTd>
                                         <MudTd DataLabel="Время">@context.ConfirmedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
                                         <MudTd>
                                             @if (_isManager)

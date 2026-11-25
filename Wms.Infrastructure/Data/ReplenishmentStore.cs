@@ -134,7 +134,7 @@ public sealed class ReplenishmentStore(IDbContextFactory<ApplicationDbContext> f
                 x.transfer.ExpirationDate, x.transfer.Quantity,
                 EffectiveQuantity(x.task, x.transfer, x.cycle,
                     byTransfer[x.transfer.Id]),
-                x.transfer.ConfirmedAtUtc)).ToLookup(x => x.TaskId);
+                x.transfer.ConfirmedBy, x.transfer.ConfirmedAtUtc)).ToLookup(x => x.TaskId);
         return tasks.Select(task => new ReplenishmentTaskSummary(task.Id,
             task.StockKeepingUnitId, skus.GetValueOrDefault(task.StockKeepingUnitId),
             task.Status, task.OrderedQuantity, task.TransferredQuantity,
