@@ -49,7 +49,7 @@ public partial class Index
         PickingAssemblyStatus.Preparing => "Подготовка 1С",
         PickingAssemblyStatus.InProgress => "Отбор",
         PickingAssemblyStatus.Closed => "Закрыт",
-        PickingAssemblyStatus.CancellationPending => "Отмена ожидается",
+        PickingAssemblyStatus.CancellationPending => "Отменяется",
         PickingAssemblyStatus.Cancelled => "Отменён",
         _ => status.ToString()
     };

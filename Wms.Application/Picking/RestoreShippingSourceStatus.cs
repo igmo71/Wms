@@ -7,8 +7,7 @@ using Wms.Domain.Enums;
 
 namespace Wms.Application.Picking;
 
-public sealed record RestoreShippingStatusResult(Guid ShippingOrderId,
-    bool Released, string? Error);
+public sealed record RestoreShippingStatusError(Guid ShippingOrderId, string Error);
 
 public sealed class RestoreShippingSourceStatus(
     IPickingAssemblyStore assemblies, IShippingExchangeStore exchangeStore,
@@ -16,15 +15,45 @@ public sealed class RestoreShippingSourceStatus(
     IShippingSourceWriter writer, CommandExecutor executor,
     WarehousePermission permission, TimeProvider clock)
 {
-    public async Task<OperationResult<RestoreShippingStatusResult>> ExecuteAsync(
-        Guid pickingAssemblyId, Guid shippingOrderId, string userId,
+    public async Task<OperationResult<IReadOnlyList<RestoreShippingStatusError>>> ExecuteAsync(
+        Guid pickingAssemblyId, string userId,
         CancellationToken ct = default)
     {
-        if (pickingAssemblyId == Guid.Empty || shippingOrderId == Guid.Empty
+        if (pickingAssemblyId == Guid.Empty
             || string.IsNullOrWhiteSpace(userId) || userId.Length > 36)
-            return OperationError.Invalid("Укажите сборку, РО 1С и исполнителя возврата.");
+            return OperationError.Invalid("Укажите сборку и исполнителя возврата.");
         var access = await permission.RequireManagerAsync(userId, ct);
         if (!access.IsSuccess) return access.Error!;
+        var assembly = await assemblies.ReadAssemblyAsync(pickingAssemblyId, ct);
+        if (assembly is null)
+            return OperationError.NotFound("Сборка WMS не найдена.");
+
+        var errors = new List<RestoreShippingStatusError>();
+        if (assembly.Status == PickingAssemblyStatus.Cancelled)
+            return errors;
+        if (assembly.Status != PickingAssemblyStatus.CancellationPending)
+            return OperationError.Conflict("Сборка не ожидает возврата статусов 1С.");
+
+        foreach (var sourceId in assembly.ActiveSources.Select(x => x.ShippingOrderId).Order())
+        {
+            try
+            {
+                var result = await RestoreAsync(pickingAssemblyId, sourceId, userId, ct);
+                if (!result.IsSuccess)
+                    errors.Add(new RestoreShippingStatusError(sourceId, result.Error!.Message));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                errors.Add(new RestoreShippingStatusError(sourceId,
+                    $"Возврат статуса РО 1С прерван: {exception.Message}"));
+            }
+        }
+        return errors;
+    }
+
+    private async Task<OperationResult> RestoreAsync(
+        Guid pickingAssemblyId, Guid shippingOrderId, string userId, CancellationToken ct)
+    {
         var acquired = await exchangeStore.AcquireAsync(shippingOrderId, ct);
         if (!acquired.IsSuccess) return acquired.Error!;
         await using var lease = acquired.Value!;
@@ -32,7 +61,7 @@ public sealed class RestoreShippingSourceStatus(
         var assembly = await assemblies.ReadAssemblyAsync(pickingAssemblyId, ct);
         if (assembly?.SourceLinks.Any(x => x.ShippingOrderId == shippingOrderId
             && x.ReturnPostConfirmedAtUtc is not null) == true)
-            return new RestoreShippingStatusResult(shippingOrderId, true, null);
+            return OperationResult.Success();
         if (assembly?.Status != PickingAssemblyStatus.CancellationPending)
             return OperationError.Conflict("Сборка не ожидает возврата статусов 1С.");
         var link = assembly.ActiveSources.SingleOrDefault(x =>
@@ -59,7 +88,7 @@ public sealed class RestoreShippingSourceStatus(
         {
             if (current.Status == ShippingOrderStatus.Prepared
                 && current.Posted == true && link.StartConfirmedAtUtc is null)
-                return await ReleaseAsync(assembly, shippingOrderId,
+                return await ReleaseAsync(assembly, current,
                     userId, ct);
             if (current.Status != ShippingOrderStatus.ReadyForPicking
                 || current.Posted != true)
@@ -124,10 +153,10 @@ public sealed class RestoreShippingSourceStatus(
             || current.Posted != true || current.DeletionMark != false)
             return await FailAsync(assembly, shippingOrderId, userId,
                 "1С не подтвердила проведённый РО 1С в статусе Подготовлен.", ct);
-        return await ReleaseAsync(assembly, shippingOrderId, userId, ct);
+        return await ReleaseAsync(assembly, current, userId, ct);
     }
 
-    private async Task<OperationResult<RestoreShippingStatusResult>> FailAsync(
+    private async Task<OperationResult> FailAsync(
         PickingAssembly assembly, Guid sourceId, string userId,
         string error, CancellationToken ct)
     {
@@ -136,25 +165,21 @@ public sealed class RestoreShippingSourceStatus(
         if (message.Length > 2000) message = message[..2000];
         var changed = await ChangeAsync(assembly, sourceId, userId,
             ReturnChange.Error, message, ct);
-        return changed.IsSuccess
-            ? new RestoreShippingStatusResult(sourceId, false, message)
-            : changed.Error!;
+        return changed.IsSuccess ? OperationError.Conflict(message) : changed.Error!;
     }
 
-    private async Task<OperationResult<RestoreShippingStatusResult>> ReleaseAsync(
-        PickingAssembly assembly, Guid sourceId, string userId,
-        CancellationToken ct)
+    private async Task<OperationResult> ReleaseAsync(PickingAssembly assembly,
+        ShippingSourceSnapshot snapshot, string userId, CancellationToken ct)
     {
-        var changed = await ChangeAsync(assembly, sourceId, userId,
-            ReturnChange.Release, null, ct);
-        return changed.IsSuccess
-            ? new RestoreShippingStatusResult(sourceId, true, null)
-            : changed.Error!;
+        var changed = await ChangeAsync(assembly, snapshot.RefKey, userId,
+            ReturnChange.Release, null, ct, snapshot);
+        return changed.IsSuccess ? OperationResult.Success() : changed.Error!;
     }
 
     private async Task<OperationResult<PickingAssembly>> ChangeAsync(
         PickingAssembly state, Guid sourceId, string userId,
-        ReturnChange change, string? error, CancellationToken ct)
+        ReturnChange change, string? error, CancellationToken ct,
+        ShippingSourceSnapshot? restoredSource = null)
     {
         var requestId = Guid.NewGuid();
         var commandType = $"picking.source-return.{change.ToString().ToLowerInvariant()}";
@@ -186,14 +211,19 @@ public sealed class RestoreShippingSourceStatus(
                         state.OperationalRevision, now)
                 };
                 if (!transition.IsSuccess) return transition.Error!;
-                if (change == ReturnChange.Release
-                    && loaded.ActiveSources.Count == 0)
+                if (restoredSource is not null)
                 {
-                    // The warehouse cancellation can finish only after all
-                    // started replenishments have also finished.
-                    var active = cancellation!.Replenishments.Any(x =>
-                        x.Status == ReplenishmentTaskStatus.InProgress);
-                    if (!active)
+                    var projection = SynchronizeShippingSource.Project(restoredSource);
+                    if (!projection.IsSuccess) return projection.Error!;
+                    var source = await assemblies.LoadSourceAsync(session, sourceId, operationCt);
+                    if (source is null) return OperationError.NotFound("РО 1С не найден в WMS.");
+                    var refreshed = source.ApplyCurrentSource(projection.Value.Source, now);
+                    if (!refreshed.IsSuccess) return refreshed.Error!;
+                    var recorded = source.RecordSourceCheck(restoredSource.RawDocumentJson, null, now);
+                    if (!recorded.IsSuccess) return recorded.Error!;
+
+                    if (loaded.ActiveSources.Count == 0 && cancellation!.Replenishments.All(x =>
+                        x.Status != ReplenishmentTaskStatus.InProgress))
                     {
                         var completed = loaded.CompleteCancellation(now, false);
                         if (!completed.IsSuccess) return completed.Error!;

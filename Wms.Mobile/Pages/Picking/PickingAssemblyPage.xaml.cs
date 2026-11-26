@@ -244,7 +244,7 @@ public partial class PickingAssemblyPage : ContentPage
         MobilePickingAssemblyStatus.Preparing => "Подготовка",
         MobilePickingAssemblyStatus.InProgress => "В работе",
         MobilePickingAssemblyStatus.Closed => "Закрыта",
-        MobilePickingAssemblyStatus.CancellationPending => "Отмена",
+        MobilePickingAssemblyStatus.CancellationPending => "Отменяется",
         _ => "Отменена"
     };
 }

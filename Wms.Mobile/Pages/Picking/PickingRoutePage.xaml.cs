@@ -175,7 +175,9 @@ public partial class PickingRoutePage : ContentPage
             MobilePickingAssemblyStatus.Preparing => "Запрос в 1С КОтбору",
             MobilePickingAssemblyStatus.InProgress => "В работе",
             MobilePickingAssemblyStatus.Closed => "Сборка закрыта",
-            _ => "Сборка отменяется или отменена"
+            MobilePickingAssemblyStatus.CancellationPending => "Отменяется",
+            MobilePickingAssemblyStatus.Cancelled => "Отменена",
+            _ => "Неизвестный статус"
         };
         OwnerLabel.Text = assembly.ResponsibleDisplayName;
     }

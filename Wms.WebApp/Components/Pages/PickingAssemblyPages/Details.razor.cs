@@ -18,6 +18,7 @@ public partial class Details
     [Inject] private IShippingSourceReader ShippingSources { get; set; } = null!;
     [Inject] private ApproveShippingExchange Approver { get; set; } = null!;
     [Inject] private CancelPickingAssembly Canceller { get; set; } = null!;
+    [Inject] private RestoreShippingSourceStatus RestoreSourceStatuses { get; set; } = null!;
     [Inject] private IReplenishmentStore Replenishments { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider Authentication { get; set; } = null!;
@@ -38,6 +39,7 @@ public partial class Details
     private readonly Dictionary<Guid, ShippingSourceSnapshot> _reviewedExchangeSources = [];
     private readonly Dictionary<Guid, string> _exchangeReasons = [];
     private readonly Dictionary<Guid, string> _exchangeAttemptErrors = [];
+    private readonly Dictionary<Guid, string> _returnAttemptErrors = [];
     private readonly HashSet<Guid> _expandedSkuIds = [];
     private readonly HashSet<Guid> _expandedSourceIds = [];
     private readonly HashSet<(Guid SourceId, Guid SkuId)> _expandedSourceSkuIds = [];
@@ -71,6 +73,7 @@ public partial class Details
         _expandedSourceSkuIds.Clear();
         _expandedReplenishmentIds.Clear();
         _closeReason = null;
+        _cancelReason = null;
         await ReloadAsync();
     }
 
@@ -79,6 +82,7 @@ public partial class Details
         _busy = true;
         _error = null;
         _message = null;
+        _returnAttemptErrors.Clear();
         _check = null;
         if (_pendingCloseRequest is null) _manualAllocations = null;
         try { await ReloadViewsAsync(); }
@@ -339,12 +343,13 @@ public partial class Details
 
     private async Task CancelAsync()
     {
-        if (!_isManager || _userId is null || _pendingCloseRequest is not null
-            || (_pendingCancelRequest is null && _assembly?.Status is not
-                (PickingAssemblyStatus.Draft or PickingAssemblyStatus.Preparing
-                    or PickingAssemblyStatus.InProgress))) return;
-        if (_pendingCancelRequest is null)
+        if (!_isManager || _busy || _userId is null || _pendingCloseRequest is not null)
+            return;
+        if (_pendingCancelRequest is null && _assembly?.Status != PickingAssemblyStatus.CancellationPending)
         {
+            if (_assembly?.Status is not (PickingAssemblyStatus.Draft
+                or PickingAssemblyStatus.Preparing or PickingAssemblyStatus.InProgress))
+                return;
             if (_work?.Entries.Any(x => x.Quantity > 0) == true)
             {
                 _error = "Верните весь отобранный товар в исходные ячейки через ТСД.";
@@ -360,24 +365,38 @@ public partial class Details
         }
         _busy = true;
         _error = null;
+        _message = null;
+        _returnAttemptErrors.Clear();
         try
         {
-            var result = await Canceller.ExecuteAsync(_pendingCancelRequest);
-            if (!result.IsSuccess)
+            if (_pendingCancelRequest is not null)
             {
+                var accepted = await Canceller.ExecuteAsync(_pendingCancelRequest);
                 _pendingCancelRequest = null;
-                _error = result.Error!.Message;
-                return;
+                if (!accepted.IsSuccess)
+                {
+                    _error = accepted.Error!.Message;
+                    return;
+                }
             }
             _check = null;
+            var restored = await RestoreSourceStatuses.ExecuteAsync(Id, _userId);
+            if (restored.IsSuccess)
+            {
+                foreach (var error in restored.Value!)
+                    _returnAttemptErrors[error.ShippingOrderId] = error.Error;
+            }
+            else _error = restored.Error!.Message;
+
             await ReloadViewsAsync();
-            _pendingCancelRequest = null;
-            _message = _assembly?.Status == PickingAssemblyStatus.Cancelled
-                ? "Сборка отменена." : "Отмена запрошена. Ожидаются незавершённые операции и возврат статусов РО 1С.";
+            if (_assembly?.Status == PickingAssemblyStatus.Cancelled)
+                _message = "Сборка отменена.";
         }
         catch (Exception exception)
         {
-            _error = $"Ответ на отмену не получен: {exception.Message} Повторите той же кнопкой.";
+            _error = _pendingCancelRequest is not null
+                ? $"Ответ на запрос отмены не получен. {exception.Message} Нажмите «Повторить отмену»."
+                : $"Не удалось обновить результат отмены. {exception.Message} Обновите карточку сборки.";
         }
         finally { _busy = false; }
     }
@@ -425,6 +444,7 @@ public partial class Details
         "replenishment.transfer.corrected" => "Подпитка скорректирована",
         "replenishment.cancelled.unneeded" => "Невостребованная Подпитка отменена",
         "picking.assembly.cancellation-requested" => "Запрошена отмена сборки",
+        "picking.source-return.release" => "РО 1С освобождён",
         _ => eventType
     };
 

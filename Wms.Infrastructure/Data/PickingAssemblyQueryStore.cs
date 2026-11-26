@@ -185,6 +185,7 @@ public sealed class PickingAssemblyQueryStore(
                     ExchangeStage = targets.GetValueOrDefault(link.ShippingOrderId)?.Stage,
                     ExchangeError = targets.GetValueOrDefault(link.ShippingOrderId)?.LastError,
                     ExchangeRevision = targets.GetValueOrDefault(link.ShippingOrderId)?.OperationalRevision,
+                    LastReturnError = link.LastReturnError,
                     CurrentLines = currentLines.Where(x => x.ShippingOrderId == link.ShippingOrderId)
                         .Select(x => x.Line).ToArray()
                 };

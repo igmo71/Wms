@@ -63,6 +63,55 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
     }
 
     [Fact]
+    public async Task Cancellation_after_lost_post_reply_releases_only_confirmed_sources_and_resumes_safely()
+    {
+        var scenario = await CreateAsync(2, hasPickedStock: false);
+        var interrupted = scenario.SourceIds[0];
+        var completed = scenario.SourceIds[1];
+        scenario.Transport.LoseNextPostResponse.Add(interrupted);
+
+        var assemblies = new PickingAssemblyStore(database);
+        var cancel = new CancelPickingAssembly(scenario.Executor, assemblies,
+            scenario.Permission, TimeProvider.System);
+        var restore = new RestoreShippingSourceStatus(assemblies, scenario.ExchangeStore,
+            scenario.Transport, new FixedParser([]), scenario.Transport, scenario.Executor,
+            scenario.Permission, TimeProvider.System);
+        var request = new CancelPickingAssemblyRequest(Guid.NewGuid(), scenario.AssemblyId,
+            scenario.Request.ExpectedRevision, Manager, "Товар возвращён");
+
+        Value(await cancel.ExecuteAsync(request));
+        var errors = Value(await restore.ExecuteAsync(scenario.AssemblyId, Manager));
+        Assert.Equal(interrupted, Assert.Single(errors).ShippingOrderId);
+        var pending = (await assemblies.ReadAssemblyAsync(scenario.AssemblyId, default))!;
+        Assert.Equal(PickingAssemblyStatus.CancellationPending, pending.Status);
+        Assert.NotNull(Assert.Single(pending.ActiveSources).LastReturnError);
+        Assert.Equal(scenario.AssemblyId, await assemblies.FindLinkedAssemblyIdAsync(interrupted, default));
+        Assert.Null(await assemblies.FindLinkedAssemblyIdAsync(completed, default));
+        Assert.Equal(ShippingOrderStatus.ReadyForPicking,
+            (await assemblies.ReadSourceAsync(interrupted, default))!.Status);
+        Assert.Equal(ShippingOrderStatus.Prepared,
+            (await assemblies.ReadSourceAsync(completed, default))!.Status);
+
+        Value(await cancel.ExecuteAsync(request));
+        Assert.Empty(Value(await restore.ExecuteAsync(scenario.AssemblyId, Manager)));
+        Assert.Empty(Value(await restore.ExecuteAsync(scenario.AssemblyId, Manager)));
+        var cancelled = (await assemblies.ReadAssemblyAsync(scenario.AssemblyId, default))!;
+        Assert.Equal(PickingAssemblyStatus.Cancelled, cancelled.Status);
+        Assert.Empty(cancelled.ActiveSources);
+        Assert.Null(await assemblies.FindLinkedAssemblyIdAsync(interrupted, default));
+        var source = (await assemblies.ReadSourceAsync(interrupted, default))!;
+        Assert.Equal(ShippingOrderStatus.Prepared, source.Status);
+        Assert.True(source.Posted);
+        Assert.All(scenario.SourceIds, sourceId =>
+        {
+            Assert.Equal(1, scenario.Transport.Patches[sourceId]);
+            Assert.Equal(1, scenario.Transport.Posts[sourceId]);
+        });
+        await using var db = database.CreateDbContext();
+        Assert.False(await db.InventoryMovements.AnyAsync(x => x.RecorderId == scenario.AssemblyId));
+    }
+
+    [Fact]
     public async Task Changed_source_requires_fresh_manager_decision_without_changing_allocation()
     {
         var scenario = await CreateAsync(1);
@@ -150,7 +199,7 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
             x.ShippingOrderId).Order());
     }
 
-    private async Task<Scenario> CreateAsync(int documentCount)
+    private async Task<Scenario> CreateAsync(int documentCount, bool hasPickedStock = true)
     {
         var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Exchange safety" };
         var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Exchange SKU" };
@@ -178,19 +227,26 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
         Success(assembly.FreezeForStart(Operator, started));
         Success(assembly.ClaimStart(leaseId, started, started.AddMinutes(10)));
         foreach (var source in sources)
+        {
+            Success(assembly.RecordStartPatchIntent(leaseId, source.RefKey, started));
             Success(assembly.RecordSourceStartResult(leaseId, source.RefKey,
                 started, null));
+        }
         Success(assembly.CompleteStart(started));
         var quantity = 5m * documentCount;
-        var entry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
-            location.Id, sku.Id, null, quantity, Operator, DateTimeOffset.UtcNow));
-        var reservation = Value(PickingReservation.Create(entry.Id, assembly.Id,
-            warehouse.Id, location.Id, sku.Id, null, quantity, Operator,
-            DateTimeOffset.UtcNow));
         await using (var db = database.CreateDbContext())
         {
-            db.AddRange(warehouse, sku, zone, location, assembly, entry,
-                reservation, Balance(warehouse.Id, location.Id, sku.Id, quantity));
+            db.AddRange(warehouse, sku, zone, location, assembly,
+                Balance(warehouse.Id, location.Id, sku.Id, quantity));
+            if (hasPickedStock)
+            {
+                var entry = Value(PickingEntry.Create(assembly.Id, warehouse.Id,
+                    location.Id, sku.Id, null, quantity, Operator, DateTimeOffset.UtcNow));
+                var reservation = Value(PickingReservation.Create(entry.Id, assembly.Id,
+                    warehouse.Id, location.Id, sku.Id, null, quantity, Operator,
+                    DateTimeOffset.UtcNow));
+                db.AddRange(entry, reservation);
+            }
             db.AddRange(orders);
             await db.SaveChangesAsync();
         }
@@ -301,7 +357,16 @@ public sealed class ShippingExchangeSafetyTests(SqlDatabase database)
             CancellationToken ct) => Task.FromResult(OperationResult.Success());
 
         public Task<OperationResult> SetPreparedAsync(Guid sourceId,
-            CancellationToken ct) => Task.FromResult(OperationResult.Success());
+            CancellationToken ct)
+        {
+            Patches[sourceId] = Patches.GetValueOrDefault(sourceId) + 1;
+            _sources[sourceId] = _sources[sourceId] with
+            {
+                Status = ShippingOrderStatus.Prepared,
+                Posted = false
+            };
+            return Task.FromResult(OperationResult.Success());
+        }
 
         public OperationResult<bool> TargetMatches(ShippingExchangeTarget target,
             string planSourceSnapshotJson, ShippingSourceSnapshot current) =>

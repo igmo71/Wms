@@ -115,7 +115,9 @@ public partial class PickingSourcesPage : ContentPage
                 MobilePickingAssemblyStatus.Preparing => "Запрос в 1С КОтбору",
                 MobilePickingAssemblyStatus.InProgress => "В работе",
                 MobilePickingAssemblyStatus.Closed => "Сборка закрыта",
-                _ => "Сборка отменяется или отменена"
+                MobilePickingAssemblyStatus.CancellationPending => "Отменяется",
+                MobilePickingAssemblyStatus.Cancelled => "Отменена",
+                _ => "Неизвестный статус"
             };
         OwnerLabel.Text = assembly?.ResponsibleDisplayName ?? string.Empty;
         var closed = assembly?.Status == MobilePickingAssemblyStatus.Closed;
@@ -136,9 +138,14 @@ public partial class PickingSourcesPage : ContentPage
             assembly.Status == MobilePickingAssemblyStatus.Draft && IsOwner)).ToArray() ?? [];
         OnPropertyChanged(nameof(SourceRows));
         EmptyLabel.IsVisible = SourceRows.Count == 0;
-        ScanHintLabel.Text = CanAttach
-            ? "Сканируйте РО 1С, чтобы добавить его в сборку."
-            : "Состав этой сборки уже зафиксирован.";
+        var status = assembly?.Status;
+        EmptyLabel.Text = status is MobilePickingAssemblyStatus.CancellationPending or MobilePickingAssemblyStatus.Cancelled
+            ? "Связанных РО 1С нет." : "Документы 1С ещё не добавлены.";
+        ScanHintLabel.IsVisible = status != MobilePickingAssemblyStatus.Cancelled;
+        ScanHintLabel.Text = status == MobilePickingAssemblyStatus.CancellationPending
+            ? "Причина ожидания указана в веб-карточке сборки."
+            : CanAttach ? "Сканируйте РО 1С, чтобы добавить его в сборку."
+                : "Состав этой сборки уже зафиксирован.";
         UpdateActions();
     }
 

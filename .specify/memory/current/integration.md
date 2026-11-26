@@ -181,16 +181,18 @@ Cancelling an unclosed picking assembly does not call 1C inside the warehouse
 transaction. Source links with no confirmed or intended start PATCH are
 released immediately. Sources with a confirmed start or an uncertain PATCH
 intent remain linked to the assembly in `CancellationPending`, preventing a
-new assembly from taking them. Their return to `Prepared` requires a separate
-safe 1C exchange. The return command compares source requisites other than
+new assembly from taking them. Once the warehouse command commits, WMS attempts
+to restore each pending source to `Prepared` through 1C. A retry processes only
+sources still linked to the assembly. The return compares source requisites other than
 WMS-owned status and posting with the frozen pre-start document. It records
 return PATCH intent before HTTP, then confirms PATCH and POST separately. An
 unchanged document still in `Prepared` after an unconfirmed start intent can
 be released without a write. Changed or deleted documents remain linked with
-an error for manual resolution; the active-link index prevents reuse. A
-confirmed return releases only that source, and cancellation finishes after
-all sources and started replenishments are done. The cancellation request and
-its reason are audited.
+an error for manual resolution; the active-link index prevents reuse. Once
+1C confirms the posted document in `Prepared`, WMS refreshes its imported
+source and releases its link in the same transaction. Cancellation finishes
+after all sources and started replenishments are done. The cancellation
+request and its reason are audited.
 
 Notification delivery uses an in-memory channel and can be lost on restart.
 WMS-to-1C multi-step transitions are not atomic across systems.

@@ -148,9 +148,14 @@ and preserve the command ID for an uncertain reply. Resolving the cell shortage
 does not change the assembly plan or approve shipping fewer units. When fact
 is below plan, the Web card directs the Manager to recheck 1C, allocate a shared
 SKU if needed, and close with a reason or wait for further picking. The cancellation action
-requires a reason and zero remaining picked fact; the server also checks
-reservations and returned pallets. An accepted cancellation may wait for
-started replenishment and 1C status restoration.
+requires a reason and zero remaining picked fact. The server also checks
+reservations and returned pallets. «Отменить сборку» starts the return of
+linked documents through the [1C exchange](integration.md#outbound-source-and-exchange).
+The Web card shows how many replenishments are still in progress and lists
+each document still linked, with any return error and an action to retry the
+return. The TSD displays «Отменяется» while cancellation is pending and
+«Отменена» once it finishes. The TSD 1C section directs the operator to the
+Web card while cancellation is pending.
 
 ## Mobile picking
 

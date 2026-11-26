@@ -61,7 +61,7 @@ public sealed class SynchronizeShippingSource(
         return OperationError.Failure(error);
     }
 
-    private static OperationResult<(
+    internal static OperationResult<(
         ShippingOrderImportSnapshot Source,
         IReadOnlyDictionary<Guid, decimal> Plan)> Project(ShippingSourceSnapshot current)
     {

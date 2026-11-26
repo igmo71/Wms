@@ -40,6 +40,7 @@ public sealed record PickingAssemblySourceView(
     public ShippingExchangeStage? ExchangeStage { get; init; }
     public string? ExchangeError { get; init; }
     public long? ExchangeRevision { get; init; }
+    public string? LastReturnError { get; init; }
 }
 
 public sealed record PickingSourceLineView(int LineNumber, Guid SkuId,

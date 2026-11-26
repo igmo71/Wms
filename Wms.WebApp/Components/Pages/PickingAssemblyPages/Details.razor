@@ -376,17 +376,47 @@ else
                 }
                 else
                 {
-                    <MudText Typo="Typo.body2">Перед отменой верните снятые поддоны и подтвердите исходные ячейки. Начатая Подпитка и возврат статусов РО 1С могут оставить отмену в ожидании.</MudText>
+                    <MudText Typo="Typo.body2">Перед отменой верните снятые поддоны и подтвердите исходные ячейки. При отмене WMS восстановит статусы связанных РО 1С и освободит их для новой сборки.</MudText>
                 }
-                <MudTextField T="string" @bind-Value="_cancelReason" Label="Причина отмены" Lines="2" MaxLength="500" Disabled="@(_pendingCancelRequest is not null)" />
+                <MudTextField T="string" @bind-Value="_cancelReason" Label="Причина отмены" Immediate="true" Lines="2" MaxLength="500" Disabled="@(_pendingCancelRequest is not null)" />
                 <MudButton Color="Color.Error" Variant="Variant.Outlined"
-                           Disabled="@(_busy || _pendingCloseRequest is not null || _pendingCancelRequest is not null || _work?.Entries.Any(x => x.Quantity > 0) == true)"
+                           Disabled="@(_busy || _pendingCloseRequest is not null || _pendingCancelRequest is not null
+                               || _work?.Entries.Any(x => x.Quantity > 0) == true || string.IsNullOrWhiteSpace(_cancelReason))"
                            OnClick="CancelAsync">Отменить сборку</MudButton>
             </MudPaper>
         }
         else if (_assembly.Status == PickingAssemblyStatus.CancellationPending)
         {
-            <MudAlert Severity="Severity.Info">Отмена запрошена. Ожидается завершение начатых Подпиток и освобождение связанных РО 1С.</MudAlert>
+            var activeReplenishments = _replenishmentTasks.Count(x => x.Status == ReplenishmentTaskStatus.InProgress);
+            <MudPaper Class="pa-4">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.h6">Отмена сборки</MudText>
+                    @if (activeReplenishments > 0)
+                    {
+                        <MudAlert Severity="Severity.Info">Подпитки в работе (@activeReplenishments). Дождитесь их завершения.</MudAlert>
+                    }
+                    @if (_assembly.Sources.Count > 0)
+                    {
+                        <MudText Typo="Typo.body2">WMS освободит каждый РО после подтверждения в 1С, что он проведён в статусе «Подготовлен».</MudText>
+                        @foreach (var source in _assembly.Sources)
+                        {
+                            var error = _returnAttemptErrors.GetValueOrDefault(source.SourceRefKey) ?? source.LastReturnError;
+                            <MudAlert Severity="@(error is null ? Severity.Info : Severity.Warning)">
+                                РО @(source.Number ?? source.SourceRefKey.ToString()) · @(error ?? "Ожидает возврата статуса в 1С.")
+                            </MudAlert>
+                        }
+                        @if (_pendingCancelRequest is null)
+                        {
+                            <MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy"
+                                       OnClick="CancelAsync">Повторить возврат статусов в 1С</MudButton>
+                        }
+                    }
+                    else if (activeReplenishments == 0)
+                    {
+                        <MudText Typo="Typo.body2">Обновите карточку, чтобы проверить состояние отмены.</MudText>
+                    }
+                </MudStack>
+            </MudPaper>
         }
 
         <MudExpansionPanels>

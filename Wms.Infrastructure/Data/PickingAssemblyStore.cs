@@ -181,7 +181,8 @@ public sealed class PickingAssemblyStore(IDbContextFactory<ApplicationDbContext>
 
     public Task<ShippingOrder?> LoadSourceAsync(
         ICommandExecutionContext context, Guid sourceId, CancellationToken ct) =>
-        Session(context).Db.ShippingOrders.SingleOrDefaultAsync(x => x.Id == sourceId, ct)!;
+        Session(context).Db.ShippingOrders.Include(x => x.Items).Include(x => x.BaseItems)
+            .SingleOrDefaultAsync(x => x.Id == sourceId, ct);
 
     public async Task<bool> AreKnownSkusAsync(ICommandExecutionContext context,
         IReadOnlyCollection<Guid> skuIds, CancellationToken ct)

@@ -118,7 +118,9 @@ public partial class PickingSkuPage : ContentPage
                 x.ExchangeStage == MobileShippingExchangeStage.PostConfirmed)
                 ? "Сборка закрыта · обмен с 1С подтверждён"
                 : "Складской факт проведён · обмен с 1С ожидается",
-            _ => "Сборка отменяется или отменена"
+            MobilePickingAssemblyStatus.CancellationPending => "Отменяется",
+            MobilePickingAssemblyStatus.Cancelled => "Отменена",
+            _ => "Неизвестный статус"
         };
         OwnerLabel.Text = assembly.ResponsibleDisplayName;
         var entriesBySku = _work?.Entries.ToLookup(x => x.SkuId);
