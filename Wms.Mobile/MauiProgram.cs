@@ -39,6 +39,7 @@ public static class MauiProgram
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<InventoryTransferPage>();
         builder.Services.AddTransient<InventoryCountPage>();
+        builder.Services.AddTransient<StockCorrectionPage>();
         builder.Services.AddTransient<ReceivingOrderPage>();
         builder.Services.AddTransient<ReceivingOrderSkuPage>();
         builder.Services.AddTransient<ReceivingOrderLpnListPage>();
@@ -109,6 +110,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(serviceProvider => new MobileInventoryTransferClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
         builder.Services.AddSingleton(serviceProvider => new MobileInventoryCountClient(
+            serviceProvider.GetRequiredService<MobileApiTransport>()));
+        builder.Services.AddSingleton(serviceProvider => new MobileStockCorrectionClient(
             serviceProvider.GetRequiredService<MobileApiTransport>()));
 
 #if DEBUG

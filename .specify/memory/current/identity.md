@@ -25,7 +25,8 @@ Changing the SKU expiration-tracking flag also requires `Manager` at execution;
 the one-time opening-stock command may enable it from accepted source rows
 marked `Да` under explicit `Administrator` membership. This command never
 disables an already enabled flag. Inventory count commands require `Operator`,
-including posting with differences. Web count documents are visible to
+including posting with differences. Manual cell stock correction requires
+`Operator` on TSD and either `Operator` or `Manager` in Web. Web count documents are visible to
 `Operator` and `Manager`. The [cell mixing permission](inventory.md) requires
 `Manager` at execution. Zone and cell topology require `Administrator`.
 The Web [stock reconciliation report](clients.md#stock-reconciliation-report)

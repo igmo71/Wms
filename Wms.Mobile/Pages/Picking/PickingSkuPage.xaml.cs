@@ -124,12 +124,11 @@ public partial class PickingSkuPage : ContentPage
         };
         OwnerLabel.Text = assembly.ResponsibleDisplayName;
         var entriesBySku = _work?.Entries.ToLookup(x => x.SkuId);
-        var proposalSkuIds = _replenishmentList?.Proposals.Select(x => x.SkuId).ToHashSet();
         SkuRows = _work?.Skus.Select(x =>
         {
             var remaining = x.PlannedQuantity - x.ConfirmedQuantity;
             var pickable = _replenishmentList?.PickableBySku.GetValueOrDefault(x.SkuId);
-            var hasProposal = proposalSkuIds?.Contains(x.SkuId) == true;
+            var stock = _replenishmentList?.StockBySku.GetValueOrDefault(x.SkuId);
             return new PickingSkuPlanRow(x.SkuId, x.Name ?? x.Code ?? x.SkuId.ToString(),
                 x.PlannedQuantity, x.ConfirmedQuantity, x.Unit)
             {
@@ -139,10 +138,10 @@ public partial class PickingSkuPage : ContentPage
                     entry.Quantity, entry.ExpirationDate,
                     assembly.Status == MobilePickingAssemblyStatus.InProgress && IsOwner))
                     .ToArray() ?? [],
-                Stock = _replenishmentList?.StockBySku.GetValueOrDefault(x.SkuId),
-                UncoveredQuantity = pickable is decimal covered ? Math.Max(0, remaining - covered) : 0,
-                ReplenishmentState = ReplenishmentStateFor(x.SkuId, remaining, pickable, hasProposal),
-                HasReplenishmentProposal = hasProposal
+                Stock = stock,
+                StockSummary = new(pickable is decimal covered ? Math.Max(0, remaining - covered) : 0,
+                    stock?.FreeStorageQuantity),
+                Replenishment = PickingReplenishmentAction.ForSku(_replenishmentList, x.SkuId, remaining)
             };
         }).ToArray()
             ?? assembly.PlanLines.GroupBy(x => x.SkuId)
@@ -153,28 +152,6 @@ public partial class PickingSkuPage : ContentPage
                 .ThenBy(x => x.SkuId).ToArray();
         OnPropertyChanged(nameof(SkuRows));
         UpdateActions();
-    }
-
-    private PickingReplenishmentState ReplenishmentStateFor(Guid skuId,
-        decimal remaining, decimal? pickable, bool hasProposal)
-    {
-        if (remaining <= 0 || _assembly?.Status != MobilePickingAssemblyStatus.InProgress
-            || !IsOwner || pickable is null || _replenishmentList is null)
-            return PickingReplenishmentState.Hidden;
-        if (pickable >= remaining)
-            return _replenishmentList.Tasks.Any(x => x.SkuId == skuId
-                && x.Status != MobileReplenishmentTaskStatus.Cancelled)
-                ? PickingReplenishmentState.Ready
-                : PickingReplenishmentState.Hidden;
-        if (_replenishmentList.Tasks.Any(x => x.SkuId == skuId
-            && x.Status == MobileReplenishmentTaskStatus.InProgress
-            && x.TransferredQuantity < x.OrderedQuantity))
-            return PickingReplenishmentState.InProgress;
-        if (_replenishmentList.Tasks.Any(x => x.SkuId == skuId
-            && x.Status == MobileReplenishmentTaskStatus.Ordered
-            && x.TransferredQuantity < x.OrderedQuantity))
-            return PickingReplenishmentState.Ordered;
-        return hasProposal ? PickingReplenishmentState.CanOrder : PickingReplenishmentState.Unavailable;
     }
 
     private async void OnSkuTapped(object? sender, TappedEventArgs e)
@@ -221,25 +198,20 @@ public partial class PickingSkuPage : ContentPage
 
     private async void OnReplenishmentClicked(object? sender, EventArgs e)
     {
-        if (_busy || _process.HasPendingCommand || _assembly is null
-            || _assembly.Status != MobilePickingAssemblyStatus.InProgress || !IsOwner
+        if (_busy || _process.HasPendingCommand || _assembly is not { Status: MobilePickingAssemblyStatus.InProgress } assembly
+            || !IsOwner || _replenishmentList is not { } list
             || sender is not Button { CommandParameter: Guid skuId }) return;
         var row = SkuRows.FirstOrDefault(x => x.SkuId == skuId);
-        if (row is null || !row.HasReplenishmentIcon) return;
-        if (row.CanOrderMoreReplenishment)
+        if (row is null || !row.Replenishment.IsVisible) return;
+        SetBusy(true);
+        try
         {
-            if (!await DisplayAlertAsync("Подпитка", row.ReplenishmentHint,
-                "Заказать ещё", "Закрыть")) return;
+            if (!await row.Replenishment.ConfirmOrderAsync(this)) return;
         }
-        else if (row.ReplenishmentState != PickingReplenishmentState.CanOrder)
-        {
-            await DisplayAlertAsync("Подпитка", row.ReplenishmentHint, "Понятно");
-            return;
-        }
+        finally { SetBusy(false); }
 
-        if (_replenishmentList is not { } list) return;
         await RunCommandAsync(() => _process.OrderReplenishmentAsync(
-            _assembly.Id, _assembly.WarehouseId, list.Revision,
+            assembly.Id, assembly.WarehouseId, list.Revision,
             skuId), operation: "Заказ подпитки");
     }
 
@@ -421,30 +393,8 @@ public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
 {
     public IReadOnlyList<PickingEntryListRow> Entries { get; init; } = [];
     public MobilePickingSkuStockResponse? Stock { get; init; }
-    public decimal UncoveredQuantity { get; init; }
-    public PickingReplenishmentState ReplenishmentState { get; init; }
-    public bool HasReplenishmentProposal { get; init; }
-    public bool CanOrderMoreReplenishment => HasReplenishmentProposal
-        && ReplenishmentState is (PickingReplenishmentState.Ordered or PickingReplenishmentState.InProgress);
-    public bool HasReplenishmentIcon => ReplenishmentState != PickingReplenishmentState.Hidden;
-    public bool ShowUnavailableSlash => ReplenishmentState == PickingReplenishmentState.Unavailable;
-    public string ReplenishmentHint => ReplenishmentState switch
-    {
-        PickingReplenishmentState.CanOrder => "Заказать подпитку",
-        PickingReplenishmentState.Ordered => "Подпитка заказана",
-        PickingReplenishmentState.InProgress => "Подпитка выполняется",
-        PickingReplenishmentState.Ready => "Готово: можно отобрать оставшийся план",
-        PickingReplenishmentState.Unavailable => "Сейчас подпитать нельзя",
-        _ => string.Empty
-    };
-    public Color ReplenishmentColor => ReplenishmentState switch
-    {
-        PickingReplenishmentState.CanOrder => Color.FromArgb("#1976D2"),
-        PickingReplenishmentState.Ordered => Color.FromArgb("#E9B949"),
-        PickingReplenishmentState.InProgress => Color.FromArgb("#E87924"),
-        PickingReplenishmentState.Ready => Color.FromArgb("#358A4B"),
-        _ => Color.FromArgb("#9E9E9E")
-    };
+    public PickingStockSummary StockSummary { get; init; }
+    public PickingReplenishmentAction Replenishment { get; init; } = PickingReplenishmentAction.Hidden;
     public string PlanText => $"План {PlannedQuantity:0.###} {Unit ?? "—"}";
     public bool HasStock => Stock is not null;
     public bool HasReserveStock => Stock is { Reserve.Quantity: > 0 };
@@ -452,17 +402,10 @@ public sealed record PickingSkuPlanRow(Guid SkuId, string Name,
     public bool HasExpiredReserveStock => Stock?.Reserve.HasExpiredStock == true;
     public string StorageText => Stock is { } stock ? $"{stock.Storage.Quantity:0.###}" : "—";
     public string ReserveText => Stock is { } stock ? $"{stock.Reserve.Quantity:0.###}" : string.Empty;
-    public bool HasUncoveredQuantity => UncoveredQuantity > 0;
-    public string UncoveredText => $"Не хватает к отбору {UncoveredQuantity:0.###}";
     public string FactText => $"Факт {ConfirmedQuantity:0.###}";
     public Color BackgroundColor => ConfirmedQuantity == PlannedQuantity
         ? Color.FromArgb("#E4F5E7")
         : ConfirmedQuantity > 0 ? Color.FromArgb("#FFF1CF") : Colors.White;
-}
-
-public enum PickingReplenishmentState
-{
-    Hidden, CanOrder, Ordered, InProgress, Ready, Unavailable
 }
 
 public sealed record PickingEntryListRow(Guid Id, string Address, decimal Quantity,

@@ -7,9 +7,100 @@ using Wms.Domain.Enums;
 
 namespace Wms.Data;
 
+public sealed record CellStockAvailability(StorageLocation Location, IReadOnlyList<CellStockGroup> Groups);
+
+public sealed record CellStockGroup(StockKeepingUnit Sku, StockAvailability Stock);
+
 public sealed class StockAvailabilityStore(IDbContextFactory<ApplicationDbContext> factory)
-    : IStockAvailabilityStore, IStockReservationStore, IStockShortageStore
+    : IStockAvailabilityStore, IStockReservationStore, IStockShortageStore, ICellStockCorrectionStore
 {
+    public async Task<IReadOnlyList<StorageLocation>> SearchStorageCellsAsync(Guid warehouseId,
+        string? searchText, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var locations = db.StorageLocations.AsNoTracking().Include(x => x.Zone)
+            .Where(x => x.WarehouseId == warehouseId && !x.DeletionMark && !x.IsFolder
+                && !x.Warehouse!.DeletionMark && !x.Zone!.DeletionMark
+                && (x.Zone.Type == ZoneType.Storage || x.Zone.Type == ZoneType.Reserve));
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            var normalized = StorageLocationAddress.Normalize(term);
+            var code = normalized.IsSuccess ? normalized.Value! : term;
+            locations = locations.Where(x => x.Name.Contains(term) || x.Code.Contains(code));
+        }
+        return await locations.OrderBy(x => x.Code).Take(10).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<StockKeepingUnit>> SearchCorrectionSkusAsync(string? searchText, CancellationToken ct)
+    {
+        var term = searchText?.Trim();
+        if (term is null || term.Length < 2)
+            return [];
+
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.StockKeepingUnits.AsNoTracking().Include(x => x.BaseUnitOfMeasure)
+            .Where(x => !x.DeletionMark && ((x.Name != null && x.Name.Contains(term))
+                || (x.Code != null && x.Code.Contains(term))
+                || db.SkuBarcodes.Any(barcode => barcode.SkuId == x.Id && barcode.Value == term)))
+            .OrderByDescending(x => x.Code == term
+                || db.SkuBarcodes.Any(barcode => barcode.SkuId == x.Id && barcode.Value == term))
+            .ThenBy(x => x.Name).ThenBy(x => x.Code).ThenBy(x => x.Id).Take(10).ToListAsync(ct);
+    }
+
+    public async Task<OperationResult<CellStockAvailability>> ReadCorrectionCellAsync(
+        Guid warehouseId, string barcode, CancellationToken ct)
+    {
+        if (warehouseId == Guid.Empty)
+            return OperationError.Invalid("Выберите склад.");
+        var address = StorageLocationAddress.Normalize(barcode);
+        if (!address.IsSuccess)
+            return address.Error!;
+
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var location = await db.StorageLocations.AsNoTracking()
+            .Include(x => x.Warehouse).Include(x => x.Zone).Include(x => x.ActiveLock)
+            .SingleOrDefaultAsync(x => x.WarehouseId == warehouseId && x.Code == address.Value, ct);
+        if (location is null)
+            return OperationError.NotFound("Ячейка не найдена на выбранном складе.");
+        if (location.IsFolder || location.DeletionMark || location.Warehouse is not { DeletionMark: false }
+            || location.Zone is not { DeletionMark: false, Type: ZoneType.Storage or ZoneType.Reserve }
+            || location.Zone.WarehouseId != warehouseId)
+            return OperationError.Conflict("Корректировка проводится в активной ячейке Комплектации или Хранения.");
+
+        var locationId = location.Id;
+        var skuIds = await db.InventoryBalances
+            .Where(x => x.WarehouseId == warehouseId && x.StorageLocationId == locationId && x.Quantity != 0)
+            .Select(x => x.StockKeepingUnitId)
+            .Union(db.PickingReservations.Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == locationId && x.CompletedAtUtc == null).Select(x => x.StockKeepingUnitId))
+            .Union(db.PickingRouteReservations.Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == locationId).Select(x => x.StockKeepingUnitId))
+            .Union(db.StockShortages.Where(x => x.WarehouseId == warehouseId
+                && x.StorageLocationId == locationId && x.ResolvedAtUtc == null).Select(x => x.StockKeepingUnitId))
+            .ToArrayAsync(ct);
+        var stock = await ReadSkusAsync(db, warehouseId, skuIds, ct, locationId);
+        var skus = new Dictionary<Guid, StockKeepingUnit>();
+        foreach (var batch in skuIds.Chunk(500))
+        {
+            var matches = await db.StockKeepingUnits.AsNoTracking().Include(x => x.BaseUnitOfMeasure)
+                .Where(x => batch.Contains(x.Id)).ToArrayAsync(ct);
+            foreach (var sku in matches)
+                skus.Add(sku.Id, sku);
+        }
+
+        var groups = stock.Where(x => x.AccountingQuantity != 0 || x.ReservedQuantity != 0 || x.BlockedQuantity != 0)
+            .Select(x => new CellStockGroup(skus[x.Group.StockKeepingUnitId], x))
+            .OrderBy(x => x.Sku.Name).ThenBy(x => x.Sku.Code)
+            .ThenBy(x => x.Stock.Group.ExpirationDate is null).ThenBy(x => x.Stock.Group.ExpirationDate)
+            .ToArray();
+        return new CellStockAvailability(location, groups);
+    }
+
+    public Task<bool> CanCorrectSkuAsync(ICommandExecutionContext session, Guid skuId, bool adding,
+        CancellationToken ct) => RequireSession(session).Db.StockKeepingUnits
+        .AnyAsync(x => x.Id == skuId && (!adding || !x.DeletionMark), ct);
+
     public Task<IReadOnlyList<StockAvailability>> ReadSkuAsync(
         Guid warehouseId, Guid stockKeepingUnitId, CancellationToken ct) =>
         ReadSkusAsync(warehouseId, [stockKeepingUnitId], ct);

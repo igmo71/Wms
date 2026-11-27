@@ -15,6 +15,7 @@ namespace Wms.WebApp.Components.Pages.InventoryCountPages;
 public partial class Index
 {
     [Inject] private InventoryCountQueryService InventoryCountQueryService { get; set; } = null!;
+    [Inject] private StockAvailabilityStore StockAvailability { get; set; } = null!;
     [Inject] private ApplicationUserQueryService ApplicationUserQueryService { get; set; } = null!;
     [Inject] private InventoryCountCommandService InventoryCountCommandService { get; set; } = null!;
     [Inject] private WarehouseService WarehouseService { get; set; } = null!;
@@ -88,7 +89,7 @@ public partial class Index
         if (_warehouse is null)
             return [];
 
-        return await InventoryCountQueryService.SearchLocationsAsync(_warehouse.Id, searchText, ct);
+        return await StockAvailability.SearchStorageCellsAsync(_warehouse.Id, searchText, ct);
     }
 
     private static string GetLocationText(StorageLocation? location) =>

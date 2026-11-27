@@ -44,7 +44,10 @@ public sealed record MobilePickingReplenishmentsResponse(
 }
 
 public sealed record MobilePickingSkuStockResponse(MobilePickingFreeStockResponse Storage,
-    MobilePickingFreeStockResponse Reserve);
+    MobilePickingFreeStockResponse Reserve)
+{
+    public decimal FreeStorageQuantity { get; init; }
+}
 
 public sealed record MobileReplenishmentQueueItemResponse(
     Guid Id, Guid PickingAssemblyId, string AssemblyNumber,

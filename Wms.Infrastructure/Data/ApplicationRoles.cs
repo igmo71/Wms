@@ -8,6 +8,7 @@ public static class ApplicationRoles
     public const string Manager = WarehousePermission.ManagerRole;
     public const string Operator = nameof(Operator);
     public const string WmsUser = Administrator + "," + Manager + "," + Operator;
+    public const string OperatorOrManager = Operator + "," + Manager;
     public const string ManagerOrAdministrator = Manager + "," + Administrator;
 
     public static readonly string[] All = [Administrator, Manager, Operator];

@@ -15,6 +15,7 @@ public sealed record PickingSourceView(Guid PickingAssemblyId, Guid StorageLocat
     public bool FromReserve { get; init; }
     public bool PalletHeld { get; init; }
     public decimal ExpectedPhysicalQuantity { get; init; }
+    public decimal MaximumQuantity { get; init; } = SuggestedQuantity;
 }
 
 public sealed class GetPickingSource(
@@ -129,14 +130,20 @@ internal static class PickingSourceRules
         if (remainingOutsideOtherPallets <= 0)
             return OperationError.Conflict("Оставшийся товар уже закреплён на удерживаемом поддоне.");
 
+        var suggested = Math.Min(remainingOutsideOtherPallets, available);
+        // Additional free units follow the same expiration order as an off-route pick.
+        var maximum = !fromReserve && group.Group.ExpirationDate == eligible[0].Group.ExpirationDate
+            ? Math.Min(remainingOutsideOtherPallets, group.AvailableForAssemblyPick(assembly.Id))
+            : suggested;
         return new PickingSourceView(assembly.Id, location.Id, scannedCode, skuId,
             group.Group.ExpirationDate, group.AccountingQuantity, available,
-            Math.Min(remainingOutsideOtherPallets, available), group.ReservedQuantity,
+            suggested, group.ReservedQuantity,
             group.BlockedQuantity, group.Group.ExpirationDate is null
                 && state.CellSkus.Single(x => x.Id == skuId).TracksExpirationDate)
         {
             LocationName = location.Name, FromReserve = fromReserve, PalletHeld = ownedHold,
-            ExpectedPhysicalQuantity = Math.Max(0, group.AccountingQuantity - group.ConfirmedReservedQuantity)
+            ExpectedPhysicalQuantity = Math.Max(0, group.AccountingQuantity - group.ConfirmedReservedQuantity),
+            MaximumQuantity = maximum
         };
     }
 

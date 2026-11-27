@@ -120,6 +120,7 @@ public class Program
         app.MapMobilePickingEndpoints();
         app.MapMobileReplenishmentEndpoints();
         app.MapMobileStockAvailabilityEndpoints();
+        app.MapMobileStockCorrectionEndpoints();
         app.MapOneCEndpoints();
 
         app.Run();

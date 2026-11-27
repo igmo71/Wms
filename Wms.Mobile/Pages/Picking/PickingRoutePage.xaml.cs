@@ -10,16 +10,19 @@ namespace Wms.Mobile;
 public partial class PickingRoutePage : ContentPage
 {
     private readonly MobilePickingClient _client;
+    private readonly MobileReplenishmentClient _replenishments;
     private readonly IOperationalBarcodeScanner _scanner;
     private readonly MobileWarehouseSelection _selection;
     private readonly IServiceProvider _services;
     private PickingAssemblyProcess _process;
     private MobilePickingAssemblyResponse? _assembly;
+    private MobilePickingReplenishmentsResponse? _replenishmentList;
+    private bool _orderingReplenishment;
     private bool _busy;
     private bool _visible;
     private long _scanGeneration;
 
-    public PickingRoutePage(MobilePickingClient client,
+    public PickingRoutePage(MobilePickingClient client, MobileReplenishmentClient replenishments,
         IOperationalBarcodeScanner scanner,
         MobileWarehouseSelection selection,
         PickingAssemblyProcess process,
@@ -27,6 +30,7 @@ public partial class PickingRoutePage : ContentPage
     {
         InitializeComponent();
         _client = client;
+        _replenishments = replenishments;
         _scanner = scanner;
         _selection = selection;
         _process = process;
@@ -35,7 +39,7 @@ public partial class PickingRoutePage : ContentPage
         CameraScannerView.Configure(scanner);
     }
 
-    public IReadOnlyList<PickingRouteRow> Steps { get; private set; } = [];
+    public IReadOnlyList<PickingRouteRow> Rows { get; private set; } = [];
     private bool CanWork => _assembly is { Status: MobilePickingAssemblyStatus.InProgress } assembly
         && assembly.ResponsibleUserId == _selection.CurrentUserId;
 
@@ -69,7 +73,7 @@ public partial class PickingRoutePage : ContentPage
         RouteRefreshView.IsRefreshing = false;
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(MobilePickingAssemblyResponse? updatedAssembly = null)
     {
         if (_busy || _assembly is null) return;
         using var measurement = MobilePerformanceDiagnostics.Load("Маршрут");
@@ -77,9 +81,12 @@ public partial class PickingRoutePage : ContentPage
         ErrorLabel.Text = string.Empty;
         try
         {
-            var assembly = await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
+            var assembly = updatedAssembly ?? await _client.GetAsync(_assembly.Id, _assembly.WarehouseId);
             ApplyAssembly(assembly);
-            var route = await LoadRouteAsync(assembly);
+            var routeTask = LoadRouteAsync(assembly);
+            var replenishmentTask = LoadReplenishmentsAsync(assembly);
+            await Task.WhenAll(routeTask, replenishmentTask);
+            var route = await routeTask;
             if (route is null)
             {
                 ClearRoute();
@@ -90,39 +97,12 @@ public partial class PickingRoutePage : ContentPage
                 }
                 return;
             }
-            var work = route.Work;
-            var skus = work.Skus.ToDictionary(x => x.SkuId);
-            var availableBySku = route.Steps.GroupBy(x => x.SkuId)
-                .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
-            Steps = route.Steps.Select((x, index) =>
-            {
-                var sku = skus.GetValueOrDefault(x.SkuId);
-                var name = sku?.Name ?? sku?.Code ?? x.SkuId.ToString();
-                var plan = sku is null ? "—" : sku.PlannedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
-                var fact = sku is null ? "—" : sku.ConfirmedQuantity.ToString("0.###", CultureInfo.CurrentCulture);
-                return new PickingRouteRow(x.SkuId, x.LocationCode,
-                    x.DirectPalletPick, index == 0, name,
-                    $"План {plan} {sku?.Unit ?? "—"}",
-                    $"Доступно {availableBySku[x.SkuId]:0.###}",
-                    $"Факт {fact}",
-                    $"Взять {x.Quantity:0.###}",
-                    (x.ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : "")
-                    + (x.DirectPalletPick ? " · снять весь поддон" : ""))
-                {
-                    Address = string.IsNullOrWhiteSpace(x.LocationName) ? x.LocationCode : x.LocationName,
-                    HasExpiredStock = x.CellAvailability?.HasExpiredStock == true
-                };
-            }).ToArray();
-            OnPropertyChanged(nameof(Steps));
-            RouteHint.IsVisible = Steps.Count > 0;
-            EmptyLabel.Text = work.Skus.All(x => x.ConfirmedQuantity >= x.PlannedQuantity)
-                ? "Отбор по маршруту завершён." : "Доступных шагов нет.";
-            EmptyLabel.IsVisible = Steps.Count == 0;
-            var uncovered = route.Gaps.GroupBy(x => x.SkuId)
-                .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
-            UncoveredLabel.Text = string.Join("\n", work.Skus.Where(x => uncovered.ContainsKey(x.SkuId))
-                .Select(x => $"{x.Name ?? x.Code ?? x.SkuId.ToString()} · {uncovered[x.SkuId]:0.###} {x.Unit ?? "—"}"));
-            UncoveredBlock.IsVisible = uncovered.Count > 0;
+            var (replenishmentList, replenishmentError) = await replenishmentTask;
+            _replenishmentList = replenishmentList?.Revision == route.Revision ? replenishmentList : null;
+            if (replenishmentList is not null && _replenishmentList is null)
+                replenishmentError = "Сборка изменилась. Потяните вниз, чтобы обновить подпитки.";
+            ErrorLabel.Text = replenishmentError ?? string.Empty;
+            ApplyRoute(route);
         }
         catch (MobileApiException exception)
         {
@@ -135,6 +115,59 @@ public partial class PickingRoutePage : ContentPage
             ErrorLabel.Text = "Не удалось обновить маршрут.";
         }
         finally { SetBusy(false); await UpdateCameraAsync(); }
+    }
+
+    private void ApplyRoute(MobilePickingRouteResponse route)
+    {
+        var skus = route.Work.Skus.ToDictionary(x => x.SkuId);
+        var reservedBySku = route.Steps.GroupBy(x => x.SkuId)
+            .ToDictionary(x => x.Key, x => x.Sum(step => step.Quantity));
+        var uncoveredBySku = route.Gaps.GroupBy(x => x.SkuId)
+            .ToDictionary(x => x.Key, x => x.Sum(gap => gap.Quantity));
+        var shownSkus = new HashSet<Guid>();
+        var rows = route.Steps.Select((step, index) =>
+            CreateRow(step.SkuId, step, index == 0, shownSkus.Add(step.SkuId))).ToList();
+        foreach (var sku in route.Work.Skus.Where(x => uncoveredBySku.ContainsKey(x.SkuId) && !shownSkus.Contains(x.SkuId)))
+            rows.Add(CreateRow(sku.SkuId, null, false, true));
+
+        Rows = rows;
+        OnPropertyChanged(nameof(Rows));
+        RouteHint.IsVisible = route.Steps.Count > 0;
+        EmptyLabel.Text = route.Work.Skus.All(x => x.ConfirmedQuantity >= x.PlannedQuantity)
+            ? "Отбор по маршруту завершён." : "Шагов маршрута нет.";
+        EmptyLabel.IsVisible = Rows.Count == 0;
+
+        PickingRouteRow CreateRow(Guid skuId, MobilePickingRouteStepResponse? step, bool isCurrent, bool showSummary)
+        {
+            var sku = skus.GetValueOrDefault(skuId);
+            var plan = sku?.PlannedQuantity.ToString("0.###", CultureInfo.CurrentCulture) ?? "—";
+            var fact = sku?.ConfirmedQuantity.ToString("0.###", CultureInfo.CurrentCulture) ?? "—";
+            var remaining = sku is null ? 0 : sku.PlannedQuantity - sku.ConfirmedQuantity;
+            var locationName = step?.LocationName;
+            var expiry = step?.ExpirationDate is DateOnly date ? $"до {date:dd.MM.yyyy}" : string.Empty;
+            var pallet = step?.DirectPalletPick == true;
+            var detail = pallet ? string.Join(" · ", new[] { expiry, "снять весь поддон" }.Where(x => x.Length > 0)) : expiry;
+            return new(skuId, step?.LocationCode, pallet, isCurrent, sku?.Name ?? sku?.Code ?? skuId.ToString(),
+                $"План {plan} {sku?.Unit ?? "—"}", $"Резерв {reservedBySku.GetValueOrDefault(skuId):0.###}",
+                $"Факт {fact}", step is null ? string.Empty : $"Взять {step.Quantity:0.###}", detail)
+            {
+                Address = string.IsNullOrWhiteSpace(locationName) ? step?.LocationCode : locationName,
+                HasExpiredStock = step?.CellAvailability?.HasExpiredStock == true,
+                StockSummary = new(showSummary ? uncoveredBySku.GetValueOrDefault(skuId) : 0,
+                    _replenishmentList?.StockBySku.GetValueOrDefault(skuId)?.FreeStorageQuantity),
+                Replenishment = showSummary ? PickingReplenishmentAction.ForSku(_replenishmentList, skuId, remaining)
+                    : PickingReplenishmentAction.Hidden
+            };
+        }
+    }
+
+    private async Task<(MobilePickingReplenishmentsResponse? List, string? Error)> LoadReplenishmentsAsync(
+        MobilePickingAssemblyResponse assembly)
+    {
+        if (!CanWork) return (null, null);
+        try { return (await _replenishments.AssemblyAsync(assembly.Id, assembly.WarehouseId), null); }
+        catch (MobileApiException exception) { return (null, exception.Message); }
+        catch (HttpRequestException) { return (null, "Не удалось обновить подпитки."); }
     }
 
     private async Task<MobilePickingRouteResponse?> LoadRouteAsync(MobilePickingAssemblyResponse assembly)
@@ -157,11 +190,11 @@ public partial class PickingRoutePage : ContentPage
 
     private void ClearRoute()
     {
-        Steps = [];
-        OnPropertyChanged(nameof(Steps));
+        Rows = [];
+        _replenishmentList = null;
+        OnPropertyChanged(nameof(Rows));
         RouteHint.IsVisible = false;
         EmptyLabel.IsVisible = false;
-        UncoveredBlock.IsVisible = false;
     }
 
     private void ApplyAssembly(MobilePickingAssemblyResponse assembly)
@@ -189,6 +222,12 @@ public partial class PickingRoutePage : ContentPage
         await OpenStepAsync(row, null);
     }
 
+    private async void OnChooseCellClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: PickingRouteRow { CanChooseCell: true } row })
+            await OpenStepAsync(row, null);
+    }
+
     private void OnScanReceived(object? sender, BarcodeScanEvent scan)
     {
         var generation = Volatile.Read(ref _scanGeneration);
@@ -201,10 +240,10 @@ public partial class PickingRoutePage : ContentPage
 
     private async Task OpenScannedStepAsync(string? code)
     {
-        if (!_visible || _busy || _process.HasPendingCommand || !CanWork || Steps.Count == 0
+        if (!_visible || _busy || _process.HasPendingCommand || !CanWork || !RouteHint.IsVisible
             || string.IsNullOrWhiteSpace(code)) return;
         var scannedCode = code.Trim();
-        var row = Steps.FirstOrDefault(x => string.Equals(x.LocationCode,
+        var row = Rows.FirstOrDefault(x => string.Equals(x.LocationCode,
             scannedCode, StringComparison.OrdinalIgnoreCase));
         if (row is null)
         {
@@ -224,8 +263,25 @@ public partial class PickingRoutePage : ContentPage
         {
             var page = _services.GetRequiredService<PickingEntryPage>();
             page.ShowPick(_assembly, _process, row.SkuId,
-                row.LocationCode, row.DirectPalletPick, PickingEntryOrigin.Route, scannedCode);
+                row.LocationCode, row.DirectPalletPick,
+                row.HasStep ? PickingEntryOrigin.Route : PickingEntryOrigin.Sku, scannedCode);
             await Navigation.PushAsync(page);
+        }
+        finally { SetBusy(false); await UpdateCameraAsync(); }
+    }
+
+    private async void OnReplenishmentClicked(object? sender, EventArgs e)
+    {
+        if (_busy || _process.HasPendingCommand || !CanWork || _assembly is not { } assembly
+            || _replenishmentList is not { } list
+            || sender is not Button { CommandParameter: PickingRouteRow row } || !row.Replenishment.IsVisible) return;
+        SetBusy(true);
+        try
+        {
+            if (!await row.Replenishment.ConfirmOrderAsync(this)) return;
+            _orderingReplenishment = true;
+            await RunWorkAsync(() => _process.OrderReplenishmentAsync(assembly.Id, assembly.WarehouseId,
+                list.Revision, row.SkuId));
         }
         finally { SetBusy(false); await UpdateCameraAsync(); }
     }
@@ -269,8 +325,8 @@ public partial class PickingRoutePage : ContentPage
             }
             if (!await DisplayAlertAsync("Закрыть и отгрузить",
                 "Складской факт будет проведён. Продолжить?", "Закрыть", "Отмена")) return;
-            SetBusy(false);
-            await CloseWorkAsync(() => _process.CloseAsync(_assembly.Id,
+            _orderingReplenishment = false;
+            await RunWorkAsync(() => _process.CloseAsync(_assembly.Id,
                 _assembly.WarehouseId, check.Revision));
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
@@ -281,19 +337,25 @@ public partial class PickingRoutePage : ContentPage
     private async void OnRetryClicked(object? sender, EventArgs e)
     {
         if (_busy || !_process.HasPendingCommand) return;
-        await CloseWorkAsync(_process.RetryAsync);
+        await RunWorkAsync(_process.RetryAsync);
     }
 
-    private async Task CloseWorkAsync(Func<Task<MobilePickingAssemblyResponse>> execute)
+    private async Task RunWorkAsync(Func<Task<MobilePickingAssemblyResponse>> execute)
     {
+        using var measurement = MobilePerformanceDiagnostics.Action(_orderingReplenishment ? "Заказ подпитки" : "Закрытие и отгрузка");
         SetBusy(true);
+        ErrorLabel.Text = string.Empty;
+        MobilePickingAssemblyResponse? refreshRoute = null;
         try
         {
-            _assembly = await execute();
-            if (_assembly.Status == MobilePickingAssemblyStatus.Closed)
+            var assembly = await execute();
+            ApplyAssembly(assembly);
+            if (_orderingReplenishment)
+                refreshRoute = assembly;
+            else if (assembly.Status == MobilePickingAssemblyStatus.Closed)
                 await Navigation.PopAsync();
             else
-                await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
+                await PickingSectionNavigation.SwitchAsync(this, _services, assembly,
                     _process, PickingSection.Sku);
         }
         catch (MobileApiException exception) { ErrorLabel.Text = exception.Message; }
@@ -301,9 +363,11 @@ public partial class PickingRoutePage : ContentPage
         {
             ErrorLabel.Text = _process.HasPendingCommand
                 ? "Ответ не подтверждён. Повторите ту же команду."
-                : "Сборка закрыта, но экран не обновился. Вернитесь к списку сборок.";
+                : "Команда выполнена, но экран не обновился. Потяните вниз.";
         }
-        finally { SetBusy(false); await UpdateCameraAsync(); }
+        finally { SetBusy(false); }
+        if (refreshRoute is not null) await RefreshAsync(refreshRoute);
+        else await UpdateCameraAsync();
     }
 
     private void SetBusy(bool busy)
@@ -313,6 +377,7 @@ public partial class PickingRoutePage : ContentPage
         ProgressIndicator.IsVisible = busy && !RouteRefreshView.IsRefreshing;
         ProgressIndicator.IsRunning = ProgressIndicator.IsVisible;
         RetryButton.IsVisible = !busy && _process.HasPendingCommand;
+        if (_process.HasPendingCommand) RetryButton.Text = $"Повторить: {_process.PendingLabel}";
         var canNavigate = !busy && !_process.HasPendingCommand && _assembly is not null;
         SkuButton.IsEnabled = canNavigate;
         SourcesButton.IsEnabled = canNavigate;
@@ -324,7 +389,7 @@ public partial class PickingRoutePage : ContentPage
 
     private async Task UpdateCameraAsync()
     {
-        if (_visible && !_busy && !_process.HasPendingCommand && CanWork && Steps.Count > 0
+        if (_visible && !_busy && !_process.HasPendingCommand && CanWork && RouteHint.IsVisible
             && _scanner.ActiveSource == BarcodeScanSource.Camera)
             await CameraScannerView.StartAsync();
         else CameraScannerView.Stop();
@@ -338,13 +403,17 @@ public partial class PickingRoutePage : ContentPage
     }
 }
 
-public sealed record PickingRouteRow(Guid SkuId, string LocationCode,
+public sealed record PickingRouteRow(Guid SkuId, string? LocationCode,
     bool DirectPalletPick, bool IsCurrent, string Heading,
-    string PlanText, string AvailableText, string FactText,
+    string PlanText, string ReservedText, string FactText,
     string StepQuantity, string Detail)
 {
-    public string Address { get; init; } = LocationCode;
+    public string? Address { get; init; } = LocationCode;
     public bool HasExpiredStock { get; init; }
+    public PickingStockSummary StockSummary { get; init; }
+    public PickingReplenishmentAction Replenishment { get; init; } = PickingReplenishmentAction.Hidden;
+    public bool HasStep => LocationCode is not null;
+    public bool CanChooseCell => !HasStep;
     public string ZoneIcon => DirectPalletPick ? "picking_pallet.png" : "picking_shelf.png";
     public string ZoneName => DirectPalletPick ? "Хранение" : "Комплектация";
     public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);

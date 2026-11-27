@@ -53,7 +53,7 @@
                                                 <Label Text="{Binding PlanText}" TextColor="#202124"
                                                        HorizontalTextAlignment="End" />
                                                 <HorizontalStackLayout HorizontalOptions="End" Spacing="3">
-                                                    <Label Text="Доступно" TextColor="#202124" />
+                                                    <Label Text="Резерв" TextColor="#202124" />
                                                     <Image Source="picking_shelf.png" WidthRequest="18" HeightRequest="18"
                                                            VerticalOptions="Center" IsVisible="{Binding HasStock}"
                                                            ToolTipProperties.Text="Комплектация"
@@ -80,7 +80,9 @@
                                                        HorizontalTextAlignment="End" />
                                             </VerticalStackLayout>
                                         </Grid>
-                                        <Label Text="{Binding UncoveredText}" IsVisible="{Binding HasUncoveredQuantity}"
+                                        <Label Text="{Binding StockSummary.FreeStockText}" IsVisible="{Binding StockSummary.HasFreeStock}"
+                                               FontSize="12" TextColor="#202124" HorizontalTextAlignment="End" />
+                                        <Label Text="{Binding StockSummary.ShortageText}" IsVisible="{Binding StockSummary.HasShortage}"
                                                FontSize="12" TextColor="#A12622" HorizontalTextAlignment="End" />
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                                             <HorizontalStackLayout Spacing="4" VerticalOptions="Start">
@@ -90,18 +92,18 @@
                                                         Clicked="OnSkuInfoClicked"
                                                         ToolTipProperties.Text="Остатки SKU по ячейкам"
                                                         SemanticProperties.Description="Остатки SKU по ячейкам" />
-                                                <Grid IsVisible="{Binding HasReplenishmentIcon}">
+                                                <Grid IsVisible="{Binding Replenishment.IsVisible}">
                                                     <Button Style="{StaticResource SkuCardAction}"
                                                             ImageSource="material_move_to_inbox.png"
-                                                            BackgroundColor="{Binding ReplenishmentColor}"
+                                                            BackgroundColor="{Binding Replenishment.BackgroundColor}"
                                                             CommandParameter="{Binding SkuId}"
                                                             Clicked="OnReplenishmentClicked"
-                                                            ToolTipProperties.Text="{Binding ReplenishmentHint}"
-                                                            SemanticProperties.Description="{Binding ReplenishmentHint}" />
+                                                            ToolTipProperties.Text="{Binding Replenishment.Hint}"
+                                                            SemanticProperties.Description="{Binding Replenishment.Hint}" />
                                                     <Label Text="╱" FontSize="24" TextColor="#111111"
                                                            HorizontalOptions="Center" VerticalOptions="Center"
                                                            InputTransparent="True"
-                                                           IsVisible="{Binding ShowUnavailableSlash}" />
+                                                           IsVisible="{Binding Replenishment.IsUnavailable}" />
                                                 </Grid>
                                             </HorizontalStackLayout>
                                             <VerticalStackLayout Grid.Column="1" Spacing="4"

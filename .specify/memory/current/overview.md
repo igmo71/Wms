@@ -14,7 +14,8 @@ operational inventory by storage location. Outbound exchange with 1C depends on
 the workflow, as described in [integration](integration.md).
 
 WMS supports receiving, putaway, picking with shipment at assembly closure,
-replenishment and location inventory counts. The current direct and transit
+replenishment, location inventory counts and manual cell stock correction.
+The current direct and transit
 [transfer workflows](other-workflows.md#intra-warehouse-transfer) use undated
 stock. WMS also provides stock history, employee-performance reports, topology
 administration, synchronized catalogs, and user administration.

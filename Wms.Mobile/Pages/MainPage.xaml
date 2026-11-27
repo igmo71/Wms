@@ -85,6 +85,12 @@
                 Text="Инвентаризация" />
 
             <Button
+                Clicked="OnStockCorrectionClicked"
+                FontSize="16"
+                HeightRequest="52"
+                Text="Корректировка" />
+
+            <Button
                 Clicked="OnScannerDiagnosticsClicked"
                 FontSize="16"
                 HeightRequest="48"

@@ -1,0 +1,51 @@
+<ContentPage
+    x:Class="Wms.Mobile.StockCorrectionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Wms.Mobile"
+    Title="Корректировка">
+
+    <ScrollView x:Name="PageScroll">
+        <VerticalStackLayout Padding="16" Spacing="12">
+            <Picker
+                x:Name="WarehousePicker"
+                ItemDisplayBinding="{Binding Name}"
+                SelectedIndexChanged="OnWarehouseChanged"
+                Title="Выберите склад" />
+
+            <Label x:Name="InstructionLabel" FontSize="16" />
+            <Grid x:Name="ScanPanel" ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="False">
+                <Entry x:Name="BarcodeEntry" Completed="OnReadBarcodeClicked" Placeholder="Штрихкод" ReturnType="Go" />
+                <Button Grid.Column="1" Clicked="OnReadBarcodeClicked" Text="Найти" />
+            </Grid>
+            <local:OperationalCameraScannerView x:Name="CameraScannerView" />
+            <ActivityIndicator x:Name="ProgressIndicator" IsVisible="False" />
+            <Label x:Name="StatusLabel" />
+            <Label x:Name="ErrorLabel" TextColor="Red" />
+            <Button x:Name="RetryButton" Clicked="OnRetryClicked" IsVisible="False" Text="Повторить отправку" />
+
+            <VerticalStackLayout x:Name="CellPanel" IsVisible="False" Spacing="10">
+                <Label x:Name="AddressLabel" FontAttributes="Bold" FontSize="22" />
+                <Label x:Name="HoldLabel" TextColor="Red" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button x:Name="ScanSkuButton" Clicked="OnScanSkuClicked" Text="Сканировать товар" />
+                    <Button Grid.Column="1" Clicked="OnChangeCellClicked" Text="Другая ячейка" />
+                </Grid>
+                <Label x:Name="EmptyLabel" Text="Учётных остатков и резервов в ячейке нет." />
+                <VerticalStackLayout x:Name="GroupsPanel" Spacing="8" />
+            </VerticalStackLayout>
+
+            <Border x:Name="EditPanel" IsVisible="False" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="SelectedGroupLabel" FontAttributes="Bold" FontSize="17" />
+                    <Entry x:Name="QuantityEntry" Keyboard="Numeric" Placeholder="Количество" />
+                    <Label x:Name="QuantityErrorLabel" IsVisible="False" TextColor="Red" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button x:Name="AddButton" Clicked="OnAddClicked" FontSize="18" Text="+ Добавить" />
+                        <Button x:Name="RemoveButton" Grid.Column="1" Clicked="OnRemoveClicked" FontSize="18" Text="− Списать" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -308,7 +308,7 @@ public partial class PickingEntryPage : ContentPage
         }
         else if (_source is { } source)
         {
-            if (quantity > source.SuggestedQuantity)
+            if (source.FromReserve && quantity > source.SuggestedQuantity)
             {
                 ErrorLabel.Text = "Количество превышает предложенное для этой ячейки.";
                 return;
@@ -457,6 +457,11 @@ public partial class PickingEntryPage : ContentPage
             {
                 var previous = Navigation.NavigationStack.Count >= 2
                     ? Navigation.NavigationStack[^2] as PickingRoutePage : null;
+                if (previous is not null && route.Gaps.Count > 0)
+                {
+                    await Navigation.PopAsync();
+                    return;
+                }
                 await PickingSectionNavigation.SwitchAsync(this, _services, _assembly,
                     _process, PickingSection.Sku);
                 if (previous is not null)

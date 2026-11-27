@@ -63,8 +63,8 @@ public sealed class ConfirmPick(CommandExecutor executor, IPickingAssemblyStore 
                     request.ExpirationDate, true, availability, today);
                 if (!checkedSource.IsSuccess) return checkedSource.Error!;
                 var source = checkedSource.Value!;
-                if (request.Quantity > source.SuggestedQuantity)
-                    return OperationError.Conflict("Количество превышает оставшуюся потребность или доступный остаток.");
+                if (request.Quantity > source.MaximumQuantity)
+                    return OperationError.Conflict($"В выбранной ячейке и группе срока сейчас можно отобрать до {source.MaximumQuantity:0.###}.");
                 if (request.Quantity < source.SuggestedQuantity)
                     return OperationError.Conflict("Для меньшего количества подтвердите недостачу в ячейке.");
                 if (state.Location!.Zone!.Type == ZoneType.Reserve)

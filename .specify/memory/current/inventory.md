@@ -76,6 +76,22 @@ Corrections preserve picked stock and can consume the disputed quantity of the
 referenced shortage. The Manager use case resolves that report in the same
 session. Receiving putaway cannot occupy a cell held by picking or replenishment.
 
+## Manual cell stock correction
+
+The correction applies one signed quantity change to one SKU and expiration
+group in an active Комплектация or Хранение cell. Additions
+may create a group or increase existing stock. A cell hold blocks posting.
+Deductions are limited to current free stock by the shared posting rules.
+The operation preserves route reservations, confirmed picks and shortage
+blocks. Added stock becomes available under normal picking rules and can be
+selected by scanning the cell from an active assembly's SKU. It enters the
+assembly's fact when the operator confirms the pick.
+
+A correction commits the movement, balance, turnover, audit event and command
+receipt together. The movement uses «Корректировка остатка». The separate
+manual correction audit records actor, cell, SKU, expiration, signed change
+and movement ID. An exact retry returns the original movement.
+
 ## Expiration day
 
 Picking and replenishment use the application server's local date for expiry
@@ -111,8 +127,12 @@ released quantity is physically there; the matching reservation is reduced
 in the same command. The return checks available stock for the reopened
 demand. A plan increase does the same for newly added demand. A plan decrease
 releases the excess route quantity and keeps established physical pallet
-holds until their own release. A normal pick confirms the full quantity
-offered for the scanned SKU, cell and expiration group. When the operator finds less,
+holds until their own release. A scan in Комплектация offers the route-reserved
+quantity if present, otherwise the available free quantity, up to the remaining
+plan. A single confirmed pick can include the offered reservation plus free
+stock from the same SKU, cell and expiration group, within remaining demand
+and FEFO. The command rechecks these limits and reserves the confirmed total.
+When the operator finds less than the offered quantity,
 including zero, the found quantity means the entire remaining physical stock
 of that group in the cell. Expected physical quantity excludes confirmed
 picks and includes quantities still in the cell for other assemblies.

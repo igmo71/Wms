@@ -32,7 +32,8 @@ public sealed record PickingReplenishmentsView(
     PickingWorkView Work, IReadOnlyDictionary<Guid, decimal> PickableBySku,
     IReadOnlyDictionary<Guid, PickingSkuStock> StockBySku);
 
-public sealed record PickingSkuStock(PickingFreeStock Storage, PickingFreeStock Reserve);
+public sealed record PickingSkuStock(PickingFreeStock Storage, PickingFreeStock Reserve,
+    decimal FreeStorageQuantity);
 
 public sealed class GetPickingReplenishments(
     GetPickingWork workQuery, BuildPickingRoute routeBuilder,
@@ -77,6 +78,9 @@ public sealed class GetPickingReplenishments(
         var expiredBySku = availability.Where(x => x.Group.ExpirationDate < today
                 && x.RouteReservedFor(assemblyId) > 0)
             .ToLookup(x => x.Group.StockKeepingUnitId);
+        var freeStorageBySku = availability.Where(x => (x.Group.ExpirationDate is null || x.Group.ExpirationDate >= today)
+                && locations.GetValueOrDefault(x.Group.StorageLocationId) is { IsActive: true, ZoneType: ZoneType.Storage })
+            .ToLookup(x => x.Group.StockKeepingUnitId, x => x.AvailableQuantity);
         var stockBySku = work.Skus.ToDictionary(x => x.SkuId, x =>
         {
             var steps = stepsBySku[x.SkuId].ToLookup(step => step.DirectPalletPick);
@@ -85,7 +89,8 @@ public sealed class GetPickingReplenishments(
                 .ToHashSet();
             return new PickingSkuStock(
                 new PickingFreeStock(steps[false].Sum(step => step.Quantity), expiredZones.Contains(ZoneType.Storage)),
-                new PickingFreeStock(steps[true].Sum(step => step.Quantity), expiredZones.Contains(ZoneType.Reserve)));
+                new PickingFreeStock(steps[true].Sum(step => step.Quantity), expiredZones.Contains(ZoneType.Reserve)),
+                freeStorageBySku[x.SkuId].Sum());
         });
         return new PickingReplenishmentsView(assemblyId, work.WarehouseId,
             work.Revision,

@@ -30,4 +30,13 @@ public sealed class WarehousePermission(IWarehousePermissionStore store)
 
         return OperationResult.Success();
     }
+
+    public async Task<OperationResult> RequireOperatorOrManagerAsync(string? userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId)
+            || (!await store.HasOperatorRoleAsync(userId, ct) && !await store.HasManagerRoleAsync(userId, ct)))
+            return OperationError.Conflict("Для этого действия требуется роль Operator или Manager.");
+
+        return OperationResult.Success();
+    }
 }

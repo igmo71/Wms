@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Wms.Application.Authorization;
 using Wms.Application.CommandExecution;
+using Wms.Application.Inventory;
 using Wms.Application.Picking;
+using Wms.Application.Replenishment;
 using Wms.Common;
 using Wms.Data;
 using Wms.Domain;
@@ -14,6 +17,129 @@ namespace Wms.Tests.Picking;
 [Collection(SqlDatabaseCollection.Name)]
 public sealed class PickingRouteReservationTests(SqlDatabase database)
 {
+    [Fact]
+    public async Task Cell_correction_covers_an_active_assembly_gap_and_protects_already_picked_stock()
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Cell correction warehouse" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Found stock" };
+        var zone = Zone(warehouse.Id, "PK", ZoneType.Storage);
+        var cell = Location(warehouse.Id, zone, 1);
+        var (assembly, source) = ActiveAssembly(warehouse.Id, sku.Id, 5);
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, cell, assembly, source,
+                Balance(warehouse.Id, cell.Id, sku.Id, 2),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id, cell.Id, sku.Id, null, 2)));
+            await seed.SaveChangesAsync();
+        }
+
+        var (scan, pick, _) = Commands();
+        var firstPick = new ConfirmPickRequest(Guid.NewGuid(), assembly.Id, assembly.OperationalRevision,
+            cell.Code, sku.Id, null, 2, Worker);
+        Value(await pick.ExecuteAsync(firstPick));
+        Error(await scan.ExecuteAsync(assembly.Id, sku.Id, cell.Code, Worker), OperationErrorType.Conflict);
+
+        var stock = new StockAvailabilityStore(database);
+        var correction = new CorrectCellStock(new CommandExecutor(new CommandExecutionStore(database)),
+            stock, new PostInventoryMovement.Handler(new InventoryPostingStore()),
+            new WarehousePermission(new CorrectionRoles()), TimeProvider.System);
+        var request = new CorrectCellStockRequest(Guid.NewGuid(), Manager, warehouse.Id, cell.Id, sku.Id, null, 3);
+        Error(await correction.ExecuteAsync(request with { RequestId = Guid.NewGuid(), UserId = "other-user" }),
+            OperationErrorType.Conflict);
+        var movementId = Value(await correction.ExecuteAsync(request));
+        var rejectedRemoval = await correction.ExecuteAsync(request with
+        {
+            RequestId = Guid.NewGuid(), UserId = Worker, QuantityChange = -4
+        });
+        Error(rejectedRemoval, OperationErrorType.Conflict);
+        Assert.Contains("защиты резервов", rejectedRemoval.Error!.Message);
+
+        var correctionCell = Value(await stock.ReadCorrectionCellAsync(warehouse.Id, cell.Code, default));
+        var group = Assert.Single(correctionCell.Groups).Stock;
+        Assert.Equal(5m, group.AccountingQuantity);
+        Assert.Equal(2m, group.ConfirmedReservedQuantity);
+        Assert.Equal(3m, group.AvailableQuantity);
+
+        var work = new GetPickingWork(new PickingAssemblyQueryStore(database), Permission());
+        var skuView = Value(await new GetPickingReplenishments(work, new BuildPickingRoute(), stock,
+            new ReplenishmentStore(database), new BuildReplenishmentProposals(), TimeProvider.System)
+            .ExecuteAsync(assembly.Id, Worker));
+        Assert.Equal(3m, skuView.StockBySku[sku.Id].FreeStorageQuantity);
+        var sourceAfterCorrection = Value(await scan.ExecuteAsync(assembly.Id, sku.Id, cell.Code, Worker));
+        Assert.Equal(3m, sourceAfterCorrection.SuggestedQuantity);
+        Value(await pick.ExecuteAsync(firstPick with
+        {
+            RequestId = Guid.NewGuid(), ExpectedRevision = skuView.Revision, Quantity = 3
+        }));
+
+        await using var verify = database.CreateDbContext();
+        var movement = await verify.InventoryMovements.SingleAsync(x => x.WarehouseId == warehouse.Id);
+        Assert.Equal(movementId, movement.Id);
+        Assert.Equal(RecorderType.StockCorrection, movement.RecorderType);
+        Assert.Equal(cell.Id, movement.DestinationStorageLocationId);
+        Assert.Equal(3m, movement.Quantity);
+        var turnover = await verify.InventoryTurnovers.SingleAsync(x => x.InventoryMovementId == movementId);
+        Assert.Equal(2m, turnover.BalanceBefore);
+        Assert.Equal(5m, turnover.BalanceAfter);
+        var audit = await verify.WarehouseAuditEvents.SingleAsync(x => x.RequestId == request.RequestId);
+        Assert.Equal(CorrectCellStock.PostedEventType, audit.EventType);
+        Assert.Equal(Manager, audit.ActorUserId);
+        Assert.Equal(cell.Id, audit.StorageLocationId);
+        Assert.Equal(5m, (await verify.InventoryBalances.SingleAsync(x => x.WarehouseId == warehouse.Id)).Quantity);
+        Assert.Equal(5m, await verify.PickingReservations.Where(x => x.PickingAssemblyId == assembly.Id)
+            .SumAsync(x => x.Quantity));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Pick_can_combine_own_route_and_free_stock_without_using_protected_stock_or_skipping_fefo(
+        bool earlierStockAvailable)
+    {
+        var warehouse = new Warehouse { Id = Guid.NewGuid(), Name = "Supplemental pick warehouse" };
+        var sku = new StockKeepingUnit { Id = Guid.NewGuid(), Name = "Picking SKU" };
+        var zone = Zone(warehouse.Id, "PK", ZoneType.Storage);
+        var cell = Location(warehouse.Id, zone, 1);
+        var earlierCell = Location(warehouse.Id, zone, 2);
+        var (assembly, source) = ActiveAssembly(warehouse.Id, sku.Id, 6);
+        var (other, otherSource) = ActiveAssembly(warehouse.Id, sku.Id, 1);
+        var date = DateOnly.FromDateTime(DateTime.Today.AddDays(30));
+        await using (var seed = database.CreateDbContext())
+        {
+            seed.AddRange(warehouse, sku, zone, cell, earlierCell, assembly, source, other, otherSource,
+                Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id, cell.Id, sku.Id, 6,
+                    DateTimeOffset.UtcNow, date)),
+                Value(PickingRouteReservation.Create(assembly.Id, warehouse.Id, cell.Id, sku.Id, date, 2)),
+                Value(PickingRouteReservation.Create(other.Id, warehouse.Id, cell.Id, sku.Id, date, 1)));
+            if (earlierStockAvailable)
+                seed.Add(Value(InventoryBalance.Create(Guid.NewGuid(), warehouse.Id, earlierCell.Id, sku.Id, 1,
+                    DateTimeOffset.UtcNow, date.AddDays(-1))));
+            await seed.SaveChangesAsync();
+        }
+
+        var (scan, pick, _) = Commands();
+        var scanned = Value(await scan.ExecuteAsync(assembly.Id, sku.Id, cell.Code, Worker));
+        Assert.Equal(2m, scanned.SuggestedQuantity);
+        var expected = earlierStockAvailable ? 2m : 5m;
+        Assert.Equal(expected, scanned.MaximumQuantity);
+
+        var request = new ConfirmPickRequest(Guid.NewGuid(), assembly.Id, assembly.OperationalRevision,
+            cell.Code, sku.Id, date, expected, Worker);
+        Error(await pick.ExecuteAsync(request with
+        {
+            RequestId = Guid.NewGuid(), Quantity = earlierStockAvailable ? 5m : 6m
+        }), OperationErrorType.Conflict);
+        var entryId = Value(await pick.ExecuteAsync(request));
+
+        await using var verify = database.CreateDbContext();
+        var routeReservation = await verify.PickingRouteReservations.SingleAsync(x => x.StorageLocationId == cell.Id);
+        Assert.Equal(other.Id, routeReservation.PickingAssemblyId);
+        Assert.Equal(1m, routeReservation.Quantity);
+        var confirmed = await verify.PickingReservations.SingleAsync(x => x.PickingAssemblyId == assembly.Id);
+        Assert.Equal(entryId, confirmed.PickingEntryId);
+        Assert.Equal(expected, confirmed.Quantity);
+    }
+
     [Fact]
     public async Task Picking_from_an_alternative_releases_only_the_replaced_quantity_once()
     {
@@ -177,5 +303,11 @@ public sealed class PickingRouteReservationTests(SqlDatabase database)
                 permission, routeStock, TimeProvider.System),
             new ReportPickingShortage(executor, assemblies, stock, stock, stock,
                 permission, routeStock, TimeProvider.System));
+    }
+
+    private sealed class CorrectionRoles : IWarehousePermissionStore
+    {
+        public Task<bool> HasOperatorRoleAsync(string userId, CancellationToken ct) => Task.FromResult(userId == Worker);
+        public Task<bool> HasManagerRoleAsync(string userId, CancellationToken ct) => Task.FromResult(userId == Manager);
     }
 }

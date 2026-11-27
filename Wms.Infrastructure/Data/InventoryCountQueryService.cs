@@ -8,24 +8,6 @@ namespace Wms.Data;
 
 public class InventoryCountQueryService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 {
-    public async Task<IReadOnlyList<StorageLocation>> SearchLocationsAsync(Guid warehouseId,
-        string? searchText, CancellationToken ct = default)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
-        var locations = db.StorageLocations.AsNoTracking().Include(x => x.Zone)
-            .Where(x => x.WarehouseId == warehouseId && !x.DeletionMark && !x.IsFolder
-                && !x.Warehouse!.DeletionMark && !x.Zone!.DeletionMark
-                && (x.Zone.Type == ZoneType.Storage || x.Zone.Type == ZoneType.Reserve));
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            var term = searchText.Trim();
-            var normalized = StorageLocationAddress.Normalize(term);
-            var code = normalized.IsSuccess ? normalized.Value! : term;
-            locations = locations.Where(x => x.Name.Contains(term) || x.Code.Contains(code));
-        }
-        return await locations.OrderBy(x => x.Code).Take(10).ToListAsync(ct);
-    }
-
     public async Task<InventoryCount?> GetAsync(Guid id, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);

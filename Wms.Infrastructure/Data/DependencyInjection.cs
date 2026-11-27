@@ -64,7 +64,9 @@ public static class DependencyInjection
         services.AddScoped<IStockAvailabilityStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
         services.AddScoped<IStockReservationStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
         services.AddScoped<IStockShortageStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
+        services.AddScoped<ICellStockCorrectionStore>(sp => sp.GetRequiredService<StockAvailabilityStore>());
         services.AddScoped<GetStockAvailability>();
+        services.AddScoped<CorrectCellStock>();
         services.AddScoped<IReceivingSourceStore, ReceivingSourceStore>();
         services.AddScoped<SynchronizeReceivingSource>();
         services.AddScoped<IShippingSourceStore, ShippingSourceStore>();

@@ -60,6 +60,18 @@ group and set its quantity. A Web Manager can change the cell's SKU-mixing
 permission from «Инвентаризация» by choosing the warehouse and cell. See the
 [count rules](other-workflows.md#inventory-count).
 
+## Stock correction
+
+«Корректировка» opens the cell scanner on the TSD home screen and the warehouse
+and cell selectors from Web navigation. Both screens show each SKU and expiration
+group with accounting stock, confirmed picks, route reservations, shortage blocks
+and free stock. A held cell shows the reason. The user selects a row or finds a
+SKU and chooses its expiration group. TSD accepts barcode scans, and Web searches
+by name, code or barcode. The user enters the quantity and confirms «+ Добавить»
+or «− Списать». After posting, the screen reloads the cell. If the posting
+response is uncertain, the retry sends the same request. See the
+[posting rules](inventory.md#manual-cell-stock-correction).
+
 ## Putaway history
 
 Independent putaway starts from its own LPN screen. Its placement history shows
@@ -213,8 +225,8 @@ sections share a compact bottom navigation row. Section changes replace
 the current section in the stack, while pending commands block navigation;
 unavailable work sections remain disabled. The first route card has a stronger
 border and gray background. The SKU and route cards show the assembly's plan,
-confirmed fact and availability from the [reserved route](inventory.md#picking)
-per SKU. The SKU card breaks the total down into «Комплектация» and eligible
+confirmed fact and «Резерв», the quantity in the [reserved route](inventory.md#picking)
+per SKU. The SKU card breaks that quantity down into «Комплектация» and eligible
 whole «Хранение» pallets, while each route card shows the SKU's total across
 its steps. The unit appears next to plan. SKU cards use green when fact equals
 plan, yellow for a positive fact that differs from plan and white for zero
@@ -222,10 +234,12 @@ fact against an outstanding plan. An expired reservation can add a warning
 alongside the quantity. Unknown availability is shown as a dash.
 Route cards appear in route order without step numbers. Each card shows its
 address prominently with «Взять» and the step quantity on the same line, the
-SKU name on the left, and plan, available and fact in a right-aligned column.
-SKU cards show «Не хватает к отбору» when the route cannot cover the remaining
-plan. The route lists the same shortfall by SKU below its steps, including when
-it offers no steps. When the fact covers the plan, the empty route shows
+SKU name on the left, and plan, reserved route quantity and fact on the right.
+When the reserve falls short of the remaining plan, both screens show available
+nonexpired Комплектация stock as «Свободный остаток». «Не хватает» shows the
+remaining quantity after counting the reserve and that free stock. The route
+shows these quantities on the first card for the SKU. An outstanding SKU with no step
+gets a card that opens cell selection for that SKU. When the fact covers the plan, the empty route shows
 «Отбор по маршруту завершён». The scan instruction and scanner are available
 while there are route steps. The Route page refreshes the assembly status and
 owner before requesting working steps and offers closing to the active owner.
@@ -251,18 +265,19 @@ and a return icon for the current owner of an active assembly. Facts from differ
 cells or expiration groups stay separate without repeating the SKU name in a
 second list. Tapping the name/quantity block opens picking; action buttons and fact
 rows do not open it. The card uses 36-by-36 action buttons with 24-by-24 symbols.
-A replenishment icon
-on that card uses blue for an available order action, yellow for ordered,
+A replenishment icon on SKU and on the first route card for that SKU uses
+blue for an available order action, yellow for ordered,
 orange for in progress, and green only when currently pickable quantity covers
 the whole remaining SKU plan and this SKU has a non-cancelled replenishment
 task. The icon is absent when the SKU was already fully pickable without
-replenishment. Where shown, it sits beside the information action. When the
+replenishment. On SKU it sits beside the information action. When the
 remaining plan is not yet covered, in-progress tasks take precedence over
 ordered tasks, and both retain their status color when another proposal exists.
 Tapping that status opens a dialog with «Заказать ещё» when applicable.
-A gray icon with a crossed arrow means no further
-replenishment is currently available; tapping it shows a short explanation.
-The icon is hidden when the SKU plan is already confirmed. The picking worker
+A gray icon with a crossed arrow means no further replenishment is available;
+tapping it shows a short explanation. The icon is hidden when the SKU plan is
+confirmed or free Комплектация stock covers the route gap and there is no
+order proposal or active replenishment. The picking worker
 does not see a separate replenishment section or individual task details.
 ### Cell selection, confirmation and return
 
@@ -280,8 +295,10 @@ expiration ascending with unknown dates last, then by available quantity
 descending and warehouse address descending. The info button opens the full
 stock-by-cell report. «Доступно» is red when the row can be
 picked now and its available quantity is below the remaining SKU demand.
-Tapping a row uses the same source check as scanning its cell. The operator
-confirms the offered quantity explicitly. The fact and return pages show plan,
+Tapping a row uses the same source check as scanning its cell. The fact input
+starts with the offered quantity. In Комплектация the operator can increase it
+to include free stock under the [picking rules](inventory.md#picking).
+The fact and return pages show plan,
 confirmed fact and remaining or return quantity beside the SKU, with the unit
 beside plan. They show the recommended or original address separately from the
 scanned cell's stock and expiry. The device scanner and camera are available
@@ -292,7 +309,8 @@ hint appears only for a scanned pick, not a return. Inputs and actions are
 disabled while a command is running or awaiting an explicit retry.
 Opened from the route, the fact card refreshes the next route step in place.
 When no route steps remain after a pick or shortage confirmation, the app
-returns to the SKU list, where all outstanding quantities are visible.
+returns to the route if there are outstanding SKU cards, and to the SKU list
+if the route has no gaps.
 Opened from SKU, it returns to that SKU list after each successful pick or
 shortage confirmation, even if the SKU is not complete. An uncertain response
 keeps the page open; a successful explicit retry follows the same navigation.

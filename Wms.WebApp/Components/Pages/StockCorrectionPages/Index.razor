@@ -1,0 +1,133 @@
+@page "/stock-corrections"
+@attribute [Authorize(Roles = ApplicationRoles.OperatorOrManager)]
+@using Wms.Domain
+
+<PageTitle>Корректировка остатков</PageTitle>
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h5">Корректировка остатков</MudText>
+
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" sm="5">
+            <MudAutocomplete T="Warehouse" Value="_warehouse" ValueChanged="SelectWarehouse"
+                             SearchFunc="SearchWarehousesAsync" ToStringFunc="warehouse => warehouse?.Name ?? string.Empty"
+                             Label="Склад" Disabled="@InputsLocked" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="5">
+            <MudAutocomplete T="StorageLocation" Value="_location" ValueChanged="SelectLocationAsync"
+                             SearchFunc="SearchLocationsAsync" ToStringFunc="GetLocationText"
+                             Label="Ячейка" Disabled="@(InputsLocked || _warehouse is null)" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudButton Disabled="@(InputsLocked || _location is null)" OnClick="ReloadAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh">Обновить</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (_busy)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+    @if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+    }
+    @if (_status is not null)
+    {
+        <MudAlert Severity="Severity.Success">@_status</MudAlert>
+    }
+    @if (_pending is not null)
+    {
+        <MudAlert Severity="Severity.Info">
+            Корректировка ждёт подтверждения результата.
+            <MudButton OnClick="@(() => RunCorrectionAsync())" Disabled="@_busy" Color="Color.Primary">
+                Повторить
+            </MudButton>
+        </MudAlert>
+    }
+
+    @if (_cell is { } cell)
+    {
+        @if (cell.Location.ActiveLock is { } hold)
+        {
+            <MudAlert Severity="Severity.Warning">@hold.Reason</MudAlert>
+        }
+        else
+        {
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="5">
+                        <MudAutocomplete T="StockKeepingUnit" Value="_sku" ValueChanged="SelectSku"
+                                         SearchFunc="SearchSkusAsync" ToStringFunc="GetSkuText"
+                                         Label="Товар по наименованию, коду или штрихкоду"
+                                         Disabled="@InputsLocked" Clearable="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_expiration" Label="Срок годности" DateFormat="dd.MM.yyyy"
+                                       Editable="true" Clearable="true"
+                                       Disabled="@(InputsLocked || _sku is null || _withoutDate)" />
+                        @if (_sku is not null)
+                        {
+                            <MudCheckBox T="bool" @bind-Value="_withoutDate" Label="Без даты / срок неизвестен"
+                                         Disabled="@(InputsLocked || _expiration.HasValue)" />
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="2">
+                        <MudNumericField T="decimal?" @bind-Value="_quantity" Label="Количество"
+                                         Adornment="Adornment.End" AdornmentText="@GetUnitText(_sku)"
+                                         Min="0" Step="@(0.001m)" Immediate="true" HideSpinButtons="true"
+                                         Disabled="@(InputsLocked || _sku is null)" />
+                    </MudItem>
+                    <MudItem xs="12" md="2">
+                        <MudStack Spacing="1">
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!CanPost(true))"
+                                       OnClick="@(() => RunCorrectionAsync(true))">+ Добавить</MudButton>
+                            <MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="@(!CanPost(false))"
+                                       OnClick="@(() => RunCorrectionAsync(false))">− Списать</MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <MudTable T="CellStockGroup" Items="cell.Groups" Hover="true" Striped="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Товар</MudTh>
+                <MudTh>Срок годности</MudTh>
+                <MudTh>По учёту</MudTh>
+                <MudTh>Уже отобрано</MudTh>
+                <MudTh>В маршруте</MudTh>
+                <MudTh>Заблокировано недостачей</MudTh>
+                <MudTh>Свободно</MudTh>
+                @if (cell.Location.ActiveLock is null) { <MudTh></MudTh> }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Товар">
+                    @GetSkuText(context.Sku)
+                    <MudText Typo="Typo.caption">@GetUnitText(context.Sku)</MudText>
+                </MudTd>
+                <MudTd DataLabel="Срок годности">@FormatExpiration(context.Stock.Group.ExpirationDate)</MudTd>
+                <MudTd DataLabel="По учёту">@FormatQuantity(context.Stock.AccountingQuantity)</MudTd>
+                <MudTd DataLabel="Уже отобрано">@FormatQuantity(context.Stock.ConfirmedReservedQuantity)</MudTd>
+                <MudTd DataLabel="В маршруте">@FormatQuantity(context.Stock.RouteReservations.Sum(x => x.Quantity))</MudTd>
+                <MudTd DataLabel="Заблокировано недостачей">@FormatQuantity(context.Stock.BlockedQuantity)</MudTd>
+                <MudTd DataLabel="Свободно">@FormatQuantity(context.Stock.AvailableQuantity)</MudTd>
+                @if (cell.Location.ActiveLock is null)
+                {
+                    <MudTd>
+                        <MudButton Disabled="@InputsLocked" OnClick="@(() => SelectGroup(context))" Size="Size.Small">
+                            Выбрать
+                        </MudButton>
+                    </MudTd>
+                }
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Учётных остатков и резервов в ячейке нет.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudStack>

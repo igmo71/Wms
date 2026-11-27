@@ -73,7 +73,8 @@ internal static class MobileReplenishmentEndpoints
         {
             StockBySku = view.StockBySku.ToDictionary(x => x.Key, x =>
                 new MobilePickingSkuStockResponse(MobilePickingEndpoints.MapFreeStock(x.Value.Storage),
-                    MobilePickingEndpoints.MapFreeStock(x.Value.Reserve)))
+                    MobilePickingEndpoints.MapFreeStock(x.Value.Reserve))
+                { FreeStorageQuantity = x.Value.FreeStorageQuantity })
         });
     }
 

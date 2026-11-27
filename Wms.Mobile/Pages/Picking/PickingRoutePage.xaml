@@ -26,7 +26,7 @@
         <RefreshView x:Name="RouteRefreshView" Grid.Row="1" Refreshing="OnRefreshing">
             <ScrollView>
                 <VerticalStackLayout Spacing="7">
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps, Source={x:Reference Page}}"
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows, Source={x:Reference Page}}"
                                          Spacing="5">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="local:PickingRouteRow">
@@ -38,54 +38,71 @@
                                             <Setter Property="Stroke" Value="{AppThemeBinding Light=#707070, Dark=#A0A0A0}" />
                                         </DataTrigger>
                                     </Border.Triggers>
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Tapped="OnStepTapped"
-                                                              CommandParameter="{Binding .}" />
-                                    </Border.GestureRecognizers>
-                                    <VerticalStackLayout Spacing="2">
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
-                                                <Image Source="{Binding ZoneIcon}" WidthRequest="20" HeightRequest="20"
-                                                       VerticalOptions="Center" ToolTipProperties.Text="{Binding ZoneName}"
-                                                       SemanticProperties.Description="{Binding ZoneName}" />
-                                                <Label Grid.Column="1" Text="{Binding Address}" FontSize="23"
-                                                       FontAttributes="Bold" VerticalTextAlignment="Center" />
-                                            </Grid>
-                                            <Label Grid.Column="1" Text="{Binding StepQuantity}" FontSize="13"
-                                                   FontAttributes="Bold" VerticalTextAlignment="Center"
-                                                   MaxLines="1" LineBreakMode="NoWrap" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                            <Label Text="{Binding Heading}" FontAttributes="Bold"
-                                                   LineBreakMode="WordWrap" />
-                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                                <Label Text="{Binding PlanText}" HorizontalTextAlignment="End"
+                                    <VerticalStackLayout Spacing="5">
+                                        <VerticalStackLayout Spacing="2">
+                                            <VerticalStackLayout.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnStepTapped" CommandParameter="{Binding .}" />
+                                            </VerticalStackLayout.GestureRecognizers>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasStep}">
+                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
+                                                    <Image Source="{Binding ZoneIcon}" WidthRequest="20" HeightRequest="20"
+                                                           VerticalOptions="Center" ToolTipProperties.Text="{Binding ZoneName}"
+                                                           SemanticProperties.Description="{Binding ZoneName}" />
+                                                    <Label Grid.Column="1" Text="{Binding Address}" FontSize="23"
+                                                           FontAttributes="Bold" VerticalTextAlignment="Center" />
+                                                </Grid>
+                                                <Label Grid.Column="1" Text="{Binding StepQuantity}" FontSize="13"
+                                                       FontAttributes="Bold" VerticalTextAlignment="Center"
                                                        MaxLines="1" LineBreakMode="NoWrap" />
-                                                <HorizontalStackLayout HorizontalOptions="End" Spacing="3">
-                                                    <Label Text="{Binding AvailableText}" MaxLines="1" LineBreakMode="NoWrap" />
-                                                    <Image Source="picking_expiry_warning.png" WidthRequest="16" HeightRequest="16"
-                                                           VerticalOptions="Center" IsVisible="{Binding HasExpiredStock}"
-                                                           ToolTipProperties.Text="Есть товар с истёкшим сроком годности"
-                                                           SemanticProperties.Description="Есть товар с истёкшим сроком годности" />
-                                                </HorizontalStackLayout>
-                                                <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
-                                                       HorizontalTextAlignment="End" MaxLines="1" LineBreakMode="NoWrap" />
-                                            </VerticalStackLayout>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                                <Label Text="{Binding Heading}" FontAttributes="Bold"
+                                                       LineBreakMode="WordWrap" />
+                                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                    <Label Text="{Binding PlanText}" HorizontalTextAlignment="End"
+                                                           MaxLines="1" LineBreakMode="NoWrap" />
+                                                    <HorizontalStackLayout HorizontalOptions="End" Spacing="3">
+                                                        <Label Text="{Binding ReservedText}" MaxLines="1" LineBreakMode="NoWrap" />
+                                                        <Image Source="picking_expiry_warning.png" WidthRequest="16" HeightRequest="16"
+                                                               VerticalOptions="Center" IsVisible="{Binding HasExpiredStock}"
+                                                               ToolTipProperties.Text="Есть товар с истёкшим сроком годности"
+                                                               SemanticProperties.Description="Есть товар с истёкшим сроком годности" />
+                                                    </HorizontalStackLayout>
+                                                    <Label Text="{Binding FactText}" FontFamily="OpenSansSemibold"
+                                                           HorizontalTextAlignment="End" MaxLines="1" LineBreakMode="NoWrap" />
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                            <Label Text="{Binding Detail}" FontSize="13"
+                                                   IsVisible="{Binding HasDetail}" />
+                                            <Label Text="{Binding StockSummary.FreeStockText}" IsVisible="{Binding StockSummary.HasFreeStock}"
+                                                   FontSize="12" HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding StockSummary.ShortageText}" IsVisible="{Binding StockSummary.HasShortage}"
+                                                   FontSize="12" HorizontalTextAlignment="End"
+                                                   TextColor="{AppThemeBinding Light=#A12622, Dark=#FFB4AB}" />
+                                        </VerticalStackLayout>
+                                        <Grid IsVisible="{Binding Replenishment.IsVisible}" HorizontalOptions="Start">
+                                            <Button WidthRequest="36" HeightRequest="36"
+                                                    MinimumWidthRequest="36" MinimumHeightRequest="36"
+                                                    Padding="6" CornerRadius="6"
+                                                    ImageSource="material_move_to_inbox.png"
+                                                    BackgroundColor="{Binding Replenishment.BackgroundColor}"
+                                                    CommandParameter="{Binding .}" Clicked="OnReplenishmentClicked"
+                                                    ToolTipProperties.Text="{Binding Replenishment.Hint}"
+                                                    SemanticProperties.Description="{Binding Replenishment.Hint}" />
+                                            <Label Text="╱" FontSize="24" TextColor="#111111"
+                                                   HorizontalOptions="Center" VerticalOptions="Center"
+                                                   InputTransparent="True" IsVisible="{Binding Replenishment.IsUnavailable}" />
                                         </Grid>
-                                        <Label Text="{Binding Detail}" FontSize="13"
-                                               IsVisible="{Binding HasDetail}" />
+                                        <Button Text="Выбрать ячейку" IsVisible="{Binding CanChooseCell}"
+                                                HorizontalOptions="Start" FontSize="13" Padding="8,4"
+                                                CommandParameter="{Binding .}" Clicked="OnChooseCellClicked" />
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
-                    <Label x:Name="EmptyLabel" Text="Доступных шагов нет."
+                    <Label x:Name="EmptyLabel" Text="Шагов маршрута нет."
                            IsVisible="False" />
-                    <VerticalStackLayout x:Name="UncoveredBlock" Spacing="2" IsVisible="False">
-                        <Label Text="Не хватает к отбору" FontAttributes="Bold"
-                               TextColor="{AppThemeBinding Light=#A12622, Dark=#FFB4AB}" />
-                        <Label x:Name="UncoveredLabel" FontSize="13" />
-                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
